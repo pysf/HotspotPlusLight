@@ -5,16 +5,16 @@ import (
 	"context"
 
 	"hotspotpluslight/internal/clock"
+	"hotspotpluslight/internal/domain"
 )
 
 type Repo interface {
 	CountOpenSessions(ctx context.Context) (int, error)
 }
 
-// Target identifies a session to disconnect (BR-18).
-type Target struct {
-	NASIP, Username, AcctSessionID, FramedIP, MAC string
-}
+// Target identifies a session to disconnect (BR-18). The type lives in domain
+// so that the member service can use it without importing this package.
+type Target = domain.SessionTarget
 
 // Disconnector sends a RADIUS Disconnect-Request (implemented in Phase 5 by internal/radius).
 type Disconnector interface {

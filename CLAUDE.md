@@ -83,7 +83,7 @@ Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **
 
 ## Current status
 - **Phases 0 and 1 are done and committed** (skeleton, migrations, first-boot seeding, two listeners, RADIUS Reject stub, e2e harness + fake router; admin login/sessions/CSRF, `admin set-password`, plan CRUD, settings, shared templ UI components). Commands: `make run`, `make test`, `make ci`. Notes: `docs/phase0-notes.md`, `docs/phase1-notes.md`. Open owner question (Q44): the RADIUS shared secret is rendered in the settings page HTML in a password input — keep, or never put it in the page source. The skipped test `TestE1_18_LimitsChangeAffectsNextAccessRequest` is filled in during Phase 3. Run the `code-review` skill from inside this repo (it reviews the repo it is started in).
-- Next step: **Phase 2 (members)**, following the phase workflow above.
+- **Phase 2 (members, admin) is done and committed** (review findings fixed). Notes: `docs/phase2-notes.md`. Owner approved (2026-11-01): strict 12-hex-digit MAC, mobile = ASCII digits then last 10, list status precedence expired > inactive > active; Q44 stays as is (secret in a masked input). E2.13's RADIUS half is skipped until Phase 3 (the verdict already comes from `domain.Evaluate`, which Phase 3 reuses). Next step: **Phase 3 (RADIUS authentication)**.
 
 ## Facts about the owner's environment
 - Deployment: a machine on the owner's local network; HTTP only is acceptable.

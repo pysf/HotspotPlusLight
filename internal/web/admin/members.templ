@@ -1,0 +1,266 @@
+package admin
+
+import (
+	"fmt"
+	"net/url"
+	"strconv"
+
+	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/member"
+	"hotspotpluslight/internal/web/ui"
+)
+
+type MembersProps struct {
+	Result member.ListResult
+	Filter domain.MemberFilter
+	Plans  []domain.Plan
+}
+
+func planFilterOptions(plans []domain.Plan, anyLabel string) []ui.Option {
+	o := []ui.Option{{Value: "", Label: anyLabel}}
+	for _, p := range plans {
+		o = append(o, ui.Option{Value: strconv.FormatInt(p.ID, 10), Label: p.Name})
+	}
+	return o
+}
+
+func planFilterValue(id int64) string {
+	if id == 0 {
+		return ""
+	}
+	return strconv.FormatInt(id, 10)
+}
+
+var statusOptions = []ui.Option{{Value: "", Label: "Any status"}, {Value: "active", Label: "Active"}, {Value: "inactive", Label: "Inactive"}, {Value: "expired", Label: "Expired"}}
+
+func pageSizeOptions() []ui.Option {
+	o := make([]ui.Option, len(domain.PageSizes))
+	for i, n := range domain.PageSizes {
+		o[i] = ui.Option{Value: strconv.Itoa(n), Label: strconv.Itoa(n) + " per page"}
+	}
+	return o
+}
+
+// emptySelectionGuard stops htmx from sending a delete request when nothing is ticked.
+const emptySelectionGuard = `if(!this.querySelector('input[name=id]:checked')&&!this.querySelector('input[name=all_results]:checked')){event.preventDefault();document.getElementById('bulk-result').innerHTML='<div class="flash error" role="alert">No member selected.</div>'}`
+
+const togglePage = `for(const c of document.querySelectorAll('#bulk-form input[name=id]')){c.checked=this.checked}`
+
+func bulkGuardAttrs() templ.Attributes {
+	return templ.Attributes{"hx-on::config-request": emptySelectionGuard}
+}
+
+func togglePageAttrs() templ.Attributes { return templ.Attributes{"onclick": togglePage} }
+
+templ MembersPage(l ui.LayoutData, p MembersProps) {
+	@ui.Layout(l) {
+		<h1>Members</h1>
+		<p><a class="btn primary" href="/admin/members/new">New member</a></p>
+		<form id="member-filter" class="filter" method="get" action="/admin/members">
+			@ui.Field(ui.FieldProps{Label: "Search", Name: "q", Value: p.Filter.Query})
+			@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan", Value: planFilterValue(p.Filter.PlanID), Options: planFilterOptions(p.Plans, "Any plan")})
+			@ui.Select(ui.SelectProps{Label: "Status", Name: "status", Value: p.Filter.Status, Options: statusOptions})
+			@ui.Select(ui.SelectProps{Label: "Page size", Name: "per", Value: strconv.Itoa(p.Result.Per), Options: pageSizeOptions()})
+			<button type="submit">Filter</button>
+		</form>
+		if p.Result.Total == 0 {
+			<p class="card">No members match.</p>
+		} else {
+			<form id="bulk-form" data-bulk-guard hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML" { bulkGuardAttrs()... }>
+				<input type="hidden" name="q" value={ p.Filter.Query }/>
+				<input type="hidden" name="plan" value={ planFilterValue(p.Filter.PlanID) }/>
+				<input type="hidden" name="status" value={ p.Filter.Status }/>
+				<div class="bulk-bar">
+					<label><input type="checkbox" { togglePageAttrs()... }/> Select all on this page</label>
+					<label data-select-all-results><input type="checkbox" name="all_results" value="1"/> Select all { strconv.Itoa(p.Result.Total) } results of this filter</label>
+					<button type="submit" class="danger">Delete selected</button>
+				</div>
+				<div id="bulk-result"></div>
+				@ui.Table([]string{"", "Username", "Name", "Mobile", "Plan", "Status", "Data", "Time", "Window ends", "Verdict", "MAC", "Online"}) {
+					for _, v := range p.Result.Rows {
+						@MemberRow(newVM(v))
+					}
+				}
+			</form>
+			@ui.Pagination(ui.PageProps{Page: p.Result.Page, Pages: p.Result.Pages, Href: listHref(p.Filter, p.Result.Per)})
+		}
+	}
+}
+
+// UsageCells are the data / time / window / verdict cells, shared by the list rows and the member page (BR-22).
+templ UsageCells(m memberVM) {
+	<td data-col="data">{ m.Data }</td>
+	<td data-col="time">{ m.Time }</td>
+	<td data-col="window-end">{ m.WindowEnd }</td>
+	<td data-col="verdict">{ m.VerdictText }</td>
+}
+
+templ MemberRow(m memberVM) {
+	<tr data-member data-id={ strconv.FormatInt(m.ID, 10) } data-username={ m.Username } data-status={ m.Status } data-verdict={ m.VerdictCode } data-online={ strconv.FormatBool(m.Online) }>
+		<td><input type="checkbox" name="id" value={ strconv.FormatInt(m.ID, 10) }/></td>
+		<td><a href={ templ.SafeURL(memberURL(m.ID)) }>{ m.Username }</a></td>
+		<td>{ m.Name }</td>
+		<td>{ m.Mobile }</td>
+		<td>{ m.PlanName }</td>
+		<td data-col="status"><span class={ "tag", m.Status }>{ m.Status }</span></td>
+		@UsageCells(m)
+		<td>{ m.MAC }</td>
+		<td data-col="online"><span class={ "dot", templ.KV("on", m.Online) } title={ onlineTitle(m.Online) }></span></td>
+	</tr>
+}
+
+func onlineTitle(on bool) string {
+	if on {
+		return "online"
+	}
+	return "offline"
+}
+
+templ MemberNewPage(l ui.LayoutData, p MemberFormProps) {
+	@ui.Layout(l) {
+		<h1>New member</h1>
+		if len(p.Plans) == 0 {
+			<p class="card">No plans exist yet. Create a plan first, then add members. <a href="/admin/plans/new">New plan</a></p>
+		} else {
+			@MemberFormView(p)
+		}
+	}
+}
+
+type MemberFormProps struct {
+	Form    domain.MemberForm
+	Errors  domain.FieldErrors
+	Plans   []domain.Plan
+	Create  bool
+	URL     string
+	Warning string // shown above the form (e.g. a failed kick)
+}
+
+func memberFormAttrs(p MemberFormProps) templ.Attributes {
+	a := templ.Attributes{"hx-target": "this", "hx-swap": "outerHTML"}
+	if p.Create {
+		a["hx-post"] = p.URL
+	} else {
+		a["hx-put"] = p.URL
+	}
+	return a
+}
+
+// MemberFormView is both the new and edit form and the 422 response body.
+templ MemberFormView(p MemberFormProps) {
+	<form id="member-form" class="card" { memberFormAttrs(p)... }>
+		if p.Warning != "" {
+			@ui.Flash("warn", p.Warning)
+		}
+		@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: p.Form.Username, Error: p.Errors["username"], Hint: "English letters and digits, up to 64. Case-insensitive. Empty = use the mobile number."})
+		if p.Create {
+			@ui.Field(ui.FieldProps{Label: "Password", Name: "password", Value: p.Form.Password, Error: p.Errors["password"], Hint: "Empty = a random 6-digit number.", Attrs: templ.Attributes{"autocomplete": "off"}})
+		}
+		@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan_id", Value: p.Form.PlanID, Options: planFilterOptions(p.Plans, "Choose a plan"), Error: p.Errors["plan_id"]})
+		@ui.Field(ui.FieldProps{Label: "First name", Name: "first_name", Value: p.Form.FirstName, Error: p.Errors["first_name"]})
+		@ui.Field(ui.FieldProps{Label: "Last name", Name: "last_name", Value: p.Form.LastName, Error: p.Errors["last_name"]})
+		@ui.Field(ui.FieldProps{Label: "Mobile", Name: "mobile", Value: p.Form.Mobile, Error: p.Errors["mobile"], Hint: "The last 10 digits are kept."})
+		@ui.Field(ui.FieldProps{Label: "Email", Name: "email", Value: p.Form.Email, Error: p.Errors["email"]})
+		@ui.Field(ui.FieldProps{Label: "National code", Name: "national_code", Value: p.Form.NationalCode, Error: p.Errors["national_code"]})
+		@ui.Field(ui.FieldProps{Label: "MAC address", Name: "mac", Value: p.Form.MAC, Error: p.Errors["mac"], Hint: "Optional. Filled in automatically from the first session."})
+		@ui.Field(ui.FieldProps{Label: "Expires at", Name: "expires_at", Type: "datetime-local", Value: p.Form.ExpiresAt, Error: p.Errors["expires_at"], Hint: "Optional. Logins after this moment are refused. Settings time zone."})
+		@ui.Checkbox(ui.CheckboxProps{Label: "Active", Name: "active", Checked: p.Form.Active, Hint: "Deactivating disconnects the member's open sessions."})
+		<div class="actions">
+			<button type="submit" class="primary">Save</button>
+			<a class="btn" href="/admin/members">Cancel</a>
+		</div>
+	</form>
+}
+
+templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
+	@ui.Layout(l) {
+		<h1>{ m.Username }</h1>
+		<div class="stack">
+			@ui.Table([]string{"Data", "Time", "Window ends", "Verdict"}) {
+				<tr data-summary data-verdict={ m.VerdictCode }>
+					@UsageCells(m)
+				</tr>
+			}
+			<p class="muted">
+				Plan { m.PlanName } · status { m.Status }
+				if m.Online {
+					· online
+				}
+			</p>
+			if m.RenewalText != "" {
+				<p data-renewal>{ m.RenewalText }</p>
+			}
+			@MemberFormView(p)
+			<div class="card">
+				<h2>Extra data</h2>
+				if m.UnlimitedData {
+					<p class="muted">This plan has unlimited data.</p>
+				} else {
+					<p>Current extra data: <strong data-extra-bulk>{ m.ExtraBulk }</strong></p>
+					@ExtraBulkFormView(ExtraBulkProps{URL: memberURL(m.ID) + "/extra-bulk", Value: m.ExtraBulkValue, Unit: m.PlanUnit})
+				}
+			</div>
+			<div class="card">
+				<h2>Password</h2>
+				<div id="password-view">
+					<button type="button" hx-get={ memberURL(m.ID) + "/password" } hx-target="#password-view" hx-swap="innerHTML">Reveal</button>
+				</div>
+				<form hx-put={ memberURL(m.ID) + "/password" } hx-target="#password-view" hx-swap="innerHTML">
+					@ui.Field(ui.FieldProps{Label: "New password", Name: "password", Attrs: templ.Attributes{"autocomplete": "off"}})
+					<button type="submit">Set password</button>
+				</form>
+			</div>
+			<div class="actions">
+				@ui.ConfirmAction("Renew now", "post", memberURL(m.ID)+"/renewals", "Restart this member's validity window? Used data, time and extra data are cleared.")
+				@ui.ConfirmDelete("Delete member", memberURL(m.ID), "Delete this member? Open sessions are disconnected first.")
+			</div>
+		</div>
+	}
+}
+
+type ExtraBulkProps struct {
+	URL, Value, Unit string
+	Errors           domain.FieldErrors
+}
+
+// ExtraBulkFormView sets (not adds) the extra data; it is also the 422 response body.
+templ ExtraBulkFormView(p ExtraBulkProps) {
+	<form id="extra-bulk-form" hx-put={ p.URL } hx-target="this" hx-swap="outerHTML">
+		@ui.FieldPair(ui.PairProps{Label: "Set extra data to", For: "value", Hint: "Replaces the current amount. 0 removes it. Decimals allowed.", Errors: []ui.NamedError{{Name: "value", Msg: p.Errors["value"]}, {Name: "unit", Msg: p.Errors["unit"]}}}) {
+			@ui.InputControl(ui.FieldProps{Name: "value", Value: p.Value, Error: p.Errors["value"]})
+			@ui.SelectControl(ui.SelectProps{Name: "unit", Value: p.Unit, Options: unitOptions(domain.BulkUnits), Error: p.Errors["unit"]})
+		}
+		<button type="submit">Save</button>
+	</form>
+}
+
+templ PasswordShown(pw string) {
+	<code data-password>{ pw }</code>
+}
+
+// BulkConfirm is the delete confirmation: it carries the selection and confirmed=1 back to the same route.
+templ BulkConfirm(st member.BulkStats, sel url.Values) {
+	<form id="bulk-confirm" class="card" hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML">
+		<p>
+			Delete <strong data-confirm-members>{ strconv.Itoa(st.Members) }</strong> members?
+			<strong data-confirm-online>{ strconv.Itoa(st.Online) }</strong> of them are online and will be disconnected first.
+		</p>
+		for _, id := range sel["id"] {
+			<input type="hidden" name="id" value={ id }/>
+		}
+		for _, name := range []string{"all_results", "q", "plan", "status"} {
+			<input type="hidden" name={ name } value={ sel.Get(name) }/>
+		}
+		<input type="hidden" name="confirmed" value="1"/>
+		<div class="actions">
+			<button type="submit" class="danger">Delete</button>
+			<button type="button" onclick="document.getElementById('bulk-result').innerHTML=''">Cancel</button>
+		</div>
+	</form>
+}
+
+// DeletedNotice reports a delete whose Disconnect-Requests partly failed (BR-18, BR-23).
+templ DeletedNotice(res member.DeleteResult) {
+	@ui.Flash("warn", fmt.Sprintf("Deleted %d members. %d of %d open sessions could not be disconnected.", res.Deleted, res.Kick.Failed, res.Kick.Attempted))
+	<p><a href="/admin/members">Back to members</a></p>
+}

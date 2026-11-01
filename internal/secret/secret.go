@@ -79,3 +79,15 @@ func (b *Box) VerifyKeyCheck(stored string) error {
 	}
 	return nil
 }
+
+// RandomDigits returns n random decimal digits (crypto/rand), e.g. a 6-digit member password (BR-14).
+func RandomDigits(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	for i := range b {
+		b[i] = '0' + b[i]%10 // 256 % 10 != 0: a negligible bias that does not matter for a short voucher PIN
+	}
+	return string(b), nil
+}

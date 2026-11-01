@@ -24,6 +24,7 @@ import (
 
 	"hotspotpluslight/internal/app"
 	"hotspotpluslight/internal/clock"
+	"hotspotpluslight/internal/session"
 )
 
 // Options configures one start. Zero value = fresh temp dir, fresh key.
@@ -34,6 +35,8 @@ type Options struct {
 	Env        map[string]string // extra HSP_* variables (without prefix)
 	Clock      clock.Clock
 	Migrations fs.FS
+	// Disconnector replaces the production Disconnect client (see FakeDisconnector).
+	Disconnector session.Disconnector
 }
 
 // Server is a started app plus what tests need to inspect it.
@@ -104,11 +107,12 @@ func TryStart(opts Options) (*Server, error) {
 	out := &SafeBuffer{}
 	ctx, cancel := context.WithCancel(context.Background())
 	a, err := app.New(ctx, app.Options{
-		Getenv:     func(k string) string { return env[k] },
-		Stdout:     out,
-		Logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Clock:      opts.Clock,
-		Migrations: opts.Migrations,
+		Getenv:       func(k string) string { return env[k] },
+		Stdout:       out,
+		Logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Clock:        opts.Clock,
+		Migrations:   opts.Migrations,
+		Disconnector: opts.Disconnector,
 	})
 	if err != nil {
 		cancel()

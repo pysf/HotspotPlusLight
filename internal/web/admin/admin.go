@@ -17,6 +17,7 @@ import (
 
 	"hotspotpluslight/internal/auth"
 	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/member"
 	"hotspotpluslight/internal/plan"
 	"hotspotpluslight/internal/web/static"
 	"hotspotpluslight/internal/web/ui"
@@ -39,6 +40,21 @@ type PlanService interface {
 	Delete(ctx context.Context, id int64) error
 }
 
+type MemberService interface {
+	NewForm(ctx context.Context) (domain.MemberForm, error)
+	Create(ctx context.Context, f domain.MemberForm) (int64, domain.FieldErrors, error)
+	Get(ctx context.Context, id int64) (member.View, error)
+	Update(ctx context.Context, id int64, f domain.MemberForm) (domain.FieldErrors, member.KickResult, error)
+	Renew(ctx context.Context, id int64) error
+	SetExtraBulk(ctx context.Context, id int64, value, unit string) (domain.FieldErrors, error)
+	RevealPassword(ctx context.Context, id int64) (string, error)
+	SetPassword(ctx context.Context, id int64, password string) (string, error)
+	List(ctx context.Context, q member.ListQuery) (member.ListResult, error)
+	Stats(ctx context.Context, sel domain.MemberSelection) (member.BulkStats, error)
+	Delete(ctx context.Context, sel domain.MemberSelection) (member.DeleteResult, error)
+	DeleteOne(ctx context.Context, id int64) (member.DeleteResult, error)
+}
+
 type SettingsService interface {
 	Get(ctx context.Context) (domain.Settings, error)
 	Update(ctx context.Context, f domain.SettingsForm) (domain.FieldErrors, error)
@@ -47,6 +63,7 @@ type SettingsService interface {
 type Deps struct {
 	Auth     AuthService
 	Plans    PlanService
+	Members  MemberService
 	Settings SettingsService
 	Log      *slog.Logger
 }
@@ -70,7 +87,22 @@ func Handler(d Deps) http.Handler {
 			r.Use(h.requireSession, h.requireCSRF)
 			r.Get("/", redirect("/admin/members"))
 			r.Post("/logout", h.logout)
-			r.Get("/members", h.members)
+			r.Route("/members", func(r chi.Router) {
+				r.Get("/", h.members)
+				r.Post("/", h.memberCreate)
+				r.Get("/new", h.memberNew)
+				r.Post("/bulk-delete", h.memberBulkDelete)
+				// Digits only: "/members/delete" and friends are plain 404s, not 405s.
+				r.Route("/{id:[0-9]+}", func(r chi.Router) {
+					r.Get("/", h.memberPage)
+					r.Put("/", h.memberUpdate)
+					r.Delete("/", h.memberDelete)
+					r.Post("/renewals", h.memberRenew)
+					r.Put("/extra-bulk", h.memberExtraBulk)
+					r.Get("/password", h.passwordReveal)
+					r.Put("/password", h.passwordSet)
+				})
+			})
 			r.Route("/plans", func(r chi.Router) {
 				r.Get("/", h.plansList)
 				r.Post("/", h.planCreate)
@@ -211,9 +243,4 @@ func (h handlers) logout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode})
 	htmxRedirect(w, r, http.StatusOK, "/admin/login")
-}
-
-// members is a placeholder landing page until Phase 2.
-func (h handlers) members(w http.ResponseWriter, r *http.Request) {
-	h.render(w, r, http.StatusOK, MembersPage(layout(r, "Members", "/admin/members")))
 }

@@ -2,6 +2,8 @@
 // page: layout, flash, form fields, table, confirm button, error fragment.
 package ui
 
+import "strconv"
+
 type NavItem struct{ Label, Href string }
 
 // LayoutData configures the page shell. An empty CSRF means "not logged in":
@@ -198,4 +200,43 @@ templ Table(headers []string) {
 // a 409 body is swapped into #flash, a success answers HX-Redirect.
 templ ConfirmDelete(label, url, confirm string) {
 	<button type="button" class="danger" hx-delete={ url } hx-confirm={ confirm } hx-target="#flash" hx-swap="innerHTML">{ label }</button>
+}
+
+// ConfirmAction is a button that asks for confirmation, then sends method (post|put|delete) to url.
+// Responses are swapped into #flash (errors and conflicts); a success answers HX-Redirect.
+templ ConfirmAction(label, method, url, confirm string) {
+	<button type="button" { confirmAttrs(method, url, confirm)... }>{ label }</button>
+}
+
+func confirmAttrs(method, url, confirm string) templ.Attributes {
+	return templ.Attributes{"hx-" + method: url, "hx-confirm": confirm, "hx-target": "#flash", "hx-swap": "innerHTML"}
+}
+
+// PageProps describes a paginated list: the current page, the page count and a
+// function that builds the link of any page (so filters survive paging).
+type PageProps struct {
+	Page, Pages int
+	Href        func(page int) string
+}
+
+// pageNumbers lists the pages to link: the first, the last and two either side of the current one.
+func pageNumbers(page, pages int) []int {
+	var out []int
+	for n := 1; n <= pages; n++ {
+		if n == 1 || n == pages || (n >= page-2 && n <= page+2) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// Pagination renders the page links; nothing for a single page.
+templ Pagination(p PageProps) {
+	if p.Pages > 1 {
+		<nav class="pagination" aria-label="Pages">
+			for _, n := range pageNumbers(p.Page, p.Pages) {
+				<a data-page={ strconv.Itoa(n) } href={ templ.SafeURL(p.Href(n)) } class={ templ.KV("active", n == p.Page) } aria-current?={ n == p.Page }>{ strconv.Itoa(n) }</a>
+			}
+		</nav>
+	}
 }

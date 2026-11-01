@@ -210,9 +210,9 @@ Use these as the spec; each is exercised by named E2E tests (§10). Legacy refer
 
 **BR-1 Username** — trim; only `A–Z a–z 0–9`, 1–64 characters, unique **case-insensitively** (O13); anything else is rejected (no digit conversion). Legacy: `Member.createUsername/extractUsername`, `before save` hook.
 
-**BR-2 Mobile** (optional field) — strip whitespace; keep the **last 10 digits**; fewer than 10 → validation error. Legacy: `utility.verifyAndTrimMobile`.
+**BR-2 Mobile** (optional field) — keep only ASCII digits (spaces, `+`, `-` dropped), then the **last 10 digits**; fewer than 10 digits → validation error (Phase 2, 2026-11-01). Legacy: `utility.verifyAndTrimMobile`.
 
-**BR-3 MAC** — normalize to lower-case hex without `-`, `:`, `.`. Legacy: `utility.trimMac` (+ lower-casing in `loadProfile`).
+**BR-3 MAC** — normalize to lower-case hex without `-`, `:`, `.`; the result must be exactly 12 hex digits, else validation error (Phase 2 addition: legacy did not validate; empty stays allowed). Legacy: `utility.trimMac` (+ lower-casing in `loadProfile`).
 
 **BR-4 Units** — speed → kbps: Kbps×1, Mbps×1000, Gbps×1,000,000. Bulk → bytes: KB×1024, MB×1024², GB×1024³. Values may be decimal. Legacy: `utility.toKbps/toByte`.
 
@@ -488,7 +488,7 @@ There is **no** server-rendered member page, cookie, language switch, plan list,
 | `PUT /admin/members/{id}/extra-bulk` | **Sets** `extra_bulk_bytes` to the entered amount (unit KB/MB/GB, decimal allowed, ≥ 0; `0` clears it) — owner 2026-11-01, Q17. Refused (`409`) with "This plan has unlimited data" when the member's plan has unlimited data (bulk 0). The member page shows the current value in the same units as the plan. |
 | `GET /admin/members/{id}/password`, `PUT /admin/members/{id}/password` | htmx reveal (decrypted) / set a new member password. |
 | `POST /admin/members/{id}/disconnections` | Disconnect all open sessions of the member (BR-18). |
-| `POST /admin/members/bulk-delete` | Bulk delete from the member list: checkboxes + "select all on this page" + one **Delete selected** button (legacy grid parity, owner 2026-11-01, Q26); body = ids, or the filter (`q`, `plan`, `status`) for "Select all N results" (Q29: re-evaluated inside the delete transaction); confirmation shows the member count and how many are online; open sessions are kicked first (best effort, E5.08), then members and their session rows are removed in one transaction. |
+| `POST /admin/members/bulk-delete` | (Phase 2: two steps on this one route — without `confirmed=1` it answers the confirmation fragment with the counts; with `confirmed=1` it deletes. Nothing ticked ⇒ `422` "No member selected", plus a client-side guard so no request is sent. `/admin/members/{id}` matches digits only, so `/admin/members/delete` is a plain 404.) Bulk delete from the member list: checkboxes + "select all on this page" + one **Delete selected** button (legacy grid parity, owner 2026-11-01, Q26); body = ids, or the filter (`q`, `plan`, `status`) for "Select all N results" (Q29: re-evaluated inside the delete transaction); confirmation shows the member count and how many are online; open sessions are kicked first (best effort, E5.08), then members and their session rows are removed in one transaction. |
 | `GET /admin/batches`, `GET /admin/batches/new`, `POST /admin/batches` | BR-15. The batch list shows per batch: label, plan, created date, member count, unused count (members with all usage counters 0 and no session row), and a **Reprint** button. |
 | `GET /admin/batches/{id}/vouchers`, `PUT /admin/batches/{id}`, `DELETE /admin/batches/{id}` | Print (or reprint) the batch's vouchers (BR-16, decrypted passwords read at print time); rename the label; delete the batch with its members (BR-23, Q25). |
 | `GET /admin/members/{id}/voucher` | **Print voucher** for a single member: the same template as BR-16 with one voucher (Q24); button on the member page. Works for any member, batch or not. |

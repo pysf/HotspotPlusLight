@@ -42,3 +42,15 @@ func TestParseKey(t *testing.T) {
 		}
 	}
 }
+
+func TestRandomDigits(t *testing.T) {
+	a, err := RandomDigits(6)
+	if err != nil || len(a) != 6 {
+		t.Fatalf("%q %v", a, err)
+	}
+	for _, r := range a {
+		if r < '0' || r > '9' {
+			t.Fatalf("non-digit in %q", a)
+		}
+	}
+}

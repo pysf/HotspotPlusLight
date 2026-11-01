@@ -39,5 +39,9 @@ func BulkBytes(value float64, unit string) (int64, error) {
 	default:
 		return 0, fmt.Errorf("unknown bulk unit %q", unit)
 	}
-	return int64(math.Round(value * f)), nil
+	r := math.Round(value * f)
+	if r >= math.MaxInt64 { // saturate instead of overflowing
+		return math.MaxInt64, nil
+	}
+	return int64(r), nil
 }

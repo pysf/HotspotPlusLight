@@ -69,6 +69,17 @@ func (p *parser) decimal(field, raw string, max float64) float64 {
 	return 0
 }
 
+// MaxBulkBytes caps a data amount entered in any unit (1 PiB), so the byte
+// conversion and base+extra sums stay far from int64 overflow.
+const MaxBulkBytes = int64(1) << 50
+
+// bulkCap adds a field error when value in unit exceeds MaxBulkBytes.
+func (p *parser) bulkCap(field string, value float64, unit string) {
+	if b, err := BulkBytes(value, unit); err == nil && b > MaxBulkBytes {
+		p.errs.add(field, fmt.Sprintf("Too large: the limit is %d GB.", MaxBulkBytes>>30))
+	}
+}
+
 func (p *parser) oneOf(field, raw string, allowed []string) string {
 	for _, a := range allowed {
 		if raw == a {

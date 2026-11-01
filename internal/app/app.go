@@ -39,6 +39,9 @@ type Options struct {
 	Logger     *slog.Logger        // default text logger on stderr at HSP_LOG_LEVEL
 	Clock      clock.Clock         // default real clock
 	Migrations fs.FS               // default embedded migrations (tests inject others)
+	// Disconnector sends RADIUS Disconnect-Requests (BR-18). Default: a no-op until
+	// Phase 5 provides the real CoA client; tests inject a recording fake.
+	Disconnector session.Disconnector
 }
 
 // Addrs are the bound listener addresses (useful when configured with port 0).
@@ -134,19 +137,31 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		}
 	}
 
+	disc := opts.Disconnector
+	if disc == nil {
+		disc = noopDisconnector{}
+	}
 	a.svc = services{
 		auth:     auth.New(st, opts.Clock),
-		member:   member.New(st),
+		member:   member.New(st, box, disc, opts.Clock),
 		plan:     plan.New(st, opts.Clock),
 		settings: settings.New(st, opts.Clock),
-		session:  session.New(st, nil /* Disconnector: Phase 5 */, opts.Clock),
+		session:  session.New(st, disc, opts.Clock),
 		voucher:  voucher.New(opts.Clock),
 	}
 	a.radius = radius.New(st, log)
 	a.httpSrv = &http.Server{Handler: pageapi.Handler(), ReadHeaderTimeout: 10 * time.Second}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Settings: a.svc.settings, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Settings: a.svc.settings, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
+
+// noopDisconnector is the production Disconnector until Phase 5 adds the real
+// RADIUS Disconnect client. It reports success without contacting the router.
+// MONITOR: until then, deleting or deactivating a member does not end their
+// router session.
+type noopDisconnector struct{}
+
+func (noopDisconnector) Disconnect(context.Context, domain.SessionTarget) error { return nil }
 
 // seed performs first-boot seeding (O15, BR-21) and prints the generated admin
 // password exactly once.

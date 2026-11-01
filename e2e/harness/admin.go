@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -223,8 +224,40 @@ func FormValues(t *testing.T, d *goquery.Document, sel string) url.Values {
 				return
 			}
 			val, _ := s.Attr("value")
-			v.Set(name, val)
+			if typ == "hidden" {
+				v.Add(name, val) // hidden fields may repeat (e.g. a list of ids)
+			} else {
+				v.Set(name, val)
+			}
 		}
 	})
 	return v
+}
+
+// MemberForm returns valid member form values for the given plan; override
+// entries as needed ("-" deletes a key).
+func MemberForm(planID int64, username string, override ...string) url.Values {
+	v := url.Values{"username": {username}, "plan_id": {strconv.FormatInt(planID, 10)}, "active": {"on"}}
+	for i := 0; i+1 < len(override); i += 2 {
+		if override[i+1] == "-" {
+			v.Del(override[i])
+		} else {
+			v.Set(override[i], override[i+1])
+		}
+	}
+	return v
+}
+
+// CreateMember creates a member through the admin UI and returns its id.
+func (c *AdminClient) CreateMember(form url.Values) int64 {
+	c.t.Helper()
+	r := c.Send("POST", "/admin/members", form)
+	if r.StatusCode != http.StatusCreated {
+		c.t.Fatalf("create member: %d %s", r.StatusCode, r.Body)
+	}
+	id, err := strconv.ParseInt(strings.TrimPrefix(r.Header.Get("Location"), "/admin/members/"), 10, 64)
+	if err != nil {
+		c.t.Fatalf("create member: Location %q", r.Header.Get("Location"))
+	}
+	return id
 }

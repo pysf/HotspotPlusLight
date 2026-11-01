@@ -46,5 +46,6 @@ func ParsePlan(f PlanForm) (Plan, FieldErrors) {
 		MaxSessions:      p.integer("max_sessions", f.MaxSessions, 1, 1000),
 		AutoResubscribe:  f.AutoResubscribe,
 	}
+	p.bulkCap("bulk_value", plan.BulkValue, plan.BulkUnit)
 	return plan, p.errs
 }

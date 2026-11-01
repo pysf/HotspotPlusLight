@@ -24,14 +24,6 @@ templ LoginPage(username, errMsg string) {
 	}
 }
 
-// MembersPage is a placeholder: the member pages arrive in Phase 2.
-templ MembersPage(l ui.LayoutData) {
-	@ui.Layout(l) {
-		<h1>Members</h1>
-		<p class="card">Member management is not available yet.</p>
-	}
-}
-
 func num(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
 
 func limit(v float64, unit string) string {
