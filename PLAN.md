@@ -524,7 +524,7 @@ HotspotPlusLight/
   internal/radius/             UDP server, handlers, MikroTik attrs, CoA client, message catalog — calls the services
   internal/web/pageapi/        JSON API v1 + CORS + throttling — calls auth/member services
   internal/web/admin/          handlers + templ components (reusable: layout, table, pagination, filter bar, form field, confirm dialog, flash)
-  internal/web/static/         htmx (vendored, pinned), css, router pack sources (shared layout template, router pages, 38 theme manifests + backgrounds + logos, `go:embed`)
+  internal/web/static/         htmx and Bootstrap 5.3.8 CSS only (vendored, pinned; D24, 2026-11-01, `docs/ui-notes.md`), app.css overrides, router pack sources (shared layout template, router pages, 38 theme manifests + backgrounds + logos, `go:embed`)
   e2e/                         black-box tests, harness, fake router
   docs/
 ```

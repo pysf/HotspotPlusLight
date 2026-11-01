@@ -36,20 +36,27 @@ templ Layout(d LayoutData) {
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<meta name="htmx-config" content={ htmxConfig }/>
 			<title>{ d.Title } - HotspotPlusLight</title>
+			<link rel="stylesheet" href="/admin/static/bootstrap.min.css"/>
 			<link rel="stylesheet" href="/admin/static/app.css"/>
 			<script src="/admin/static/htmx.min.js" defer></script>
 		</head>
-		<body { bodyAttrs(d)... }>
-			<header class="top">
-				<span class="brand">HotspotPlusLight</span>
-				for _, n := range d.Nav {
-					<a href={ templ.SafeURL(n.Href) } class={ templ.KV("active", n.Href == d.Active) }>{ n.Label }</a>
-				}
-				if d.LogoutURL != "" {
-					<button type="button" hx-post={ d.LogoutURL }>Log out</button>
-				}
-			</header>
-			<main>
+		<body class="bg-body-tertiary" { bodyAttrs(d)... }>
+			<nav class="navbar bg-body border-bottom">
+				<div class="container">
+					<span class="navbar-brand">HotspotPlusLight</span>
+					<ul class="navbar-nav flex-row flex-wrap me-auto gap-2">
+						for _, n := range d.Nav {
+							<li class="nav-item">
+								<a href={ templ.SafeURL(n.Href) } class={ "nav-link", templ.KV("active", n.Href == d.Active) } aria-current?={ n.Href == d.Active }>{ n.Label }</a>
+							</li>
+						}
+					</ul>
+					if d.LogoutURL != "" {
+						<button type="button" class="btn btn-outline-secondary btn-sm" hx-post={ d.LogoutURL }>Log out</button>
+					}
+				</div>
+			</nav>
+			<main class="container py-4">
 				<div id="flash" aria-live="polite"></div>
 				{ children... }
 			</main>
@@ -59,17 +66,27 @@ templ Layout(d LayoutData) {
 
 // Flash is a message box; kind is "ok", "warn" or "error".
 templ Flash(kind, msg string) {
-	<div class={ "flash", kind }>{ msg }</div>
+	<div class={ "alert", alertClass(kind) }>{ msg }</div>
+}
+
+func alertClass(kind string) string {
+	switch kind {
+	case "ok":
+		return "alert-success"
+	case "warn":
+		return "alert-warning"
+	}
+	return "alert-danger"
 }
 
 // ErrorFragment is the body of a 4xx htmx response that is swapped into #flash.
 templ ErrorFragment(msg string) {
-	<div class="flash error" role="alert">{ msg }</div>
+	<div class="alert alert-danger" role="alert">{ msg }</div>
 }
 
 templ FieldError(name, msg string) {
 	if msg != "" {
-		<p class="field-error" data-error-for={ name }>{ msg }</p>
+		<div class="invalid-feedback d-block" data-error-for={ name }>{ msg }</div>
 	}
 }
 
@@ -87,8 +104,8 @@ func inputType(t string) string {
 
 // Field is a labelled text-like input with its hint and error message.
 templ Field(p FieldProps) {
-	<div class="field">
-		<label for={ p.Name }>{ p.Label }</label>
+	<div class="field mb-3">
+		<label class="form-label" for={ p.Name }>{ p.Label }</label>
 		@InputControl(p)
 		@FieldHint(p.Hint)
 		@FieldError(p.Name, p.Error)
@@ -97,7 +114,7 @@ templ Field(p FieldProps) {
 
 // InputControl is the bare <input>, reused inside composite fields.
 templ InputControl(p FieldProps) {
-	<input id={ p.Name } name={ p.Name } type={ inputType(p.Type) } value={ p.Value } aria-invalid?={ p.Error != "" } { p.Attrs... }/>
+	<input id={ p.Name } name={ p.Name } type={ inputType(p.Type) } value={ p.Value } class={ "form-control", templ.KV("is-invalid", p.Error != "") } aria-invalid?={ p.Error != "" } { p.Attrs... }/>
 }
 
 // NamedError is the error message of one control inside a composite field.
@@ -111,9 +128,9 @@ type PairProps struct {
 // FieldPair is a labelled field holding two controls side by side (the
 // children), with one hint and the errors of each control.
 templ FieldPair(p PairProps) {
-	<div class="field">
-		<label for={ p.For }>{ p.Label }</label>
-		<div class="pair">
+	<div class="field mb-3">
+		<label class="form-label" for={ p.For }>{ p.Label }</label>
+		<div class="input-group">
 			{ children... }
 		</div>
 		@FieldHint(p.Hint)
@@ -125,7 +142,7 @@ templ FieldPair(p PairProps) {
 
 templ FieldHint(h string) {
 	if h != "" {
-		<small class="hint">{ h }</small>
+		<div class="form-text">{ h }</div>
 	}
 }
 
@@ -137,8 +154,8 @@ type SelectProps struct {
 }
 
 templ Select(p SelectProps) {
-	<div class="field">
-		<label for={ p.Name }>{ p.Label }</label>
+	<div class="field mb-3">
+		<label class="form-label" for={ p.Name }>{ p.Label }</label>
 		@SelectControl(p)
 		@FieldHint(p.Hint)
 		@FieldError(p.Name, p.Error)
@@ -147,7 +164,7 @@ templ Select(p SelectProps) {
 
 // SelectControl is the bare <select>, reused inside composite fields.
 templ SelectControl(p SelectProps) {
-	<select id={ p.Name } name={ p.Name } aria-invalid?={ p.Error != "" }>
+	<select id={ p.Name } name={ p.Name } class={ "form-select", templ.KV("is-invalid", p.Error != "") } aria-invalid?={ p.Error != "" }>
 		for _, o := range p.Options {
 			<option value={ o.Value } selected?={ o.Value == p.Value }>{ o.Label }</option>
 		}
@@ -157,9 +174,9 @@ templ SelectControl(p SelectProps) {
 type TextareaProps struct{ Label, Name, Value, Error, Hint string }
 
 templ Textarea(p TextareaProps) {
-	<div class="field">
-		<label for={ p.Name }>{ p.Label }</label>
-		<textarea id={ p.Name } name={ p.Name } aria-invalid?={ p.Error != "" }>{ p.Value }</textarea>
+	<div class="field mb-3">
+		<label class="form-label" for={ p.Name }>{ p.Label }</label>
+		<textarea id={ p.Name } name={ p.Name } rows="4" class={ "form-control", templ.KV("is-invalid", p.Error != "") } aria-invalid?={ p.Error != "" }>{ p.Value }</textarea>
 		@FieldHint(p.Hint)
 		@FieldError(p.Name, p.Error)
 	</div>
@@ -171,41 +188,43 @@ type CheckboxProps struct {
 }
 
 templ Checkbox(p CheckboxProps) {
-	<div class="field">
-		<label>
-			<input type="checkbox" name={ p.Name } value="on" checked?={ p.Checked }/>
-			{ p.Label }
-		</label>
+	<div class="field mb-3">
+		<div class="form-check">
+			<input class="form-check-input" type="checkbox" id={ "f-" + p.Name } name={ p.Name } value="on" checked?={ p.Checked }/>
+			<label class="form-check-label" for={ "f-" + p.Name }>{ p.Label }</label>
+		</div>
 		@FieldHint(p.Hint)
 	</div>
 }
 
 // Table renders the header row and wraps the <tr> children in a body.
 templ Table(headers []string) {
-	<table>
-		<thead>
-			<tr>
-				for _, h := range headers {
-					<th>{ h }</th>
-				}
-			</tr>
-		</thead>
-		<tbody>
-			{ children... }
-		</tbody>
-	</table>
+	<div class="table-responsive">
+		<table class="table table-sm table-hover align-middle bg-body border">
+			<thead>
+				<tr>
+					for _, h := range headers {
+						<th>{ h }</th>
+					}
+				</tr>
+			</thead>
+			<tbody>
+				{ children... }
+			</tbody>
+		</table>
+	</div>
 }
 
 // ConfirmDelete is a button that asks for confirmation, then sends DELETE;
 // a 409 body is swapped into #flash, a success answers HX-Redirect.
 templ ConfirmDelete(label, url, confirm string) {
-	<button type="button" class="danger" hx-delete={ url } hx-confirm={ confirm } hx-target="#flash" hx-swap="innerHTML">{ label }</button>
+	<button type="button" class="btn btn-outline-danger" hx-delete={ url } hx-confirm={ confirm } hx-target="#flash" hx-swap="innerHTML">{ label }</button>
 }
 
 // ConfirmAction is a button that asks for confirmation, then sends method (post|put|delete) to url.
 // Responses are swapped into #flash (errors and conflicts); a success answers HX-Redirect.
 templ ConfirmAction(label, method, url, confirm string) {
-	<button type="button" { confirmAttrs(method, url, confirm)... }>{ label }</button>
+	<button type="button" class="btn btn-outline-secondary" { confirmAttrs(method, url, confirm)... }>{ label }</button>
 }
 
 func confirmAttrs(method, url, confirm string) templ.Attributes {
@@ -233,10 +252,14 @@ func pageNumbers(page, pages int) []int {
 // Pagination renders the page links; nothing for a single page.
 templ Pagination(p PageProps) {
 	if p.Pages > 1 {
-		<nav class="pagination" aria-label="Pages">
-			for _, n := range pageNumbers(p.Page, p.Pages) {
-				<a data-page={ strconv.Itoa(n) } href={ templ.SafeURL(p.Href(n)) } class={ templ.KV("active", n == p.Page) } aria-current?={ n == p.Page }>{ strconv.Itoa(n) }</a>
-			}
+		<nav aria-label="Pages">
+			<ul class="pagination flex-wrap">
+				for _, n := range pageNumbers(p.Page, p.Pages) {
+					<li class={ "page-item", templ.KV("active", n == p.Page) }>
+						<a data-page={ strconv.Itoa(n) } href={ templ.SafeURL(p.Href(n)) } class="page-link" aria-current?={ n == p.Page }>{ strconv.Itoa(n) }</a>
+					</li>
+				}
+			</ul>
 		</nav>
 	}
 }

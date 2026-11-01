@@ -449,10 +449,10 @@ func TestE2_09_SearchAndPaging(t *testing.T) {
 		t.Fatal("a page past the end must clamp to the last page")
 	}
 	d := list("per=10")
-	if d.Find("nav.pagination a[data-page]").Length() < 2 {
+	if d.Find("ul.pagination a[data-page]").Length() < 2 {
 		t.Fatal("no pagination links")
 	}
-	if href := d.Find(`nav.pagination a[data-page="2"]`).AttrOr("href", ""); !strings.Contains(href, "per=10") || !strings.Contains(href, "page=2") {
+	if href := d.Find(`ul.pagination a[data-page="2"]`).AttrOr("href", ""); !strings.Contains(href, "per=10") || !strings.Contains(href, "page=2") {
 		t.Fatalf("pagination link loses the page size: %q", href)
 	}
 	for q, want := range map[string]string{"user07": "user07", "Zoe": "user03", "quinn": "user03", "9876543210": "user04", "USER1": "user1"} {
