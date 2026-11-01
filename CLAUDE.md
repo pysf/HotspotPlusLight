@@ -75,6 +75,9 @@ The legacy usage data lived in ClickHouse (`Session` = per-packet **delta** rows
 7. **Legacy-faithful enforcement gap.** No automatic disconnect on expiry/quota exhaustion (O3/O4). Mark the spots with a `MONITOR:` comment (Session-Timeout/Xmit-Limit calculation, interim handler) explaining the gap, so it can be revisited.
 8. **Do not guess RouterOS/RADIUS vendor details.** The MikroTik attribute ids, the CoA attribute set, and `login-by` behaviour must be verified (`PLAN.md` §13). Mark anything unverified in code comments with `VERIFY-ON-HARDWARE`.
 
+## Phase workflow (owner, 2026-11-01)
+Each phase is done by its own agent: tests first (E2E ids from `PLAN.md` §11), implement until green, **do not commit**. Then the orchestrator: (1) re-runs `gofmt -l .`, `go vet ./...`, `go test -race -count=1 ./...`; (2) runs the `code-review` skill on the uncommitted changes and fixes real findings (re-running tests); (3) commits with a `Phase N: …` message; (4) only then starts the next phase.
+
 ## Conventions (decided by the owner, `PLAN.md` O1)
 Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **templ** components, vendored pinned htmx, `modernc.org/sqlite` (no CGO), `layeh.com/radius`, `bcrypt`, `httptest` + `goquery` in tests, `log/slog`. Timestamps are Unix seconds UTC; display in `settings.timezone`. Env vars are prefixed `HSP_` (see `PLAN.md` §9.2). Layout in `PLAN.md` §9.1.
 
