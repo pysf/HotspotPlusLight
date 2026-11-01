@@ -81,28 +81,10 @@ func (s *Store) RadiusSecret(ctx context.Context) (string, error) {
 func (s *Store) GetAdmin(ctx context.Context) (domain.Admin, error) {
 	var a domain.Admin
 	err := s.db.QueryRowContext(ctx, `SELECT username, password_hash FROM admin WHERE id=1`).Scan(&a.Username, &a.PasswordHash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return a, domain.ErrNotFound
+	}
 	return a, err
-}
-
-func (s *Store) ListPlans(ctx context.Context) ([]domain.Plan, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, name, duration_days, speed_value, speed_unit, bulk_value, bulk_unit,
-		time_limit_minutes, max_sessions, auto_resubscribe FROM plan ORDER BY id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []domain.Plan
-	for rows.Next() {
-		var p domain.Plan
-		var auto int
-		if err := rows.Scan(&p.ID, &p.Name, &p.DurationDays, &p.SpeedValue, &p.SpeedUnit, &p.BulkValue, &p.BulkUnit,
-			&p.TimeLimitMinutes, &p.MaxSessions, &auto); err != nil {
-			return nil, err
-		}
-		p.AutoResubscribe = auto != 0
-		out = append(out, p)
-	}
-	return out, rows.Err()
 }
 
 func (s *Store) CountMembers(ctx context.Context) (int, error) {

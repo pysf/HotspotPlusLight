@@ -1,4 +1,4 @@
-.PHONY: build run vet test ci clean
+.PHONY: build run vet test ci clean generate
 
 # Key used by `make run` when HSP_SECRET_KEY is not set. Created once, kept out of git.
 DEV_KEY_FILE := .dev-secret-key
@@ -22,3 +22,7 @@ ci: vet test
 
 clean:
 	rm -rf bin
+
+# Regenerate the templ components (the generated *_templ.go files are committed).
+generate:
+	go run github.com/a-h/templ/cmd/templ@v0.3.1100 generate

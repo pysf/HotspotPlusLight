@@ -86,14 +86,15 @@ func TestE0_02_SecondBootKeepsData(t *testing.T) {
 	}
 }
 
-// E0.03 /healthz on the public listener; admin placeholder answers 404.
+// E0.03 /healthz on the public listener; the admin listener serves nothing outside /admin
+// ("/admin" itself is Phase 1: E1.03).
 func TestE0_03_Healthz(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	resp, body := harness.Get(t, "http://"+s.Addrs.HTTP+"/healthz")
 	if resp.StatusCode != 200 || strings.TrimSpace(body) != "ok" {
 		t.Fatalf("healthz: %d %q", resp.StatusCode, body)
 	}
-	for _, p := range []string{"/", "/healthz", "/admin"} {
+	for _, p := range []string{"/", "/healthz"} {
 		if r, _ := harness.Get(t, "http://"+s.Addrs.Admin+p); r.StatusCode != 404 {
 			t.Errorf("admin %s: %d", p, r.StatusCode)
 		}
@@ -287,7 +288,7 @@ func TestE0_10_Layering(t *testing.T) {
 			}
 		}
 	}
-	for _, svc := range []string{"auth", "member", "plan", "session", "voucher"} {
+	for _, svc := range []string{"auth", "member", "plan", "session", "settings", "voucher"} {
 		forbid("internal/"+svc, "internal/web", "internal/radius", "internal/store")
 	}
 	forbid("internal/radius", "internal/store")

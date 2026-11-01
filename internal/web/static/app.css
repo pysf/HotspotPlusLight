@@ -1,0 +1,32 @@
+:root { --fg:#1b1f24; --muted:#59636e; --bg:#f6f8fa; --card:#fff; --line:#d0d7de; --accent:#0969da; --danger:#cf222e; --warn:#9a6700; --ok:#1a7f37; }
+* { box-sizing: border-box; }
+body { margin:0; font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--fg); background:var(--bg); }
+header.top { display:flex; align-items:center; gap:1rem; padding:.6rem 1rem; background:var(--card); border-bottom:1px solid var(--line); }
+header.top .brand { font-weight:600; margin-right:auto; }
+header.top a { color:var(--fg); text-decoration:none; padding:.2rem .5rem; border-radius:6px; }
+header.top a.active { background:var(--bg); font-weight:600; }
+main { max-width:60rem; margin:1.5rem auto; padding:0 1rem; }
+h1 { font-size:1.4rem; margin:.2rem 0 1rem; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:1rem 1.25rem; }
+.field { margin-bottom:.9rem; }
+.field label { display:block; font-weight:600; margin-bottom:.2rem; }
+.field input:not([type=checkbox]), .field select, .field textarea { width:100%; max-width:26rem; padding:.4rem .5rem; border:1px solid var(--line); border-radius:6px; font:inherit; }
+.field textarea { max-width:40rem; min-height:5rem; }
+.field input[aria-invalid], .field select[aria-invalid] { border-color:var(--danger); }
+.field .pair { display:flex; gap:.5rem; max-width:26rem; }
+.field .pair input { flex:1; } .field .pair select { width:7rem; }
+.hint { display:block; color:var(--muted); font-size:.85rem; }
+.field-error { color:var(--danger); margin:.2rem 0 0; font-size:.9rem; }
+.flash { padding:.6rem .8rem; border-radius:6px; margin:0 0 1rem; border:1px solid var(--line); background:var(--card); }
+.flash.error { border-color:var(--danger); color:var(--danger); }
+.flash.warn { border-color:var(--warn); color:var(--warn); }
+.flash.ok { border-color:var(--ok); color:var(--ok); }
+table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:8px; }
+th, td { text-align:left; padding:.5rem .7rem; border-bottom:1px solid var(--line); }
+th { color:var(--muted); font-weight:600; font-size:.85rem; }
+.btn, button { display:inline-block; padding:.4rem .9rem; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--fg); font:inherit; cursor:pointer; text-decoration:none; }
+.btn.primary, button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+button.danger { color:var(--danger); border-color:var(--danger); }
+.actions { display:flex; gap:.6rem; margin-top:1rem; }
+.htmx-request button { opacity:.6; }
+.login { max-width:22rem; margin:4rem auto; }

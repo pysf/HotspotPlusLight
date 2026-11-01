@@ -1,0 +1,200 @@
+package admin
+
+import (
+	"fmt"
+	"strconv"
+
+	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/web/ui"
+)
+
+templ LoginPage(username, errMsg string) {
+	@ui.Layout(ui.LayoutData{Title: "Log in"}) {
+		<div class="login card">
+			<h1>Admin login</h1>
+			if errMsg != "" {
+				@ui.ErrorFragment(errMsg)
+			}
+			<form method="post" action="/admin/login">
+				@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: username, Attrs: templ.Attributes{"autocomplete": "username", "autofocus": true}})
+				@ui.Field(ui.FieldProps{Label: "Password", Name: "password", Type: "password", Attrs: templ.Attributes{"autocomplete": "current-password"}})
+				<button type="submit" class="primary">Log in</button>
+			</form>
+		</div>
+	}
+}
+
+// MembersPage is a placeholder: the member pages arrive in Phase 2.
+templ MembersPage(l ui.LayoutData) {
+	@ui.Layout(l) {
+		<h1>Members</h1>
+		<p class="card">Member management is not available yet.</p>
+	}
+}
+
+func num(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
+
+func limit(v float64, unit string) string {
+	if v == 0 {
+		return "Unlimited"
+	}
+	return num(v) + " " + unit
+}
+
+func minutes(m int) string {
+	if m == 0 {
+		return "Unlimited"
+	}
+	return strconv.Itoa(m) + " min"
+}
+
+templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
+	@ui.Layout(l) {
+		<h1>Plans</h1>
+		<p><a class="btn primary" href="/admin/plans/new">New plan</a></p>
+		if len(plans) == 0 {
+			<p class="card">No plans yet. Create the first one.</p>
+		} else {
+			@ui.Table([]string{"Name", "Validity", "Speed", "Data", "Time", "Devices", ""}) {
+				for _, p := range plans {
+					<tr>
+						<td><a href={ templ.SafeURL(fmt.Sprintf("/admin/plans/%d", p.ID)) }>{ p.Name }</a></td>
+						<td>{ strconv.Itoa(p.DurationDays) } days</td>
+						<td>{ limit(p.SpeedValue, p.SpeedUnit) }</td>
+						<td>{ limit(p.BulkValue, p.BulkUnit) }</td>
+						<td>{ minutes(p.TimeLimitMinutes) }</td>
+						<td>{ strconv.Itoa(p.MaxSessions) }</td>
+						<td>
+							@ui.ConfirmDelete("Delete", fmt.Sprintf("/admin/plans/%d", p.ID), "Delete plan "+p.Name+"?")
+						</td>
+					</tr>
+				}
+			}
+		}
+	}
+}
+
+templ PlanNewPage(l ui.LayoutData) {
+	@ui.Layout(l) {
+		<h1>New plan</h1>
+		@PlanFormView(PlanFormProps{Form: domain.NewPlanForm(), Action: "post", URL: "/admin/plans"})
+	}
+}
+
+templ PlanEditPage(l ui.LayoutData, p PlanFormProps) {
+	@ui.Layout(l) {
+		<h1>Edit plan</h1>
+		@PlanFormView(p)
+	}
+}
+
+type PlanFormProps struct {
+	Form    domain.PlanForm
+	Errors  domain.FieldErrors
+	Action  string // "post" or "put"
+	URL     string
+	Members int // members using the plan (edit only)
+}
+
+func membersWarning(n int) string {
+	if n == 1 {
+		return "1 member uses this plan; changes apply to it at their next login"
+	}
+	return strconv.Itoa(n) + " members use this plan; changes apply to all of them at their next login"
+}
+
+func unitOptions(units []string) []ui.Option {
+	o := make([]ui.Option, len(units))
+	for i, u := range units {
+		o[i] = ui.Option{Value: u, Label: u}
+	}
+	return o
+}
+
+func planFormAttrs(p PlanFormProps) templ.Attributes {
+	a := templ.Attributes{"hx-target": "this", "hx-swap": "outerHTML"}
+	a["hx-"+p.Action] = p.URL
+	return a
+}
+
+// PlanFormView is both the new and edit form; it is also the 422 response body.
+templ PlanFormView(p PlanFormProps) {
+	<form id="plan-form" class="card" { planFormAttrs(p)... }>
+		if p.Members > 0 {
+			<div class="flash warn" data-plan-warning>{ membersWarning(p.Members) }</div>
+		}
+		@ui.Field(ui.FieldProps{Label: "Name", Name: "name", Value: p.Form.Name, Error: p.Errors["name"]})
+		@ui.Field(ui.FieldProps{Label: "Validity (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Whole number, at least 1."})
+		@ui.FieldPair(ui.PairProps{Label: "Speed limit", For: "speed_value", Hint: "0 = no speed limit. Decimals allowed.", Errors: []ui.NamedError{{Name: "speed_value", Msg: p.Errors["speed_value"]}, {Name: "speed_unit", Msg: p.Errors["speed_unit"]}}}) {
+			@ui.InputControl(ui.FieldProps{Name: "speed_value", Value: p.Form.SpeedValue, Error: p.Errors["speed_value"]})
+			@ui.SelectControl(ui.SelectProps{Name: "speed_unit", Value: p.Form.SpeedUnit, Options: unitOptions(domain.SpeedUnits), Error: p.Errors["speed_unit"]})
+		}
+		@ui.FieldPair(ui.PairProps{Label: "Data limit", For: "bulk_value", Hint: "0 = unlimited data. Decimals allowed.", Errors: []ui.NamedError{{Name: "bulk_value", Msg: p.Errors["bulk_value"]}, {Name: "bulk_unit", Msg: p.Errors["bulk_unit"]}}}) {
+			@ui.InputControl(ui.FieldProps{Name: "bulk_value", Value: p.Form.BulkValue, Error: p.Errors["bulk_value"]})
+			@ui.SelectControl(ui.SelectProps{Name: "bulk_unit", Value: p.Form.BulkUnit, Options: unitOptions(domain.BulkUnits), Error: p.Errors["bulk_unit"]})
+		}
+		@ui.Field(ui.FieldProps{Label: "Time limit (minutes)", Name: "time_limit_minutes", Value: p.Form.TimeLimitMinutes, Error: p.Errors["time_limit_minutes"], Hint: "0 = unlimited time."})
+		@ui.Field(ui.FieldProps{Label: "Simultaneous devices", Name: "max_sessions", Value: p.Form.MaxSessions, Error: p.Errors["max_sessions"], Hint: "Whole number, at least 1."})
+		@ui.Checkbox(ui.CheckboxProps{Label: "Renew automatically when the validity ends", Name: "auto_resubscribe", Checked: p.Form.AutoResubscribe})
+		<div class="actions">
+			<button type="submit" class="primary">Save</button>
+			<a class="btn" href="/admin/plans">Cancel</a>
+			if p.Action == "put" {
+				@ui.ConfirmDelete("Delete plan", p.URL, "Delete this plan?")
+			}
+		</div>
+	</form>
+}
+
+type SettingsProps struct {
+	Form   domain.SettingsForm
+	Errors domain.FieldErrors
+	Plans  []domain.Plan
+	Saved  bool
+}
+
+templ SettingsPage(l ui.LayoutData, p SettingsProps) {
+	@ui.Layout(l) {
+		<h1>Settings</h1>
+		@SettingsFormView(p)
+	}
+}
+
+func planOptions(plans []domain.Plan) []ui.Option {
+	o := []ui.Option{{Value: "", Label: "(none)"}}
+	for _, p := range plans {
+		o = append(o, ui.Option{Value: strconv.FormatInt(p.ID, 10), Label: p.Name})
+	}
+	return o
+}
+
+// SettingsFormView is the settings form and the PUT response body (200 with a
+// flash, or 422 with field errors).
+templ SettingsFormView(p SettingsProps) {
+	<form id="settings-form" class="card" hx-put="/admin/settings" hx-target="this" hx-swap="outerHTML">
+		if p.Saved {
+			@ui.Flash("ok", "Settings saved.")
+		}
+		@ui.Field(ui.FieldProps{Label: "Site title", Name: "site_title", Value: p.Form.SiteTitle, Error: p.Errors["site_title"]})
+		@ui.Field(ui.FieldProps{Label: "Time zone", Name: "timezone", Value: p.Form.Timezone, Error: p.Errors["timezone"], Hint: "IANA name, e.g. Europe/London. Dates are shown in this zone."})
+		@ui.FieldPair(ui.PairProps{Label: "RADIUS shared secret", For: "radius_shared_secret", Hint: "Must match the secret configured on the router. Changes apply immediately.", Errors: []ui.NamedError{{Name: "radius_shared_secret", Msg: p.Errors["radius_shared_secret"]}}}) {
+			@ui.InputControl(ui.FieldProps{Name: "radius_shared_secret", Type: "password", Value: p.Form.RadiusSharedSecret, Error: p.Errors["radius_shared_secret"], Attrs: templ.Attributes{"autocomplete": "off"}})
+			<button type="button" id="reveal-secret" onclick="var i=document.getElementById('radius_shared_secret');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'Reveal':'Hide'">Reveal</button>
+		}
+		@ui.Field(ui.FieldProps{Label: "Disconnect (CoA) port", Name: "coa_port", Value: p.Form.CoaPort, Error: p.Errors["coa_port"], Hint: "1-65535. Router default: 3799."})
+		@ui.Field(ui.FieldProps{Label: "Accounting interval (seconds)", Name: "accounting_interval_seconds", Value: p.Form.AccountingIntervalSeconds, Error: p.Errors["accounting_interval_seconds"], Hint: "At least 10."})
+		@ui.Select(ui.SelectProps{Label: "Default plan", Name: "default_plan_id", Value: p.Form.DefaultPlanID, Options: planOptions(p.Plans), Error: p.Errors["default_plan_id"], Hint: "Preselected on the new-member form; nothing is assigned silently."})
+		@ui.Checkbox(ui.CheckboxProps{Label: "MAC auto-login", Name: "mac_auto_login", Checked: p.Form.MacAutoLogin, Hint: "Warning: a device can spoof another device's MAC address and sign in as that member."})
+		@ui.Field(ui.FieldProps{Label: "After-login URL", Name: "after_login_url", Value: p.Form.AfterLoginURL, Error: p.Errors["after_login_url"], Hint: "Optional http:// or https:// address."})
+		@ui.Field(ui.FieldProps{Label: "Public base URL", Name: "public_base_url", Value: p.Form.PublicBaseURL, Error: p.Errors["public_base_url"], Hint: "How clients reach this server, e.g. http://192.168.1.10:8080."})
+		@ui.Field(ui.FieldProps{Label: "Voucher username prefix", Name: "batch_username_prefix", Value: p.Form.BatchUsernamePrefix, Error: p.Errors["batch_username_prefix"], Hint: "English letters and digits."})
+		@ui.Field(ui.FieldProps{Label: "Next voucher number", Name: "batch_counter", Value: p.Form.BatchCounter, Error: p.Errors["batch_counter"]})
+		@ui.Field(ui.FieldProps{Label: "Maximum vouchers per batch", Name: "batch_max_count", Value: p.Form.BatchMaxCount, Error: p.Errors["batch_max_count"]})
+		@ui.Field(ui.FieldProps{Label: "Voucher password length", Name: "voucher_password_length", Value: p.Form.VoucherPasswordLength, Error: p.Errors["voucher_password_length"], Hint: "4-20 digits."})
+		@ui.Textarea(ui.TextareaProps{Label: "Voucher help text", Name: "voucher_help", Value: p.Form.VoucherHelp, Error: p.Errors["voucher_help"]})
+		@ui.Field(ui.FieldProps{Label: "Keep finished sessions (days)", Name: "session_retention_days", Value: p.Form.SessionRetentionDays, Error: p.Errors["session_retention_days"], Hint: "0 = keep forever."})
+		<div class="actions">
+			<button type="submit" class="primary">Save</button>
+		</div>
+	</form>
+}

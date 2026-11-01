@@ -1,5 +1,5 @@
-// Package auth holds the login checks. Phase 0: admin credential helpers only;
-// the member Evaluator (PLAN 7.2) arrives in Phase 3.
+// Package auth holds the login checks: admin login, server-side admin sessions
+// and password helpers (Phase 1); the member Evaluator (PLAN 7.2) arrives in Phase 3.
 package auth
 
 import (
@@ -9,17 +9,32 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"hotspotpluslight/internal/clock"
 	"hotspotpluslight/internal/domain"
 )
 
 // Repo is what auth needs from storage (declared here, implemented by store).
 type Repo interface {
+	// GetAdmin returns domain.ErrNotFound when the admin has not been seeded.
 	GetAdmin(ctx context.Context) (domain.Admin, error)
+	InsertAdminSession(ctx context.Context, tokenHash, csrf string, createdAt, expiresAt int64) error
+	// TouchAdminSession extends a live (unexpired) session and returns its CSRF token.
+	TouchAdminSession(ctx context.Context, tokenHash string, now, newExpiresAt int64) (csrf string, found bool, err error)
+	DeleteAdminSession(ctx context.Context, tokenHash string) error
+	PurgeExpiredAdminSessions(ctx context.Context, now int64) error
+	// SetAdminPassword stores the hash and deletes every admin session, atomically.
+	SetAdminPassword(ctx context.Context, hash string, now int64) error
 }
 
-type Service struct{ repo Repo }
+type Service struct {
+	repo     Repo
+	clock    clock.Clock
+	throttle *throttle
+}
 
-func New(repo Repo) *Service { return &Service{repo: repo} }
+func New(repo Repo, c clock.Clock) *Service {
+	return &Service{repo: repo, clock: c, throttle: newThrottle(loginMaxFailures, loginLockout)}
+}
 
 // VerifyAdmin reports whether username/password match the admin account.
 func (s *Service) VerifyAdmin(ctx context.Context, username, password string) (bool, error) {
@@ -27,10 +42,26 @@ func (s *Service) VerifyAdmin(ctx context.Context, username, password string) (b
 	if err != nil {
 		return false, err
 	}
-	if a.Username != username {
-		return false, nil
+	// Always run bcrypt so a wrong username costs the same as a wrong password.
+	okPW := bcrypt.CompareHashAndPassword([]byte(a.PasswordHash), []byte(password)) == nil
+	return okPW && a.Username == username, nil
+}
+
+// SetAdminPassword enforces BR-20, stores the bcrypt hash and ends every admin
+// session (PLAN 9.5). It is the only way the password changes (CLI only).
+func (s *Service) SetAdminPassword(ctx context.Context, password string) error {
+	a, err := s.repo.GetAdmin(ctx)
+	if err != nil {
+		return err
 	}
-	return bcrypt.CompareHashAndPassword([]byte(a.PasswordHash), []byte(password)) == nil, nil
+	if err := domain.ValidateAdminPassword(password, a.Username); err != nil {
+		return err
+	}
+	hash, err := HashPassword(password)
+	if err != nil {
+		return err
+	}
+	return s.repo.SetAdminPassword(ctx, hash, s.clock.Now().Unix())
 }
 
 // HashPassword returns the bcrypt hash stored in admin.password_hash.

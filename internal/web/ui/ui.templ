@@ -1,0 +1,201 @@
+// Package ui holds the small reusable templ components shared by every admin
+// page: layout, flash, form fields, table, confirm button, error fragment.
+package ui
+
+type NavItem struct{ Label, Href string }
+
+// LayoutData configures the page shell. An empty CSRF means "not logged in":
+// no nav, no logout, no hx-headers.
+type LayoutData struct {
+	Title     string
+	CSRF      string
+	Nav       []NavItem
+	Active    string // Href of the current nav item
+	LogoutURL string
+}
+
+// htmxConfig makes htmx swap 422 (validation) and 409 (conflict) responses
+// like successes; other 4xx/5xx stay errors (PLAN 8.2).
+const htmxConfig = `{"responseHandling":[{"code":"422|409","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
+
+func bodyAttrs(d LayoutData) templ.Attributes {
+	if d.CSRF == "" {
+		return nil
+	}
+	h, _ := templ.JSONString(map[string]string{"X-CSRF-Token": d.CSRF}) //nolint: map of strings cannot fail
+	return templ.Attributes{"hx-headers": h}
+}
+
+templ Layout(d LayoutData) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="htmx-config" content={ htmxConfig }/>
+			<title>{ d.Title } - HotspotPlusLight</title>
+			<link rel="stylesheet" href="/admin/static/app.css"/>
+			<script src="/admin/static/htmx.min.js" defer></script>
+		</head>
+		<body { bodyAttrs(d)... }>
+			<header class="top">
+				<span class="brand">HotspotPlusLight</span>
+				for _, n := range d.Nav {
+					<a href={ templ.SafeURL(n.Href) } class={ templ.KV("active", n.Href == d.Active) }>{ n.Label }</a>
+				}
+				if d.LogoutURL != "" {
+					<button type="button" hx-post={ d.LogoutURL }>Log out</button>
+				}
+			</header>
+			<main>
+				<div id="flash" aria-live="polite"></div>
+				{ children... }
+			</main>
+		</body>
+	</html>
+}
+
+// Flash is a message box; kind is "ok", "warn" or "error".
+templ Flash(kind, msg string) {
+	<div class={ "flash", kind }>{ msg }</div>
+}
+
+// ErrorFragment is the body of a 4xx htmx response that is swapped into #flash.
+templ ErrorFragment(msg string) {
+	<div class="flash error" role="alert">{ msg }</div>
+}
+
+templ FieldError(name, msg string) {
+	if msg != "" {
+		<p class="field-error" data-error-for={ name }>{ msg }</p>
+	}
+}
+
+type FieldProps struct {
+	Label, Name, Type, Value, Error, Hint string
+	Attrs                                 templ.Attributes
+}
+
+func inputType(t string) string {
+	if t == "" {
+		return "text"
+	}
+	return t
+}
+
+// Field is a labelled text-like input with its hint and error message.
+templ Field(p FieldProps) {
+	<div class="field">
+		<label for={ p.Name }>{ p.Label }</label>
+		@InputControl(p)
+		@FieldHint(p.Hint)
+		@FieldError(p.Name, p.Error)
+	</div>
+}
+
+// InputControl is the bare <input>, reused inside composite fields.
+templ InputControl(p FieldProps) {
+	<input id={ p.Name } name={ p.Name } type={ inputType(p.Type) } value={ p.Value } aria-invalid?={ p.Error != "" } { p.Attrs... }/>
+}
+
+// NamedError is the error message of one control inside a composite field.
+type NamedError struct{ Name, Msg string }
+
+type PairProps struct {
+	Label, For, Hint string
+	Errors           []NamedError
+}
+
+// FieldPair is a labelled field holding two controls side by side (the
+// children), with one hint and the errors of each control.
+templ FieldPair(p PairProps) {
+	<div class="field">
+		<label for={ p.For }>{ p.Label }</label>
+		<div class="pair">
+			{ children... }
+		</div>
+		@FieldHint(p.Hint)
+		for _, e := range p.Errors {
+			@FieldError(e.Name, e.Msg)
+		}
+	</div>
+}
+
+templ FieldHint(h string) {
+	if h != "" {
+		<small class="hint">{ h }</small>
+	}
+}
+
+type Option struct{ Value, Label string }
+
+type SelectProps struct {
+	Label, Name, Value, Error, Hint string
+	Options                         []Option
+}
+
+templ Select(p SelectProps) {
+	<div class="field">
+		<label for={ p.Name }>{ p.Label }</label>
+		@SelectControl(p)
+		@FieldHint(p.Hint)
+		@FieldError(p.Name, p.Error)
+	</div>
+}
+
+// SelectControl is the bare <select>, reused inside composite fields.
+templ SelectControl(p SelectProps) {
+	<select id={ p.Name } name={ p.Name } aria-invalid?={ p.Error != "" }>
+		for _, o := range p.Options {
+			<option value={ o.Value } selected?={ o.Value == p.Value }>{ o.Label }</option>
+		}
+	</select>
+}
+
+type TextareaProps struct{ Label, Name, Value, Error, Hint string }
+
+templ Textarea(p TextareaProps) {
+	<div class="field">
+		<label for={ p.Name }>{ p.Label }</label>
+		<textarea id={ p.Name } name={ p.Name } aria-invalid?={ p.Error != "" }>{ p.Value }</textarea>
+		@FieldHint(p.Hint)
+		@FieldError(p.Name, p.Error)
+	</div>
+}
+
+type CheckboxProps struct {
+	Label, Name, Hint string
+	Checked           bool
+}
+
+templ Checkbox(p CheckboxProps) {
+	<div class="field">
+		<label>
+			<input type="checkbox" name={ p.Name } value="on" checked?={ p.Checked }/>
+			{ p.Label }
+		</label>
+		@FieldHint(p.Hint)
+	</div>
+}
+
+// Table renders the header row and wraps the <tr> children in a body.
+templ Table(headers []string) {
+	<table>
+		<thead>
+			<tr>
+				for _, h := range headers {
+					<th>{ h }</th>
+				}
+			</tr>
+		</thead>
+		<tbody>
+			{ children... }
+		</tbody>
+	</table>
+}
+
+// ConfirmDelete is a button that asks for confirmation, then sends DELETE;
+// a 409 body is swapped into #flash, a success answers HX-Redirect.
+templ ConfirmDelete(label, url, confirm string) {
+	<button type="button" class="danger" hx-delete={ url } hx-confirm={ confirm } hx-target="#flash" hx-swap="innerHTML">{ label }</button>
+}

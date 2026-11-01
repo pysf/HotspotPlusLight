@@ -1,0 +1,53 @@
+package admin
+
+import (
+	"net/http"
+
+	"hotspotpluslight/internal/domain"
+)
+
+func settingsForm(r *http.Request) domain.SettingsForm {
+	_ = r.ParseForm()
+	v := r.PostFormValue
+	return domain.SettingsForm{
+		SiteTitle: v("site_title"), Timezone: v("timezone"), RadiusSharedSecret: v("radius_shared_secret"),
+		CoaPort: v("coa_port"), AccountingIntervalSeconds: v("accounting_interval_seconds"), DefaultPlanID: v("default_plan_id"),
+		MacAutoLogin: domain.Checked(v("mac_auto_login")), AfterLoginURL: v("after_login_url"),
+		BatchUsernamePrefix: v("batch_username_prefix"), BatchCounter: v("batch_counter"), BatchMaxCount: v("batch_max_count"),
+		VoucherPasswordLength: v("voucher_password_length"), VoucherHelp: v("voucher_help"),
+		PublicBaseURL: v("public_base_url"), SessionRetentionDays: v("session_retention_days"),
+	}
+}
+
+func (h handlers) settingsPage(w http.ResponseWriter, r *http.Request) {
+	st, err := h.Settings.Get(r.Context())
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	plans, err := h.Plans.List(r.Context())
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	h.render(w, r, http.StatusOK, SettingsPage(layout(r, "Settings", "/admin/settings"), SettingsProps{Form: domain.FormFromSettings(st), Plans: plans}))
+}
+
+func (h handlers) settingsUpdate(w http.ResponseWriter, r *http.Request) {
+	f := settingsForm(r)
+	errs, err := h.Settings.Update(r.Context(), f)
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	plans, err := h.Plans.List(r.Context())
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	if len(errs) > 0 {
+		h.render(w, r, http.StatusUnprocessableEntity, SettingsFormView(SettingsProps{Form: f, Errors: errs, Plans: plans}))
+		return
+	}
+	h.render(w, r, http.StatusOK, SettingsFormView(SettingsProps{Form: f, Plans: plans, Saved: true}))
+}

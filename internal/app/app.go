@@ -19,11 +19,13 @@ import (
 	"hotspotpluslight/internal/auth"
 	"hotspotpluslight/internal/clock"
 	"hotspotpluslight/internal/config"
+	"hotspotpluslight/internal/domain"
 	"hotspotpluslight/internal/member"
 	"hotspotpluslight/internal/plan"
 	"hotspotpluslight/internal/radius"
 	"hotspotpluslight/internal/secret"
 	"hotspotpluslight/internal/session"
+	"hotspotpluslight/internal/settings"
 	"hotspotpluslight/internal/store"
 	"hotspotpluslight/internal/voucher"
 	"hotspotpluslight/internal/web/admin"
@@ -43,11 +45,12 @@ type Options struct {
 type Addrs struct{ HTTP, Admin, RadiusAuth, RadiusAcct string }
 
 type services struct {
-	auth    *auth.Service
-	member  *member.Service
-	plan    *plan.Service
-	session *session.Service
-	voucher *voucher.Service
+	auth     *auth.Service
+	member   *member.Service
+	plan     *plan.Service
+	settings *settings.Service
+	session  *session.Service
+	voucher  *voucher.Service
 }
 
 type App struct {
@@ -132,15 +135,16 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	}
 
 	a.svc = services{
-		auth:    auth.New(st),
-		member:  member.New(st),
-		plan:    plan.New(st),
-		session: session.New(st, nil /* Disconnector: Phase 5 */, opts.Clock),
-		voucher: voucher.New(opts.Clock),
+		auth:     auth.New(st, opts.Clock),
+		member:   member.New(st),
+		plan:     plan.New(st, opts.Clock),
+		settings: settings.New(st, opts.Clock),
+		session:  session.New(st, nil /* Disconnector: Phase 5 */, opts.Clock),
+		voucher:  voucher.New(opts.Clock),
 	}
 	a.radius = radius.New(st, log)
 	a.httpSrv = &http.Server{Handler: pageapi.Handler(), ReadHeaderTimeout: 10 * time.Second}
-	a.adminSrv = &http.Server{Handler: admin.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Settings: a.svc.settings, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 
@@ -232,6 +236,36 @@ func (a *App) Shutdown(ctx context.Context) error {
 		err = errors.Join(a.httpSrv.Shutdown(ctx), a.adminSrv.Shutdown(ctx), a.radius.Shutdown(ctx), a.store.Close())
 		a.log.Info("shutdown complete")
 	})
+	return err
+}
+
+// SetAdminPassword is the `admin set-password` subcommand: it opens the existing
+// database (no migration, no seeding), applies BR-20, stores the bcrypt hash and
+// deletes every admin session. The password is never printed or logged.
+func SetAdminPassword(ctx context.Context, opts Options, password string) error {
+	if opts.Getenv == nil {
+		opts.Getenv = os.Getenv
+	}
+	if opts.Clock == nil {
+		opts.Clock = clock.Real{}
+	}
+	cfg, err := config.Load(opts.Getenv)
+	if err != nil {
+		return err
+	}
+	dbPath := filepath.Join(cfg.DataDir, "hsp.db")
+	if _, err := os.Stat(dbPath); err != nil {
+		return fmt.Errorf("no database at %s: run `hotspotpluslight serve` once, or check HSP_DATA_DIR", dbPath)
+	}
+	st, err := store.Open(dbPath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	err = auth.New(st, opts.Clock).SetAdminPassword(ctx, password)
+	if errors.Is(err, domain.ErrNotFound) {
+		return errors.New("the database has no admin account yet: run `hotspotpluslight serve` once")
+	}
 	return err
 }
 
