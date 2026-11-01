@@ -762,7 +762,6 @@ func TestE2_13_UsageSummaryAndVerdict(t *testing.T) {
 	}
 
 	t.Run("matches Access-Request", func(t *testing.T) {
-		t.Skip("Phase 3: enable when the RADIUS evaluator exists. The shown verdict is already produced by domain.Evaluate, the function the RADIUS login will call.")
 		nas := fakenas.New(f.s.Addrs.RadiusAuth, scalar[string](t, f.db, `SELECT radius_shared_secret FROM settings`))
 		for _, c := range cases {
 			resp, err := nas.Authenticate(c.name, "pw-"+c.name)

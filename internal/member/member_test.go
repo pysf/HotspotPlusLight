@@ -276,3 +276,21 @@ func TestSelectionTooLarge(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+// Passwords the RADIUS edge would mistake for a wrong shared secret are refused up front.
+func TestMemberPasswordRejectsControlCharacters(t *testing.T) {
+	s, _, _ := setup()
+	ctx := context.Background()
+	for _, bad := range []string{"ab\tcd", "ab\ncd", "ab\x00cd", "ab\x7fcd", "ab\xffcd"} {
+		if _, errs, _ := s.Create(ctx, domain.MemberForm{Username: "carol", PlanID: "1", Password: bad}); errs["password"] == "" {
+			t.Errorf("create accepted %q", bad)
+		}
+	}
+	id, errs, err := s.Create(ctx, domain.MemberForm{Username: "carol", PlanID: "1", Password: "pässwörd 1"})
+	if err != nil || len(errs) != 0 {
+		t.Fatalf("%v %v", errs, err)
+	}
+	if msg, _ := s.SetPassword(ctx, id, "x\x1by"); msg == "" {
+		t.Error("set-password accepted a control character")
+	}
+}

@@ -37,6 +37,8 @@ type Options struct {
 	Migrations fs.FS
 	// Disconnector replaces the production Disconnect client (see FakeDisconnector).
 	Disconnector session.Disconnector
+	// Logger receives the server log (default: discarded).
+	Logger *slog.Logger
 }
 
 // Server is a started app plus what tests need to inspect it.
@@ -105,11 +107,15 @@ func TryStart(opts Options) (*Server, error) {
 	}
 	env := opts.env(dir, key)
 	out := &SafeBuffer{}
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	a, err := app.New(ctx, app.Options{
 		Getenv:       func(k string) string { return env[k] },
 		Stdout:       out,
-		Logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Logger:       logger,
 		Clock:        opts.Clock,
 		Migrations:   opts.Migrations,
 		Disconnector: opts.Disconnector,

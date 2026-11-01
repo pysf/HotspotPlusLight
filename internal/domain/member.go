@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // ErrUsernameTaken is returned by the repository on a case-insensitive duplicate (BR-1).
@@ -142,6 +143,9 @@ func ValidateMemberPassword(pw string) string {
 		return "Required."
 	case len([]byte(pw)) > MaxMemberPasswordLen:
 		return "At most 64 bytes."
+	case !utf8.ValidString(pw) || strings.ContainsFunc(pw, func(r rune) bool { return r < 0x20 || r == 0x7f }):
+		// The RADIUS edge drops such passwords as "wrong shared secret" (PLAN 7.1).
+		return "No control characters."
 	}
 	return ""
 }
@@ -169,7 +173,7 @@ func ParseMember(f MemberForm, loc *time.Location, create bool) (MemberInput, Fi
 	if username == "" {
 		p.errs.add("username", "Required (or enter a mobile number to use it as the username).")
 	} else {
-		in.Username = p.alnum("username", username, 64)
+		in.Username = p.alnum("username", username, MaxUsernameLen)
 	}
 	if email := strings.TrimSpace(f.Email); email != "" {
 		if a, err := mail.ParseAddress(email); err != nil || a.Address != email || len(email) > 254 {

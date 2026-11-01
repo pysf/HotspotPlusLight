@@ -230,7 +230,7 @@ Use these as the spec; each is exercised by named E2E tests (§10). Legacy refer
 
 **BR-9 Concurrent sessions** — a session is *active* if not ended and `now − last_update_at ≤ accounting_interval + 60 s` (mirrors the legacy Redis TTL). If active sessions of the member `≥ plan.max_sessions` (the member's plan, default 1; moved from a global setting, owner 2026-11-01, Q27) ⇒ reject `noMoreSessionAllowed`. Editing the plan's limit applies to everyone on it at their next login (BR-5b). Legacy: `radiusPostAuth`, `ClientSession.getActiveMemberSessions`, `cacheManager` TTL.
 
-**BR-10 Reply attributes (exactly legacy; O2, O3, O4)** — **one speed per plan, used for both directions (owner 2026-11-01, Q28: kept like legacy; separate up/down speeds declined)** — `Acct-Interim-Interval = settings.accounting_interval_seconds` (default 60). `Session-Timeout` = remaining time-quota seconds (BR-8), `172800` when the plan has no time limit. `Mikrotik-Xmit-Limit` = remaining bytes (BR-7), `3,900,000,000` when the plan is unlimited; the attribute is 32-bit, so clamp to 4,294,967,295 and log if larger (confirm at implementation). `Mikrotik-Rate-Limit` only when speed > 0: let `s = round(speed in kbps)` (download = upload), burst `b = s × 4`, burst time `8`; if `b > 12,000,000` the value is just `"<s>k"`, otherwise `"<s>k/<s>k <b>k/<b>k <ceil(b/2)>k/<ceil(b/2)>k 8/8"`. Legacy: `radiusPostAuth`, `avps.js getRateLimit`, `hasEnoughBulk` (3.9 GB sentinel), `hasEnoughTime` (172800 sentinel).
+**BR-10 Reply attributes (exactly legacy; O2, O3, O4)** — **one speed per plan, used for both directions (owner 2026-11-01, Q28: kept like legacy; separate up/down speeds declined)** — `Acct-Interim-Interval = settings.accounting_interval_seconds` (default 60). `Session-Timeout` = remaining time-quota seconds (BR-8), `172800` when the plan has no time limit. `Mikrotik-Xmit-Limit` = remaining bytes (BR-7), `3,900,000,000` when the plan is unlimited; the attribute is 32-bit, so clamp to 4,294,967,295 and log if larger (confirm at implementation). `Mikrotik-Rate-Limit` only when speed > 0: let `s = round(speed in kbps)` (download = upload), burst `b = s × 4`, burst time `8`; if `b > 12,000,000` the value is just `"<s>k"` (deliberate deviation, 2026-11-01: `s` is floored at 1 so a sub-1-kbps speed sends `1k`, never legacy `0k`, which RouterOS reads as unlimited), otherwise `"<s>k/<s>k <b>k/<b>k <ceil(b/2)>k/<ceil(b/2)>k 8/8"`. Legacy: `radiusPostAuth`, `avps.js getRateLimit`, `hasEnoughBulk` (3.9 GB sentinel), `hasEnoughTime` (172800 sentinel).
 
 **BR-11 Accounting → usage** (replaces ClickHouse + Redis):
 - `upload = Acct-Input-Octets (+ Acct-Input-Gigawords<<32)`; `download = Acct-Output-Octets (+ Acct-Output-Gigawords<<32)`; `seconds = Acct-Session-Time`. These are **cumulative per session**.
@@ -241,6 +241,8 @@ Use these as the spec; each is exercised by named E2E tests (§10). Legacy refer
 **BR-12 MAC capture** — on the first accounting packet for a member whose `mac` is empty, store `Calling-Station-Id` (BR-3). Never overwritten automatically. Legacy: `setMemberMac`.
 
 **BR-13 Plan assignment** — (a) *create / change plan*: on member creation `subscription_date = now`, counters 0, extra bulk 0. **Changing an existing member's plan only sets `plan_id`** — window start, usage counters and extra bulk are kept (owner 2026-11-01, legacy behaviour); it takes effect at the member's next login, running sessions are untouched and no Disconnect is sent. Only the *renew* action resets. Renew discards the old window's totals; no usage history is kept (owner 2026-11-01). (b) *renew* (admin "Reset subscription" button / auto-resubscribe): `subscription_date = now`, `extra_bulk_bytes = 0`, usage counters = 0, **`last_renewed_at = now`, `renewal_count += 1`** (counts automatic and manual renewals; the member page shows "Renewed N times, last on <date> (automatic|manual)" — owner 2026-11-01, Q21; the manual/automatic label is kept in `member.last_renewal_kind` TEXT `'auto'|'manual'`). Legacy: `assignPlanToMember`, `resetMemberSubscription`.
+
+**BR-14a Member password characters (Phase 3 review, 2026-11-01)** — a member password (create, set-password) must be valid UTF-8 and contain no control characters (< 0x20, 0x7f), because the RADIUS edge treats a `User-Password` that decrypts to such bytes as a wrong shared secret and drops it (§7.1). The form shows "No control characters.". Batch passwords are digits only.
 
 **BR-14 Create member (admin)** — `username` default = mobile; `password` default = random 6-digit number (legacy `createRandomNumericalPassword`); `active` default true; `subscription_date = now`; plan = **required** (the form preselects `settings.default_plan_id`; creation without a plan is rejected, Q19); mobile per BR-2. Legacy: `createNewMember`.
 
@@ -386,7 +388,7 @@ CREATE INDEX session_started ON session(started_at);
 ## 7. RADIUS specification
 
 ### 7.1 Listeners
-UDP `:1812` (auth) and `:1813` (acct), addresses configurable. **Secret is read from `settings` per packet** (changes apply without restart). Any source IP is accepted if the packet verifies; Accounting-Request authenticators must be verified and bad packets dropped silently. Unknown/other codes are dropped.
+UDP `:1812` (auth) and `:1813` (acct), addresses configurable. **Secret is read from `settings` per packet** (changes apply without restart). Any source IP is accepted if the packet verifies; Accounting-Request authenticators must be verified and bad packets dropped silently. *(Phase 3, 2026-11-01: an Access-Request carries no verifiable authenticator, so a wrong secret is detected heuristically — a PAP `User-Password` that does not decrypt to valid UTF-8 text without control characters is dropped silently with a WARN log; see `docs/phase3-notes.md`.)* Unknown/other codes are dropped.
 
 ### 7.2 Access-Request (PAP)
 Inputs: `User-Name`, `User-Password` (PAP, decrypted with the secret), optional `Calling-Station-Id`, `NAS-IP-Address`, `NAS-Identifier`.
@@ -403,7 +405,7 @@ Evaluation order (first failing step rejects; message keys in §7.6):
 8. remaining time > 0 (BR-8) → else `outOfTime`
 9. concurrent sessions (BR-9) → else `noMoreSession`
 
-All pass ⇒ **Access-Accept** with the attributes of BR-10. (Auto-resubscribe in step 6 mutates the member before the Accept.)
+All pass ⇒ **Access-Accept** with the attributes of BR-10. (Auto-resubscribe in step 6 mutates the member before the Accept.) *(Phase 3 review, 2026-11-01:)* the renewal therefore also happens when step 9 then rejects `noMoreSession` — this is the legacy order (`checkAuthorization` renews before the session check) and is kept. Step 9 is **not atomic** with the Accept: two simultaneous logins at `max_sessions = 1` can both pass (legacy has no locking; `MONITOR:` in the evaluator). If a concurrent edit leaves the member outside the window right after the guarded renewal, the answer is a normal Reject `noActiveSubscription` (WARN log); "no reply" is reserved for database failures. An unknown username does an equivalent constant-time compare against a dummy value so timing does not reveal which usernames exist; there is no brute-force protection at the RADIUS edge (accepted).
 
 ### 7.3 Accounting-Request
 `Acct-Status-Type`: 1 Start · 2 Stop · 3 Interim-Update · 7 Accounting-On · 8 Accounting-Off.
@@ -429,7 +431,7 @@ See BR-18. Packet code 40; expect 41 (ACK) / 42 (NAK). Router needs incoming RAD
 | Mikrotik-Rate-Limit | 8 | string, format in BR-10 |
 | Mikrotik-Xmit-Limit | 2 | remaining bytes, 32-bit (BR-10) |
 
-*Type ids are from memory of the MikroTik dictionary — confirm against a RouterOS dictionary or `radclient` capture before coding (listed in §13).* No Gigawords attribute is sent (O3 = legacy).
+*Type ids (Xmit-Limit 2, Rate-Limit 8, vendor 14988) were checked against the MikroTik dictionary shipped with `layeh.com/radius` in Phase 3 and match; the semantics on a real router remain VERIFY-ON-HARDWARE (§13).* No Gigawords attribute is sent (O3 = legacy).
 
 ### 7.6 Message catalog (English only — O11)
 Each reject has a stable **code** and an English **message**. The Page API returns both (`code`, `message`); the RADIUS `Reply-Message` is `"<CODE>: <message>"` (O20). The legacy Persian texts (`radiusMessages.js`) are kept only as example translations inside the starter page.

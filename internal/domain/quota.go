@@ -12,12 +12,39 @@ const maxWindowDays = 100_000
 type Reason string
 
 const (
-	ReasonInactive       Reason = "INACTIVE_USER"
-	ReasonExpired        Reason = "EXPIRED"
-	ReasonNoSubscription Reason = "NO_ACTIVE_SUBSCRIPTION"
-	ReasonOutOfBulk      Reason = "OUT_OF_BULK"
-	ReasonOutOfTime      Reason = "OUT_OF_TIME"
+	ReasonInvalidCredentials Reason = "INVALID_CREDENTIALS"
+	ReasonInactive           Reason = "INACTIVE_USER"
+	ReasonNoPlan             Reason = "NO_PLAN"
+	ReasonPlanRemoved        Reason = "PLAN_REMOVED"
+	ReasonExpired            Reason = "EXPIRED"
+	ReasonNoSubscription     Reason = "NO_ACTIVE_SUBSCRIPTION"
+	ReasonOutOfBulk          Reason = "OUT_OF_BULK"
+	ReasonOutOfTime          Reason = "OUT_OF_TIME"
+	ReasonNoMoreSession      Reason = "NO_MORE_SESSION"
+	ReasonUnsupportedAuth    Reason = "UNSUPPORTED_AUTH_METHOD"
+	ReasonGeneralError       Reason = "GENERAL_ERROR"
 )
+
+// reasonMessages is the English message catalog (PLAN 7.6, O11, O20).
+var reasonMessages = map[Reason]string{
+	ReasonInvalidCredentials: "Wrong username or password.",
+	ReasonInactive:           "This account is disabled.",
+	ReasonNoPlan:             "No internet plan is assigned to this account.",
+	ReasonPlanRemoved:        "This plan has been removed.",
+	ReasonExpired:            "This account has expired.",
+	ReasonNoSubscription:     "Your plan period has ended.",
+	ReasonOutOfBulk:          "Your data allowance is used up.",
+	ReasonOutOfTime:          "Your time allowance is used up.",
+	ReasonNoMoreSession:      "Someone else is using this account. Try again in a few minutes.",
+	ReasonUnsupportedAuth:    "This network only supports PAP login.",
+	ReasonGeneralError:       "Unexpected server error. Contact support or try again.",
+}
+
+// Message is the English text of a rejection code; the empty Reason has none.
+func (r Reason) Message() string { return reasonMessages[r] }
+
+// ReplyMessage is the RADIUS Reply-Message of a rejection: "CODE: message" (O20).
+func (r Reason) ReplyMessage() string { return string(r) + ": " + r.Message() }
 
 // MemberState is what the login rules need to know about a member.
 type MemberState struct {

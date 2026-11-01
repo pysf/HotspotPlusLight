@@ -48,12 +48,13 @@ type Options struct {
 type Addrs struct{ HTTP, Admin, RadiusAuth, RadiusAcct string }
 
 type services struct {
-	auth     *auth.Service
-	member   *member.Service
-	plan     *plan.Service
-	settings *settings.Service
-	session  *session.Service
-	voucher  *voucher.Service
+	auth      *auth.Service
+	evaluator *auth.Evaluator
+	member    *member.Service
+	plan      *plan.Service
+	settings  *settings.Service
+	session   *session.Service
+	voucher   *voucher.Service
 }
 
 type App struct {
@@ -142,14 +143,15 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		disc = noopDisconnector{}
 	}
 	a.svc = services{
-		auth:     auth.New(st, opts.Clock),
-		member:   member.New(st, box, disc, opts.Clock),
-		plan:     plan.New(st, opts.Clock),
-		settings: settings.New(st, opts.Clock),
-		session:  session.New(st, disc, opts.Clock),
-		voucher:  voucher.New(opts.Clock),
+		auth:      auth.New(st, opts.Clock),
+		evaluator: auth.NewEvaluator(st, box, opts.Clock, log),
+		member:    member.New(st, box, disc, opts.Clock),
+		plan:      plan.New(st, opts.Clock),
+		settings:  settings.New(st, opts.Clock),
+		session:   session.New(st, disc, opts.Clock),
+		voucher:   voucher.New(opts.Clock),
 	}
-	a.radius = radius.New(st, log)
+	a.radius = radius.New(st, a.svc.evaluator, log)
 	a.httpSrv = &http.Server{Handler: pageapi.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Settings: a.svc.settings, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil

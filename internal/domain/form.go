@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -134,11 +133,9 @@ func Checked(v string) bool {
 	return false
 }
 
-var alnum = regexp.MustCompile(`^[A-Za-z0-9]+$`)
-
 func (p *parser) alnum(field, raw string, maxLen int) string {
 	raw = strings.TrimSpace(raw)
-	if !alnum.MatchString(raw) || len(raw) > maxLen {
+	if !usernameRE.MatchString(raw) || len(raw) > maxLen {
 		p.errs.add(field, fmt.Sprintf("1-%d English letters or digits.", maxLen))
 	}
 	return raw

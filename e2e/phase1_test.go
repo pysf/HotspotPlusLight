@@ -727,9 +727,47 @@ func TestE1_18_PlanEditWarning(t *testing.T) {
 	}
 }
 
-// E1.18 second half: needs Access-Request verdicts (Phases 2-3).
+// E1.18 second half: plan limits are read live at each login (BR-5b, Q16).
 func TestE1_18_LimitsChangeAffectsNextAccessRequest(t *testing.T) {
-	t.Skip("Phase 3")
+	f := newP3(t)
+	form := func(kv ...string) url.Values { return harness.PlanForm("Shared", kv...) }
+	planID := f.plan("Shared", "bulk_value", "1", "bulk_unit", "GB", "duration_days", "30")
+	path := fmt.Sprintf("/admin/plans/%d", planID)
+	edit := func(kv ...string) {
+		t.Helper()
+		if r := f.c.Send("PUT", path, form(kv...)); r.StatusCode != 200 {
+			t.Fatalf("edit plan: %d %s", r.StatusCode, r.Body)
+		}
+	}
+	id := f.member(planID, "alice", "password", "pw")
+	f.exec(`UPDATE member SET used_download_bytes=?, subscription_date=? WHERE id=?`, 500*mb, t0.Unix()-10*24*3600, id)
+	f.accepted("alice", "pw")
+
+	// Lowering the data limit below the usage rejects at the next login; raising it accepts again.
+	edit("bulk_value", "100", "bulk_unit", "MB", "duration_days", "30")
+	f.rejected("alice", "pw", "OUT_OF_BULK")
+	edit("bulk_value", "2", "bulk_unit", "GB", "duration_days", "30")
+	f.accepted("alice", "pw")
+
+	// Shortening the duration below the elapsed time lapses the window; auto-resubscribe renews instead.
+	edit("bulk_value", "2", "bulk_unit", "GB", "duration_days", "5")
+	f.rejected("alice", "pw", "NO_ACTIVE_SUBSCRIPTION")
+	edit("bulk_value", "2", "bulk_unit", "GB", "duration_days", "5", "auto_resubscribe", "on")
+	f.accepted("alice", "pw")
+	if n := scalar[int](t, f.db, `SELECT renewal_count FROM member WHERE id=?`, id); n != 1 {
+		t.Errorf("renewal_count %d, want 1", n)
+	}
+
+	// The time limit and the session limit are live too.
+	edit("bulk_value", "2", "bulk_unit", "GB", "duration_days", "5", "time_limit_minutes", "10")
+	f.exec(`UPDATE member SET used_seconds=600 WHERE id=?`, id)
+	f.rejected("alice", "pw", "OUT_OF_TIME")
+	edit("bulk_value", "2", "bulk_unit", "GB", "duration_days", "5", "time_limit_minutes", "20")
+	f.accepted("alice", "pw")
+	f.openSession(id, "alice", "s1", f.fc.Now())
+	f.rejected("alice", "pw", "NO_MORE_SESSION")
+	edit("bulk_value", "2", "bulk_unit", "GB", "duration_days", "5", "time_limit_minutes", "20", "max_sessions", "2")
+	f.accepted("alice", "pw")
 }
 
 // E1.19 resource-style routes (Q39): verbs, statuses, htmx config, removed verb routes.

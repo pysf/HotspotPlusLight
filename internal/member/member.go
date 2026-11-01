@@ -77,7 +77,7 @@ func (s *Service) env(ctx context.Context) (env, error) {
 		return env{}, fmt.Errorf("settings.timezone %q: %w", st.Timezone, lerr)
 	}
 	now := s.clock.Now()
-	return env{st, loc, now, now.Add(-time.Duration(st.AccountingIntervalSeconds+60) * time.Second)}, nil
+	return env{st, loc, now, domain.ActiveSince(now, st.AccountingIntervalSeconds)}, nil
 }
 
 // View is a member with everything the admin pages show about it.
