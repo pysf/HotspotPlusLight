@@ -82,8 +82,8 @@ Each phase is done by its own agent: tests first (E2E ids from `PLAN.md` §11), 
 Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **templ** components, vendored pinned htmx, `modernc.org/sqlite` (no CGO), `layeh.com/radius`, `bcrypt`, `httptest` + `goquery` in tests, `log/slog`. Timestamps are Unix seconds UTC; display in `settings.timezone`. Env vars are prefixed `HSP_` (see `PLAN.md` §9.2). Layout in `PLAN.md` §9.1.
 
 ## Current status
-- **Phase 0 is done** (skeleton, migrations, first-boot seeding, two listeners, RADIUS Reject stub, e2e harness + fake router; `make run`, `make test`). Phase 1 is next (admin login/sessions, `admin set-password`, settings, plan CRUD). `PLAN.md` v2 has every §3 decision resolved.
-- Next step: **Phase 1**.
+- **Phases 0 and 1 are done and committed** (skeleton, migrations, first-boot seeding, two listeners, RADIUS Reject stub, e2e harness + fake router; admin login/sessions/CSRF, `admin set-password`, plan CRUD, settings, shared templ UI components). Commands: `make run`, `make test`, `make ci`. Notes: `docs/phase0-notes.md`, `docs/phase1-notes.md`. Open owner question (Q44): the RADIUS shared secret is rendered in the settings page HTML in a password input — keep, or never put it in the page source. The skipped test `TestE1_18_LimitsChangeAffectsNextAccessRequest` is filled in during Phase 3. Run the `code-review` skill from inside this repo (it reviews the repo it is started in).
+- Next step: **Phase 2 (members)**, following the phase workflow above.
 
 ## Facts about the owner's environment
 - Deployment: a machine on the owner's local network; HTTP only is acceptable.
