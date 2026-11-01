@@ -416,11 +416,14 @@ Session identity key = `(username, acct_session_id, packet source IP)`, matched 
 |---|---|
 | Start | Create a new session row (status 1) — unless an open row for the key exists with `session_seconds = 0` (retransmission) → reuse. Capture MAC (BR-12). |
 | Interim | Find open row, else create one (`started_at = now − Acct-Session-Time`). Apply BR-11 deltas, update row, `last_update_at = now`, status 3. No server-side enforcement (O3 = legacy): the router's `Mikrotik-Xmit-Limit` and `Session-Timeout` end the session, and the next login is rejected by §7.2. |
-| Stop | Apply final deltas, status 2, `ended_at = now`, `terminate_cause`. |
-| Accounting-On/Off | Acknowledge with Accounting-Response, change nothing (legacy; reboot handling declined by owner, 2026-11-01). `MONITOR:` comment in code: ghost sessions after a router reboot can block `max_sessions` logins until the admin kicks or the session goes stale. |
+| Stop | Apply final deltas, status 2, `ended_at = now`, `terminate_cause`. A Stop/Interim with no open row whose figures are all <= the latest *finished* row of the same key is a retransmission/late duplicate and is ignored (Phase 4, 2026-11-01). |
+| Start on an open row that already counted time | (Phase 4 review, 2026-11-01) The router reused the id after a reboot: the old row is closed (`ended_at = now`, `terminate_cause = Lost-Service`, counters unchanged) and a new row is created, so it cannot stay online or count toward `max_sessions` (BR-9). |
+| Accounting-On/Off | (E4.11 asserts exactly this, 2026-11-01) Acknowledge with Accounting-Response, change nothing (legacy; reboot handling declined by owner, 2026-11-01). `MONITOR:` comment in code: ghost sessions after a router reboot can block `max_sessions` logins until the admin kicks or the session goes stale. |
 | Unknown user | Reply Accounting-Response, change nothing (legacy "silently discarded"). |
 
-Always respond with **Accounting-Response** after the transaction commits.
+Always respond with **Accounting-Response** after the transaction commits. A present but malformed accounting attribute drops the packet (WARN, no reply, no state change); absent ones count as 0/empty.
+
+**Known edge cases (accepted, `MONITOR:` comments; Phase 4 review, 2026-11-01):** (1) a reordered/delayed Interim (cur < prev) is treated as a counter restart (over-counts, rewinds the stored counter); (2) a late Interim/Stop with no open row and figures above the latest finished row creates a new row and double-bills the overlap (needed for server downtime, E4.17); (3) the finished-row fallback of `LatestSession` is a full scan (no index; fix = an index migration).
 
 ### 7.4 Disconnect (CoA port)
 See BR-18. Packet code 40; expect 41 (ACK) / 42 (NAK). Router needs incoming RADIUS enabled (see §9.4, verify on hardware).

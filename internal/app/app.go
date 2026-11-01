@@ -42,6 +42,9 @@ type Options struct {
 	// Disconnector sends RADIUS Disconnect-Requests (BR-18). Default: a no-op until
 	// Phase 5 provides the real CoA client; tests inject a recording fake.
 	Disconnector session.Disconnector
+	// AccountingBeforeCommit runs inside each accounting transaction just before the
+	// commit; an error rolls it back and the packet gets no reply (crash injection, E4.15).
+	AccountingBeforeCommit func() error
 }
 
 // Addrs are the bound listener addresses (useful when configured with port 0).
@@ -69,6 +72,8 @@ type App struct {
 	httpLn, adminLn    net.Listener
 	addrs              Addrs
 	stopOnce           sync.Once
+	pruneCancel        context.CancelFunc
+	pruneDone          chan struct{}
 }
 
 // New loads config, opens and migrates the database, verifies the key, seeds
@@ -142,19 +147,31 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if disc == nil {
 		disc = noopDisconnector{}
 	}
+	sessOpts := []session.Option{session.WithLogger(log)}
+	if opts.AccountingBeforeCommit != nil {
+		sessOpts = append(sessOpts, session.WithBeforeCommit(opts.AccountingBeforeCommit))
+	}
 	a.svc = services{
 		auth:      auth.New(st, opts.Clock),
 		evaluator: auth.NewEvaluator(st, box, opts.Clock, log),
 		member:    member.New(st, box, disc, opts.Clock),
 		plan:      plan.New(st, opts.Clock),
 		settings:  settings.New(st, opts.Clock),
-		session:   session.New(st, disc, opts.Clock),
+		session:   session.New(sessionRepo{st}, disc, opts.Clock, sessOpts...),
 		voucher:   voucher.New(opts.Clock),
 	}
-	a.radius = radius.New(st, a.svc.evaluator, log)
+	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, log)
 	a.httpSrv = &http.Server{Handler: pageapi.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Settings: a.svc.settings, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
+}
+
+// sessionRepo adapts the store to session.Repo: the store's transaction type is
+// concrete, the service wants its own consumer-side interface.
+type sessionRepo struct{ *store.Store }
+
+func (r sessionRepo) InAcctTx(ctx context.Context, fn func(session.AcctTx) error) error {
+	return r.Store.InAcctTx(ctx, func(tx *store.AcctTx) error { return fn(tx) })
 }
 
 // noopDisconnector is the production Disconnector until Phase 5 adds the real
@@ -233,9 +250,40 @@ func (a *App) Start() (err error) {
 	a.addrs = Addrs{a.httpLn.Addr().String(), a.adminLn.Addr().String(), a.authConn.LocalAddr().String(), a.acctConn.LocalAddr().String()}
 	go a.serveHTTP("public", a.httpSrv, a.httpLn)
 	go a.serveHTTP("admin", a.adminSrv, a.adminLn)
+	a.startPruning()
 	a.radius.Serve(a.authConn, a.acctConn)
 	a.log.Info("listening", "http", a.addrs.HTTP, "admin", a.addrs.Admin, "radius_auth", a.addrs.RadiusAuth, "radius_acct", a.addrs.RadiusAcct)
 	return nil
+}
+
+// pruneEvery is how often old sessions are pruned after the run at start (O18).
+const pruneEvery = 24 * time.Hour
+
+// startPruning prunes once now, in the background so RADIUS serving never waits for it (so a restart applies a changed retention) and
+// then daily until Shutdown. Real timer, not the injected clock: it only
+// schedules; the cut-off itself comes from the Clock.
+func (a *App) startPruning() {
+	ctx, cancel := context.WithCancel(context.Background())
+	a.pruneCancel, a.pruneDone = cancel, make(chan struct{})
+	run := func() {
+		if _, err := a.svc.session.Prune(ctx); err != nil && ctx.Err() == nil {
+			a.log.Error("session pruning failed", "err", err)
+		}
+	}
+	go func() {
+		defer close(a.pruneDone)
+		run()
+		t := time.NewTicker(pruneEvery)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				run()
+			}
+		}
+	}()
 }
 
 func (a *App) serveHTTP(name string, s *http.Server, ln net.Listener) {
@@ -250,6 +298,10 @@ func (a *App) Addrs() Addrs { return a.addrs }
 func (a *App) Shutdown(ctx context.Context) error {
 	var err error
 	a.stopOnce.Do(func() {
+		if a.pruneCancel != nil {
+			a.pruneCancel()
+			<-a.pruneDone
+		}
 		err = errors.Join(a.httpSrv.Shutdown(ctx), a.adminSrv.Shutdown(ctx), a.radius.Shutdown(ctx), a.store.Close())
 		a.log.Info("shutdown complete")
 	})

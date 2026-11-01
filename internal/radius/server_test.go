@@ -11,6 +11,8 @@ import (
 
 	"layeh.com/radius"
 	"layeh.com/radius/rfc2865"
+	"layeh.com/radius/rfc2866"
+	"layeh.com/radius/rfc2869"
 
 	"hotspotpluslight/internal/auth"
 	"hotspotpluslight/internal/domain"
@@ -36,14 +38,102 @@ func (f *fakeAuth) Login(_ context.Context, u, p string) (auth.Verdict, error) {
 	return f.verdict, f.err
 }
 
+// fakeAcct is a hand-written Accountant.
+type fakeAcct struct {
+	mu   sync.Mutex
+	recs []domain.AcctRecord
+	err  error
+}
+
+func (f *fakeAcct) Account(_ context.Context, r domain.AcctRecord) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recs = append(f.recs, r)
+	return f.err
+}
+
+func (f *fakeAcct) got() []domain.AcctRecord {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]domain.AcctRecord(nil), f.recs...)
+}
+
+func startBoth(t *testing.T, a Authenticator, ac Accountant) (authAddr, acctAddr string) {
+	t.Helper()
+	ap, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	cp, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	s := New(staticSecret("s3cret"), a, ac, slog.Default())
+	s.Serve(ap, cp)
+	t.Cleanup(func() { s.Shutdown(context.Background()) })
+	return ap.LocalAddr().String(), cp.LocalAddr().String()
+}
+
 func start(t *testing.T, a Authenticator) string {
 	t.Helper()
-	ac, _ := net.ListenPacket("udp", "127.0.0.1:0")
-	cc, _ := net.ListenPacket("udp", "127.0.0.1:0")
-	s := New(staticSecret("s3cret"), a, slog.Default())
-	s.Serve(ac, cc)
-	t.Cleanup(func() { s.Shutdown(context.Background()) })
-	return ac.LocalAddr().String()
+	addr, _ := startBoth(t, a, &fakeAcct{})
+	return addr
+}
+
+func acctPkt(typ rfc2866.AcctStatusType, sid string) *radius.Packet {
+	p := radius.New(radius.CodeAccountingRequest, []byte("s3cret"))
+	rfc2866.AcctStatusType_Set(p, typ)
+	rfc2865.UserName_SetString(p, "Alice")
+	if sid != "" {
+		rfc2866.AcctSessionID_SetString(p, sid)
+	}
+	rfc2866.AcctInputOctets_Set(p, 10)
+	rfc2869.AcctInputGigawords_Set(p, 2)
+	rfc2866.AcctOutputOctets_Set(p, 20)
+	rfc2866.AcctSessionTime_Set(p, 30)
+	rfc2865.CallingStationID_SetString(p, "AA:BB:CC:DD:EE:FF")
+	return p
+}
+
+func TestAccountingRecordAndReplyAfterAccount(t *testing.T) {
+	fa := &fakeAcct{}
+	_, addr := startBoth(t, &fakeAuth{}, fa)
+	reply, err := exchange(t, addr, acctPkt(rfc2866.AcctStatusType_Value_InterimUpdate, "s1"), 2*time.Second)
+	if err != nil || reply.Code != radius.CodeAccountingResponse {
+		t.Fatalf("%v %v", reply, err)
+	}
+	recs := fa.got()
+	if len(recs) != 1 {
+		t.Fatalf("%d records", len(recs))
+	}
+	r := recs[0]
+	want := domain.Counters{Download: 20, Upload: 2<<32 + 10, Seconds: 30}
+	if r.Status != domain.AcctInterim || r.Username != "Alice" || r.SessionID != "s1" || r.NASIP != "127.0.0.1" || r.MAC != "AA:BB:CC:DD:EE:FF" || r.Cum != want {
+		t.Fatalf("record %+v", r)
+	}
+}
+
+func TestAccountingFailureMeansNoReply(t *testing.T) {
+	_, addr := startBoth(t, &fakeAuth{}, &fakeAcct{err: errors.New("database is down")})
+	if reply, err := exchange(t, addr, acctPkt(rfc2866.AcctStatusType_Value_Stop, "s1"), 500*time.Millisecond); err == nil {
+		t.Fatalf("got a reply: %v", reply.Code)
+	}
+}
+
+func TestAccountingOnOffAckedWithoutRecord(t *testing.T) {
+	fa := &fakeAcct{}
+	_, addr := startBoth(t, &fakeAuth{}, fa)
+	for _, typ := range []rfc2866.AcctStatusType{rfc2866.AcctStatusType_Value_AccountingOn, rfc2866.AcctStatusType_Value_AccountingOff} {
+		reply, err := exchange(t, addr, acctPkt(typ, ""), 2*time.Second)
+		if err != nil || reply.Code != radius.CodeAccountingResponse {
+			t.Fatalf("%v %v", reply, err)
+		}
+	}
+	if len(fa.got()) != 0 {
+		t.Fatalf("records %v", fa.got())
+	}
+}
+
+func TestAccountingWithoutSessionIDDropped(t *testing.T) {
+	fa := &fakeAcct{}
+	_, addr := startBoth(t, &fakeAuth{}, fa)
+	if _, err := exchange(t, addr, acctPkt(rfc2866.AcctStatusType_Value_Start, ""), 400*time.Millisecond); err == nil || len(fa.got()) != 0 {
+		t.Fatal("a Start without Acct-Session-Id must be dropped")
+	}
 }
 
 func exchange(t *testing.T, addr string, p *radius.Packet, wait time.Duration) (*radius.Packet, error) {
@@ -99,5 +189,18 @@ func TestPlausiblePassword(t *testing.T) {
 		if got := plausiblePassword([]byte(in)); got != want {
 			t.Errorf("%q: %v", in, got)
 		}
+	}
+}
+
+func TestAccountingMalformedAttributeDroppedWithoutReply(t *testing.T) {
+	fa := &fakeAcct{}
+	_, addr := startBoth(t, &fakeAuth{}, fa)
+	p := acctPkt(rfc2866.AcctStatusType_Value_InterimUpdate, "s1")
+	p.Set(rfc2866.AcctInputOctets_Type, radius.Attribute{1, 2}) // not 4 bytes
+	if reply, err := exchange(t, addr, p, 500*time.Millisecond); err == nil {
+		t.Fatalf("got a reply: %v", reply.Code)
+	}
+	if n := len(fa.got()); n != 0 {
+		t.Fatalf("%d records accounted", n)
 	}
 }

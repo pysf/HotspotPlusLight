@@ -37,6 +37,9 @@ type Options struct {
 	Migrations fs.FS
 	// Disconnector replaces the production Disconnect client (see FakeDisconnector).
 	Disconnector session.Disconnector
+	// AccountingBeforeCommit runs inside every accounting transaction just before
+	// it commits; an error rolls it back and the packet gets no reply (E4.15).
+	AccountingBeforeCommit func() error
 	// Logger receives the server log (default: discarded).
 	Logger *slog.Logger
 }
@@ -119,6 +122,8 @@ func TryStart(opts Options) (*Server, error) {
 		Clock:        opts.Clock,
 		Migrations:   opts.Migrations,
 		Disconnector: opts.Disconnector,
+
+		AccountingBeforeCommit: opts.AccountingBeforeCommit,
 	})
 	if err != nil {
 		cancel()
