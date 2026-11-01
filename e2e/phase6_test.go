@@ -689,16 +689,19 @@ func TestE6_15_ThemeDownloads(t *testing.T) {
 			t.Errorf("%s: API base not baked from public_base_url", e.ID)
 		}
 		for _, code := range reasonCodes {
-			if n := len(regexp.MustCompile(`(?m)^\s*`+code+`:\s*"`).FindAllString(login, -1)); n != 2 {
-				t.Errorf("%s: %s has %d dictionary entries, want 2 (en + sample fa)", e.ID, code, n)
+			if n := len(regexp.MustCompile(`(?m)^\s*`+code+`:\s*"`).FindAllString(login, -1)); n != 1 {
+				t.Errorf("%s: %s has %d dictionary entries, want 1 (English only)", e.ID, code, n)
 			}
+		}
+		if regexp.MustCompile(`[\x{0600}-\x{06FF}]`).MatchString(login) {
+			t.Errorf("%s: the page contains Arabic-script text; it ships English only", e.ID)
 		}
 		// E6.18 the disconnected hint and its dictionary key
 		if !strings.Contains(login, "If you were disconnected, your plan's data or time may be used up. Try logging in again to see why.") {
 			t.Errorf("%s: hint line missing", e.ID)
 		}
-		if n := len(regexp.MustCompile(`(?m)^\s*DISCONNECTED_HINT:\s*"`).FindAllString(login, -1)); n != 2 {
-			t.Errorf("%s: DISCONNECTED_HINT has %d dictionary entries, want 2", e.ID, n)
+		if n := len(regexp.MustCompile(`(?m)^\s*DISCONNECTED_HINT:\s*"`).FindAllString(login, -1)); n != 1 {
+			t.Errorf("%s: DISCONNECTED_HINT has %d dictionary entries, want 1", e.ID, n)
 		}
 		if !strings.Contains(login, `data-i18n="DISCONNECTED_HINT"`) {
 			t.Errorf("%s: hint not bound to its key", e.ID)

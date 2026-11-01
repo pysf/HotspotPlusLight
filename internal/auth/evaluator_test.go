@@ -206,7 +206,7 @@ func TestAccount(t *testing.T) {
 
 func TestCredentialsByMAC(t *testing.T) {
 	f := newFake()
-	f.member.MAC = "aabbccddeeff"
+	f.member.MAC = "AA:BB:CC:DD:EE:FF"
 	ev := NewEvaluator(f, plainCipher{}, clock.NewFake(now0), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	u, pw, ok, err := ev.CredentialsByMAC(context.Background(), "AA:BB:CC:DD:EE:FF")
 	if err != nil || !ok || u != "alice" || pw != "pw" {
@@ -226,7 +226,7 @@ func TestCredentialsByMAC(t *testing.T) {
 // Several members may share a MAC: the newest one that could log in wins; if none can, the newest.
 func TestCredentialsByMACSeveralMembers(t *testing.T) {
 	f := newFake() // alice, id 1: expired
-	f.member.MAC = "aabbccddeeff"
+	f.member.MAC = "AA:BB:CC:DD:EE:FF"
 	exp := now0.Add(-time.Hour)
 	f.member.ExpiresAt = &exp
 	f.pw = "old"
@@ -243,7 +243,7 @@ func TestCredentialsByMACSeveralMembers(t *testing.T) {
 		t.Fatalf("only member: %q", u)
 	}
 	// A valid newer member wins over the expired old one.
-	f.macMembers = []domain.Member{{ID: 2, Username: "bob", Active: true, PlanID: 1, SubscriptionDate: now0, MAC: "aabbccddeeff"}}
+	f.macMembers = []domain.Member{{ID: 2, Username: "bob", Active: true, PlanID: 1, SubscriptionDate: now0, MAC: "AA:BB:CC:DD:EE:FF"}}
 	if u, pw := get(); u != "bob" || pw != "bob-pw" {
 		t.Fatalf("valid newer: %q %q", u, pw)
 	}

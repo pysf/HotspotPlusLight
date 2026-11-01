@@ -88,9 +88,9 @@ Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **
 
 - **Phase 4 (accounting and usage) is done and committed** (review findings fixed). Notes: `docs/phase4-notes.md`; known edge cases are listed there and in PLAN §7.3. Next: Phase 5 (online sessions and kick). Open questions for the owner: `docs/open-questions.md`.
 - **Phase 5 (online sessions and kick) is done and committed** (review findings fixed). Notes: `docs/phase5-notes.md`. Open questions for the owner: `docs/open-questions.md`.
-- **Phase 6 (router page pack and page API) is done and committed** (review findings fixed). Notes: `docs/phase6-notes.md`. Owner decisions 2026-11-02 (see `docs/open-questions.md`): all defaults accepted except row 12; English only (Persian sample removed); MAC stored RouterOS-style `AA:BB:CC:DD:EE:FF`; admin UI to move to **Tabler (boxed layout)** with the member list trimmed to username, online, status, data. Queue: MAC style + Persian removal, Tabler restyle, then Phase 7.
+- **Phase 6 (router page pack and page API) is done and committed** (review findings fixed). Notes: `docs/phase6-notes.md`. Owner decisions 2026-11-02 (see `docs/open-questions.md`): all defaults accepted except row 12; English only (Persian sample removed, done); MAC stored RouterOS-style `AA:BB:CC:DD:EE:FF` (done, `domain.NormalizeMAC`, see `docs/mac-and-english-notes.md`); admin UI to move to **Tabler (boxed layout)** with the member list trimmed to username, online, status, data. Queue: Tabler restyle, then Phase 7.
 
 ## Facts about the owner's environment
 - Deployment: a machine on the owner's local network; HTTP only is acceptable.
 - Only MikroTik routers are used. Legacy code for CoovaChilli/EnGenius was already broken server-side since 2019 and is not needed.
-- The legacy product was Iran-oriented (Persian UI, Payping, Kavenegar, Jalali dates). The rewrite is **English only**; the starter login page includes a sample Persian translation table (from the legacy messages) as an example the admin can edit. No payment/SMS integrations.
+- The legacy product was Iran-oriented (Persian UI, Payping, Kavenegar, Jalali dates). The rewrite is **English only**, including the starter login page (its translation table is keyed by reject code and ships English only; the admin can add a language by hand). No payment/SMS integrations.

@@ -168,13 +168,13 @@ func TestAccountAppliesDeltasAndCapturesMACOnce(t *testing.T) {
 		}
 	}
 	m := db.members["alice"]
-	if m.UsedDownload != 250 || m.MAC != "aabbccddeeff" || len(db.sessions) != 1 {
+	if m.UsedDownload != 250 || m.MAC != "AA:BB:CC:DD:EE:FF" || len(db.sessions) != 1 {
 		t.Fatalf("member %+v sessions %d", m, len(db.sessions))
 	}
 	r := rec(domain.AcctInterim, "alice", 300)
 	r.MAC = "11:22:33:44:55:66"
 	s.Account(ctx, r)
-	if db.members["alice"].MAC != "aabbccddeeff" {
+	if db.members["alice"].MAC != "AA:BB:CC:DD:EE:FF" {
 		t.Fatal("MAC overwritten")
 	}
 }

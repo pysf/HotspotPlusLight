@@ -16,11 +16,11 @@ E2E (`e2e/phase5_test.go`): E5.01-E5.12 as in PLAN section 11, plus E5.03b (rout
 After an ACK the router sends its own Stop with final totals. Treating the kicked row as finished would have created a second row and billed the whole session again. `domain.ApplyAccounting` now treats a row that is ended but whose status is not Stop (a kick-ended row) like an open one for Stop/Interim figures: same row, delta added once, `ended_at` and `Admin-Reset` kept, status becomes Stop (so a retransmitted Stop is ignored). A Start with the same id is a new session. Tests: domain `TestApplyAccountingStopCompletesKickedSession`, `E5.04`. Recorded in PLAN BR-18.
 
 ## VERIFY-ON-HARDWARE
-Whether RouterOS accepts this attribute set and matches on it, the spelling of `Calling-Station-Id` (router's `AA:BB:CC:DD:EE:FF` is sent, not the stored form), that incoming RADIUS is enabled on 3799 (PLAN 13), and whether a Disconnect-NAK carries `Error-Cause` (not read).
+Whether RouterOS accepts this attribute set and matches on it, the spelling of `Calling-Station-Id` (since 2026-11-02 the stored form is the RouterOS-style `AA:BB:CC:DD:EE:FF` and is sent as is), that incoming RADIUS is enabled on 3799 (PLAN 13), and whether a Disconnect-NAK carries `Error-Cause` (not read).
 
 ## Decisions to confirm
 1. Kick-ended rows are completed by the router's Stop (above), question 11.
-2. `Calling-Station-Id` in router spelling, question 12.
+2. `Calling-Station-Id` sent as stored (RouterOS spelling), question 12.
 3. Required identifiers for E5.10, question 13.
 4. `502` for router failures, question 14.
 5. Member-level Disconnect also kicks stale open rows, question 15.

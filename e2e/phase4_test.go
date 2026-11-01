@@ -138,18 +138,18 @@ func TestE4_01_StartCreatesSession(t *testing.T) {
 	}
 	s := f.session("s1")
 	if s.status != 1 || s.startedAt != t0.Unix() || s.lastUpdate != t0.Unix() || s.ended.Valid || s.nasIP != "127.0.0.1" ||
-		s.framedIP != "192.168.88.10" || s.mac != "aabbccddee01" || s.nasIdent != "fakenas" {
+		s.framedIP != "192.168.88.10" || s.mac != "AA:BB:CC:DD:EE:01" || s.nasIdent != "fakenas" {
 		t.Fatalf("session row %+v", s)
 	}
-	if got := scalar[string](t, f.db, `SELECT mac FROM member WHERE id=?`, id); got != "aabbccddee01" {
+	if got := scalar[string](t, f.db, `SELECT mac FROM member WHERE id=?`, id); got != "AA:BB:CC:DD:EE:01" {
 		t.Fatalf("member mac %q", got)
 	}
 	// A later session from another device never overwrites it (BR-12).
 	f.acct(fakenas.Acct{Type: rfc2866.AcctStatusType_Value_Start, User: "alice", SessionID: "s2", MAC: "11-22-33-44-55-66"})
-	if got := scalar[string](t, f.db, `SELECT mac FROM member WHERE id=?`, id); got != "aabbccddee01" {
+	if got := scalar[string](t, f.db, `SELECT mac FROM member WHERE id=?`, id); got != "AA:BB:CC:DD:EE:01" {
 		t.Fatalf("member mac overwritten: %q", got)
 	}
-	if f.session("s2").mac != "112233445566" {
+	if f.session("s2").mac != "11:22:33:44:55:66" {
 		t.Fatal("the session keeps its own device MAC")
 	}
 	// The username is case-insensitive and stored canonically.

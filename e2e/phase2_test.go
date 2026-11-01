@@ -56,7 +56,7 @@ func (f *p2) exec(q string, args ...any) {
 // openSession inserts an open router session row for the member (what Phase 4 accounting will create).
 func (f *p2) openSession(memberID int64, username, acctID string, lastUpdate time.Time) {
 	f.exec(`INSERT INTO session(member_id, username, acct_session_id, nas_ip, framed_ip, mac, status, started_at, last_update_at)
-		VALUES (?,?,?,?,?,?,3,?,?)`, memberID, username, acctID, "10.0.0.1", "192.168.88.10", "aabbccddeeff", lastUpdate.Unix()-100, lastUpdate.Unix())
+		VALUES (?,?,?,?,?,?,3,?,?)`, memberID, username, acctID, "10.0.0.1", "192.168.88.10", "AA:BB:CC:DD:EE:FF", lastUpdate.Unix()-100, lastUpdate.Unix())
 }
 
 // advance moves the clock in steps shorter than the admin session's idle limit,
@@ -227,16 +227,16 @@ func TestE2_03_Mobile(t *testing.T) {
 func TestE2_04_MAC(t *testing.T) {
 	f := newP2(t)
 	p := f.plan("Basic")
-	for i, in := range []string{"AA-BB-CC-DD-EE-FF", "aa:bb:cc:dd:ee:ff", "AABB.CCDD.EEFF", " aabbccddeeff "} {
+	for i, in := range []string{"AA-BB-CC-DD-EE-FF", "aa:bb:cc:dd:ee:ff", "AABB.CCDD.EEFF", " aabbccddeeff ", "aa bb cc dd ee ff"} {
 		id := f.member(p, fmt.Sprintf("m%d", i), "mac", in)
-		if got := scalar[string](t, f.db, `SELECT mac FROM member WHERE id=?`, id); got != "aabbccddeeff" {
+		if got := scalar[string](t, f.db, `SELECT mac FROM member WHERE id=?`, id); got != "AA:BB:CC:DD:EE:FF" {
 			t.Errorf("mac %q stored as %q", in, got)
 		}
 	}
 	if id := f.member(p, "nomac"); scalar[string](t, f.db, `SELECT mac FROM member WHERE id=?`, id) != "" {
 		t.Error("empty mac must stay empty")
 	}
-	for _, bad := range []string{"zz:zz:zz:zz:zz:zz", "aa:bb:cc", "aabbccddeeff00"} {
+	for _, bad := range []string{"zz:zz:zz:zz:zz:zz", "aa:bb:cc", "aabbccddeeff00", "AA:BB:CC:DD:EE:GG"} {
 		if r := f.c.Send("POST", "/admin/members", harness.MemberForm(p, "x", "mac", bad)); r.StatusCode != 422 || fieldError(r, t, "mac") == "" {
 			t.Errorf("mac %q: %d", bad, r.StatusCode)
 		}
@@ -248,7 +248,7 @@ func TestE2_04_MAC(t *testing.T) {
 	if r := f.c.Send("PUT", mpath(id), form); r.StatusCode != 200 {
 		t.Fatalf("edit: %d", r.StatusCode)
 	}
-	if got := scalar[string](t, f.db, `SELECT mac FROM member WHERE id=?`, id); got != "112233445566" {
+	if got := scalar[string](t, f.db, `SELECT mac FROM member WHERE id=?`, id); got != "11:22:33:44:55:66" {
 		t.Errorf("edited mac %q", got)
 	}
 }

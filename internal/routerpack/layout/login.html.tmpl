@@ -4,7 +4,7 @@
   This file is stored on the MikroTik router (hotspot folder) and edited by hand:
     - colors: the two CSS variables below; replace background.jpg and logo.png in the same folder
     - texts: the site title (loaded from the server, this is the fallback) and the footer
-    - translations: the HSP_MESSAGES table in the script; set HSP_LANG to pick one
+    - translations: English only; to add a language copy the "en" block of HSP_MESSAGES in the script and set HSP_LANG
   The router replaces its dollar-parenthesis variables when it serves this file.
   VERIFY-ON-HARDWARE: variable names, the form fields (username, password, dst, popup) and the login URL.
 -->
@@ -105,7 +105,9 @@ input:focus { outline: 2px solid #fff; }
 // How this page reaches the HotspotPlusLight server (settings.public_base_url). The server's address
 // must be in the router's walled garden.
 var HSP_API_BASE = {{js .APIBase}};
-// Language of the dictionary below: "en" or the sample "fa" (Persian). Add your own table the same way.
+// Language of the dictionary below. To add a language by hand: copy the whole "en" block, give the copy a
+// new key (e.g. de: { ... }), translate the texts, then set HSP_LANG to that key (the page lays out left-to-right; a right-to-left language would also need `dir="rtl"` added by hand). A code missing from the
+// chosen table falls back to the English text.
 var HSP_LANG = "en";
 
 // ---- translations, keyed by message code ---------------------------------
@@ -120,26 +122,6 @@ var HSP_MESSAGES = {
     PASSWORD: "Password",
     LOGIN: "Log in",
     NETWORK_ERROR: "Cannot reach the server. Check your connection and try again."
-  },
-  // Sample translation (from the legacy product's Persian texts); edit or delete.
-  fa: {
-    INVALID_CREDENTIALS: "نام کاربری یا رمز عبور غلط است.",
-    INACTIVE_USER: "این کاربر غیر فعال شده است.",
-    NO_PLAN: "هیچ بسته ی اینترنتی به این کاربر تخصیص داده نشده است.",
-    PLAN_REMOVED: "این بسته ی اینترنت حذف شده است.",
-    EXPIRED: "این حساب منقضی شده است.",
-    NO_ACTIVE_SUBSCRIPTION: "مدت بسته ی اینترنت شما به اتمام رسیده است.",
-    OUT_OF_BULK: "حجم شما به اتمام رسیده است.",
-    OUT_OF_TIME: "زمان استفاده شما به اتمام رسیده است.",
-    NO_MORE_SESSION: "یک نفر دیگر با این نام کاربری در حال استفاده از اینترنت است، دقایقی دیگر تلاش کنید.",
-    UNSUPPORTED_AUTH_METHOD: "این شبکه فقط از ورود با PAP پشتیبانی می‌کند.",
-    GENERAL_ERROR: "خطایی نامشخص در سمت سرور رخ داده است. با پشتیبانی تماس بگیرید یا لحظاتی دیگر تلاش کنید.",
-    TOO_MANY_ATTEMPTS: "تلاش‌های ناموفق زیاد بود. یک دقیقه دیگر دوباره تلاش کنید.",
-    DISCONNECTED_HINT: "اگر قطع شده‌اید، ممکن است حجم یا زمان بسته شما تمام شده باشد. دوباره وارد شوید تا دلیل را ببینید.",
-    USERNAME: "نام کاربری",
-    PASSWORD: "رمز عبور",
-    LOGIN: "ورود",
-    NETWORK_ERROR: "ارتباط با سرور برقرار نشد. دوباره تلاش کنید."
   }
 };
 
@@ -150,8 +132,6 @@ var HSP_MESSAGES = {
   var errorBox = document.getElementById("error-message");
   var button = document.getElementById("login-button");
   var afterLoginUrl = "";
-
-  if (HSP_LANG === "fa") { document.documentElement.dir = "rtl"; document.documentElement.lang = "fa"; }
 
   function text(code) {
     var table = HSP_MESSAGES[HSP_LANG] || {};

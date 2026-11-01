@@ -113,11 +113,11 @@ func NormalizeMobile(raw string) (string, bool) {
 	return d[len(d)-10:], true
 }
 
-// NormalizeMAC applies BR-3: lower-case hex without '-', ':' or '.'. Empty is valid.
-// The result must be 12 hex digits (VERIFY: legacy only stripped separators).
+// NormalizeMAC applies BR-3: the RouterOS spelling, upper-case hex pairs joined by ':'
+// ("AA:BB:CC:DD:EE:FF"). Separators ':', '-', '.' and spaces are stripped first; what remains
+// must be exactly 12 hex digits. Empty is valid. This is the only MAC normalizer.
 func NormalizeMAC(raw string) (string, bool) {
-	s := strings.ToLower(strings.TrimSpace(raw))
-	s = strings.NewReplacer("-", "", ":", "", ".", "").Replace(s)
+	s := strings.ToUpper(strings.NewReplacer("-", "", ":", "", ".", "", " ", "", "\t", "", "\r", "", "\n", "").Replace(raw))
 	if s == "" {
 		return "", true
 	}
@@ -125,11 +125,11 @@ func NormalizeMAC(raw string) (string, bool) {
 		return "", false
 	}
 	for _, r := range s {
-		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f') {
+		if !(r >= '0' && r <= '9' || r >= 'A' && r <= 'F') {
 			return "", false
 		}
 	}
-	return s, true
+	return s[0:2] + ":" + s[2:4] + ":" + s[4:6] + ":" + s[6:8] + ":" + s[8:10] + ":" + s[10:12], true
 }
 
 // MaxMemberPasswordLen bounds member passwords (RADIUS User-Password carries at most 128 bytes).

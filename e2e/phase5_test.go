@@ -183,7 +183,7 @@ func TestE5_12_OnlinePageColumnsAndPolling(t *testing.T) {
 		t.Fatalf("%d rows", row.Length())
 	}
 	cell := func(c string) string { return text(row.Find("td[data-col=" + c + "]")) }
-	if cell("username") != "alice" || cell("ip") != "192.168.88.10" || cell("mac") != "aabbccddee01" {
+	if cell("username") != "alice" || cell("ip") != "192.168.88.10" || cell("mac") != "AA:BB:CC:DD:EE:01" {
 		t.Fatalf("cells: user %q ip %q mac %q", cell("username"), cell("ip"), cell("mac"))
 	}
 	if cell("started") != "2026-11-01 12:00" {
@@ -260,7 +260,7 @@ func TestE5_03_KickSendsDisconnect(t *testing.T) {
 	if ip, err := rfc2865.FramedIPAddress_Lookup(p); err != nil || !ip.Equal(net.ParseIP("192.168.88.10")) {
 		t.Errorf("Framed-IP-Address %v %v", ip, err)
 	}
-	// VERIFY-ON-HARDWARE: the router's own spelling (colon-separated, upper case) is assumed for Calling-Station-Id.
+	// The stored MAC is already in the RouterOS spelling and is sent as is. VERIFY-ON-HARDWARE: that the router matches on it.
 	if got := rfc2865.CallingStationID_GetString(p); got != "AA:BB:CC:DD:EE:01" {
 		t.Errorf("Calling-Station-Id %q", got)
 	}

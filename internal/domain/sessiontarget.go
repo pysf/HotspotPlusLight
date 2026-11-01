@@ -40,14 +40,3 @@ func (t SessionTarget) Validate() error {
 	}
 	return fmt.Errorf("%w: the session has no %s", ErrKickIdentifiers, strings.Join(missing, ", "))
 }
-
-// RouterMAC spells a normalized MAC (BR-3) the way RouterOS writes Calling-Station-Id:
-// upper-case pairs separated by ':'. Anything that is not 12 hex digits is returned unchanged.
-// VERIFY-ON-HARDWARE: the router's own spelling is assumed to be what its Disconnect matching expects.
-func RouterMAC(mac string) string {
-	if len(mac) != 12 {
-		return mac
-	}
-	m := strings.ToUpper(mac)
-	return m[0:2] + ":" + m[2:4] + ":" + m[4:6] + ":" + m[6:8] + ":" + m[8:10] + ":" + m[10:12]
-}

@@ -20,12 +20,12 @@ func TestNormalizeMobile(t *testing.T) {
 }
 
 func TestNormalizeMAC(t *testing.T) {
-	for _, in := range []string{"AA-BB-CC-DD-EE-FF", "aa:bb:cc:dd:ee:ff", "AABB.CCDD.EEFF"} {
-		if got, ok := NormalizeMAC(in); !ok || got != "aabbccddeeff" {
+	for _, in := range []string{"AA-BB-CC-DD-EE-FF", "aa:bb:cc:dd:ee:ff", "AABB.CCDD.EEFF", "aabbccddeeff", " aa bb cc dd ee ff "} {
+		if got, ok := NormalizeMAC(in); !ok || got != "AA:BB:CC:DD:EE:FF" {
 			t.Errorf("%q -> %q %v", in, got, ok)
 		}
 	}
-	for _, in := range []string{"zz:zz:zz:zz:zz:zz", "aa:bb", "aabbccddeeff00"} {
+	for _, in := range []string{"zz:zz:zz:zz:zz:zz", "aa:bb", "aabbccddeeff00", "AA:BB:CC:DD:EE:GG"} {
 		if _, ok := NormalizeMAC(in); ok {
 			t.Errorf("%q accepted", in)
 		}
@@ -104,5 +104,12 @@ func TestBulkAmountsAreCappedInBytes(t *testing.T) {
 	f.Name, f.BulkValue, f.BulkUnit = "P", "1000000000000", "GB"
 	if _, errs := ParsePlan(f); errs["bulk_value"] == "" {
 		t.Fatalf("plan bulk 1e12 GB must be rejected: %v", errs)
+	}
+}
+
+func TestNormalizeMACIgnoresLineBreaks(t *testing.T) {
+	got, ok := NormalizeMAC("aa:bb:cc:dd:ee:ff\r\n")
+	if !ok || got != "AA:BB:CC:DD:EE:FF" {
+		t.Fatalf("got %q ok=%v", got, ok)
 	}
 }

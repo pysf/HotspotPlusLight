@@ -65,7 +65,7 @@ func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) e
 		rfc2865.FramedIPAddress_Set(p, ip)
 	}
 	if t.MAC != "" {
-		rfc2865.CallingStationID_SetString(p, domain.RouterMAC(t.MAC))
+		rfc2865.CallingStationID_SetString(p, t.MAC)
 	}
 	addr := net.JoinHostPort(t.NASIP, strconv.Itoa(st.CoaPort))
 	client := radius.Client{} // no library retry: the loop below resends the same packet

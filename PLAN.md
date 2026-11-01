@@ -82,7 +82,7 @@ Each row has my recommendation. Replying "accept all recommendations" is fine; o
 | O8 | **MAC auto-login.** | **RESOLVED — keep as a setting, off by default (owner, 2026-11-01).** The settings page shows a warning about MAC spoofing. | Implement as stated. |
 | O9 | **Member plan selection at the portal.** | **RESOLVED (owner, 2026-11-01).** Members never see plans and cannot choose or activate one; they are given a plan by the admin, who alone manages plans. There is **no public signup**: the portal has a single login page (plus the post-login status/account pages). The plan `access_type` (public/private) flag is dropped. | Implement as stated. |
 | O10 | **Default plan.** | **RESOLVED (owner, 2026-11-01); revised Q19:** every member **must have a plan** (no plan-less members). The admin picks one default plan in settings; it is only the **preselected value** of the plan dropdown on the new-member form (nothing is assigned silently). **Nothing is created at startup** (owner 2026-11-01): the admin creates the first plan in the web UI; until a default is chosen the form has no preselection. The activation period/count settings, the auto-assign toggle and the member activation counter are dropped (nothing triggers re-activation). The admin can change any member's plan. | Implement as stated. |
-| O11 | **Portal language.** | **RESOLVED (owner, 2026-11-01): English only, everywhere** (admin panel, API, router reject messages, voucher help). The router-hosted page carries its own translation dictionary keyed by message code. | Implement as stated. |
+| O11 | **Portal language.** | **RESOLVED (owner, 2026-11-01): English only, everywhere** (admin panel, API, router reject messages, voucher help). The router-hosted page carries its own translation dictionary keyed by message code, shipped with English only (Persian sample removed 2026-11-02); the admin can add a language by hand. | Implement as stated. |
 | O12 | **Delete a plan that members use.** | **RESOLVED — block it and show the member count (owner, 2026-11-01).** The default plan also cannot be deleted until another default is chosen. | Implement as stated. |
 | O13 | **Member username rules.** | **RESOLVED (owner, 2026-11-01): case-insensitive; only English letters and digits (`A–Z a–z 0–9`), 1–64 characters.** No `.`, `_`, `@`, `-` or non-ASCII characters. Persian/Arabic digits are **not** converted — they are rejected like any other invalid character (*to confirm: members typing Persian digits will simply fail to log in*). | Implement as stated. |
 | O14 | **Batch (voucher) parameters.** | **RESOLVED (owner, 2026-11-01): legacy defaults with 6-digit passwords.** Max 30 accounts per batch, usernames `wifi` + counter starting at 1360, expiry = local midnight of (today + plan duration + 1 day); all configurable in settings (`batch_max_count`, `batch_username_prefix`, `batch_counter`, `voucher_password_length` = 6). | Implement as stated. |
@@ -110,7 +110,7 @@ Legend: **Keep** = same behaviour · **Change** = kept, behaviour differs (see n
 | Disconnect/POD (`radiusDisconnectService.sendPod`) | Fix | Legacy needs `nasSessionId`, which is never persisted → kick never worked. New stores `Acct-Session-Id` and waits for ACK/NAK |
 | Reply: `Session-Timeout`, `Mikrotik-Rate-Limit`, `Mikrotik-Xmit-Limit`, `Acct-Interim-Interval` | Change | See O2, O3, O4 |
 | Reply: `Framed-Pool` (plan IP pool), framed IP/netmask | Drop | D13 |
-| Reply-Message (Persian error texts) | Change | English only, `"CODE: message"` (O11, O20); Persian legacy texts survive only as sample translations inside the starter page |
+| Reply-Message (Persian error texts) | Change | English only, `"CODE: message"` (O11, O20); the legacy Persian texts are not carried over (removed 2026-11-02) |
 | Accumulating usage deltas from cumulative counters | Fix | Legacy ignored `Acct-*-Gigawords` (>4 GiB sessions undercounted) and could double-count if a 1 h Redis key lapsed |
 | Member MAC captured from first accounting | Keep | BR-12 |
 | `Accounting-On/Off` (router reboot) | Same as legacy | Ignored (acknowledged only). Owner 2026-11-01: router reboots are not handled; ghost sessions and Session-Id reuse after a reboot are accepted risks |
@@ -212,7 +212,7 @@ Use these as the spec; each is exercised by named E2E tests (§10). Legacy refer
 
 **BR-2 Mobile** (optional field) — keep only ASCII digits (spaces, `+`, `-` dropped), then the **last 10 digits**; fewer than 10 digits → validation error (Phase 2, 2026-11-01). Legacy: `utility.verifyAndTrimMobile`.
 
-**BR-3 MAC** — normalize to lower-case hex without `-`, `:`, `.`; the result must be exactly 12 hex digits, else validation error (Phase 2 addition: legacy did not validate; empty stays allowed). Legacy: `utility.trimMac` (+ lower-casing in `loadProfile`).
+**BR-3 MAC** — canonical stored form is the **RouterOS spelling: upper-case hex pairs joined by `:` (`AA:BB:CC:DD:EE:FF`)** (owner, 2026-11-02; was 12 lower-case hex). One normalizer, `domain.NormalizeMAC`: strip `:`, `-`, `.` and spaces, the rest must be exactly 12 hex digits, else validation error (member form) / ignored with a WARN (accounting); empty stays allowed. Used by the member form, accounting capture (BR-12), the `devices/{mac}/credentials` lookup (any common spelling accepted, canonicalized before the query) and the session rows; the Disconnect sends the stored value as is. No data migration (pre-release). Legacy: `utility.trimMac` (+ lower-casing in `loadProfile`).
 
 **BR-4 Units** — speed → kbps: Kbps×1, Mbps×1000, Gbps×1,000,000. Bulk → bytes: KB×1024, MB×1024², GB×1024³. Values may be decimal. Legacy: `utility.toKbps/toByte`.
 
@@ -341,7 +341,7 @@ CREATE TABLE member (
   mobile TEXT NOT NULL DEFAULT '',
   email TEXT NOT NULL DEFAULT '',
   national_code TEXT NOT NULL DEFAULT '',          -- free text, no validation (legacy had none)
-  mac TEXT NOT NULL DEFAULT '',
+  mac TEXT NOT NULL DEFAULT '', -- 'AA:BB:CC:DD:EE:FF' (BR-3) or ''
   plan_id INTEGER NOT NULL REFERENCES plan(id) ON DELETE RESTRICT,
   subscription_date INTEGER NOT NULL,
   extra_bulk_bytes INTEGER NOT NULL DEFAULT 0,
@@ -365,7 +365,7 @@ CREATE TABLE session (
   nas_ip TEXT NOT NULL,                             -- packet source IP (used for kick)
   nas_identifier TEXT NOT NULL DEFAULT '',
   framed_ip TEXT NOT NULL DEFAULT '',
-  mac TEXT NOT NULL DEFAULT '',
+  mac TEXT NOT NULL DEFAULT '', -- 'AA:BB:CC:DD:EE:FF' (BR-3) or ''
   status INTEGER NOT NULL CHECK (status IN (1,2,3)),-- 1 start, 2 stop, 3 interim
   started_at INTEGER NOT NULL,
   last_update_at INTEGER NOT NULL,
@@ -426,7 +426,7 @@ Always respond with **Accounting-Response** after the transaction commits. A pre
 **Known edge cases (accepted, `MONITOR:` comments; Phase 4 review, 2026-11-01):** (1) a reordered/delayed Interim (cur < prev) is treated as a counter restart (over-counts, rewinds the stored counter); (2) a late Interim/Stop with no open row and figures above the latest finished row creates a new row and double-bills the overlap (needed for server downtime, E4.17); (3) the finished-row fallback of `LatestSession` is a full scan (no index; fix = an index migration).
 
 ### 7.4 Disconnect (CoA port)
-See BR-18. Packet code 40; expect 41 (ACK) / 42 (NAK). Router needs incoming RADIUS enabled (see §9.4, verify on hardware).
+See BR-18. `Calling-Station-Id` is the stored RouterOS-style MAC sent as is (BR-3, 2026-11-02; VERIFY-ON-HARDWARE that the router matches it). Packet code 40; expect 41 (ACK) / 42 (NAK). Router needs incoming RADIUS enabled (see §9.4, verify on hardware).
 
 ### 7.5 MikroTik vendor attributes (vendor-id 14988)
 | Attribute | Type id | Use |
@@ -437,7 +437,7 @@ See BR-18. Packet code 40; expect 41 (ACK) / 42 (NAK). Router needs incoming RAD
 *Type ids (Xmit-Limit 2, Rate-Limit 8, vendor 14988) were checked against the MikroTik dictionary shipped with `layeh.com/radius` in Phase 3 and match; the semantics on a real router remain VERIFY-ON-HARDWARE (§13).* No Gigawords attribute is sent (O3 = legacy).
 
 ### 7.6 Message catalog (English only — O11)
-*(Phase 6, 2026-11-01: `TOO_MANY_ATTEMPTS` is page-API only (HTTP 429), never a RADIUS reject; it is in the catalog so the starter page's dictionary has it.)* Each reject has a stable **code** and an English **message**. The Page API returns both (`code`, `message`); the RADIUS `Reply-Message` is `"<CODE>: <message>"` (O20). The legacy Persian texts (`radiusMessages.js`) are kept only as example translations inside the starter page.
+*(Phase 6, 2026-11-01: `TOO_MANY_ATTEMPTS` is page-API only (HTTP 429), never a RADIUS reject; it is in the catalog so the starter page's dictionary has it.)* Each reject has a stable **code** and an English **message**. The Page API returns both (`code`, `message`); the RADIUS `Reply-Message` is `"<CODE>: <message>"` (O20). The starter page ships this English table only (the legacy Persian texts were dropped, 2026-11-02); the admin adds a language by hand by copying the `en` block in the page script and setting `HSP_LANG`.
 
 | Code | English message |
 |---|---|
@@ -454,7 +454,6 @@ See BR-18. Packet code 40; expect 41 (ACK) / 42 (NAK). Router needs incoming RAD
 | GENERAL_ERROR | Unexpected server error. Contact support or try again. |
 | TOO_MANY_ATTEMPTS | Too many attempts. Try again in a minute. |
 
-Legacy Persian texts for the sample dictionary: INVALID_CREDENTIALS «نام کاربری یا رمز عبور غلط است.», INACTIVE_USER «این کاربر غیر فعال شده است.», NO_PLAN «هیچ بسته ی اینترنتی به این کاربر تخصیص داده نشده است.», PLAN_REMOVED «این بسته ی اینترنت حذف شده است.», NO_ACTIVE_SUBSCRIPTION «مدت بسته ی اینترنت شما به اتمام رسیده است.», OUT_OF_BULK «حجم شما به اتمام رسیده است.», OUT_OF_TIME «زمان استفاده شما به اتمام رسیده است.», NO_MORE_SESSION «یک نفر دیگر با این نام کاربری در حال استفاده از اینترنت است، دقایقی دیگر تلاش کنید.», GENERAL_ERROR «خطایی نامشخص در سمت سرور رخ داده است. با پشتیبانی تماس بگیرید یا لحظاتی دیگر تلاش کنید.»
 
 ---
 
@@ -475,7 +474,7 @@ Redesigned along REST practice (owner 2026-11-01, Q37; legacy shape not followed
 | Route | Behaviour |
 |---|---|
 | `GET /api/v1/account` | Basic auth (username normalized per BR-1, password verified). **`401`** wrong credentials. **`200`** with the member's status — this single call replaces the legacy pre-check *and* balance: `{"plan":{"name","speedKbps","durationDays","maxSessions"},"data":{"unlimited","allowedBytes","usedDownloadBytes","usedUploadBytes","remainingBytes"},"time":{"unlimited","allowedSeconds","usedSeconds","remainingSeconds"},"validUntil","expiresAt","loginAllowed":true|false,"reason":null|"<CODE>","message":null|"<English text>"}`. `loginAllowed`/`reason` come from checks 2–8 of §7.2 (not the session-count check) — the same domain code as the RADIUS login, so the page and the router can't disagree. A member over quota gets `200` with `loginAllowed:false, reason:"OUT_OF_BULK"` so the page can still show "0 left". |
-| `GET /api/v1/devices/{mac}/credentials` | Only when `settings.mac_auto_login` is on (O8): otherwise **`403`** `DISABLED`. MAC normalized (BR-3). Active member with that MAC ⇒ **`200`** `{"username","password"}`; none ⇒ **`404`** `DEVICE_NOT_FOUND`. Throttled like the others. |
+| `GET /api/v1/devices/{mac}/credentials` | Only when `settings.mac_auto_login` is on (O8): otherwise **`403`** `DISABLED`. MAC accepted in any common spelling and canonicalized (BR-3: `AA:BB:CC:DD:EE:FF`) before the lookup. Active member with that MAC ⇒ **`200`** `{"username","password"}`; none ⇒ **`404`** `DEVICE_NOT_FOUND`. Throttled like the others. |
 | `GET /api/v1/config` | `200` `{"siteTitle","afterLoginUrl"}`; read at page load so settings changes apply without re-uploading the page. |
 | `GET /healthz` | `200 ok` (not versioned, not JSON). |
 
@@ -548,10 +547,10 @@ HotspotPlusLight/
 SQLite single writer: all mutating work in short transactions; accounting handlers run synchronously per packet (fast). `Clock` is injected everywhere so tests control time. Background jobs: session pruning (daily), nothing else.
 
 ### 9.4 Router artifacts (generated from settings)
-**Themes (D22, T1, T2).** The 38 legacy styles (§16) are independent themes: each is one background photo + a primary color + an overlay color applied to **one shared layout**. Every download is a complete, self-contained hotspot folder: `login.html` with the theme's two colors as CSS custom properties at the top (`--primary-color`, `--overlay-color`), `background.jpg` and a placeholder `logo.png` in the same folder (the admin replaces them by hand), plus the router pages below. Packs are generated at download time from one layout template and the theme manifest; nothing is stored in the database. Layout elements (T2): optional logo, site title text (from `/api/v1/config`, with an editable static fallback), the login form (username, password, button, error-message area) and a footer text (edited in the HTML). Not included: signup, forgot-password, language switch, pin code, social links, balance box (the balance API still exists for admins who add one). Direction left-to-right, system font stack (legacy IRANSans was for the Persian UI). Repo layout (moved in Phase 6, 2026-11-01, to its own package; the six legacy logos are byte-identical, so one shared placeholder): `internal/routerpack/layout/{login.html.tmpl,logo.png}`, `internal/routerpack/themes/<category>/<style>/{theme.json,background.jpg}`, `internal/routerpack/pages/*.html`, embedded with `go:embed`. The admin gallery lists the 38 themes grouped by the six categories with live previews; with no `theme` parameter the download is `alpha-fall` (the legacy default).
+**Themes (D22, T1, T2).** The 38 legacy styles (§16) are independent themes: each is one background photo + a primary color + an overlay color applied to **one shared layout**. Every download is a complete, self-contained hotspot folder: `login.html` with the theme's two colors as CSS custom properties at the top (`--primary-color`, `--overlay-color`), `background.jpg` and a placeholder `logo.png` in the same folder (the admin replaces them by hand), plus the router pages below. Packs are generated at download time from one layout template and the theme manifest; nothing is stored in the database. Layout elements (T2): optional logo, site title text (from `/api/v1/config`, with an editable static fallback), the login form (username, password, button, error-message area) and a footer text (edited in the HTML). Not included: signup, forgot-password, language switch, pin code, social links, balance box (the balance API still exists for admins who add one). Direction left-to-right, system font stack (legacy IRANSans was for the legacy UI). Repo layout (moved in Phase 6, 2026-11-01, to its own package; the six legacy logos are byte-identical, so one shared placeholder): `internal/routerpack/layout/{login.html.tmpl,logo.png}`, `internal/routerpack/themes/<category>/<style>/{theme.json,background.jpg}`, `internal/routerpack/pages/*.html`, embedded with `go:embed`. The admin gallery lists the 38 themes grouped by the six categories with live previews; with no `theme` parameter the download is `alpha-fall` (the legacy default).
 
 `GET /admin/router/files.zip?theme=<id>` returns the **full hotspot folder** (P3) for the admin to download, customize and upload to the router:
-- `login.html` — the **customizable member page** (it carries a fixed hint line under the form: "If you were disconnected, your plan's data or time may be used up. Try logging in again to see why." — owner 2026-11-01, Q18; listed in the translation dictionary so it can be translated): static HTML + CSS + JS with no server templating. It holds a small config block (`HSP_API_BASE` = `settings.public_base_url`), an English-keyed **translation dictionary** (a sample Persian translation is included as an example), and the script below. It uses RouterOS variables (`$(mac)`, `$(link-orig)`, `$(link-login-only)`, `$(error)`, `$(username)`, …), which the router substitutes when serving the file.
+- `login.html` — the **customizable member page** (it carries a fixed hint line under the form: "If you were disconnected, your plan's data or time may be used up. Try logging in again to see why." — owner 2026-11-01, Q18; listed in the translation dictionary so it can be translated): static HTML + CSS + JS with no server templating. It holds a small config block (`HSP_API_BASE` = `settings.public_base_url`), an English-keyed **translation dictionary** (English only; to add a language the admin copies the `en` block by hand and sets `HSP_LANG`), and the script below. It uses RouterOS variables (`$(mac)`, `$(link-orig)`, `$(link-login-only)`, `$(error)`, `$(username)`, …), which the router substitutes when serving the file.
 - *(Phase 6, 2026-11-01: the pack is `hotspot/{login,alogin,status,logout,error,redirect,rlogin}.html`, `background.jpg`, `logo.png`; the legacy JSON helpers `rstatus`/`fstatus` served only the old SPA and are not carried over; the OS captive-check nudge runs in `alogin.html`, because `login.html` is left by the native form submit.)* The small router pages for success/status/logout/redirect/error (derived from the legacy `alogin, rlogin, status, rstatus, fstatus, logout, redirect` pages), adjusted to the new flow. *The exact set and content must be finalized against RouterOS documentation and a real router (VERIFY-ON-HARDWARE).* Legacy `rlogin.html` is not carried over as is — it redirected to the external portal and put `pap=$(plain-passwd)` in the URL.
 
 **Page script behaviour:** (1) read router variables; (2) `GET /api/v1/config`; (3) if MAC auto-login is enabled try `GET /api/v1/devices/{mac}/credentials` (404 ⇒ show the form); (4) on submit call `GET /api/v1/account` with the Basic header — `401`/`429` or `loginAllowed:false` ⇒ show the translated text for `code`/`reason` (fallback to the English `detail`/`message`); `loginAllowed:true` ⇒ submit the form natively to the router login (PAP, plaintext password); (5) the starter layout has no balance box (T2) — the status page only shows the router's own status values; the `account` response already carries the balance for admins who add one; (6) redirect to `afterLoginUrl` or the original URL; (7) fire the legacy OS captive-check nudge requests.
