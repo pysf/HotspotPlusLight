@@ -1,0 +1,8 @@
+{
+  "id": "market-strawberries",
+  "category": "Market",
+  "style": "strawberries",
+  "title": "Strawberries",
+  "primary": "rgb(163, 7, 1)",
+  "overlay": "rgba(0, 0, 0, 0.67)"
+}

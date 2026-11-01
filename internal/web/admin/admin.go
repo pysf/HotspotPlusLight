@@ -67,6 +67,7 @@ type Deps struct {
 	Members  MemberService
 	Sessions SessionService
 	Settings SettingsService
+	Router   RouterPack
 	Log      *slog.Logger
 }
 
@@ -119,6 +120,17 @@ func Handler(d Deps) http.Handler {
 				r.Put("/{id}", h.planUpdate)
 				r.Delete("/{id}", h.planDelete)
 			})
+			r.Route("/router", func(r chi.Router) {
+				r.Get("/", h.routerPage)
+				r.Get("/files.zip", h.packDownload)
+				r.Get("/themes", h.themeGallery)
+				r.Route("/themes/{id}", func(r chi.Router) {
+					r.Get("/", h.themePage)
+					r.Get("/login.html", h.themePreview)
+					r.Get("/background.jpg", h.themeBackground)
+					r.Get("/logo.png", h.themeLogo)
+				})
+			})
 			r.Get("/settings", h.settingsPage)
 			r.Put("/settings", h.settingsUpdate)
 		})
@@ -137,7 +149,7 @@ func redirect(to string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, to, http.StatusSeeOther) }
 }
 
-var nav = []ui.NavItem{{Label: "Members", Href: "/admin/members"}, {Label: "Online", Href: sessionsHome}, {Label: "Plans", Href: "/admin/plans"}, {Label: "Settings", Href: "/admin/settings"}}
+var nav = []ui.NavItem{{Label: "Members", Href: "/admin/members"}, {Label: "Online", Href: sessionsHome}, {Label: "Plans", Href: "/admin/plans"}, {Label: "Router", Href: "/admin/router"}, {Label: "Settings", Href: "/admin/settings"}}
 
 func layout(r *http.Request, title, active string) ui.LayoutData {
 	csrf, _ := r.Context().Value(ctxKey{}).(string)

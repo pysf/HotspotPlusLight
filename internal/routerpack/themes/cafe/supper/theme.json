@@ -1,0 +1,8 @@
+{
+  "id": "cafe-supper",
+  "category": "Cafe",
+  "style": "supper",
+  "title": "Supper",
+  "primary": "rgb(100, 71, 173)",
+  "overlay": "rgba(57, 41, 41, 0.5)"
+}

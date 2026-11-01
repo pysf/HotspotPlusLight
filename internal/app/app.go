@@ -23,6 +23,7 @@ import (
 	"hotspotpluslight/internal/member"
 	"hotspotpluslight/internal/plan"
 	"hotspotpluslight/internal/radius"
+	"hotspotpluslight/internal/routerpack"
 	"hotspotpluslight/internal/secret"
 	"hotspotpluslight/internal/session"
 	"hotspotpluslight/internal/settings"
@@ -162,8 +163,12 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		voucher:   voucher.New(opts.Clock),
 	}
 	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, log)
-	a.httpSrv = &http.Server{Handler: pageapi.Handler(), ReadHeaderTimeout: 10 * time.Second}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Sessions: a.svc.session, Settings: a.svc.settings, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	pack, err := routerpack.New()
+	if err != nil {
+		return fail(err)
+	}
+	a.httpSrv = &http.Server{Handler: pageapi.Handler(pageapi.Deps{Accounts: a.svc.evaluator, Settings: a.svc.settings, Clock: opts.Clock, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Sessions: a.svc.session, Settings: a.svc.settings, Router: pack, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 

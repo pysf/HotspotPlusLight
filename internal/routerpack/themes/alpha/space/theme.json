@@ -1,0 +1,8 @@
+{
+  "id": "alpha-space",
+  "category": "Alpha",
+  "style": "space",
+  "title": "Space",
+  "primary": "rgb(89, 61, 255)",
+  "overlay": "rgba(29, 22, 58, 0.64)"
+}

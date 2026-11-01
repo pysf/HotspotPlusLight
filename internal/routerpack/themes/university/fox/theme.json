@@ -1,0 +1,8 @@
+{
+  "id": "university-fox",
+  "category": "University",
+  "style": "fox",
+  "title": "Fox",
+  "primary": "rgb(254, 108, 91)",
+  "overlay": "rgba(0, 0, 0, 0.38)"
+}

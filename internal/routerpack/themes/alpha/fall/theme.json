@@ -1,0 +1,8 @@
+{
+  "id": "alpha-fall",
+  "category": "Alpha",
+  "style": "fall",
+  "title": "Fall",
+  "primary": "rgb(118, 24, 60)",
+  "overlay": "rgba(118, 24, 60, 0.58)"
+}

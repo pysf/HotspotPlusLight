@@ -4,3 +4,7 @@
 .dot.on { background: var(--bs-success); border-color: var(--bs-success); }
 .filter .field { margin-bottom: 0; }
 .htmx-request button { opacity: .6; }
+
+/* Theme gallery (router pages) */
+.theme-swatch { display: inline-block; width: 1rem; height: 1rem; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .25); }
+.theme-preview { width: 100%; max-width: 480px; height: 640px; }

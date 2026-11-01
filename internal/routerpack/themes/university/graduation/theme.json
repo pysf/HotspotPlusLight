@@ -1,0 +1,8 @@
+{
+  "id": "university-graduation",
+  "category": "University",
+  "style": "graduation",
+  "title": "Graduation",
+  "primary": "rgb(99, 70, 173)",
+  "overlay": "rgba(0, 0, 0, 0.38)"
+}

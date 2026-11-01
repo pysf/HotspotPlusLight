@@ -1,0 +1,69 @@
+package admin
+
+import (
+	"hotspotpluslight/internal/routerpack"
+	"hotspotpluslight/internal/web/ui"
+)
+
+templ RouterPage(l ui.LayoutData, noBaseURL bool, defaultTheme string) {
+	@ui.Layout(l) {
+		<h1 class="h3 mb-3">Router</h1>
+		if noBaseURL {
+			<div class="alert alert-warning" data-warning="public-base-url">
+				The public base URL is not set, so the login page cannot reach this server.
+				Set it in <a href="/admin/settings">Settings</a> before you download the folder.
+			</div>
+		}
+		<div class="card card-body mb-3">
+			<h2 class="h5">Login page</h2>
+			<p>
+				The member login page lives on the router. Download the hotspot folder, edit <code>login.html</code>
+				(footer, colors, translations), replace <code>logo.png</code> and <code>background.jpg</code>, and upload
+				the folder to the router.
+			</p>
+			<p class="mb-0">
+				<a class="btn btn-primary" href={ templ.SafeURL("/admin/router/files.zip") }>Download hotspot folder</a>
+				<a class="btn btn-outline-secondary" href="/admin/router/themes">Choose another theme</a>
+				<span class="text-body-secondary ms-2">Default theme: { defaultTheme }</span>
+			</p>
+		</div>
+	}
+}
+
+templ ThemeGalleryPage(l ui.LayoutData, groups []themeGroup) {
+	@ui.Layout(l) {
+		<h1 class="h3 mb-3">Themes</h1>
+		for _, g := range groups {
+			<section class="mb-4" data-category={ g.Category }>
+				<h2 class="h5">{ g.Category }</h2>
+				<div class="row row-cols-2 row-cols-md-4 g-3">
+					for _, t := range g.Themes {
+						<div class="col" data-theme={ t.ID } data-primary={ t.Primary } data-overlay={ t.Overlay }>
+							<div class="card h-100">
+								<a data-detail href={ templ.SafeURL(themeURL(t.ID)) }>
+									<img class="card-img-top" loading="lazy" alt={ t.Title } src={ themeURL(t.ID) + "/background.jpg" }/>
+								</a>
+								<div class="card-body p-2 d-flex align-items-center gap-2">
+									<span class="theme-swatch" style={ templ.SafeCSS("background:" + t.Primary) }></span>
+									<span class="theme-swatch" style={ templ.SafeCSS("background:" + t.Overlay) }></span>
+									<span data-title>{ t.Title }</span>
+								</div>
+							</div>
+						</div>
+					}
+				</div>
+			</section>
+		}
+	}
+}
+
+templ ThemePage(l ui.LayoutData, t routerpack.Theme) {
+	@ui.Layout(l) {
+		<h1 class="h3 mb-3">{ t.Category } / { t.Title }</h1>
+		<p>
+			<a class="btn btn-primary" data-download href={ templ.SafeURL(downloadURL(t.ID)) }>Download hotspot folder</a>
+			<a class="btn btn-outline-secondary" href="/admin/router/themes">All themes</a>
+		</p>
+		<iframe class="theme-preview border rounded bg-body" data-preview sandbox="allow-scripts" title="Preview" src={ themeURL(t.ID) + "/login.html" }></iframe>
+	}
+}

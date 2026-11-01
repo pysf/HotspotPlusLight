@@ -1,0 +1,8 @@
+{
+  "id": "alpha-field",
+  "category": "Alpha",
+  "style": "field",
+  "title": "Field",
+  "primary": "rgb(255, 119, 56)",
+  "overlay": "rgba(120, 60, 30, 0.58)"
+}

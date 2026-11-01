@@ -1,0 +1,8 @@
+{
+  "id": "university-sketch",
+  "category": "University",
+  "style": "sketch",
+  "title": "Sketch",
+  "primary": "rgb(244, 92, 36)",
+  "overlay": "rgba(0, 0, 0, 0.38)"
+}

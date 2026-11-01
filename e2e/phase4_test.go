@@ -526,6 +526,9 @@ func TestE4_16_Pruning(t *testing.T) {
 			rows.Scan(&sid)
 			out[sid] = true
 		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
 		return out
 	}
 

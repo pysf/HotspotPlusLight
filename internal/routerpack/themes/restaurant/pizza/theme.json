@@ -1,0 +1,8 @@
+{
+  "id": "restaurant-pizza",
+  "category": "Restaurant",
+  "style": "pizza",
+  "title": "Pizza",
+  "primary": "rgb(166, 57, 35)",
+  "overlay": "rgba(116, 75, 66, 0.64)"
+}

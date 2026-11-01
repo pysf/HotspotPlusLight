@@ -46,9 +46,9 @@ func randomToken() (string, error) {
 // Login checks the credentials (throttled per clientKey, e.g. the source IP)
 // and opens a server-side session.
 func (s *Service) Login(ctx context.Context, username, password, clientKey string) (AdminSession, error) {
-	defer s.throttle.lock(clientKey)() // one attempt at a time per client, or parallel guesses beat the limit
+	defer s.throttle.Lock(clientKey)() // one attempt at a time per client, or parallel guesses beat the limit
 	now := s.clock.Now()
-	if wait := s.throttle.retryAfter(clientKey, now); wait > 0 {
+	if wait := s.throttle.RetryAfter(clientKey, now); wait > 0 {
 		return AdminSession{}, &ThrottledError{RetryAfter: wait}
 	}
 	ok, err := s.VerifyAdmin(ctx, username, password)
@@ -56,10 +56,10 @@ func (s *Service) Login(ctx context.Context, username, password, clientKey strin
 		return AdminSession{}, err
 	}
 	if !ok {
-		s.throttle.failure(clientKey, now)
+		s.throttle.Failure(clientKey, now)
 		return AdminSession{}, ErrInvalidCredentials
 	}
-	s.throttle.success(clientKey)
+	s.throttle.Success(clientKey)
 	token, err := randomToken()
 	if err != nil {
 		return AdminSession{}, err

@@ -1,0 +1,8 @@
+{
+  "id": "market-autumn",
+  "category": "Market",
+  "style": "autumn",
+  "title": "Autumn",
+  "primary": "rgb(195, 94, 1)",
+  "overlay": "rgba(0, 0, 0, 0.4)"
+}

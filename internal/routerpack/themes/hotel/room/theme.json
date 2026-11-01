@@ -1,0 +1,8 @@
+{
+  "id": "hotel-room",
+  "category": "Hotel",
+  "style": "room",
+  "title": "Room",
+  "primary": "rgb(77, 19, 41)",
+  "overlay": "rgba(71, 40, 53, 0.74)"
+}

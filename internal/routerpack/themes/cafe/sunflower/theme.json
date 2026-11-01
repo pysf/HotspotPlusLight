@@ -1,0 +1,8 @@
+{
+  "id": "cafe-sunflower",
+  "category": "Cafe",
+  "style": "sunflower",
+  "title": "Sunflower",
+  "primary": "rgb(209, 102, 0)",
+  "overlay": "rgba(51, 15, 15, 0.5)"
+}

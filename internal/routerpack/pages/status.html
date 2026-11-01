@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<!-- Router status page. VERIFY-ON-HARDWARE: the variable names and that bytes-in is what the member uploaded. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="refresh" content="60">
+<title>Status</title>
+</head>
+<body style="font-family: system-ui, sans-serif; max-width: 420px; margin: 32px auto; padding: 0 16px;">
+<h1>Status</h1>
+<table cellpadding="6">
+<tr><td>User</td><td>$(username)</td></tr>
+<tr><td>IP address</td><td>$(ip)</td></tr>
+<tr><td>Connected for</td><td>$(uptime)</td></tr>
+<tr><td>Downloaded</td><td>$(bytes-out-nice)</td></tr>
+<tr><td>Uploaded</td><td>$(bytes-in-nice)</td></tr>
+$(if session-time-left != "")<tr><td>Time left</td><td>$(session-time-left)</td></tr>$(endif)
+</table>
+<p><a href="$(link-logout)">Log out</a></p>
+</body>
+</html>

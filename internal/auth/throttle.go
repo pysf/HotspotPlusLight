@@ -10,9 +10,9 @@ const (
 	loginLockout     = time.Minute
 )
 
-// throttle locks a client out for `lockout` after `max` failures within one
+// Throttle locks a client out for `lockout` after `max` failures within one
 // lockout period. In memory only: a restart forgives (single admin, LAN).
-type throttle struct {
+type Throttle struct {
 	mu      sync.Mutex
 	max     int
 	lockout time.Duration
@@ -32,12 +32,13 @@ type entry struct {
 	lockedUntil time.Time
 }
 
-func newThrottle(max int, lockout time.Duration) *throttle {
-	return &throttle{max: max, lockout: lockout, byKey: map[string]*entry{}, locks: map[string]*keyLock{}}
+// NewThrottle locks a key out for lockout after max failures.
+func NewThrottle(max int, lockout time.Duration) *Throttle {
+	return &Throttle{max: max, lockout: lockout, byKey: map[string]*entry{}, locks: map[string]*keyLock{}}
 }
 
-// retryAfter returns how long key must wait, or 0 if it may try.
-func (t *throttle) retryAfter(key string, now time.Time) time.Duration {
+// RetryAfter returns how long key must wait, or 0 if it may try.
+func (t *Throttle) RetryAfter(key string, now time.Time) time.Duration {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if e := t.byKey[key]; e != nil && now.Before(e.lockedUntil) {
@@ -46,7 +47,8 @@ func (t *throttle) retryAfter(key string, now time.Time) time.Duration {
 	return 0
 }
 
-func (t *throttle) failure(key string, now time.Time) {
+// Failure records one failure of key.
+func (t *Throttle) Failure(key string, now time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for k, e := range t.byKey { // opportunistic cleanup keeps the map small
@@ -67,7 +69,8 @@ func (t *throttle) failure(key string, now time.Time) {
 	}
 }
 
-func (t *throttle) success(key string) {
+// Success forgets the failures of key.
+func (t *Throttle) Success(key string) {
 	t.mu.Lock()
 	delete(t.byKey, key)
 	t.mu.Unlock()
@@ -75,7 +78,7 @@ func (t *throttle) success(key string) {
 
 // lock serializes check, verify and record for one key (other keys are not
 // blocked) and returns the release function.
-func (t *throttle) lock(key string) (unlock func()) {
+func (t *Throttle) Lock(key string) (unlock func()) {
 	t.mu.Lock()
 	l := t.locks[key]
 	if l == nil {

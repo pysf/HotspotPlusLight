@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<!--
+  HotspotPlusLight starter login page.
+  This file is stored on the MikroTik router (hotspot folder) and edited by hand:
+    - colors: the two CSS variables below; replace background.jpg and logo.png in the same folder
+    - texts: the site title (loaded from the server, this is the fallback) and the footer
+    - translations: the HSP_MESSAGES table in the script; set HSP_LANG to pick one
+  The router replaces its dollar-parenthesis variables when it serves this file.
+  VERIFY-ON-HARDWARE: variable names, the form fields (username, password, dst, popup) and the login URL.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="expires" content="-1">
+<title>{{html .SiteTitle}}</title>
+<style>
+:root {
+  --primary-color: {{.Primary}};
+  --overlay-color: {{.Overlay}};
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: url("background.jpg") center center / cover no-repeat fixed;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #fff;
+}
+.overlay {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--overlay-color);
+}
+.panel { width: 100%; max-width: 360px; text-align: center; }
+#logo { display: block; width: 120px; max-width: 40%; margin: 0 auto 16px; }
+#site-title { margin: 0 0 20px; font-size: 22px; font-weight: 600; }
+input[type=text], input[type=password] {
+  display: block;
+  width: 100%;
+  height: 50px;
+  margin: 0 0 14px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 50px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font: inherit;
+  text-align: center;
+  direction: ltr;
+}
+input::placeholder { color: #fff; opacity: 0.8; }
+input:focus { outline: 2px solid #fff; }
+#login-button {
+  width: 100%;
+  height: 50px;
+  border: 0;
+  border-radius: 50px;
+  background: var(--primary-color);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+#login-button:disabled { opacity: 0.6; cursor: wait; }
+#error-message {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
+}
+#hint { margin: 18px 0 0; font-size: 13px; opacity: 0.85; }
+#footer { margin-top: 24px; font-size: 13px; opacity: 0.85; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="overlay">
+  <main class="panel">
+    <img id="logo" src="logo.png" alt="">
+    <h1 id="site-title">{{html .SiteTitle}}</h1>
+    <form id="login-form" name="login" action="$(link-login-only)" method="post">
+      <input type="hidden" name="dst" value="$(link-orig)">
+      <input type="hidden" name="popup" value="true">
+      <input type="hidden" id="mac" value="$(mac)">
+      <input type="text" id="username" name="username" data-router-value="$(username)" data-i18n-placeholder="USERNAME" placeholder="Username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+      <input type="password" id="password" name="password" data-i18n-placeholder="PASSWORD" placeholder="Password" autocomplete="current-password" required>
+      <p id="error-message" role="alert" hidden></p>
+      <button type="submit" id="login-button" data-i18n="LOGIN">Log in</button>
+    </form>
+    <p id="hint" data-i18n="DISCONNECTED_HINT">If you were disconnected, your plan's data or time may be used up. Try logging in again to see why.</p>
+    <p id="footer">Edit this footer text in login.html.</p>
+    <!-- The router puts its own login error here; the script translates it. -->
+    <p id="router-error" hidden>$(error)</p>
+  </main>
+</div>
+<script>
+// ---- configuration -------------------------------------------------------
+// How this page reaches the HotspotPlusLight server (settings.public_base_url). The server's address
+// must be in the router's walled garden.
+var HSP_API_BASE = {{js .APIBase}};
+// Language of the dictionary below: "en" or the sample "fa" (Persian). Add your own table the same way.
+var HSP_LANG = "en";
+
+// ---- translations, keyed by message code ---------------------------------
+// A code the server sends that is missing here falls back to the English text it sends along.
+var HSP_MESSAGES = {
+  en: {
+{{- range .Messages}}
+    {{.Code}}: {{js .Text}},
+{{- end}}
+    DISCONNECTED_HINT: "If you were disconnected, your plan's data or time may be used up. Try logging in again to see why.",
+    USERNAME: "Username",
+    PASSWORD: "Password",
+    LOGIN: "Log in",
+    NETWORK_ERROR: "Cannot reach the server. Check your connection and try again."
+  },
+  // Sample translation (from the legacy product's Persian texts); edit or delete.
+  fa: {
+    INVALID_CREDENTIALS: "نام کاربری یا رمز عبور غلط است.",
+    INACTIVE_USER: "این کاربر غیر فعال شده است.",
+    NO_PLAN: "هیچ بسته ی اینترنتی به این کاربر تخصیص داده نشده است.",
+    PLAN_REMOVED: "این بسته ی اینترنت حذف شده است.",
+    EXPIRED: "این حساب منقضی شده است.",
+    NO_ACTIVE_SUBSCRIPTION: "مدت بسته ی اینترنت شما به اتمام رسیده است.",
+    OUT_OF_BULK: "حجم شما به اتمام رسیده است.",
+    OUT_OF_TIME: "زمان استفاده شما به اتمام رسیده است.",
+    NO_MORE_SESSION: "یک نفر دیگر با این نام کاربری در حال استفاده از اینترنت است، دقایقی دیگر تلاش کنید.",
+    UNSUPPORTED_AUTH_METHOD: "این شبکه فقط از ورود با PAP پشتیبانی می‌کند.",
+    GENERAL_ERROR: "خطایی نامشخص در سمت سرور رخ داده است. با پشتیبانی تماس بگیرید یا لحظاتی دیگر تلاش کنید.",
+    TOO_MANY_ATTEMPTS: "تلاش‌های ناموفق زیاد بود. یک دقیقه دیگر دوباره تلاش کنید.",
+    DISCONNECTED_HINT: "اگر قطع شده‌اید، ممکن است حجم یا زمان بسته شما تمام شده باشد. دوباره وارد شوید تا دلیل را ببینید.",
+    USERNAME: "نام کاربری",
+    PASSWORD: "رمز عبور",
+    LOGIN: "ورود",
+    NETWORK_ERROR: "ارتباط با سرور برقرار نشد. دوباره تلاش کنید."
+  }
+};
+
+// ---- script ----------------------------------------------------------------
+(function () {
+  "use strict";
+  var form = document.getElementById("login-form");
+  var errorBox = document.getElementById("error-message");
+  var button = document.getElementById("login-button");
+  var afterLoginUrl = "";
+
+  if (HSP_LANG === "fa") { document.documentElement.dir = "rtl"; document.documentElement.lang = "fa"; }
+
+  function text(code) {
+    var table = HSP_MESSAGES[HSP_LANG] || {};
+    return table[code] || HSP_MESSAGES.en[code] || "";
+  }
+
+  // Router variables the router did not substitute (e.g. a preview in the admin panel) count as empty.
+  function routerValue(s) { s = (s || "").trim(); return s.indexOf("\x24(") === 0 ? "" : s; }
+
+  function translatePage() {
+    var els = document.querySelectorAll("[data-i18n]");
+    for (var i = 0; i < els.length; i++) { els[i].textContent = text(els[i].getAttribute("data-i18n")) || els[i].textContent; }
+    els = document.querySelectorAll("[data-i18n-placeholder]");
+    for (var j = 0; j < els.length; j++) { els[j].placeholder = text(els[j].getAttribute("data-i18n-placeholder")) || els[j].placeholder; }
+  }
+
+  function showError(code, fallback) {
+    errorBox.textContent = (code && text(code)) || fallback || text("GENERAL_ERROR");
+    errorBox.hidden = false;
+  }
+
+  function busy(on) { button.disabled = on; }
+
+  // GET <base><path>; resolves {status, body} (body is the parsed JSON or null).
+  function api(path, headers) {
+    return fetch(HSP_API_BASE + path, { headers: headers || {}, cache: "no-store" }).then(function (r) {
+      return r.text().then(function (txt) {
+        var body = null;
+        try { body = JSON.parse(txt); } catch (e) { body = null; }
+        return { status: r.status, body: body };
+      });
+    });
+  }
+
+  function basic(user, pass) {
+    var utf8 = unescape(encodeURIComponent(user + ":" + pass));
+    return "Basic " + btoa(utf8);
+  }
+
+  // Ask the server why a login would fail before the router sees the password; if all is well,
+  // submit the form natively to the router (PAP, same origin).
+  function check(user, pass) {
+    errorBox.hidden = true;
+    busy(true);
+    api("/api/v1/account", { Authorization: basic(user, pass) }).then(function (res) {
+      var b = res.body;
+      if (res.status === 200 && b && b.loginAllowed) {
+        form.elements.dst.value = afterLoginUrl || form.elements.dst.value;
+        form.submit();
+        return;
+      }
+      if (res.status === 200 && b) { showError(b.reason, b.message); }
+      else if (b && b.code) { showError(b.code, b.detail); }
+      else { showError("NETWORK_ERROR"); }
+      busy(false);
+    }, function () { showError("NETWORK_ERROR"); busy(false); });
+  }
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    check(form.elements.username.value.trim(), form.elements.password.value);
+  });
+
+  // The router's own error (e.g. the RADIUS Reply-Message "CODE: message").
+  function showRouterError() {
+    var raw = routerValue(document.getElementById("router-error").textContent);
+    if (!raw) { return false; }
+    var m = /^([A-Z_]+): (.*)$/.exec(raw);
+    if (m) { showError(m[1], m[2]); } else { showError(null, raw); }
+    return true;
+  }
+
+  function start() {
+    translatePage();
+    var presetUser = routerValue(form.elements.username.getAttribute("data-router-value"));
+    if (presetUser) { form.elements.username.value = presetUser; }
+    var hadError = showRouterError();
+    if (!HSP_API_BASE) { return; }
+    api("/api/v1/config").then(function (res) {
+      if (res.status !== 200 || !res.body) { return; }
+      if (res.body.siteTitle) {
+        document.getElementById("site-title").textContent = res.body.siteTitle;
+        document.title = res.body.siteTitle;
+      }
+      afterLoginUrl = res.body.afterLoginUrl || "";
+    }).catch(function () {}).then(function () {
+      var mac = routerValue(document.getElementById("mac").value);
+      if (!mac || hadError) { return; }
+      // MAC auto-login (a server setting, off by default): the server answers 403 when it is off.
+      return api("/api/v1/devices/" + encodeURIComponent(mac) + "/credentials").then(function (res) {
+        if (res.status === 200 && res.body && res.body.username) {
+          form.elements.username.value = res.body.username;
+          form.elements.password.value = res.body.password;
+          check(res.body.username, res.body.password);
+        }
+      }).catch(function () {});
+    });
+  }
+
+  start();
+})();
+</script>
+</body>
+</html>

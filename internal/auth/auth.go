@@ -29,11 +29,11 @@ type Repo interface {
 type Service struct {
 	repo     Repo
 	clock    clock.Clock
-	throttle *throttle
+	throttle *Throttle
 }
 
 func New(repo Repo, c clock.Clock) *Service {
-	return &Service{repo: repo, clock: c, throttle: newThrottle(loginMaxFailures, loginLockout)}
+	return &Service{repo: repo, clock: c, throttle: NewThrottle(loginMaxFailures, loginLockout)}
 }
 
 // VerifyAdmin reports whether username/password match the admin account.
