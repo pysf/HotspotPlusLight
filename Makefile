@@ -1,4 +1,4 @@
-.PHONY: build run vet test ci clean generate
+.PHONY: build run set-password reset-password vet test ci clean generate
 
 # Key used by `make run` when HSP_SECRET_KEY is not set. Created once, kept out of git.
 DEV_KEY_FILE := .dev-secret-key
@@ -10,6 +10,12 @@ build:
 run: build
 	@test -f $(DEV_KEY_FILE) || openssl rand -base64 32 > $(DEV_KEY_FILE)
 	HSP_SECRET_KEY="$${HSP_SECRET_KEY:-$$(cat $(DEV_KEY_FILE))}" ./bin/hotspotpluslight serve
+
+# Set (or reset) the admin password for the ./data database; prompts twice without echo.
+# Rules (BR-20): min 16 chars with upper, lower, digit and symbol. Logs out every open admin session.
+set-password reset-password: build
+	@test -f $(DEV_KEY_FILE) || openssl rand -base64 32 > $(DEV_KEY_FILE)
+	HSP_SECRET_KEY="$${HSP_SECRET_KEY:-$$(cat $(DEV_KEY_FILE))}" ./bin/hotspotpluslight admin set-password
 
 vet:
 	go vet ./...
