@@ -32,15 +32,91 @@ type Repo interface {
 	InAcctTx(ctx context.Context, fn func(AcctTx) error) error
 	SessionRetentionDays(ctx context.Context) (int, error)
 	PruneSessions(ctx context.Context, cutoff time.Time) (int, error)
+	GetSettings(ctx context.Context) (domain.Settings, error)
+	CountOnlineSessions(ctx context.Context, since time.Time) (int, error)
+	ListOnlineSessions(ctx context.Context, since time.Time, limit, offset int) ([]domain.Session, error)
+	// SessionTargetByID reports whether the row is still open; domain.ErrNotFound if unknown.
+	SessionTargetByID(ctx context.Context, id int64) (t domain.SessionTarget, open bool, err error)
+	EndSession(ctx context.Context, id int64, now time.Time, cause string) error
 }
 
 // Target identifies a session to disconnect (BR-18). The type lives in domain
 // so that the member service can use it without importing this package.
 type Target = domain.SessionTarget
 
-// Disconnector sends a RADIUS Disconnect-Request (implemented in Phase 5 by internal/radius).
+// Disconnector sends a RADIUS Disconnect-Request and returns nil only on a
+// Disconnect-ACK (implemented by internal/radius). Errors wrap domain.ErrKick*.
 type Disconnector interface {
 	Disconnect(ctx context.Context, t Target) error
+}
+
+// KickCause is the terminate cause of a session ended by an ACKed kick (BR-18).
+const KickCause = "Admin-Reset"
+
+// Disconnect sends a Disconnect-Request for t and, on ACK, marks the session row
+// ended. On NAK or timeout the session stays as it was and the error is returned
+// (BR-18). It is the Disconnector the member service uses (deactivate, delete).
+func (s *Service) Disconnect(ctx context.Context, t Target) error {
+	if err := s.disc.Disconnect(ctx, t); err != nil {
+		return err
+	}
+	if t.ID == 0 {
+		return nil
+	}
+	// The router has disconnected the user. If marking the row fails, that is still
+	// a success for the admin (a retry would send a second Disconnect); the router's
+	// Stop closes the row later.
+	if err := s.repo.EndSession(ctx, t.ID, s.clock.Now(), KickCause); err != nil {
+		s.log.Error("disconnect ACKed but the session row could not be marked ended; the router's Stop will close it", "session_id", t.ID, "err", err)
+	}
+	return nil
+}
+
+// Kick disconnects one session by row id: domain.ErrNotFound if unknown,
+// domain.ErrSessionEnded if it is already finished.
+func (s *Service) Kick(ctx context.Context, id int64) error {
+	t, open, err := s.repo.SessionTargetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !open {
+		return domain.ErrSessionEnded
+	}
+	return s.Disconnect(ctx, t)
+}
+
+// OnlineView is one page of the online list (BR-17).
+type OnlineView struct {
+	Rows                    []domain.Session
+	Total, Page, Pages, Per int
+	IntervalSeconds         int // settings.accounting_interval_seconds, shown as "updated every N s"
+	Now                     time.Time
+	Loc                     *time.Location
+}
+
+// Online returns one page of the online sessions, newest first. "Online" is the
+// same predicate as the member list's dot (store.onlineSession, domain.ActiveSince).
+func (s *Service) Online(ctx context.Context, page, per int) (OnlineView, error) {
+	st, err := s.repo.GetSettings(ctx)
+	if err != nil {
+		return OnlineView{}, err
+	}
+	loc, err := st.Location()
+	if err != nil {
+		return OnlineView{}, err
+	}
+	now := s.clock.Now()
+	since := domain.ActiveSince(now, st.AccountingIntervalSeconds)
+	total, err := s.repo.CountOnlineSessions(ctx, since)
+	if err != nil {
+		return OnlineView{}, err
+	}
+	page, per, pages := domain.NormalizePaging(page, per, total)
+	rows, err := s.repo.ListOnlineSessions(ctx, since, per, (page-1)*per)
+	if err != nil {
+		return OnlineView{}, err
+	}
+	return OnlineView{Rows: rows, Total: total, Page: page, Pages: pages, Per: per, IntervalSeconds: st.AccountingIntervalSeconds, Now: now, Loc: loc}, nil
 }
 
 type Service struct {

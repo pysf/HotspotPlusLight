@@ -17,8 +17,8 @@ type LayoutData struct {
 }
 
 // htmxConfig makes htmx swap 422 (validation) and 409 (conflict) responses
-// like successes; other 4xx/5xx stay errors (PLAN 8.2).
-const htmxConfig = `{"responseHandling":[{"code":"422|409","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
+// like successes (502 = the router did not do what was asked); other 4xx/5xx stay errors (PLAN 8.2).
+const htmxConfig = `{"responseHandling":[{"code":"422|409|502","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
 
 func bodyAttrs(d LayoutData) templ.Attributes {
 	if d.CSRF == "" {

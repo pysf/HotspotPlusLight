@@ -1,8 +1,11 @@
 package session
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +20,7 @@ type fakeDB struct {
 	members  map[string]*domain.Member
 	sessions []domain.Session
 	retDays  int
+	endErr   error // EndSession fails with it
 	pruned   time.Time
 }
 
@@ -29,6 +33,45 @@ func (f *fakeDB) SessionRetentionDays(context.Context) (int, error) { return f.r
 func (f *fakeDB) PruneSessions(_ context.Context, c time.Time) (int, error) {
 	f.pruned = c
 	return 3, nil
+}
+
+func (f *fakeDB) GetSettings(context.Context) (domain.Settings, error) {
+	return domain.Settings{Timezone: "UTC", AccountingIntervalSeconds: 60}, nil
+}
+
+// online mirrors the SQL predicate: not ended and updated since the cut-off.
+func (f *fakeDB) online(since time.Time) []domain.Session {
+	var out []domain.Session
+	for _, s := range f.sessions {
+		if s.EndedAt == nil && !s.LastUpdateAt.Before(since) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+func (f *fakeDB) CountOnlineSessions(_ context.Context, since time.Time) (int, error) {
+	return len(f.online(since)), nil
+}
+func (f *fakeDB) ListOnlineSessions(_ context.Context, since time.Time, limit, offset int) ([]domain.Session, error) {
+	all := f.online(since)
+	if offset >= len(all) {
+		return nil, nil
+	}
+	return all[offset:min(offset+limit, len(all))], nil
+}
+func (f *fakeDB) SessionTargetByID(_ context.Context, id int64) (domain.SessionTarget, bool, error) {
+	if id < 1 || int(id) > len(f.sessions) {
+		return domain.SessionTarget{}, false, domain.ErrNotFound
+	}
+	s := f.sessions[id-1]
+	return domain.SessionTarget{ID: id, Username: s.Username, AcctSessionID: s.AcctSessionID, NASIP: s.NASIP}, s.EndedAt == nil, nil
+}
+func (f *fakeDB) EndSession(_ context.Context, id int64, now time.Time, cause string) error {
+	if f.endErr != nil {
+		return f.endErr
+	}
+	f.sessions[id-1].EndedAt, f.sessions[id-1].TerminateCause = &now, cause
+	return nil
 }
 
 func (f *fakeDB) InAcctTx(_ context.Context, fn func(AcctTx) error) error {
@@ -170,5 +213,74 @@ func TestPrune(t *testing.T) {
 	db.retDays = 90
 	if n, _ := s.Prune(context.Background()); n != 3 || !db.pruned.Equal(t0.Add(-90*24*time.Hour)) {
 		t.Fatalf("cutoff %v", db.pruned)
+	}
+}
+
+func openRows(db *fakeDB, now time.Time, ages ...time.Duration) {
+	for i, a := range ages {
+		db.sessions = append(db.sessions, domain.Session{ID: int64(i + 1), Username: "alice", AcctSessionID: "s", NASIP: "1.2.3.4", StartedAt: now.Add(-time.Hour), LastUpdateAt: now.Add(-a)})
+	}
+}
+
+func TestOnlineListsOnlyActiveAndPages(t *testing.T) {
+	db := newDB()
+	// interval 60 s: active while updated within 120 s; the third is stale.
+	openRows(db, t0, 0, 119*time.Second, 121*time.Second)
+	ended := t0
+	db.sessions[0].EndedAt = &ended
+	s := New(db, &FakeDisconnector{}, clock.NewFake(t0))
+	v, err := s.Online(context.Background(), 1, 20)
+	if err != nil || v.Total != 1 || len(v.Rows) != 1 || v.Rows[0].ID != 2 || v.IntervalSeconds != 60 {
+		t.Fatalf("%+v %v", v, err)
+	}
+	if v, _ := s.Online(context.Background(), 9, 3); v.Page != 1 || v.Per != 20 {
+		t.Fatalf("paging not normalized: %+v", v)
+	}
+}
+
+func TestDisconnectEndsSessionOnlyOnAck(t *testing.T) {
+	db := newDB()
+	openRows(db, t0, 0)
+	disc := &FakeDisconnector{}
+	s := New(db, disc, clock.NewFake(t0))
+	ctx := context.Background()
+	disc.Err = domain.ErrKickRefused
+	if err := s.Kick(ctx, 1); !errors.Is(err, domain.ErrKickRefused) || db.sessions[0].EndedAt != nil {
+		t.Fatalf("NAK: err %v ended %v", err, db.sessions[0].EndedAt)
+	}
+	disc.Err = nil
+	if err := s.Kick(ctx, 1); err != nil || db.sessions[0].EndedAt == nil || db.sessions[0].TerminateCause != KickCause {
+		t.Fatalf("ACK: err %v session %+v", err, db.sessions[0])
+	}
+	if err := s.Kick(ctx, 1); !errors.Is(err, domain.ErrSessionEnded) {
+		t.Fatalf("again: %v", err)
+	}
+	if err := s.Kick(ctx, 7); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("unknown: %v", err)
+	}
+	if len(disc.Calls) != 2 {
+		t.Fatalf("%d Disconnects sent, want 2 (none for ended/unknown)", len(disc.Calls))
+	}
+}
+
+// After a Disconnect-ACK the router did disconnect the user: a database failure
+// while marking the row must not turn into an error (a retry would send a second
+// Disconnect); it is logged and the router's Stop closes the row later.
+func TestDisconnectAckThenStoreFailureIsSuccess(t *testing.T) {
+	db := newDB()
+	openRows(db, t0, 0)
+	db.endErr = errors.New("database is locked")
+	var buf bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&buf, nil))
+	disc := &FakeDisconnector{}
+	s := New(db, disc, clock.NewFake(t0), WithLogger(log))
+	if err := s.Kick(context.Background(), 1); err != nil {
+		t.Fatalf("ACK + store failure must succeed, got %v", err)
+	}
+	if !strings.Contains(buf.String(), "level=ERROR") || !strings.Contains(buf.String(), "database is locked") {
+		t.Fatalf("store failure not logged at ERROR: %q", buf.String())
+	}
+	if len(disc.Calls) != 1 {
+		t.Fatalf("%d Disconnects", len(disc.Calls))
 	}
 }

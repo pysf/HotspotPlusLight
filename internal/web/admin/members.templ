@@ -182,6 +182,24 @@ templ MemberFormView(p MemberFormProps) {
 	</form>
 }
 
+// MemberStatus is the plan / status / online line. With oob it is sent as an
+// out-of-band swap, so a kick response refreshes it next to the flash.
+templ MemberStatus(m memberVM, oob bool) {
+	<p id="member-status" class="text-body-secondary" { oobAttrs(oob)... }>
+		Plan { m.PlanName } · status { m.Status }
+		if m.Online {
+			· online
+		}
+	</p>
+}
+
+func oobAttrs(oob bool) templ.Attributes {
+	if oob {
+		return templ.Attributes{"hx-swap-oob": "true"}
+	}
+	return nil
+}
+
 templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 	@ui.Layout(l) {
 		<h1 class="h3 mb-3">{ m.Username }</h1>
@@ -191,12 +209,7 @@ templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 					@UsageCells(m)
 				</tr>
 			}
-			<p class="text-body-secondary">
-				Plan { m.PlanName } · status { m.Status }
-				if m.Online {
-					· online
-				}
-			</p>
+			@MemberStatus(m, false)
 			if m.RenewalText != "" {
 				<p data-renewal>{ m.RenewalText }</p>
 			}
@@ -221,6 +234,7 @@ templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 				</form>
 			</div>
 			<div class="d-flex gap-2 mt-3">
+				@ui.ConfirmAction("Disconnect", "post", memberURL(m.ID)+"/disconnections", "Disconnect all open sessions of this member?")
 				@ui.ConfirmAction("Renew now", "post", memberURL(m.ID)+"/renewals", "Restart this member's validity window? Used data, time and extra data are cleared.")
 				@ui.ConfirmDelete("Delete member", memberURL(m.ID), "Delete this member? Open sessions are disconnected first.")
 			</div>

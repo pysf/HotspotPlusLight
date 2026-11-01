@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 )
@@ -44,4 +45,30 @@ func (q Quota) TimeText() string {
 		return FormatMinutes(q.UsedSeconds) + " / unlimited"
 	}
 	return FormatMinutes(q.UsedSeconds) + " / " + FormatMinutes(q.AllowedSeconds) + " (" + FormatMinutes(q.RemainingSecs) + " left)"
+}
+
+// FormatSize prints a byte count in the unit that fits it: B, KB, MB or GB (online list).
+func FormatSize(b int64) string {
+	switch {
+	case b < 1024:
+		return strconv.FormatInt(b, 10) + " B"
+	case b < 1024*1024:
+		return FormatBytes(b, "KB")
+	case b < 1024*1024*1024:
+		return FormatBytes(b, "MB")
+	}
+	return FormatBytes(b, "GB")
+}
+
+// FormatDuration prints seconds as "30 s", "5 min 03 s" or "2 h 05 min".
+func FormatDuration(seconds int64) string {
+	seconds = max(seconds, 0)
+	h, m, s := seconds/3600, seconds/60%60, seconds%60
+	switch {
+	case h > 0:
+		return fmt.Sprintf("%d h %02d min", h, m)
+	case m > 0:
+		return fmt.Sprintf("%d min %02d s", m, s)
+	}
+	return fmt.Sprintf("%d s", s)
 }

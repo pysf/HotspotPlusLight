@@ -3,6 +3,8 @@ package member
 import (
 	"context"
 	"errors"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -135,13 +137,19 @@ func (xorCipher) Encrypt(p []byte) ([]byte, error) { return append([]byte("enc:"
 func (xorCipher) Decrypt(d []byte) ([]byte, error) { return d[4:], nil }
 
 type fakeDisc struct {
+	mu    sync.Mutex
 	calls []domain.SessionTarget
 	fail  bool
+	delay time.Duration                   // simulates a router that is slow to answer
+	failF func(domain.SessionTarget) bool // fail only these targets
 }
 
 func (d *fakeDisc) Disconnect(_ context.Context, t domain.SessionTarget) error {
+	time.Sleep(d.delay)
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.calls = append(d.calls, t)
-	if d.fail {
+	if d.fail || (d.failF != nil && d.failF(t)) {
 		return errors.New("nak")
 	}
 	return nil
@@ -292,5 +300,32 @@ func TestMemberPasswordRejectsControlCharacters(t *testing.T) {
 	}
 	if msg, _ := s.SetPassword(ctx, id, "x\x1by"); msg == "" {
 		t.Error("set-password accepted a control character")
+	}
+}
+
+// Disconnects of one request run concurrently (bounded), so N silent sessions cost
+// about one timeout window per batch of workers, not N windows; the result counts stay exact.
+func TestKickSendsDisconnectsConcurrently(t *testing.T) {
+	s, r, d := setup()
+	id, errs, err := s.Create(context.Background(), domain.MemberForm{Username: "alice", PlanID: "1", Active: true})
+	if err != nil || len(errs) > 0 {
+		t.Fatal(errs, err)
+	}
+	for i := range 24 {
+		r.sessions = append(r.sessions, domain.SessionTarget{ID: int64(i + 1), Username: "u", AcctSessionID: strconv.Itoa(i)})
+	}
+	d.delay = 100 * time.Millisecond
+	d.failF = func(t domain.SessionTarget) bool { return t.ID%6 == 0 } // 4 failures
+	start := time.Now()
+	res, err := s.DisconnectMember(context.Background(), id)
+	took := time.Since(start)
+	if err != nil || res.Attempted != 24 || res.Failed != 4 {
+		t.Fatalf("result %+v err %v", res, err)
+	}
+	if took > time.Second { // sequential would be 2.4 s
+		t.Fatalf("took %v: Disconnects are not concurrent", took)
+	}
+	if len(d.calls) != 24 {
+		t.Fatalf("%d calls", len(d.calls))
 	}
 }

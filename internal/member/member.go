@@ -5,8 +5,8 @@ package member
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"hotspotpluslight/internal/clock"
@@ -43,7 +43,7 @@ type Cipher interface {
 	Decrypt(data []byte) ([]byte, error)
 }
 
-// Disconnector ends a router session (BR-18); implemented in Phase 5 by the RADIUS CoA client.
+// Disconnector ends a router session (BR-18); implemented by session.Service (RADIUS Disconnect + mark ended on ACK).
 type Disconnector interface {
 	Disconnect(ctx context.Context, t domain.SessionTarget) error
 }
@@ -72,9 +72,9 @@ func (s *Service) env(ctx context.Context) (env, error) {
 	if err != nil {
 		return env{}, err
 	}
-	loc, lerr := time.LoadLocation(st.Timezone)
-	if lerr != nil { // settings validation rejects bad zones, so this is a corrupt-settings error
-		return env{}, fmt.Errorf("settings.timezone %q: %w", st.Timezone, lerr)
+	loc, err := st.Location()
+	if err != nil {
+		return env{}, err
 	}
 	now := s.clock.Now()
 	return env{st, loc, now, domain.ActiveSince(now, st.AccountingIntervalSeconds)}, nil
@@ -167,7 +167,6 @@ type KickResult struct{ Attempted, Failed int }
 // kick sends a Disconnect for every open session of the selection. Failures are
 // counted, never fatal: the caller carries on (BR-18, BR-23). It returns the
 // targets it tried.
-// VERIFY-ON-HARDWARE: the real Disconnect client arrives in Phase 5.
 func (s *Service) kick(ctx context.Context, sel domain.MemberSelection, now time.Time) (KickResult, []domain.SessionTarget, error) {
 	targets, err := s.repo.OpenSessions(ctx, sel, now)
 	if err != nil {
@@ -178,14 +177,41 @@ func (s *Service) kick(ctx context.Context, sel domain.MemberSelection, now time
 	return res, targets, nil
 }
 
-// disconnect sends a Disconnect for each target and adds the outcome to res.
+// kickWorkers bounds the concurrent Disconnects of one request: each may wait up
+// to 3 s for a silent router, so serial sends would stall the HTTP request.
+const kickWorkers = 8
+
+// disconnect sends a Disconnect for each target (at most kickWorkers at a time)
+// and adds the outcome to res. The counts do not depend on the finishing order.
 func (s *Service) disconnect(ctx context.Context, targets []domain.SessionTarget, res *KickResult) {
-	for _, t := range targets {
+	failed := make([]bool, len(targets)) // one slot per target: no shared writes
+	sem := make(chan struct{}, kickWorkers)
+	var wg sync.WaitGroup
+	for i, t := range targets {
+		sem <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer func() { <-sem; wg.Done() }()
+			failed[i] = s.disc.Disconnect(ctx, t) != nil
+		}()
+	}
+	wg.Wait()
+	for _, f := range failed {
 		res.Attempted++
-		if s.disc.Disconnect(ctx, t) != nil {
+		if f {
 			res.Failed++
 		}
 	}
+}
+
+// DisconnectMember kicks every open session of one member (BR-18, E5.07).
+// domain.ErrNotFound if the member does not exist.
+func (s *Service) DisconnectMember(ctx context.Context, id int64) (KickResult, error) {
+	if _, err := s.repo.GetMember(ctx, id); err != nil {
+		return KickResult{}, err
+	}
+	res, _, err := s.kick(ctx, domain.MemberSelection{IDs: []int64{id}}, s.clock.Now())
+	return res, err
 }
 
 // Update validates and stores the member's editable fields. Changing the plan
@@ -370,11 +396,13 @@ func (s *Service) Delete(ctx context.Context, sel domain.MemberSelection) (Delet
 	for _, t := range kicked {
 		done[t] = true
 	}
+	var missed []domain.SessionTarget
 	for _, t := range deleted {
 		if !done[t] {
-			s.disconnect(ctx, []domain.SessionTarget{t}, &kick)
+			missed = append(missed, t)
 		}
 	}
+	s.disconnect(ctx, missed, &kick)
 	return DeleteResult{Deleted: n, Kick: kick}, nil
 }
 

@@ -39,8 +39,8 @@ type Options struct {
 	Logger     *slog.Logger        // default text logger on stderr at HSP_LOG_LEVEL
 	Clock      clock.Clock         // default real clock
 	Migrations fs.FS               // default embedded migrations (tests inject others)
-	// Disconnector sends RADIUS Disconnect-Requests (BR-18). Default: a no-op until
-	// Phase 5 provides the real CoA client; tests inject a recording fake.
+	// Disconnector sends RADIUS Disconnect-Requests (BR-18). Default: the real
+	// RADIUS client (internal/radius); tests inject a recording fake.
 	Disconnector session.Disconnector
 	// AccountingBeforeCommit runs inside each accounting transaction just before the
 	// commit; an error rolls it back and the packet gets no reply (crash injection, E4.15).
@@ -145,24 +145,25 @@ func New(ctx context.Context, opts Options) (*App, error) {
 
 	disc := opts.Disconnector
 	if disc == nil {
-		disc = noopDisconnector{}
+		disc = radius.NewDisconnector(st, log)
 	}
 	sessOpts := []session.Option{session.WithLogger(log)}
 	if opts.AccountingBeforeCommit != nil {
 		sessOpts = append(sessOpts, session.WithBeforeCommit(opts.AccountingBeforeCommit))
 	}
+	sess := session.New(sessionRepo{st}, disc, opts.Clock, sessOpts...)
 	a.svc = services{
 		auth:      auth.New(st, opts.Clock),
 		evaluator: auth.NewEvaluator(st, box, opts.Clock, log),
-		member:    member.New(st, box, disc, opts.Clock),
+		member:    member.New(st, box, sess, opts.Clock), // kicks go through the session service: ACK => session ended
 		plan:      plan.New(st, opts.Clock),
 		settings:  settings.New(st, opts.Clock),
-		session:   session.New(sessionRepo{st}, disc, opts.Clock, sessOpts...),
+		session:   sess,
 		voucher:   voucher.New(opts.Clock),
 	}
 	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, log)
 	a.httpSrv = &http.Server{Handler: pageapi.Handler(), ReadHeaderTimeout: 10 * time.Second}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Settings: a.svc.settings, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Sessions: a.svc.session, Settings: a.svc.settings, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 
@@ -173,14 +174,6 @@ type sessionRepo struct{ *store.Store }
 func (r sessionRepo) InAcctTx(ctx context.Context, fn func(session.AcctTx) error) error {
 	return r.Store.InAcctTx(ctx, func(tx *store.AcctTx) error { return fn(tx) })
 }
-
-// noopDisconnector is the production Disconnector until Phase 5 adds the real
-// RADIUS Disconnect client. It reports success without contacting the router.
-// MONITOR: until then, deleting or deactivating a member does not end their
-// router session.
-type noopDisconnector struct{}
-
-func (noopDisconnector) Disconnect(context.Context, domain.SessionTarget) error { return nil }
 
 // seed performs first-boot seeding (O15, BR-21) and prints the generated admin
 // password exactly once.

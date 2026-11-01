@@ -24,7 +24,7 @@ func (s *Store) GetMemberForLogin(ctx context.Context, username string) (domain.
 // CountActiveSessions counts the member's unended sessions updated at or after since (BR-9).
 func (s *Store) CountActiveSessions(ctx context.Context, memberID int64, since time.Time) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM session WHERE member_id = ? AND ended_at IS NULL AND last_update_at >= ?`,
+	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM session s WHERE s.member_id = ? AND `+onlineSession,
 		memberID, since.Unix()).Scan(&n)
 	return n, err
 }

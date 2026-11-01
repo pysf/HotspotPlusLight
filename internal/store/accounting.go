@@ -51,25 +51,30 @@ const sessionCols = `id, member_id, username, acct_session_id, nas_ip, nas_ident
 // scan, only when there is no open row. Add an index migration if it ever matters.
 func (t *AcctTx) LatestSession(ctx context.Context, username, sessionID, nasIP string) (*domain.Session, error) {
 	for _, open := range []string{" AND ended_at IS NULL", " AND ended_at IS NOT NULL"} {
-		row := t.tx.QueryRowContext(ctx, `SELECT `+sessionCols+` FROM session WHERE username=? AND acct_session_id=? AND nas_ip=?`+open+
-			` ORDER BY id DESC LIMIT 1`, username, sessionID, nasIP)
-		var s domain.Session
-		var status int
-		var started, last int64
-		var ended sql.NullInt64
-		err := row.Scan(&s.ID, &s.MemberID, &s.Username, &s.AcctSessionID, &s.NASIP, &s.NASIdentifier, &s.FramedIP, &s.MAC, &status,
-			&started, &last, &ended, &s.TerminateCause, &s.Cum.Download, &s.Cum.Upload, &s.Cum.Seconds)
+		sess, err := scanSession(t.tx.QueryRowContext(ctx, `SELECT `+sessionCols+` FROM session WHERE username=? AND acct_session_id=? AND nas_ip=?`+open+
+			` ORDER BY id DESC LIMIT 1`, username, sessionID, nasIP))
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
 		}
 		if err != nil {
 			return nil, err
 		}
-		s.Status = domain.AcctStatus(status)
-		s.StartedAt, s.LastUpdateAt, s.EndedAt = time.Unix(started, 0).UTC(), time.Unix(last, 0).UTC(), optTime(ended)
-		return &s, nil
+		return &sess, nil
 	}
 	return nil, nil
+}
+
+// scanSession reads one row selected with sessionCols.
+func scanSession(row rowScanner) (domain.Session, error) {
+	var s domain.Session
+	var status int
+	var started, last int64
+	var ended sql.NullInt64
+	err := row.Scan(&s.ID, &s.MemberID, &s.Username, &s.AcctSessionID, &s.NASIP, &s.NASIdentifier, &s.FramedIP, &s.MAC, &status,
+		&started, &last, &ended, &s.TerminateCause, &s.Cum.Download, &s.Cum.Upload, &s.Cum.Seconds)
+	s.Status = domain.AcctStatus(status)
+	s.StartedAt, s.LastUpdateAt, s.EndedAt = time.Unix(started, 0).UTC(), time.Unix(last, 0).UTC(), optTime(ended)
+	return s, err
 }
 
 func (t *AcctTx) InsertSession(ctx context.Context, s domain.Session) error {

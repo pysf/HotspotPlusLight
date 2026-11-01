@@ -102,6 +102,16 @@ type AcctResult struct {
 	Session Session
 }
 
+// kickEnded reports whether r is the router's final Stop of a session the admin
+// kicked (BR-18): the stored row is finished (EndedAt set) yet its status is not
+// Stop, and r is a Stop whose figures are all >= the stored ones. Only then does
+// r complete this same row, so the usage is counted once and the row keeps its
+// Admin-Reset cause. Anything else (an Interim, a Stop with a counter reset
+// because the router reused the Acct-Session-Id) follows the normal path.
+func kickEnded(s *Session, r AcctRecord) bool {
+	return s != nil && s.EndedAt != nil && s.Status != AcctStop && r.Status == AcctStop && r.Cum.Covers(s.Cum)
+}
+
 // ApplyAccounting is the pure core of PLAN 7.3 + BR-11. latest is the stored
 // session for the identity key (username, Acct-Session-Id, NAS address), nil if
 // none; now is the server receive time (O19).
@@ -130,7 +140,7 @@ func ApplyAccounting(latest *Session, r AcctRecord, now time.Time) AcctResult {
 			closed = &c
 		}
 		s = Session{StartedAt: now}
-	case open:
+	case open, kickEnded(latest, r):
 		s = *latest
 	case latest != nil && latest.Cum.Covers(r.Cum):
 		return AcctResult{Ignore: true}
@@ -151,7 +161,7 @@ func ApplyAccounting(latest *Session, r AcctRecord, now time.Time) AcctResult {
 		s.MAC = r.MAC
 	}
 	s.Status, s.Cum, s.LastUpdateAt = r.Status, r.Cum, now
-	if r.Status == AcctStop {
+	if r.Status == AcctStop && s.EndedAt == nil {
 		end := now
 		s.EndedAt, s.TerminateCause = &end, r.TerminateCause
 	}

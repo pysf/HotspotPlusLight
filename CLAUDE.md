@@ -87,6 +87,7 @@ Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **
 - **Phase 3 (RADIUS authentication) is done and committed** (review findings fixed). Notes: `docs/phase3-notes.md`. Admin UI is styled with Bootstrap 5.3.8 CSS only (owner 2026-11-01, D24: vendored + pinned, no Bootstrap JS; Pico rejected because it is archived; see `docs/ui-notes.md`). Next: Phase 4. **Autonomy (owner, 2026-11-01):** run the phases one after another without asking for confirmation; a blocker becomes an entry in `docs/open-questions.md` and work continues on the plan's recommended default.
 
 - **Phase 4 (accounting and usage) is done and committed** (review findings fixed). Notes: `docs/phase4-notes.md`; known edge cases are listed there and in PLAN §7.3. Next: Phase 5 (online sessions and kick). Open questions for the owner: `docs/open-questions.md`.
+- **Phase 5 (online sessions and kick) is done and committed** (review findings fixed). Notes: `docs/phase5-notes.md`. Next: Phase 6 (router page pack and page API). Open questions for the owner: `docs/open-questions.md`.
 
 ## Facts about the owner's environment
 - Deployment: a machine on the owner's local network; HTTP only is acceptable.

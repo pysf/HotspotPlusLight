@@ -1,6 +1,10 @@
 package domain
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+	"time"
+)
 
 // Settings mirrors the single settings row (PLAN.md section 6) minus key_check.
 type Settings struct {
@@ -19,6 +23,15 @@ type Settings struct {
 	VoucherHelp               string
 	PublicBaseURL             string
 	SessionRetentionDays      int
+}
+
+// Location is the display zone. A bad zone name is a corrupt-settings error (the settings form validates it).
+func (s Settings) Location() (*time.Location, error) {
+	loc, err := time.LoadLocation(s.Timezone)
+	if err != nil {
+		return nil, fmt.Errorf("settings.timezone %q: %w", s.Timezone, err)
+	}
+	return loc, nil
 }
 
 // SettingsForm is the raw text of the settings form.

@@ -193,7 +193,12 @@ func selectionClause(sel domain.MemberSelection, now time.Time) (string, []any) 
 	return `0`, nil
 }
 
-const onlineExists = `EXISTS (SELECT 1 FROM session s WHERE s.member_id = m.id AND s.ended_at IS NULL AND s.last_update_at >= ?)`
+// onlineSession is THE definition of an online session (BR-9, BR-17): not ended and
+// updated since the cut-off (the one parameter, domain.ActiveSince). The member
+// list, the concurrent-session check and the online page all use it.
+const onlineSession = `s.ended_at IS NULL AND s.last_update_at >= ?`
+
+const onlineExists = `EXISTS (SELECT 1 FROM session s WHERE s.member_id = m.id AND ` + onlineSession + `)`
 
 // CountFiltered counts the members matching a filter.
 func (s *Store) CountFiltered(ctx context.Context, f domain.MemberFilter, now time.Time) (int, error) {
@@ -261,7 +266,7 @@ type querier interface {
 }
 
 func openSessions(ctx context.Context, q querier, where string, args []any) ([]domain.SessionTarget, error) {
-	rows, err := q.QueryContext(ctx, `SELECT s.nas_ip, s.username, s.acct_session_id, s.framed_ip, s.mac FROM session s
+	rows, err := q.QueryContext(ctx, `SELECT s.id, s.nas_ip, s.username, s.acct_session_id, s.framed_ip, s.mac FROM session s
 		JOIN member m ON m.id = s.member_id WHERE s.ended_at IS NULL AND (`+where+`) ORDER BY s.id`, args...)
 	if err != nil {
 		return nil, err
@@ -270,7 +275,7 @@ func openSessions(ctx context.Context, q querier, where string, args []any) ([]d
 	var out []domain.SessionTarget
 	for rows.Next() {
 		var t domain.SessionTarget
-		if err := rows.Scan(&t.NASIP, &t.Username, &t.AcctSessionID, &t.FramedIP, &t.MAC); err != nil {
+		if err := rows.Scan(&t.ID, &t.NASIP, &t.Username, &t.AcctSessionID, &t.FramedIP, &t.MAC); err != nil {
 			return nil, err
 		}
 		out = append(out, t)

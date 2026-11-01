@@ -1,0 +1,48 @@
+package admin
+
+import (
+	"strconv"
+
+	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/session"
+	"hotspotpluslight/internal/web/ui"
+)
+
+templ SessionsPage(l ui.LayoutData, v session.OnlineView) {
+	@ui.Layout(l) {
+		<h1 class="h3 mb-3">Online sessions</h1>
+		@SessionsTable(v)
+	}
+}
+
+// SessionsTable is the polled fragment: it re-fetches itself every 10 s (htmx), keeping the page.
+templ SessionsTable(v session.OnlineView) {
+	<div id="online-table" hx-get={ tableURL(v.Page, v.Per) } hx-trigger="every 10s" hx-swap="outerHTML">
+		<p class="text-body-secondary" data-updated-note>Updated by the router every { strconv.Itoa(v.IntervalSeconds) } s</p>
+		if v.Total == 0 {
+			<p class="card card-body">Nobody is online.</p>
+		} else {
+			@ui.Table([]string{"Username", "IP", "MAC", "Started", "Duration", "Download", "Upload", ""}) {
+				for _, s := range v.Rows {
+					@SessionRow(s, v)
+				}
+			}
+			@ui.Pagination(ui.PageProps{Page: v.Page, Pages: v.Pages, Href: sessionsHref(v.Per)})
+		}
+	</div>
+}
+
+templ SessionRow(s domain.Session, v session.OnlineView) {
+	<tr data-session data-id={ strconv.FormatInt(s.ID, 10) } data-username={ s.Username }>
+		<td data-col="username"><a href={ templ.SafeURL(memberURL(s.MemberID)) }>{ s.Username }</a></td>
+		<td data-col="ip">{ s.FramedIP }</td>
+		<td data-col="mac">{ s.MAC }</td>
+		<td data-col="started">{ fmtTime(s.StartedAt, v.Loc) }</td>
+		<td data-col="duration">{ domain.FormatDuration(int64(v.Now.Sub(s.StartedAt).Seconds())) }</td>
+		<td data-col="download">{ domain.FormatSize(s.Cum.Download) }</td>
+		<td data-col="upload">{ domain.FormatSize(s.Cum.Upload) }</td>
+		<td>
+			@ui.ConfirmAction("Disconnect", "post", kickURL(s.ID, v), "Disconnect this session?")
+		</td>
+	</tr>
+}

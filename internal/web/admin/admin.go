@@ -53,6 +53,7 @@ type MemberService interface {
 	Stats(ctx context.Context, sel domain.MemberSelection) (member.BulkStats, error)
 	Delete(ctx context.Context, sel domain.MemberSelection) (member.DeleteResult, error)
 	DeleteOne(ctx context.Context, id int64) (member.DeleteResult, error)
+	DisconnectMember(ctx context.Context, id int64) (member.KickResult, error)
 }
 
 type SettingsService interface {
@@ -64,6 +65,7 @@ type Deps struct {
 	Auth     AuthService
 	Plans    PlanService
 	Members  MemberService
+	Sessions SessionService
 	Settings SettingsService
 	Log      *slog.Logger
 }
@@ -101,7 +103,13 @@ func Handler(d Deps) http.Handler {
 					r.Put("/extra-bulk", h.memberExtraBulk)
 					r.Get("/password", h.passwordReveal)
 					r.Put("/password", h.passwordSet)
+					r.Post("/disconnections", h.memberKick)
 				})
+			})
+			r.Route("/sessions", func(r chi.Router) {
+				r.Get("/", h.sessionsPage)
+				r.Get("/table", h.sessionsTable)
+				r.Post("/{id}/disconnections", h.sessionKick)
 			})
 			r.Route("/plans", func(r chi.Router) {
 				r.Get("/", h.plansList)
@@ -129,7 +137,7 @@ func redirect(to string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, to, http.StatusSeeOther) }
 }
 
-var nav = []ui.NavItem{{Label: "Members", Href: "/admin/members"}, {Label: "Plans", Href: "/admin/plans"}, {Label: "Settings", Href: "/admin/settings"}}
+var nav = []ui.NavItem{{Label: "Members", Href: "/admin/members"}, {Label: "Online", Href: sessionsHome}, {Label: "Plans", Href: "/admin/plans"}, {Label: "Settings", Href: "/admin/settings"}}
 
 func layout(r *http.Request, title, active string) ui.LayoutData {
 	csrf, _ := r.Context().Value(ctxKey{}).(string)

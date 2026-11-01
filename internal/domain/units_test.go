@@ -33,3 +33,16 @@ func TestBulkBytes(t *testing.T) {
 		t.Error("unknown unit accepted")
 	}
 }
+
+func TestFormatSizeAndDuration(t *testing.T) {
+	for in, want := range map[int64]string{0: "0 B", 1023: "1023 B", 1024: "1 KB", 1536 * 1024: "1.5 MB", 3 << 30: "3 GB"} {
+		if got := FormatSize(in); got != want {
+			t.Errorf("FormatSize(%d) = %q, want %q", in, got, want)
+		}
+	}
+	for in, want := range map[int64]string{-5: "0 s", 30: "30 s", 303: "5 min 03 s", 7500: "2 h 05 min"} {
+		if got := FormatDuration(in); got != want {
+			t.Errorf("FormatDuration(%d) = %q, want %q", in, got, want)
+		}
+	}
+}
