@@ -390,20 +390,17 @@ func TestE7_06_PrintLayout(t *testing.T) {
 	d, body := f.printPage(bpath(id) + "/vouchers")
 	var sheets []string
 	d.Find(`link[rel=stylesheet]`).Each(func(_ int, s *goquery.Selection) { sheets = append(sheets, s.AttrOr("href", "")) })
-	if len(sheets) != 1 || strings.Contains(sheets[0], "tabler") {
+	if len(sheets) != 1 || strings.Contains(sheets[0], "app.css") {
 		t.Fatalf("stylesheets %v: want only the print stylesheet", sheets)
 	}
-	if d.Find("header.navbar, nav, [hx-headers]").Length() != 0 || strings.Contains(body, "tabler") {
+	if d.Find("header, aside, nav, [hx-headers]").Length() != 0 || strings.Contains(body, "app.css") {
 		t.Error("the print page carries admin chrome")
 	}
 	css := f.c.Get(sheets[0])
 	if css.StatusCode != 200 || !strings.Contains(css.Header.Get("Content-Type"), "css") {
 		t.Fatalf("print stylesheet: %d %q", css.StatusCode, css.Header.Get("Content-Type"))
 	}
-	for _, want := range []string{"@media print", "@page", "A4", "repeat(2", "repeat(7", "page-break-after", "d-print-none"} {
-		if want == "d-print-none" {
-			continue // Tabler's class is not used here
-		}
+	for _, want := range []string{"@media print", "@page", "A4", "repeat(2", "repeat(7", "page-break-after"} {
 		if !strings.Contains(css.Body, want) {
 			t.Errorf("print stylesheet lacks %q", want)
 		}
@@ -562,10 +559,10 @@ func TestE7_10_BatchList(t *testing.T) {
 		t.Errorf("reprint href %q", href)
 	}
 	// Navigation has a Batches item.
-	if d.Find(`header a.nav-link[href="/admin/batches"]`).Length() != 1 {
+	if d.Find(`nav a[href="/admin/batches"]`).Length() != 1 {
 		t.Error("no Batches nav item")
 	}
-	if d.Find(`header a.nav-link.active[href="/admin/batches"]`).Length() != 1 {
+	if d.Find(`nav a[href="/admin/batches"][aria-current="page"]`).Length() != 1 {
 		t.Error("Batches is not the active item on its own page")
 	}
 
@@ -691,7 +688,7 @@ func TestE7_12_SingleVoucher(t *testing.T) {
 		if d.Find("[data-page]").Length() != 1 || d.Find("html").AttrOr("dir", "") != "ltr" || d.Find("[data-voucher]").AttrOr("dir", "") != "ltr" {
 			t.Error("not one left-to-right page")
 		}
-		if !strings.Contains(body, "voucher.css") || d.Find("header.navbar, [hx-headers]").Length() != 0 {
+		if !strings.Contains(body, "voucher.css") || d.Find("header, aside, nav, [hx-headers]").Length() != 0 {
 			t.Error("not the shared print page")
 		}
 	}

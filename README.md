@@ -18,7 +18,9 @@ export HSP_SECRET_KEY="$(openssl rand -base64 32)"   # keep it: see Backup
 ./bin/hotspotpluslight serve
 ```
 
-`make run` builds and starts everything with data in `./data` (it keeps a development key in the git-ignored `.dev-secret-key`). `make test` runs all tests with the race detector, `make ci` adds `go vet`.
+`make run` builds and starts everything with data in `./data` (it keeps a development key in the git-ignored `.dev-secret-key`). `make test` runs all tests with the race detector, `make ci` adds `go vet` and a check that the committed CSS is current.
+
+The admin CSS is built with Tailwind v4 (standalone CLI, no Node). After changing classes in the `.templ` files or `internal/web/ui/input.css`, run `make css` and commit `internal/web/static/app.css`. The first run downloads the pinned CLI into `tools/` (needs network). The built binary needs neither. See `docs/ui-notes.md`.
 
 ### First start
 

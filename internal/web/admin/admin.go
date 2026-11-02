@@ -172,7 +172,15 @@ func redirect(to string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, to, http.StatusSeeOther) }
 }
 
-var nav = []ui.NavItem{{Label: "Members", Href: "/admin/members"}, {Label: "Batches", Href: batchesHome}, {Label: "Online", Href: sessionsHome}, {Label: "Usage", Href: usageHome}, {Label: "Plans", Href: "/admin/plans"}, {Label: "Router", Href: "/admin/router"}, {Label: "Settings", Href: "/admin/settings"}}
+var nav = []ui.NavItem{
+	{Label: "Members", Href: "/admin/members", Group: "Manage", Icon: "users"},
+	{Label: "Batches", Href: batchesHome, Group: "Manage", Icon: "ticket"},
+	{Label: "Online", Href: sessionsHome, Group: "Manage", Icon: "wifi"},
+	{Label: "Usage", Href: usageHome, Group: "Manage", Icon: "chart"},
+	{Label: "Plans", Href: "/admin/plans", Group: "Setup", Icon: "layers"},
+	{Label: "Router", Href: "/admin/router", Group: "Setup", Icon: "router"},
+	{Label: "Settings", Href: "/admin/settings", Group: "Setup", Icon: "settings"},
+}
 
 func layout(r *http.Request, title, active string) ui.LayoutData {
 	csrf, _ := r.Context().Value(ctxKey{}).(string)

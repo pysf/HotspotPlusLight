@@ -42,7 +42,7 @@ func pageSizeOptions() []ui.Option {
 }
 
 // emptySelectionGuard stops htmx from sending a delete request when nothing is ticked.
-const emptySelectionGuard = `if(!this.querySelector('input[name=id]:checked')&&!this.querySelector('input[name=all_results]:checked')){event.preventDefault();document.getElementById('bulk-result').innerHTML='<div class="alert alert-danger" role="alert">No member selected.</div>'}`
+const emptySelectionGuard = `if(!this.querySelector('input[name=id]:checked')&&!this.querySelector('input[name=all_results]:checked')){event.preventDefault();document.getElementById('bulk-result').replaceChildren(document.getElementById('no-selection-notice').content.cloneNode(true))}`
 
 const togglePage = `for(const c of document.querySelectorAll('#bulk-form input[name=id]')){c.checked=this.checked}`
 
@@ -54,28 +54,32 @@ func togglePageAttrs() templ.Attributes { return templ.Attributes{"onclick": tog
 
 templ MembersPage(l ui.LayoutData, p MembersProps) {
 	@ui.Layout(l) {
-		<h1 class="h3 mb-3">Members</h1>
-		<p><a class="btn btn-primary" href="/admin/members/new">New member</a></p>
-		<form id="member-filter" class="filter d-flex flex-wrap gap-2 align-items-end mb-3" method="get" action="/admin/members">
+		@ui.PageHeader("Members") {
+			@ui.LinkButton("primary", "/admin/members/new", "New member", nil)
+		}
+		@ui.FilterBar("member-filter", "/admin/members") {
 			@ui.Field(ui.FieldProps{Label: "Search", Name: "q", Value: p.Filter.Query})
 			@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan", Value: planFilterValue(p.Filter.PlanID), Options: planFilterOptions(p.Plans, "Any plan")})
 			@ui.Select(ui.SelectProps{Label: "Status", Name: "status", Value: p.Filter.Status, Options: statusOptions})
 			@ui.Select(ui.SelectProps{Label: "Page size", Name: "per", Value: strconv.Itoa(p.Result.Per), Options: pageSizeOptions()})
-			<button type="submit" class="btn btn-secondary">Filter</button>
-		</form>
+			@ui.Button("secondary", "Filter", templ.Attributes{"type": "submit"})
+		}
 		if p.Result.Total == 0 {
-			<p class="card card-body">No members match.</p>
+			@ui.EmptyState("No members match.")
 		} else {
 			<form id="bulk-form" data-bulk-guard hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML" { bulkGuardAttrs()... }>
 				<input type="hidden" name="q" value={ p.Filter.Query }/>
 				<input type="hidden" name="plan" value={ planFilterValue(p.Filter.PlanID) }/>
 				<input type="hidden" name="status" value={ p.Filter.Status }/>
-				<div class="d-flex flex-wrap gap-3 align-items-center my-2">
-					<label><input type="checkbox" class="form-check-input" { togglePageAttrs()... }/> Select all on this page</label>
-					<label data-select-all-results><input type="checkbox" class="form-check-input" name="all_results" value="1"/> Select all { strconv.Itoa(p.Result.Total) } results of this filter</label>
-					<button type="submit" class="btn btn-outline-danger btn-sm">Delete selected</button>
+				<div class="mb-3 flex flex-wrap items-center gap-4">
+					<label class="check"><input type="checkbox" { togglePageAttrs()... }/> Select all on this page</label>
+					<label class="check" data-select-all-results><input type="checkbox" name="all_results" value="1"/> Select all { strconv.Itoa(p.Result.Total) } results of this filter</label>
+					@ui.Button("danger", "Delete selected", templ.Attributes{"type": "submit"})
 				</div>
 				<div id="bulk-result"></div>
+				<template id="no-selection-notice">
+					@ui.ErrorFragment("No member selected.")
+				</template>
 				@ui.Table([]string{"", "Username", "Online", "Status", "Data"}) {
 					for _, v := range p.Result.Rows {
 						@MemberRow(newVM(v))
@@ -89,35 +93,35 @@ templ MembersPage(l ui.LayoutData, p MembersProps) {
 
 // UsageCells are the data / time / window / verdict cells of the member page summary (BR-22).
 templ UsageCells(m memberVM) {
-	<td data-col="data">{ m.Data }</td>
-	<td data-col="time">{ m.Time }</td>
-	<td data-col="window-end">{ m.WindowEnd }</td>
+	<td data-col="data" class="tabular-nums">{ m.Data }</td>
+	<td data-col="time" class="tabular-nums">{ m.Time }</td>
+	<td data-col="window-end" class="tabular-nums">{ m.WindowEnd }</td>
 	<td data-col="verdict">{ m.VerdictText }</td>
 }
 
 templ MemberRow(m memberVM) {
 	<tr data-member data-id={ strconv.FormatInt(m.ID, 10) } data-username={ m.Username } data-status={ m.Status } data-verdict={ m.VerdictCode } data-online={ strconv.FormatBool(m.Online) }>
-		<td><input type="checkbox" class="form-check-input" name="id" value={ strconv.FormatInt(m.ID, 10) }/></td>
+		<td><input type="checkbox" class="size-4 accent-accent" aria-label="Select" name="id" value={ strconv.FormatInt(m.ID, 10) }/></td>
 		<td><a href={ templ.SafeURL(memberURL(m.ID)) }>{ m.Username }</a></td>
-		<td data-col="online"><span class={ "dot", templ.KV("on", m.Online) } title={ onlineTitle(m.Online) } role="img" aria-label={ onlineLabel(m.Online) }></span></td>
-		<td data-col="status"><span class={ "badge", statusBadge(m.Status) }>{ m.Status }</span></td>
-		<td data-col="data">
+		<td data-col="online"><span class={ "dot", templ.KV("dot-on", m.Online) } title={ onlineTitle(m.Online) } role="img" aria-label={ onlineLabel(m.Online) }></span></td>
+		<td data-col="status">@ui.StatusBadge(statusTone(m.Status), m.Status)</td>
+		<td data-col="data" class="tabular-nums">
 			{ m.DataMain }
 			if m.DataLeft != "" {
-				<div class="text-secondary small" data-col="data-left">{ m.DataLeft }</div>
+				<div class="text-label text-muted" data-col="data-left">{ m.DataLeft }</div>
 			}
 		</td>
 	</tr>
 }
 
-func statusBadge(s string) string {
+func statusTone(s string) string {
 	switch s {
 	case "active":
-		return "text-bg-success"
+		return "success"
 	case "expired":
-		return "text-bg-danger"
+		return "error"
 	}
-	return "text-bg-secondary"
+	return "neutral"
 }
 
 func onlineLabel(on bool) string {
@@ -136,9 +140,11 @@ func onlineTitle(on bool) string {
 
 templ MemberNewPage(l ui.LayoutData, p MemberFormProps) {
 	@ui.Layout(l) {
-		<h1 class="h3 mb-3">New member</h1>
+		@ui.PageHeader("New member")
 		if len(p.Plans) == 0 {
-			<p class="card card-body">No plans exist yet. Create a plan first, then add members. <a href="/admin/plans/new">New plan</a></p>
+			@ui.EmptyState("No plans exist yet. Create a plan first, then add members.") {
+				<p class="mt-2"><a href="/admin/plans/new">New plan</a></p>
+			}
 		} else {
 			@MemberFormView(p)
 		}
@@ -166,7 +172,7 @@ func memberFormAttrs(p MemberFormProps) templ.Attributes {
 
 // MemberFormView is both the new and edit form and the 422 response body.
 templ MemberFormView(p MemberFormProps) {
-	<form id="member-form" class="card card-body" { memberFormAttrs(p)... }>
+	<form id="member-form" class="card form max-w-xl" { memberFormAttrs(p)... }>
 		if p.Warning != "" {
 			@ui.Flash("warn", p.Warning)
 		}
@@ -183,17 +189,17 @@ templ MemberFormView(p MemberFormProps) {
 		@ui.Field(ui.FieldProps{Label: "MAC address", Name: "mac", Value: p.Form.MAC, Error: p.Errors["mac"], Hint: "Optional. Filled in automatically from the first session."})
 		@ui.Field(ui.FieldProps{Label: "Expires at", Name: "expires_at", Type: "datetime-local", Value: p.Form.ExpiresAt, Error: p.Errors["expires_at"], Hint: "Optional. Logins after this moment are refused. Settings time zone."})
 		@ui.Checkbox(ui.CheckboxProps{Label: "Active", Name: "active", Checked: p.Form.Active, Hint: "Deactivating disconnects the member's open sessions."})
-		<div class="d-flex gap-2 mt-3">
-			<button type="submit" class="btn btn-primary">Save</button>
-			<a class="btn btn-outline-secondary" href="/admin/members">Cancel</a>
-		</div>
+		@ui.Actions() {
+			@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
+			@ui.LinkButton("secondary", "/admin/members", "Cancel", nil)
+		}
 	</form>
 }
 
 // MemberStatus is the plan / status / online line. With oob it is sent as an
 // out-of-band swap, so a kick response refreshes it next to the flash.
 templ MemberStatus(m memberVM, oob bool) {
-	<p id="member-status" class="text-secondary" { oobAttrs(oob)... }>
+	<p id="member-status" class="mb-4 text-muted" { oobAttrs(oob)... }>
 		Plan { m.PlanName } · status { m.Status }
 		if m.Online {
 			· online
@@ -210,8 +216,8 @@ func oobAttrs(oob bool) templ.Attributes {
 
 templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 	@ui.Layout(l) {
-		<h1 class="h3 mb-3">{ m.Username }</h1>
-		<div class="vstack gap-3">
+		@ui.PageHeader(m.Username)
+		<div>
 			@ui.Table([]string{"Data", "Time", "Window ends", "Verdict"}) {
 				<tr data-summary data-verdict={ m.VerdictCode }>
 					@UsageCells(m)
@@ -221,31 +227,37 @@ templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 			if m.RenewalText != "" {
 				<p data-renewal>{ m.RenewalText }</p>
 			}
-			@MemberFormView(p)
-			<div class="card card-body">
-				<h2 class="h5">Extra data</h2>
-				if m.UnlimitedData {
-					<p class="text-secondary">This plan has unlimited data.</p>
-				} else {
-					<p>Current extra data: <strong data-extra-bulk>{ m.ExtraBulk }</strong></p>
-					@ExtraBulkFormView(ExtraBulkProps{URL: memberURL(m.ID) + "/extra-bulk", Value: m.ExtraBulkValue, Unit: m.PlanUnit})
+			<div class="grid max-w-xl gap-4">
+				@MemberFormView(p)
+				@ui.Card() {
+					<h2 class="mb-3">Extra data</h2>
+					if m.UnlimitedData {
+						<p class="text-muted">This plan has unlimited data.</p>
+					} else {
+						<p class="mb-3">Current extra data: <strong class="tabular-nums" data-extra-bulk>{ m.ExtraBulk }</strong></p>
+						@ExtraBulkFormView(ExtraBulkProps{URL: memberURL(m.ID) + "/extra-bulk", Value: m.ExtraBulkValue, Unit: m.PlanUnit})
+					}
+				}
+				@ui.Card() {
+					<h2 class="mb-3">Password</h2>
+					<div id="password-view" class="mb-3">
+						@ui.Button("secondary", "Reveal", templ.Attributes{"type": "button", "hx-get": memberURL(m.ID) + "/password", "hx-target": "#password-view", "hx-swap": "innerHTML"})
+					</div>
+					<form class="grid gap-3" hx-put={ memberURL(m.ID) + "/password" } hx-target="#password-view" hx-swap="innerHTML">
+						@ui.Field(ui.FieldProps{Label: "New password", Name: "password", Attrs: templ.Attributes{"autocomplete": "off"}})
+						<div>
+							@ui.Button("secondary", "Set password", templ.Attributes{"type": "submit"})
+						</div>
+					</form>
 				}
 			</div>
-			<div class="card card-body">
-				<h2 class="h5">Password</h2>
-				<div id="password-view">
-					<button type="button" class="btn btn-outline-secondary mb-3" hx-get={ memberURL(m.ID) + "/password" } hx-target="#password-view" hx-swap="innerHTML">Reveal</button>
-				</div>
-				<form hx-put={ memberURL(m.ID) + "/password" } hx-target="#password-view" hx-swap="innerHTML">
-					@ui.Field(ui.FieldProps{Label: "New password", Name: "password", Attrs: templ.Attributes{"autocomplete": "off"}})
-					<button type="submit" class="btn btn-secondary">Set password</button>
-				</form>
-			</div>
-			<div class="d-flex gap-2 mt-3">
-				<a class="btn btn-outline-secondary" href={ templ.SafeURL(memberURL(m.ID) + "/voucher") } target="_blank" rel="noopener">Print voucher</a>
-				@ui.ConfirmAction("Disconnect", "post", memberURL(m.ID)+"/disconnections", "Disconnect all open sessions of this member?")
-				@ui.ConfirmAction("Renew now", "post", memberURL(m.ID)+"/renewals", "Restart this member's validity window? Used data, time and extra data are cleared.")
-				@ui.ConfirmDelete("Delete member", memberURL(m.ID), "Delete this member? Open sessions are disconnected first.")
+			<div class="mt-6">
+				@ui.Actions() {
+					@ui.LinkButton("secondary", memberURL(m.ID)+"/voucher", "Print voucher", templ.Attributes{"target": "_blank", "rel": "noopener"})
+					@ui.ConfirmAction("Disconnect", "post", memberURL(m.ID)+"/disconnections", "Disconnect all open sessions of this member?")
+					@ui.ConfirmAction("Renew now", "post", memberURL(m.ID)+"/renewals", "Restart this member's validity window? Used data, time and extra data are cleared.")
+					@ui.ConfirmDelete("Delete member", memberURL(m.ID), "Delete this member? Open sessions are disconnected first.")
+				}
 			</div>
 		</div>
 	}
@@ -258,12 +270,14 @@ type ExtraBulkProps struct {
 
 // ExtraBulkFormView sets (not adds) the extra data; it is also the 422 response body.
 templ ExtraBulkFormView(p ExtraBulkProps) {
-	<form id="extra-bulk-form" hx-put={ p.URL } hx-target="this" hx-swap="outerHTML">
+	<form id="extra-bulk-form" class="grid gap-3" hx-put={ p.URL } hx-target="this" hx-swap="outerHTML">
 		@ui.FieldPair(ui.PairProps{Label: "Set extra data to", For: "value", Hint: "Replaces the current amount. 0 removes it. Decimals allowed.", Errors: []ui.NamedError{{Name: "value", Msg: p.Errors["value"]}, {Name: "unit", Msg: p.Errors["unit"]}}}) {
 			@ui.InputControl(ui.FieldProps{Name: "value", Value: p.Value, Error: p.Errors["value"]})
 			@ui.SelectControl(ui.SelectProps{Name: "unit", Value: p.Unit, Options: unitOptions(domain.BulkUnits), Error: p.Errors["unit"]})
 		}
-		<button type="submit" class="btn btn-secondary">Save</button>
+		<div>
+			@ui.Button("secondary", "Save", templ.Attributes{"type": "submit"})
+		</div>
 	</form>
 }
 
@@ -273,7 +287,7 @@ templ PasswordShown(pw string) {
 
 // BulkConfirm is the delete confirmation: it carries the selection and confirmed=1 back to the same route.
 templ BulkConfirm(st member.BulkStats, sel url.Values) {
-	<form id="bulk-confirm" class="card card-body" hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML">
+	<form id="bulk-confirm" class="card mb-4 grid gap-3 p-5" hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML">
 		<p>
 			Delete <strong data-confirm-members>{ strconv.Itoa(st.Members) }</strong> members?
 			<strong data-confirm-online>{ strconv.Itoa(st.Online) }</strong> of them are online and will be disconnected first.
@@ -285,15 +299,15 @@ templ BulkConfirm(st member.BulkStats, sel url.Values) {
 			<input type="hidden" name={ name } value={ sel.Get(name) }/>
 		}
 		<input type="hidden" name="confirmed" value="1"/>
-		<div class="d-flex gap-2 mt-3">
-			<button type="submit" class="btn btn-danger">Delete</button>
-			<button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('bulk-result').innerHTML=''">Cancel</button>
-		</div>
+		@ui.Actions() {
+			@ui.Button("danger", "Delete", templ.Attributes{"type": "submit"})
+			@ui.Button("secondary", "Cancel", templ.Attributes{"type": "button", "onclick": "document.getElementById('bulk-result').innerHTML=''"})
+		}
 	</form>
 }
 
 // DeletedNotice reports a delete whose Disconnect-Requests partly failed (BR-18, BR-23).
 templ DeletedNotice(res member.DeleteResult, backURL, backLabel string) {
 	@ui.Flash("warn", fmt.Sprintf("Deleted %d members. %d of %d open sessions could not be disconnected.", res.Deleted, res.Kick.Failed, res.Kick.Attempted))
-	<p><a href={ templ.SafeURL(backURL) }>{ backLabel }</a></p>
+	<p class="mb-4"><a href={ templ.SafeURL(backURL) }>{ backLabel }</a></p>
 }

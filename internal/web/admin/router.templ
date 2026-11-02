@@ -7,33 +7,37 @@ import (
 
 templ RouterPage(l ui.LayoutData, p RouterProps) {
 	@ui.Layout(l) {
-		<h1 class="h3 mb-3">Router</h1>
+		@ui.PageHeader("Router")
 		if p.NoBaseURL {
-			<div class="alert alert-warning" data-warning="public-base-url">
+			<div class="notice notice-warn" data-warning="public-base-url">
 				The public base URL is not set, so the login page cannot reach this server.
 				Set it in <a href="/admin/settings">Settings</a> before you download the folder.
 			</div>
 		}
-		<div class="card card-body mb-3">
-			<h2 class="h5">Login page</h2>
-			<p>
-				The member login page lives on the router. Download the hotspot folder, edit <code>login.html</code>
-				(footer, colors, translations), replace <code>logo.png</code> and <code>background.jpg</code>, and upload
-				the folder to the router.
-			</p>
-			<p class="mb-0">
-				<a class="btn btn-primary" href={ templ.SafeURL("/admin/router/files.zip") }>Download hotspot folder</a>
-				<a class="btn btn-outline-secondary" href="/admin/router/themes">Choose another theme</a>
-				<span class="text-secondary ms-2">Default theme: { p.DefaultTheme }</span>
-			</p>
+		<div class="mb-4">
+			@ui.Card() {
+				<h2 class="mb-2">Login page</h2>
+				<p class="mb-3">
+					The member login page lives on the router. Download the hotspot folder, edit <code>login.html</code>
+					(footer, colors, translations), replace <code>logo.png</code> and <code>background.jpg</code>, and upload
+					the folder to the router.
+				</p>
+				@ui.Actions() {
+					@ui.LinkButton("primary", "/admin/router/files.zip", "Download hotspot folder", nil)
+					@ui.LinkButton("secondary", "/admin/router/themes", "Choose another theme", nil)
+					<span class="text-muted">Default theme: { p.DefaultTheme }</span>
+				}
+			}
 		</div>
-		<div class="card card-body mb-3">
-			<h2 class="h5">Router setup script</h2>
-			<p>
-				Paste this into a RouterOS terminal. It contains the RADIUS shared secret, so do not share it.
-				Each command is marked VERIFY-ON-HARDWARE until it has been checked on your router.
-			</p>
-			@ui.CodeBlock("setup-script", p.Script)
+		<div class="mb-4">
+			@ui.Card() {
+				<h2 class="mb-2">Router setup script</h2>
+				<p class="mb-3">
+					Paste this into a RouterOS terminal. It contains the RADIUS shared secret, so do not share it.
+					Each command is marked VERIFY-ON-HARDWARE until it has been checked on your router.
+				</p>
+				@ui.CodeBlock("setup-script", p.Script)
+			}
 		</div>
 		@LinkStatusPanel(p.Link)
 	}
@@ -41,28 +45,28 @@ templ RouterPage(l ui.LayoutData, p RouterProps) {
 
 // LinkStatusPanel shows what the router last sent. It lives in memory and starts empty after a restart.
 templ LinkStatusPanel(v linkView) {
-	<div class="card card-body mb-3" data-link-status>
-		<h2 class="h5">Router link status</h2>
-		<p class="text-secondary">Since the server started. A wrong shared secret on the router shows up as bad-secret packets.</p>
+	<div data-link-status>
+		<h2 class="mb-2">Router link status</h2>
+		<p class="mb-3 text-muted">Since the server started. A wrong shared secret on the router shows up as bad-secret packets.</p>
 		@ui.Table([]string{"", "When", "Router address", "Result"}) {
 			for _, e := range v.Events {
 				<tr data-link={ e.Key }>
 					<td>{ e.Label }</td>
-					<td data-at>{ e.At }</td>
+					<td data-at class="tabular-nums">{ e.At }</td>
 					<td data-from>{ e.From }</td>
 					<td data-detail>{ e.Detail }</td>
 				</tr>
 			}
 		}
-		<p class="mt-3 mb-1">Packets with a wrong shared secret: <strong data-bad-secret-count>{ v.BadTotal }</strong></p>
+		<p class="mb-3">Packets with a wrong shared secret: <strong class="tabular-nums" data-bad-secret-count>{ v.BadTotal }</strong></p>
 		if len(v.BadSources) > 0 {
 			<div data-bad-secret-sources>
 				@ui.Table([]string{"Source address", "Packets", "Last seen"}) {
 					for _, b := range v.BadSources {
 						<tr data-bad-secret-from={ b.From }>
 							<td>{ b.From }</td>
-							<td data-count>{ b.Count }</td>
-							<td data-at>{ b.At }</td>
+							<td data-count class="tabular-nums">{ b.Count }</td>
+							<td data-at class="tabular-nums">{ b.At }</td>
 						</tr>
 					}
 				}
@@ -73,20 +77,20 @@ templ LinkStatusPanel(v linkView) {
 
 templ ThemeGalleryPage(l ui.LayoutData, groups []themeGroup) {
 	@ui.Layout(l) {
-		<h1 class="h3 mb-3">Themes</h1>
+		@ui.PageHeader("Themes")
 		for _, g := range groups {
-			<section class="mb-4" data-category={ g.Category }>
-				<h2 class="h5">{ g.Category }</h2>
-				<div class="row row-cols-2 row-cols-md-4 g-3">
+			<section class="mb-8" data-category={ g.Category }>
+				<h2 class="mb-3">{ g.Category }</h2>
+				<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
 					for _, t := range g.Themes {
-						<div class="col" data-theme={ t.ID } data-primary={ t.Primary } data-overlay={ t.Overlay }>
-							<div class="card h-100">
+						<div data-theme={ t.ID } data-primary={ t.Primary } data-overlay={ t.Overlay }>
+							<div class="card h-full overflow-hidden">
 								<a data-detail href={ templ.SafeURL(themeURL(t.ID)) }>
-									<img class="card-img-top" loading="lazy" alt={ t.Title } src={ themeURL(t.ID) + "/background.jpg" }/>
+									<img class="block h-auto w-full" loading="lazy" alt={ t.Title } src={ themeURL(t.ID) + "/background.jpg" }/>
 								</a>
-								<div class="card-body p-2 d-flex align-items-center gap-2">
-									<span class="theme-swatch" style={ templ.SafeCSS("background:" + t.Primary) }></span>
-									<span class="theme-swatch" style={ templ.SafeCSS("background:" + t.Overlay) }></span>
+								<div class="flex items-center gap-2 p-2">
+									<span class="swatch" style={ templ.SafeCSS("background:" + t.Primary) }></span>
+									<span class="swatch" style={ templ.SafeCSS("background:" + t.Overlay) }></span>
 									<span data-title>{ t.Title }</span>
 								</div>
 							</div>
@@ -100,11 +104,10 @@ templ ThemeGalleryPage(l ui.LayoutData, groups []themeGroup) {
 
 templ ThemePage(l ui.LayoutData, t routerpack.Theme) {
 	@ui.Layout(l) {
-		<h1 class="h3 mb-3">{ t.Category } / { t.Title }</h1>
-		<p>
-			<a class="btn btn-primary" data-download href={ templ.SafeURL(downloadURL(t.ID)) }>Download hotspot folder</a>
-			<a class="btn btn-outline-secondary" href="/admin/router/themes">All themes</a>
-		</p>
-		<iframe class="theme-preview border rounded bg-body" data-preview sandbox="allow-scripts" title="Preview" src={ themeURL(t.ID) + "/login.html" }></iframe>
+		@ui.PageHeader(t.Category + " / " + t.Title) {
+			@ui.LinkButton("primary", downloadURL(t.ID), "Download hotspot folder", templ.Attributes{"data-download": true})
+			@ui.LinkButton("secondary", "/admin/router/themes", "All themes", nil)
+		}
+		<iframe class="preview" data-preview sandbox="allow-scripts" title="Preview" src={ themeURL(t.ID) + "/login.html" }></iframe>
 	}
 }

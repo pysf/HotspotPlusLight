@@ -10,18 +10,16 @@ import (
 
 templ LoginPage(username, errMsg string) {
 	@ui.Layout(ui.LayoutData{Title: "Log in", Bare: true}) {
-		<div class="card card-md">
-			<div class="card-body">
-			<h1 class="h2 text-center mb-4">Admin login</h1>
+		<div class="card form">
+			<h1>Admin login</h1>
 			if errMsg != "" {
 				@ui.ErrorFragment(errMsg)
 			}
-			<form method="post" action="/admin/login">
+			<form class="grid gap-4" method="post" action="/admin/login">
 				@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: username, Attrs: templ.Attributes{"autocomplete": "username", "autofocus": true}})
 				@ui.Field(ui.FieldProps{Label: "Password", Name: "password", Type: "password", Attrs: templ.Attributes{"autocomplete": "current-password"}})
-				<button type="submit" class="btn btn-primary w-100">Log in</button>
+				@ui.Button("primary", "Log in", templ.Attributes{"type": "submit"})
 			</form>
-			</div>
 		</div>
 	}
 }
@@ -44,22 +42,25 @@ func minutes(m int) string {
 
 templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
 	@ui.Layout(l) {
-		<h1 class="h3 mb-3">Plans</h1>
-		<p><a class="btn btn-primary" href="/admin/plans/new">New plan</a></p>
+		@ui.PageHeader("Plans") {
+			@ui.LinkButton("primary", "/admin/plans/new", "New plan", nil)
+		}
 		if len(plans) == 0 {
-			<p class="card card-body">No plans yet. Create the first one.</p>
+			@ui.EmptyState("No plans yet. Create the first one.")
 		} else {
 			@ui.Table([]string{"Name", "Validity", "Speed", "Data", "Time", "Devices", ""}) {
 				for _, p := range plans {
 					<tr>
 						<td><a href={ templ.SafeURL(fmt.Sprintf("/admin/plans/%d", p.ID)) }>{ p.Name }</a></td>
-						<td>{ strconv.Itoa(p.DurationDays) } days</td>
+						<td class="tabular-nums">{ strconv.Itoa(p.DurationDays) } days</td>
 						<td>{ limit(p.SpeedValue, p.SpeedUnit) }</td>
 						<td>{ limit(p.BulkValue, p.BulkUnit) }</td>
 						<td>{ minutes(p.TimeLimitMinutes) }</td>
 						<td>{ strconv.Itoa(p.MaxSessions) }</td>
 						<td>
-							@ui.ConfirmDelete("Delete", fmt.Sprintf("/admin/plans/%d", p.ID), "Delete plan "+p.Name+"?")
+							@ui.Actions() {
+								@ui.ConfirmDelete("Delete", fmt.Sprintf("/admin/plans/%d", p.ID), "Delete plan "+p.Name+"?")
+							}
 						</td>
 					</tr>
 				}
@@ -70,14 +71,14 @@ templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
 
 templ PlanNewPage(l ui.LayoutData) {
 	@ui.Layout(l) {
-		<h1 class="h3 mb-3">New plan</h1>
+		@ui.PageHeader("New plan")
 		@PlanFormView(PlanFormProps{Form: domain.NewPlanForm(), Action: "post", URL: "/admin/plans"})
 	}
 }
 
 templ PlanEditPage(l ui.LayoutData, p PlanFormProps) {
 	@ui.Layout(l) {
-		<h1 class="h3 mb-3">Edit plan</h1>
+		@ui.PageHeader("Edit plan")
 		@PlanFormView(p)
 	}
 }
@@ -113,9 +114,9 @@ func planFormAttrs(p PlanFormProps) templ.Attributes {
 
 // PlanFormView is both the new and edit form; it is also the 422 response body.
 templ PlanFormView(p PlanFormProps) {
-	<form id="plan-form" class="card card-body" { planFormAttrs(p)... }>
+	<form id="plan-form" class="card form max-w-xl" { planFormAttrs(p)... }>
 		if p.Members > 0 {
-			<div class="alert alert-warning" data-plan-warning>{ membersWarning(p.Members) }</div>
+			<div class="notice notice-warn" data-plan-warning>{ membersWarning(p.Members) }</div>
 		}
 		@ui.Field(ui.FieldProps{Label: "Name", Name: "name", Value: p.Form.Name, Error: p.Errors["name"]})
 		@ui.Field(ui.FieldProps{Label: "Validity (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Whole number, at least 1."})
@@ -130,13 +131,13 @@ templ PlanFormView(p PlanFormProps) {
 		@ui.Field(ui.FieldProps{Label: "Time limit (minutes)", Name: "time_limit_minutes", Value: p.Form.TimeLimitMinutes, Error: p.Errors["time_limit_minutes"], Hint: "0 = unlimited time."})
 		@ui.Field(ui.FieldProps{Label: "Simultaneous devices", Name: "max_sessions", Value: p.Form.MaxSessions, Error: p.Errors["max_sessions"], Hint: "Whole number, at least 1."})
 		@ui.Checkbox(ui.CheckboxProps{Label: "Renew automatically when the validity ends", Name: "auto_resubscribe", Checked: p.Form.AutoResubscribe})
-		<div class="d-flex gap-2 mt-3">
-			<button type="submit" class="btn btn-primary">Save</button>
-			<a class="btn btn-outline-secondary" href="/admin/plans">Cancel</a>
+		@ui.Actions() {
+			@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
+			@ui.LinkButton("secondary", "/admin/plans", "Cancel", nil)
 			if p.Action == "put" {
 				@ui.ConfirmDelete("Delete plan", p.URL, "Delete this plan?")
 			}
-		</div>
+		}
 	</form>
 }
 
@@ -149,7 +150,7 @@ type SettingsProps struct {
 
 templ SettingsPage(l ui.LayoutData, p SettingsProps) {
 	@ui.Layout(l) {
-		<h1 class="h3 mb-3">Settings</h1>
+		@ui.PageHeader("Settings")
 		@SettingsFormView(p)
 	}
 }
@@ -165,7 +166,7 @@ func planOptions(plans []domain.Plan) []ui.Option {
 // SettingsFormView is the settings form and the PUT response body (200 with a
 // flash, or 422 with field errors).
 templ SettingsFormView(p SettingsProps) {
-	<form id="settings-form" class="card card-body" hx-put="/admin/settings" hx-target="this" hx-swap="outerHTML">
+	<form id="settings-form" class="card form max-w-xl" hx-put="/admin/settings" hx-target="this" hx-swap="outerHTML">
 		if p.Saved {
 			@ui.Flash("ok", "Settings saved.")
 		}
@@ -173,7 +174,7 @@ templ SettingsFormView(p SettingsProps) {
 		@ui.Field(ui.FieldProps{Label: "Time zone", Name: "timezone", Value: p.Form.Timezone, Error: p.Errors["timezone"], Hint: "IANA name, e.g. Europe/London. Dates are shown in this zone."})
 		@ui.FieldPair(ui.PairProps{Label: "RADIUS shared secret", For: "radius_shared_secret", Hint: "Must match the secret configured on the router. Changes apply immediately.", Errors: []ui.NamedError{{Name: "radius_shared_secret", Msg: p.Errors["radius_shared_secret"]}}}) {
 			@ui.InputControl(ui.FieldProps{Name: "radius_shared_secret", Type: "password", Value: p.Form.RadiusSharedSecret, Error: p.Errors["radius_shared_secret"], Attrs: templ.Attributes{"autocomplete": "off"}})
-			<button type="button" class="btn btn-outline-secondary" id="reveal-secret" onclick="var i=document.getElementById('radius_shared_secret');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'Reveal':'Hide'">Reveal</button>
+			@ui.Button("secondary", "Reveal", templ.Attributes{"type": "button", "id": "reveal-secret", "onclick": "var i=document.getElementById('radius_shared_secret');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'Reveal':'Hide'"})
 		}
 		@ui.Field(ui.FieldProps{Label: "Disconnect (CoA) port", Name: "coa_port", Value: p.Form.CoaPort, Error: p.Errors["coa_port"], Hint: "1-65535. Router default: 3799."})
 		@ui.Field(ui.FieldProps{Label: "Accounting interval (seconds)", Name: "accounting_interval_seconds", Value: p.Form.AccountingIntervalSeconds, Error: p.Errors["accounting_interval_seconds"], Hint: "At least 10."})
@@ -187,8 +188,8 @@ templ SettingsFormView(p SettingsProps) {
 		@ui.Field(ui.FieldProps{Label: "Voucher password length", Name: "voucher_password_length", Value: p.Form.VoucherPasswordLength, Error: p.Errors["voucher_password_length"], Hint: "4-20 digits."})
 		@ui.Textarea(ui.TextareaProps{Label: "Voucher help text", Name: "voucher_help", Value: p.Form.VoucherHelp, Error: p.Errors["voucher_help"], Hint: "Printed on every voucher. Empty = the default English text."})
 		@ui.Field(ui.FieldProps{Label: "Keep finished sessions (days)", Name: "session_retention_days", Value: p.Form.SessionRetentionDays, Error: p.Errors["session_retention_days"], Hint: "0 = keep forever."})
-		<div class="d-flex gap-2 mt-3">
-			<button type="submit" class="btn btn-primary">Save</button>
-		</div>
+		@ui.Actions() {
+			@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
+		}
 	</form>
 }

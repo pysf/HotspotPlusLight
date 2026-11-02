@@ -869,3 +869,26 @@ func TestE1_19_ResourceStyleRoutes(t *testing.T) {
 		}
 	}
 }
+
+// Sidebar: every group has a heading and every link an icon.
+func TestE1_20_SidebarGroupsAndIcons(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	d := c.Get("/admin/members").Doc(t)
+	if d.Find("#sidebar .nav-heading").Length() != 2 {
+		t.Errorf("want 2 nav groups")
+	}
+	d.Find("#sidebar .nav-heading").Each(func(_ int, h *goquery.Selection) {
+		if strings.TrimSpace(h.Text()) == "" {
+			t.Errorf("empty nav group heading")
+		}
+	})
+	if d.Find("#sidebar a.nav-link").Length() != 7 {
+		t.Errorf("want 7 nav links")
+	}
+	d.Find("#sidebar a.nav-link").Each(func(_ int, a *goquery.Selection) {
+		if a.Find("svg > path, svg > rect, svg > circle").Length() == 0 {
+			t.Errorf("nav link %q has no icon", strings.TrimSpace(a.Text()))
+		}
+	})
+}
