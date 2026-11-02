@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -104,11 +105,14 @@ func (p *parser) text(field, raw string, required bool, maxLen int) string {
 }
 
 // secret keeps the value verbatim (spaces can be part of a shared secret) and
-// only rejects empty or whitespace-only input.
+// rejects empty or whitespace-only input and control characters (a newline would
+// end the quoted string in the pasted router setup script).
 func (p *parser) secret(field, raw string, maxLen int) string {
 	switch {
 	case strings.TrimSpace(raw) == "":
 		p.errs.add(field, "Required.")
+	case strings.ContainsFunc(raw, func(r rune) bool { return r < 0x20 || r == 0x7f }):
+		p.errs.add(field, "Must not contain control characters.")
 	case len([]rune(raw)) > maxLen:
 		p.errs.add(field, fmt.Sprintf("At most %d characters.", maxLen))
 	}
@@ -126,6 +130,18 @@ func (p *parser) httpURL(field, raw string) string {
 	}
 	return raw
 }
+
+// publicURL is an http(s) address whose host is also pasted into the router
+// setup script, so the host is limited to letters, digits, dot, dash, colon and brackets.
+func (p *parser) publicURL(field, raw string) string {
+	raw = p.httpURL(field, raw)
+	if u, err := url.Parse(raw); err == nil && raw != "" && u.Host != "" && !hostRE.MatchString(u.Host) {
+		p.errs.add(field, "The host may only contain letters, digits, dots, dashes, colons and brackets.")
+	}
+	return raw
+}
+
+var hostRE = regexp.MustCompile(`^[A-Za-z0-9.:\-\[\]]+$`)
 
 // Checked reports whether a checkbox value means "on".
 func Checked(v string) bool {

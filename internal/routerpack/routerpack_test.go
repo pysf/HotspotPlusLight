@@ -94,3 +94,21 @@ func TestZipLayout(t *testing.T) {
 		}
 	}
 }
+
+func TestSetupScriptDefensive(t *testing.T) {
+	// a newline can never end the quoted secret
+	got := SetupScript(ScriptConfig{PublicBaseURL: "http://10.0.0.2:8080", Secret: "a\nb\r/system reset", AuthPort: 1812, AcctPort: 1813, CoaPort: 3799, InterimSeconds: 60})
+	for _, l := range strings.Split(got, "\n") {
+		if strings.HasPrefix(l, "/system") {
+			t.Errorf("injected command line: %q", l)
+		}
+	}
+	if !strings.Contains(got, `secret="a\nb\r/system reset"`) {
+		t.Errorf("secret not escaped:\n%s", got)
+	}
+	// no interval: no radius-interim-update at all
+	got = SetupScript(ScriptConfig{PublicBaseURL: "http://10.0.0.2:8080", Secret: "s", AuthPort: 1812, AcctPort: 1813, CoaPort: 3799})
+	if strings.Contains(got, "radius-interim-update=") {
+		t.Errorf("zero interval emitted:\n%s", got)
+	}
+}

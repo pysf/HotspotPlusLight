@@ -29,14 +29,20 @@ const (
 	attempts       = 2
 )
 
+// DisconnectRecorder receives the outcome of each Disconnect (PLAN 8.2; implemented by linkstatus.Recorder).
+type DisconnectRecorder interface {
+	Disconnect(addr, outcome string)
+}
+
 // Disconnector is the RADIUS Disconnect-Request client (BR-18, PLAN 7.4).
 type Disconnector struct {
 	settings SettingsReader
+	link     DisconnectRecorder
 	log      *slog.Logger
 }
 
-func NewDisconnector(s SettingsReader, log *slog.Logger) *Disconnector {
-	return &Disconnector{settings: s, log: log}
+func NewDisconnector(s SettingsReader, link DisconnectRecorder, log *slog.Logger) *Disconnector {
+	return &Disconnector{settings: s, link: link, log: log}
 }
 
 // Disconnect sends a Disconnect-Request for t to t.NASIP:settings.coa_port,
@@ -70,17 +76,27 @@ func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) e
 	addr := net.JoinHostPort(t.NASIP, strconv.Itoa(st.CoaPort))
 	client := radius.Client{} // no library retry: the loop below resends the same packet
 	var last error
+	// MONITOR: the panel's outcome is best effort. A cancelled context is shown as "no answer", and a
+	// failure before the packet is built (bad target, unreadable settings) is not recorded at all.
+	outcome := "no answer"
+	defer func() { d.link.Disconnect(addr, outcome) }()
 	for range attempts {
 		actx, cancel := context.WithTimeout(ctx, attemptTimeout)
 		reply, err := client.Exchange(actx, p, addr)
 		cancel()
 		switch {
 		case err == nil && reply.Code == radius.CodeDisconnectACK:
+			outcome = "ACK"
 			return nil
 		case err == nil && reply.Code == radius.CodeDisconnectNAK && rfc3576.ErrorCause_Get(reply) == rfc3576.ErrorCause_Value_SessionContextNotFound:
 			d.log.Info("router has no such session (Disconnect-NAK, Error-Cause 503); treating it as disconnected", "user", t.Username, "session", t.AcctSessionID)
+			outcome = "NAK (session not found)"
 			return nil
 		case err == nil:
+			outcome = "NAK"
+			if ec, err := rfc3576.ErrorCause_Lookup(reply); err == nil {
+				outcome = fmt.Sprintf("NAK (Error-Cause %d)", ec)
+			}
 			return fmt.Errorf("%w (%s)", domain.ErrKickRefused, reply.Code)
 		case ctx.Err() != nil:
 			return ctx.Err()

@@ -5,10 +5,10 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
-templ RouterPage(l ui.LayoutData, noBaseURL bool, defaultTheme string) {
+templ RouterPage(l ui.LayoutData, p RouterProps) {
 	@ui.Layout(l) {
 		<h1 class="h3 mb-3">Router</h1>
-		if noBaseURL {
+		if p.NoBaseURL {
 			<div class="alert alert-warning" data-warning="public-base-url">
 				The public base URL is not set, so the login page cannot reach this server.
 				Set it in <a href="/admin/settings">Settings</a> before you download the folder.
@@ -24,10 +24,51 @@ templ RouterPage(l ui.LayoutData, noBaseURL bool, defaultTheme string) {
 			<p class="mb-0">
 				<a class="btn btn-primary" href={ templ.SafeURL("/admin/router/files.zip") }>Download hotspot folder</a>
 				<a class="btn btn-outline-secondary" href="/admin/router/themes">Choose another theme</a>
-				<span class="text-secondary ms-2">Default theme: { defaultTheme }</span>
+				<span class="text-secondary ms-2">Default theme: { p.DefaultTheme }</span>
 			</p>
 		</div>
+		<div class="card card-body mb-3">
+			<h2 class="h5">Router setup script</h2>
+			<p>
+				Paste this into a RouterOS terminal. It contains the RADIUS shared secret, so do not share it.
+				Each command is marked VERIFY-ON-HARDWARE until it has been checked on your router.
+			</p>
+			@ui.CodeBlock("setup-script", p.Script)
+		</div>
+		@LinkStatusPanel(p.Link)
 	}
+}
+
+// LinkStatusPanel shows what the router last sent. It lives in memory and starts empty after a restart.
+templ LinkStatusPanel(v linkView) {
+	<div class="card card-body mb-3" data-link-status>
+		<h2 class="h5">Router link status</h2>
+		<p class="text-secondary">Since the server started. A wrong shared secret on the router shows up as bad-secret packets.</p>
+		@ui.Table([]string{"", "When", "Router address", "Result"}) {
+			for _, e := range v.Events {
+				<tr data-link={ e.Key }>
+					<td>{ e.Label }</td>
+					<td data-at>{ e.At }</td>
+					<td data-from>{ e.From }</td>
+					<td data-detail>{ e.Detail }</td>
+				</tr>
+			}
+		}
+		<p class="mt-3 mb-1">Packets with a wrong shared secret: <strong data-bad-secret-count>{ v.BadTotal }</strong></p>
+		if len(v.BadSources) > 0 {
+			<div data-bad-secret-sources>
+				@ui.Table([]string{"Source address", "Packets", "Last seen"}) {
+					for _, b := range v.BadSources {
+						<tr data-bad-secret-from={ b.From }>
+							<td>{ b.From }</td>
+							<td data-count>{ b.Count }</td>
+							<td data-at>{ b.At }</td>
+						</tr>
+					}
+				}
+			</div>
+		}
+	</div>
 }
 
 templ ThemeGalleryPage(l ui.LayoutData, groups []themeGroup) {

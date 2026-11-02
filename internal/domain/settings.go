@@ -77,7 +77,7 @@ func ParseSettings(f SettingsForm) (Settings, FieldErrors) {
 		BatchMaxCount:             p.integer("batch_max_count", f.BatchMaxCount, 1, 1000),
 		VoucherPasswordLength:     p.integer("voucher_password_length", f.VoucherPasswordLength, 4, 20),
 		VoucherHelp:               p.text("voucher_help", f.VoucherHelp, false, 2000),
-		PublicBaseURL:             p.httpURL("public_base_url", f.PublicBaseURL),
+		PublicBaseURL:             p.publicURL("public_base_url", f.PublicBaseURL),
 		SessionRetentionDays:      p.integer("session_retention_days", f.SessionRetentionDays, 0, 36500),
 	}
 	if f.DefaultPlanID != "" {

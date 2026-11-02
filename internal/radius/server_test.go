@@ -58,11 +58,27 @@ func (f *fakeAcct) got() []domain.AcctRecord {
 	return append([]domain.AcctRecord(nil), f.recs...)
 }
 
+// fakeLink is a hand-written LinkRecorder.
+type fakeLink struct {
+	mu                       sync.Mutex
+	authReq, acct, badSecret []string
+}
+
+func (f *fakeLink) add(l *[]string, a string) { f.mu.Lock(); *l = append(*l, a); f.mu.Unlock() }
+func (f *fakeLink) AccessRequest(a string)    { f.add(&f.authReq, a) }
+func (f *fakeLink) Accounting(a string)       { f.add(&f.acct, a) }
+func (f *fakeLink) BadSecret(a string)        { f.add(&f.badSecret, a) }
+func (f *fakeLink) counts() (int, int, int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.authReq), len(f.acct), len(f.badSecret)
+}
+
 func startBoth(t *testing.T, a Authenticator, ac Accountant) (authAddr, acctAddr string) {
 	t.Helper()
 	ap, _ := net.ListenPacket("udp", "127.0.0.1:0")
 	cp, _ := net.ListenPacket("udp", "127.0.0.1:0")
-	s := New(staticSecret("s3cret"), a, ac, slog.Default())
+	s := New(staticSecret("s3cret"), a, ac, &fakeLink{}, slog.Default())
 	s.Serve(ap, cp)
 	t.Cleanup(func() { s.Shutdown(context.Background()) })
 	return ap.LocalAddr().String(), cp.LocalAddr().String()
@@ -202,5 +218,30 @@ func TestAccountingMalformedAttributeDroppedWithoutReply(t *testing.T) {
 	}
 	if n := len(fa.got()); n != 0 {
 		t.Fatalf("%d records accounted", n)
+	}
+}
+
+func TestLinkRecorderSeesGoodAndBadPackets(t *testing.T) {
+	ap, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	cp, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	link := &fakeLink{}
+	s := New(staticSecret("s3cret"), &fakeAuth{}, &fakeAcct{}, link, slog.Default())
+	s.Serve(ap, cp)
+	t.Cleanup(func() { s.Shutdown(context.Background()) })
+
+	good := radius.New(radius.CodeAccountingRequest, []byte("s3cret"))
+	rfc2866.AcctStatusType_Set(good, rfc2866.AcctStatusType_Value_AccountingOn)
+	bad := radius.New(radius.CodeAccountingRequest, []byte("other"))
+	rfc2866.AcctStatusType_Set(bad, rfc2866.AcctStatusType_Value_AccountingOn)
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	if _, err := radius.Exchange(ctx, good, cp.LocalAddr().String()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := radius.Exchange(ctx, bad, cp.LocalAddr().String()); err == nil {
+		t.Fatal("bad authenticator answered")
+	}
+	if a, c, b := link.counts(); a != 0 || c != 1 || b != 1 {
+		t.Errorf("access=%d accounting=%d bad=%d, want 0 1 1", a, c, b)
 	}
 }

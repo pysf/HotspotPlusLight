@@ -49,6 +49,7 @@ templ Layout(d LayoutData) {
 			<link rel="stylesheet" href="/admin/static/tabler.min.css"/>
 			<link rel="stylesheet" href="/admin/static/app.css"/>
 			<script src="/admin/static/htmx.min.js" defer></script>
+			<script src="/admin/static/app.js" defer></script>
 		</head>
 		<body class={ bodyClass(d) } { bodyAttrs(d)... }>
 			if d.Bare {
@@ -287,4 +288,13 @@ templ Pagination(p PageProps) {
 			</ul>
 		</nav>
 	}
+}
+
+// CodeBlock shows read-only text (a script) in a box with a Copy button; the
+// click is handled by /admin/static/app.js (delegated on [data-copy-target]).
+templ CodeBlock(id, text string) {
+	<textarea class="form-control font-monospace mb-2" id={ id } data-script rows="18" readonly spellcheck="false">{ text }</textarea>
+	<div>
+		<button type="button" class="btn btn-outline-secondary" data-copy-target={ id }>Copy</button>
+	</div>
 }

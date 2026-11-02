@@ -17,6 +17,7 @@ import (
 
 	"hotspotpluslight/internal/auth"
 	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/linkstatus"
 	"hotspotpluslight/internal/member"
 	"hotspotpluslight/internal/plan"
 	"hotspotpluslight/internal/web/static"
@@ -61,6 +62,11 @@ type SettingsService interface {
 	Update(ctx context.Context, f domain.SettingsForm) (domain.FieldErrors, error)
 }
 
+// LinkStatus is the in-memory router link status (implemented by linkstatus.Recorder).
+type LinkStatus interface {
+	Snapshot() linkstatus.Snapshot
+}
+
 type Deps struct {
 	Auth     AuthService
 	Plans    PlanService
@@ -69,7 +75,10 @@ type Deps struct {
 	Sessions SessionService
 	Settings SettingsService
 	Router   RouterPack
-	Log      *slog.Logger
+	Link     LinkStatus
+	// RadiusPorts gives the RADIUS UDP ports for the router setup script, read when the page is rendered.
+	RadiusPorts func() (authPort, acctPort int)
+	Log         *slog.Logger
 }
 
 type handlers struct{ Deps }

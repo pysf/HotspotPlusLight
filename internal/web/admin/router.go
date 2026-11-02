@@ -3,10 +3,12 @@ package admin
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/linkstatus"
 	"hotspotpluslight/internal/routerpack"
 )
 
@@ -53,7 +55,62 @@ func (h handlers) routerPage(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, RouterPage(layout(r, "Router", routerHome), st.PublicBaseURL == "", routerpack.DefaultTheme))
+	loc, err := st.Location()
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	// MONITOR: the script shows the RADIUS shared secret in plain text (read-only textarea) because
+	// the pasted script needs it. Admin listener only, behind login, Cache-Control: no-store (admin group).
+	authPort, acctPort := h.RadiusPorts()
+	script := routerpack.SetupScript(routerpack.ScriptConfig{
+		PublicBaseURL: st.PublicBaseURL, Secret: st.RadiusSharedSecret, AuthPort: authPort, AcctPort: acctPort,
+		CoaPort: st.CoaPort, InterimSeconds: st.AccountingIntervalSeconds,
+	})
+	h.render(w, r, http.StatusOK, RouterPage(layout(r, "Router", routerHome), RouterProps{
+		NoBaseURL: st.PublicBaseURL == "", DefaultTheme: routerpack.DefaultTheme, Script: script, Link: linkRows(h.Link.Snapshot(), loc),
+	}))
+}
+
+// RouterProps is everything the router page shows.
+type RouterProps struct {
+	NoBaseURL    bool
+	DefaultTheme string
+	Script       string
+	Link         linkView
+}
+
+type linkEvent struct{ Key, Label, At, From, Detail string }
+
+type badSource struct{ From, Count, At string }
+
+type linkView struct {
+	Events     []linkEvent
+	BadTotal   string
+	BadSources []badSource
+}
+
+const linkTimeFormat = "2006-01-02 15:04:05"
+
+func linkRows(s linkstatus.Snapshot, loc *time.Location) linkView {
+	ev := func(key, label string, e linkstatus.Event) linkEvent {
+		if e.At.IsZero() {
+			return linkEvent{Key: key, Label: label, At: "never"}
+		}
+		return linkEvent{key, label, e.At.In(loc).Format(linkTimeFormat), e.From, e.Detail}
+	}
+	v := linkView{
+		Events: []linkEvent{
+			ev("access-request", "Last Access-Request", s.AccessRequest),
+			ev("accounting", "Last Accounting packet", s.Accounting),
+			ev("disconnect", "Last Disconnect", s.Disconnect),
+		},
+		BadTotal: strconv.Itoa(s.BadSecretTotal),
+	}
+	for _, b := range s.BadSecretSources {
+		v.BadSources = append(v.BadSources, badSource{b.From, strconv.Itoa(b.Count), b.Last.In(loc).Format(linkTimeFormat)})
+	}
+	return v
 }
 
 func (h handlers) themeGallery(w http.ResponseWriter, r *http.Request) {

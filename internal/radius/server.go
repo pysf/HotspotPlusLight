@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"time"
 	"unicode/utf8"
 
 	"layeh.com/radius"
@@ -45,18 +46,29 @@ type Accountant interface {
 	Account(ctx context.Context, rec domain.AcctRecord) error
 }
 
-// Server owns the auth and accounting packet servers.
-type Server struct {
-	log   *slog.Logger
-	login Authenticator
-	acctg Accountant
-	auth  *radius.PacketServer
-	acct  *radius.PacketServer
+// LinkRecorder receives the router link events (PLAN 8.2; implemented by
+// linkstatus.Recorder). Source addresses are "ip:port".
+type LinkRecorder interface {
+	AccessRequest(addr string)
+	Accounting(addr string)
+	BadSecret(addr string)
 }
 
-func New(secrets SecretProvider, login Authenticator, acctg Accountant, log *slog.Logger) *Server {
+// Server owns the auth and accounting packet servers.
+type Server struct {
+	log     *slog.Logger
+	secrets SecretProvider
+	login   Authenticator
+	acctg   Accountant
+	link    LinkRecorder
+	auth    *radius.PacketServer
+	acct    *radius.PacketServer
+	conns   []net.PacketConn
+}
+
+func New(secrets SecretProvider, login Authenticator, acctg Accountant, link LinkRecorder, log *slog.Logger) *Server {
 	src := secretSource{secrets}
-	s := &Server{log: log, login: login, acctg: acctg}
+	s := &Server{log: log, secrets: secrets, login: login, acctg: acctg, link: link}
 	s.auth = &radius.PacketServer{SecretSource: src, Handler: radius.HandlerFunc(s.handleAuth)}
 	s.acct = &radius.PacketServer{SecretSource: src, Handler: radius.HandlerFunc(s.handleAcct)}
 	return s
@@ -64,8 +76,57 @@ func New(secrets SecretProvider, login Authenticator, acctg Accountant, log *slo
 
 // Serve runs both listeners on the given connections until Shutdown.
 func (s *Server) Serve(authConn, acctConn net.PacketConn) {
-	go s.run("auth", s.auth, authConn)
-	go s.run("acct", s.acct, acctConn)
+	s.conns = []net.PacketConn{authConn, acctConn}
+	go s.run("auth", s.auth, &lateCloseConn{PacketConn: authConn})
+	go s.run("acct", s.acct, &lateCloseConn{PacketConn: acctConn, onRead: s.sniffAcct})
+}
+
+// lateCloseConn lets requests in flight at shutdown still be answered. The
+// library closes its listeners the moment Shutdown starts and only then waits
+// for the running handlers, so their replies would fail. Close here only stops
+// the reading (an immediate read deadline); the socket is really closed by
+// Server.Shutdown once every handler has finished. The library calls Close only
+// from its own Shutdown, after it set its shutdown flag, so a deadline error is
+// always read as "shutting down" and never retried as a temporary error; and
+// Server.Shutdown closes the real sockets even if a Serve loop ended early. onRead, if set, sees every
+// datagram before the library does.
+type lateCloseConn struct {
+	net.PacketConn
+	onRead func(pkt []byte, from net.Addr)
+}
+
+func (c *lateCloseConn) Close() error { return c.PacketConn.SetReadDeadline(time.Unix(1, 0)) }
+
+func (c *lateCloseConn) ReadFrom(b []byte) (int, net.Addr, error) {
+	n, addr, err := c.PacketConn.ReadFrom(b)
+	if err == nil && c.onRead != nil {
+		c.onRead(b[:n], addr)
+	}
+	return n, addr, err
+}
+
+// sniffAcct looks at accounting datagrams before the library does. The library
+// drops a packet whose Request Authenticator does not verify without telling us
+// who sent it; this is how the link status panel learns about wrong shared
+// secrets (it repeats the library's own check).
+//
+// MONITOR: this runs in the UDP read loop and does one SQLite read (the current
+// secret, so settings changes apply at once) plus one MD5 per accounting packet.
+// Fine at LAN scale (one router, an interim every 60 s per user); if accounting
+// volume ever grows, cache the secret in memory and invalidate it on settings save.
+func (s *Server) sniffAcct(pkt []byte, from net.Addr) {
+	if len(pkt) >= 20 && radius.Code(pkt[0]) == radius.CodeAccountingRequest {
+		s.checkAcctSecret(pkt, from)
+	}
+}
+
+func (s *Server) checkAcctSecret(pkt []byte, from net.Addr) {
+	secret, err := s.secrets.RadiusSecret(context.Background())
+	if err != nil || secret == "" || radius.IsAuthenticRequest(pkt, []byte(secret)) {
+		return
+	}
+	s.link.BadSecret(from.String())
+	s.log.Warn("Accounting-Request dropped: its authenticator does not verify, probably a wrong shared secret", "from", from.String())
 }
 
 func (s *Server) run(name string, ps *radius.PacketServer, c net.PacketConn) {
@@ -75,12 +136,12 @@ func (s *Server) run(name string, ps *radius.PacketServer, c net.PacketConn) {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	e1 := s.auth.Shutdown(ctx)
-	e2 := s.acct.Shutdown(ctx)
-	if e1 != nil {
-		return e1
+	// Waits for the handlers in flight; their replies still go out (lateCloseConn). Then the sockets are released.
+	err := errors.Join(s.auth.Shutdown(ctx), s.acct.Shutdown(ctx))
+	for _, c := range s.conns {
+		c.Close()
 	}
-	return e2
+	return err
 }
 
 // handleAuth answers Access-Requests (PAP only, PLAN 7.2). It stays silent
@@ -91,7 +152,9 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 		return // other codes are dropped (PLAN 7.1)
 	}
 	from := r.RemoteAddr.String()
+	ctx := context.WithoutCancel(r.Context()) // a shutdown lets requests in flight finish
 	if isCHAP(r.Packet) {
+		s.link.AccessRequest(from)
 		// This is how we notice a router that is not on PAP (D4, PLAN 13.1).
 		s.log.Warn("CHAP/MS-CHAP Access-Request rejected: only PAP is supported", "from", from)
 		s.reply(w, r, auth.Verdict{Reason: domain.ReasonUnsupportedAuth})
@@ -101,18 +164,22 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 	raw, err := rfc2865.UserPassword_Lookup(r.Packet)
 	switch {
 	case errors.Is(err, radius.ErrNoAttribute):
+		s.link.AccessRequest(from)
 		s.reply(w, r, auth.Verdict{Reason: domain.ReasonInvalidCredentials})
 		return
 	case err != nil:
+		s.link.AccessRequest(from)
 		s.log.Warn("Access-Request with a malformed User-Password dropped", "from", from, "err", err)
 		return
 	case !plausiblePassword(raw):
 		// layeh does not authenticate Access-Requests, so a wrong shared secret
 		// shows up only as a User-Password that decrypts to noise. Never answer it.
+		s.link.BadSecret(from) // MONITOR: spoofable on UDP, see internal/linkstatus
 		s.log.Warn("Access-Request dropped: User-Password does not decrypt, probably a wrong shared secret", "from", from)
 		return
 	}
-	v, err := s.login.Login(r.Context(), username, string(raw))
+	s.link.AccessRequest(from)
+	v, err := s.login.Login(ctx, username, string(raw))
 	if err != nil {
 		s.log.Error("login check failed; no reply", "from", from, "err", err)
 		return
@@ -192,6 +259,9 @@ func (s *Server) handleAcct(w radius.ResponseWriter, r *radius.Request) {
 		return
 	}
 	from := r.RemoteAddr.String()
+	s.link.Accounting(from)
+	// Shutdown cancels r.Context(); a transaction in flight must still commit and be answered (E8.06).
+	ctx := context.WithoutCancel(r.Context())
 	status, err := rfc2866.AcctStatusType_Lookup(r.Packet)
 	if err != nil {
 		s.log.Warn("Accounting-Request without Acct-Status-Type dropped", "from", from)
@@ -209,7 +279,7 @@ func (s *Server) handleAcct(w radius.ResponseWriter, r *radius.Request) {
 			s.log.Warn("Accounting-Request with a malformed attribute dropped", "from", from, "session", sid, "err", err)
 			return
 		}
-		if err := s.acctg.Account(r.Context(), rec); err != nil {
+		if err := s.acctg.Account(ctx, rec); err != nil {
 			s.log.Error("accounting failed; no reply", "from", from, "err", err)
 			return
 		}

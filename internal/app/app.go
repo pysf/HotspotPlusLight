@@ -3,6 +3,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -20,6 +22,7 @@ import (
 	"hotspotpluslight/internal/clock"
 	"hotspotpluslight/internal/config"
 	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/linkstatus"
 	"hotspotpluslight/internal/member"
 	"hotspotpluslight/internal/plan"
 	"hotspotpluslight/internal/radius"
@@ -72,6 +75,7 @@ type App struct {
 	authConn, acctConn net.PacketConn
 	httpLn, adminLn    net.Listener
 	addrs              Addrs
+	addrMu             sync.RWMutex // guards addrs: written by Start, read by admin handlers
 	stopOnce           sync.Once
 	pruneCancel        context.CancelFunc
 	pruneDone          chan struct{}
@@ -95,7 +99,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	}
 	log := opts.Logger
 	if log == nil {
-		log = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: cfg.LogLevel}))
+		log = newLogger(os.Stderr, cfg)
 	}
 	box, err := secret.NewBox(cfg.SecretKey)
 	if err != nil {
@@ -144,9 +148,10 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		}
 	}
 
+	link := linkstatus.New(opts.Clock)
 	disc := opts.Disconnector
 	if disc == nil {
-		disc = radius.NewDisconnector(st, log)
+		disc = radius.NewDisconnector(st, link, log)
 	}
 	sessOpts := []session.Option{session.WithLogger(log)}
 	if opts.AccountingBeforeCommit != nil {
@@ -163,14 +168,23 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		session:   sess,
 		voucher:   voucher.New(st, box, members, opts.Clock), // batch delete reuses the member delete path (kick, then remove)
 	}
-	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, log)
+	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, link, log)
 	pack, err := routerpack.New()
 	if err != nil {
 		return fail(err)
 	}
 	a.httpSrv = &http.Server{Handler: pageapi.Handler(pageapi.Deps{Accounts: a.svc.evaluator, Settings: a.svc.settings, Clock: opts.Clock, Log: log}), ReadHeaderTimeout: 10 * time.Second}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Settings: a.svc.settings, Router: pack, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
+}
+
+// newLogger writes structured lines to w: key=value text by default, JSON with HSP_LOG_FORMAT=json.
+func newLogger(w io.Writer, cfg config.Config) *slog.Logger {
+	ho := &slog.HandlerOptions{Level: cfg.LogLevel}
+	if cfg.LogFormat == "json" {
+		return slog.New(slog.NewJSONHandler(w, ho))
+	}
+	return slog.New(slog.NewTextHandler(w, ho))
 }
 
 // sessionRepo adapts the store to session.Repo: the store's transaction type is
@@ -246,7 +260,9 @@ func (a *App) Start() (err error) {
 	if a.acctConn, err = net.ListenPacket("udp", a.cfg.RadiusAcctAddr); err != nil {
 		return fmt.Errorf("listen HSP_RADIUS_ACCT_ADDR: %w", err)
 	}
+	a.addrMu.Lock()
 	a.addrs = Addrs{a.httpLn.Addr().String(), a.adminLn.Addr().String(), a.authConn.LocalAddr().String(), a.acctConn.LocalAddr().String()}
+	a.addrMu.Unlock()
 	go a.serveHTTP("public", a.httpSrv, a.httpLn)
 	go a.serveHTTP("admin", a.adminSrv, a.adminLn)
 	a.startPruning()
@@ -291,7 +307,31 @@ func (a *App) serveHTTP(name string, s *http.Server, ln net.Listener) {
 	}
 }
 
-func (a *App) Addrs() Addrs { return a.addrs }
+func (a *App) Addrs() Addrs {
+	a.addrMu.RLock()
+	defer a.addrMu.RUnlock()
+	return a.addrs
+}
+
+// radiusPorts are the UDP ports the router must be told (read when the setup
+// script is rendered). The bound port wins; before Start, or if it cannot be
+// read, the configured one, then the RADIUS standard ports.
+func (a *App) radiusPorts() (authPort, acctPort int) {
+	port := func(addrs ...string) int {
+		for _, addr := range addrs {
+			if _, p, err := net.SplitHostPort(addr); err == nil {
+				if n, _ := strconv.Atoi(p); n > 0 {
+					return n
+				}
+			}
+		}
+		return 0
+	}
+	b := a.Addrs()
+	authPort = cmp.Or(port(b.RadiusAuth, a.cfg.RadiusAuthAddr), 1812)
+	acctPort = cmp.Or(port(b.RadiusAcct, a.cfg.RadiusAcctAddr), 1813)
+	return authPort, acctPort
+}
 
 // Shutdown stops accepting, drains in-flight work, then closes the database.
 func (a *App) Shutdown(ctx context.Context) error {
