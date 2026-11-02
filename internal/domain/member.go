@@ -242,6 +242,9 @@ type MemberFilter struct {
 type MemberSelection struct {
 	IDs    []int64
 	Filter *MemberFilter
+	// BatchID selects every member of one batch; deleting such a selection also
+	// removes the batch row in the same transaction (BR-23).
+	BatchID *int64
 }
 
 // MemberRow is one list entry: the member, its plan and whether it is online.

@@ -712,7 +712,7 @@ func SettingsFormView(p SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = ui.Textarea(ui.TextareaProps{Label: "Voucher help text", Name: "voucher_help", Value: p.Form.VoucherHelp, Error: p.Errors["voucher_help"]}).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ui.Textarea(ui.TextareaProps{Label: "Voucher help text", Name: "voucher_help", Value: p.Form.VoucherHelp, Error: p.Errors["voucher_help"], Hint: "Printed on every voucher. Empty = the default English text."}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

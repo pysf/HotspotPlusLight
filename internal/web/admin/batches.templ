@@ -1,0 +1,101 @@
+package admin
+
+import (
+	"fmt"
+	"strconv"
+
+	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/voucher"
+	"hotspotpluslight/internal/web/ui"
+)
+
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return strconv.Itoa(n) + " " + noun + "s"
+}
+
+// deleteBatchConfirm is the text of the confirmation dialog: member and online counts (BR-23b).
+func deleteBatchConfirm(r domain.BatchRow) string {
+	return fmt.Sprintf("Delete this batch? %s will be deleted (%d online, disconnected first).", plural(r.Members, "member"), r.Online)
+}
+
+func labelText(l string) string {
+	if l == "" {
+		return "(no label)"
+	}
+	return l
+}
+
+templ BatchesPage(l ui.LayoutData, res voucher.ListResult) {
+	@ui.Layout(l) {
+		<h1 class="h3 mb-3">Batches</h1>
+		<p><a class="btn btn-primary" href="/admin/batches/new">New batch</a></p>
+		if res.Total == 0 {
+			<p class="card card-body">No batches yet. Create the first one.</p>
+		} else {
+			@ui.Table([]string{"Label", "Rename", "Plan", "Created", "Members", "Unused", ""}) {
+				for _, r := range res.Rows {
+					@BatchRow(r, res)
+				}
+			}
+			@ui.Pagination(ui.PageProps{Page: res.Page, Pages: res.Pages, Href: batchesHref(res.Per)})
+		}
+	}
+}
+
+templ BatchRow(r domain.BatchRow, res voucher.ListResult) {
+	<tr data-batch data-id={ strconv.FormatInt(r.Batch.ID, 10) } data-members={ strconv.Itoa(r.Members) } data-online={ strconv.Itoa(r.Online) }>
+		<td data-col="label">{ labelText(r.Batch.Label) }</td>
+		<td data-col="rename">
+			<form class="d-flex gap-2" hx-put={ batchURL(r.Batch.ID) } hx-target="#flash" hx-swap="innerHTML">
+				<input name="label" class="form-control form-control-sm" value={ r.Batch.Label } maxlength="100" aria-label="Label"/>
+				<button type="submit" class="btn btn-outline-secondary btn-sm">Save</button>
+			</form>
+		</td>
+		<td data-col="plan">{ r.PlanName }</td>
+		<td data-col="created">{ fmtTime(r.Batch.CreatedAt, res.Loc) }</td>
+		<td data-col="members">{ strconv.Itoa(r.Members) }</td>
+		<td data-col="unused">{ strconv.Itoa(r.Unused) }</td>
+		<td class="text-nowrap">
+			<a data-reprint class="btn btn-outline-secondary btn-sm" href={ templ.SafeURL(batchURL(r.Batch.ID) + "/vouchers") } target="_blank" rel="noopener">Reprint</a>
+			@ui.ConfirmDelete("Delete", batchURL(r.Batch.ID), deleteBatchConfirm(r))
+		</td>
+	</tr>
+}
+
+templ BatchNewPage(l ui.LayoutData, p BatchFormProps) {
+	@ui.Layout(l) {
+		<h1 class="h3 mb-3">New batch</h1>
+		if len(p.Plans) == 0 {
+			<p class="card card-body">No plans exist yet. Create a plan first, then create batches. <a href="/admin/plans/new">New plan</a></p>
+		} else {
+			@BatchFormView(p)
+		}
+	}
+}
+
+type BatchFormProps struct {
+	Form     domain.BatchForm
+	Errors   domain.FieldErrors
+	Plans    []domain.Plan
+	Conflict string // shown above the form when a generated username already exists
+}
+
+// BatchFormView is the new-batch form and its 422 / 409 response body.
+templ BatchFormView(p BatchFormProps) {
+	<form id="batch-form" class="card card-body" hx-post="/admin/batches" hx-target="this" hx-swap="outerHTML">
+		if p.Conflict != "" {
+			@ui.Flash("error", p.Conflict)
+		}
+		@ui.Field(ui.FieldProps{Label: "Label", Name: "label", Value: p.Form.Label, Error: p.Errors["label"], Hint: "Optional, for your own reference."})
+		@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan_id", Value: p.Form.PlanID, Options: planFilterOptions(p.Plans, "Choose a plan"), Error: p.Errors["plan_id"]})
+		@ui.Field(ui.FieldProps{Label: "How many vouchers", Name: "count", Value: p.Form.Count, Error: p.Errors["count"], Hint: "From 1 to the maximum set in Settings.", Attrs: templ.Attributes{"inputmode": "numeric"}})
+		@ui.Field(ui.FieldProps{Label: "Valid for (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Optional. Empty = the plan's validity. Vouchers expire at midnight after this many days plus one, in the Settings time zone.", Attrs: templ.Attributes{"inputmode": "numeric"}})
+		<div class="d-flex gap-2 mt-3">
+			<button type="submit" class="btn btn-primary">Create and print</button>
+			<a class="btn btn-outline-secondary" href="/admin/batches">Cancel</a>
+		</div>
+	</form>
+}

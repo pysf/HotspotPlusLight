@@ -1,0 +1,44 @@
+package admin
+
+import (
+	"strconv"
+
+	"hotspotpluslight/internal/voucher"
+)
+
+func pageCount(p voucher.Print) string { return strconv.Itoa(len(p.Pages)) }
+
+// VoucherSheets is the print page (BR-16): a standalone left-to-right page with
+// its own print stylesheet and none of the admin chrome. Shared by the batch
+// print / reprint and the single-voucher print.
+templ VoucherSheets(p voucher.Print, backURL string) {
+	<!DOCTYPE html>
+	<html lang="en" dir="ltr">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ p.Title } - HotspotPlusLight</title>
+			<link rel="stylesheet" href="/admin/static/voucher.css"/>
+		</head>
+		<body>
+			<div class="toolbar" data-page-count={ pageCount(p) }>
+				<button type="button" onclick="window.print()">Print</button>
+				<a href={ templ.SafeURL(backURL) }>Back</a>
+				<span>{ plural(p.Total, "voucher") } on { plural(len(p.Pages), "page") }</span>
+			</div>
+			if p.Total == 0 {
+				<p class="empty">There are no vouchers to print.</p>
+			}
+			for i, page := range p.Pages {
+				<section class="sheet" data-page={ strconv.Itoa(i + 1) }>
+					for _, v := range page {
+						<div class="voucher" dir="ltr" data-voucher data-username={ v.Username } data-password={ v.Password }>
+							<p class="help" data-help>{ p.Help }</p>
+							<p class="credentials">Username: <b>{ v.Username }</b> | Password: <b>{ v.Password }</b></p>
+						</div>
+					}
+				</section>
+			}
+		</body>
+	</html>
+}

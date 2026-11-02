@@ -17,9 +17,12 @@ var (
 )
 
 // InUseError is returned when a plan cannot be deleted because members use it (O12).
-type InUseError struct{ Members int }
+// A batch row also holds a plan (even after all its members were deleted one by one).
+type InUseError struct{ Members, Batches int }
 
-func (e *InUseError) Error() string { return fmt.Sprintf("plan is used by %d members", e.Members) }
+func (e *InUseError) Error() string {
+	return fmt.Sprintf("plan is used by %d members and %d batches", e.Members, e.Batches)
+}
 
 // FieldErrors maps a form field name to its message. Empty = valid.
 type FieldErrors map[string]string

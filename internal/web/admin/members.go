@@ -19,8 +19,8 @@ const membersHome = "/admin/members"
 
 func memberURL(id int64) string { return fmt.Sprintf("%s/%d", membersHome, id) }
 
-// memberID parses {id}; the route only matches digits, so this fails only for 0 or overflow (404).
-func memberID(r *http.Request) (int64, bool) {
+// pathID parses {id}; the route only matches digits, so this fails only for 0 or overflow (404).
+func pathID(r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	return id, err == nil && id > 0
 }
@@ -107,7 +107,7 @@ func (h handlers) memberCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handlers) memberPage(w http.ResponseWriter, r *http.Request) {
-	id, ok := memberID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Member")
 		return
@@ -131,7 +131,7 @@ func (h handlers) memberPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handlers) memberUpdate(w http.ResponseWriter, r *http.Request) {
-	id, ok := memberID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Member")
 		return
@@ -166,7 +166,7 @@ func (h handlers) memberUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handlers) memberDelete(w http.ResponseWriter, r *http.Request) {
-	id, ok := memberID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Member")
 		return
@@ -178,14 +178,14 @@ func (h handlers) memberDelete(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		h.serverError(w, r, err)
 	case res.Kick.Failed > 0:
-		h.render(w, r, http.StatusOK, DeletedNotice(res))
+		h.render(w, r, http.StatusOK, DeletedNotice(res, membersHome, "Back to members"))
 	default:
 		htmxRedirect(w, r, http.StatusOK, membersHome)
 	}
 }
 
 func (h handlers) memberRenew(w http.ResponseWriter, r *http.Request) {
-	id, ok := memberID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Member")
 		return
@@ -201,7 +201,7 @@ func (h handlers) memberRenew(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handlers) memberExtraBulk(w http.ResponseWriter, r *http.Request) {
-	id, ok := memberID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Member")
 		return
@@ -224,7 +224,7 @@ func (h handlers) memberExtraBulk(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handlers) passwordReveal(w http.ResponseWriter, r *http.Request) {
-	id, ok := memberID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Member")
 		return
@@ -241,7 +241,7 @@ func (h handlers) passwordReveal(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handlers) passwordSet(w http.ResponseWriter, r *http.Request) {
-	id, ok := memberID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Member")
 		return
@@ -304,7 +304,7 @@ func (h handlers) memberBulkDelete(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		h.serverError(w, r, err)
 	case res.Kick.Failed > 0:
-		h.render(w, r, http.StatusOK, DeletedNotice(res))
+		h.render(w, r, http.StatusOK, DeletedNotice(res, membersHome, "Back to members"))
 	default:
 		htmxRedirect(w, r, http.StatusOK, membersHome)
 	}

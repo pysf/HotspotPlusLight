@@ -119,7 +119,11 @@ func (h handlers) planDelete(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, domain.ErrNotFound):
 		h.notFound(w, r, "Plan")
 	case errors.As(err, &inUse):
-		h.render(w, r, http.StatusConflict, ui.ErrorFragment(fmt.Sprintf("This plan is used by %d members and cannot be deleted.", inUse.Members)))
+		msg := fmt.Sprintf("This plan is used by %d members and cannot be deleted.", inUse.Members)
+		if inUse.Members == 0 {
+			msg = fmt.Sprintf("This plan is used by %s and cannot be deleted. Delete the batches first.", plural(inUse.Batches, "batch"))
+		}
+		h.render(w, r, http.StatusConflict, ui.ErrorFragment(msg))
 	case errors.Is(err, domain.ErrDefault):
 		h.render(w, r, http.StatusConflict, ui.ErrorFragment("This plan is the default plan. Clear the default plan in Settings first."))
 	case err != nil:

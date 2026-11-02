@@ -178,9 +178,11 @@ func filterClause(f domain.MemberFilter, now time.Time) (string, []any) {
 	return strings.Join(parts, ` AND `), args
 }
 
-// selectionClause is the WHERE fragment for explicit ids or a filter; an empty selection matches nothing.
+// selectionClause is the WHERE fragment for a batch, explicit ids or a filter; an empty selection matches nothing.
 func selectionClause(sel domain.MemberSelection, now time.Time) (string, []any) {
 	switch {
+	case sel.BatchID != nil:
+		return `m.batch_id = ?`, []any{*sel.BatchID}
 	case sel.Filter != nil:
 		return filterClause(*sel.Filter, now)
 	case len(sel.IDs) > 0:
@@ -303,5 +305,10 @@ func (s *Store) DeleteMembers(ctx context.Context, sel domain.MemberSelection, n
 		return 0, nil, err
 	}
 	n, _ := res.RowsAffected()
+	if sel.BatchID != nil { // the batch row goes in the same transaction (BR-23b)
+		if _, err := tx.ExecContext(ctx, `DELETE FROM batch WHERE id=?`, *sel.BatchID); err != nil {
+			return 0, nil, err
+		}
+	}
 	return int(n), open, tx.Commit()
 }

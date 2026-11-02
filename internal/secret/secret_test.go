@@ -3,6 +3,7 @@ package secret
 import (
 	"bytes"
 	"encoding/base64"
+	"strings"
 	"testing"
 )
 
@@ -51,6 +52,20 @@ func TestRandomDigits(t *testing.T) {
 	for _, r := range a {
 		if r < '0' || r > '9' {
 			t.Fatalf("non-digit in %q", a)
+		}
+	}
+}
+
+func TestRandomDigitsBounds(t *testing.T) {
+	for _, n := range []int{1, 4, 20, MaxRandomDigits} {
+		a, err := RandomDigits(n)
+		if err != nil || len(a) != n || strings.Trim(a, "0123456789") != "" {
+			t.Fatalf("n=%d: %q %v", n, a, err)
+		}
+	}
+	for _, n := range []int{-1, 0, MaxRandomDigits + 1} {
+		if _, err := RandomDigits(n); err == nil {
+			t.Errorf("n=%d accepted", n)
 		}
 	}
 }

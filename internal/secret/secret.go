@@ -80,14 +80,27 @@ func (b *Box) VerifyKeyCheck(stored string) error {
 	return nil
 }
 
-// RandomDigits returns n random decimal digits (crypto/rand), e.g. a 6-digit member password (BR-14).
+// RandomDigits returns n random decimal digits (crypto/rand), e.g. a 6-digit
+// member password (BR-14). Bytes >= 250 are discarded (rejection sampling), so
+// every digit is exactly uniform. n must be 1..MaxRandomDigits.
 func RandomDigits(n int) (string, error) {
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
+	if n < 1 || n > MaxRandomDigits {
+		return "", fmt.Errorf("secret: digit count %d out of range 1..%d", n, MaxRandomDigits)
 	}
-	for i := range b {
-		b[i] = '0' + b[i]%10 // 256 % 10 != 0: a negligible bias that does not matter for a short voucher PIN
+	out := make([]byte, 0, n)
+	buf := make([]byte, n+n/4+8)
+	for len(out) < n {
+		if _, err := rand.Read(buf); err != nil {
+			return "", err
+		}
+		for _, b := range buf {
+			if b < 250 && len(out) < n {
+				out = append(out, '0'+b%10)
+			}
+		}
 	}
-	return string(b), nil
+	return string(out), nil
 }
+
+// MaxRandomDigits is the longest password RandomDigits produces (settings allow 20).
+const MaxRandomDigits = 64

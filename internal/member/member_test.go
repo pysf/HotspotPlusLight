@@ -274,6 +274,16 @@ func TestDeleteKicksSessionsThatAppearBeforeTheTransaction(t *testing.T) {
 	}
 }
 
+func TestDeleteBatchKicksSessionsThatAppearBeforeTheTransaction(t *testing.T) {
+	s, r, d := setup()
+	r.late = []domain.SessionTarget{{Username: "v1", AcctSessionID: "late"}}
+	id := int64(7)
+	res, err := s.Delete(context.Background(), domain.MemberSelection{BatchID: &id})
+	if err != nil || len(d.calls) != 1 || d.calls[0].AcctSessionID != "late" || res.Kick.Attempted != 1 {
+		t.Fatalf("%+v %v %+v", res, err, d.calls)
+	}
+}
+
 func TestSelectionTooLarge(t *testing.T) {
 	s, _, _ := setup()
 	ids := make([]int64, MaxSelectionIDs+1)

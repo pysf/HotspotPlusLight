@@ -65,6 +65,7 @@ type Deps struct {
 	Auth     AuthService
 	Plans    PlanService
 	Members  MemberService
+	Batches  BatchService
 	Sessions SessionService
 	Settings SettingsService
 	Router   RouterPack
@@ -105,6 +106,17 @@ func Handler(d Deps) http.Handler {
 					r.Get("/password", h.passwordReveal)
 					r.Put("/password", h.passwordSet)
 					r.Post("/disconnections", h.memberKick)
+					r.Get("/voucher", h.memberPrint)
+				})
+			})
+			r.Route("/batches", func(r chi.Router) {
+				r.Get("/", h.batches)
+				r.Post("/", h.batchCreate)
+				r.Get("/new", h.batchNew)
+				r.Route("/{id:[0-9]+}", func(r chi.Router) {
+					r.Put("/", h.batchRename)
+					r.Delete("/", h.batchDelete)
+					r.Get("/vouchers", h.batchPrint)
 				})
 			})
 			r.Route("/sessions", func(r chi.Router) {
@@ -149,7 +161,7 @@ func redirect(to string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, to, http.StatusSeeOther) }
 }
 
-var nav = []ui.NavItem{{Label: "Members", Href: "/admin/members"}, {Label: "Online", Href: sessionsHome}, {Label: "Plans", Href: "/admin/plans"}, {Label: "Router", Href: "/admin/router"}, {Label: "Settings", Href: "/admin/settings"}}
+var nav = []ui.NavItem{{Label: "Members", Href: "/admin/members"}, {Label: "Batches", Href: batchesHome}, {Label: "Online", Href: sessionsHome}, {Label: "Plans", Href: "/admin/plans"}, {Label: "Router", Href: "/admin/router"}, {Label: "Settings", Href: "/admin/settings"}}
 
 func layout(r *http.Request, title, active string) ui.LayoutData {
 	csrf, _ := r.Context().Value(ctxKey{}).(string)

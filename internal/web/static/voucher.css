@@ -1,0 +1,80 @@
+/* Voucher print page: 14 vouchers per A4 sheet, 2 columns x 7 rows, always left-to-right (PLAN BR-16). */
+@page { size: A4; margin: 0; }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #ccc;
+  color: #000;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  direction: ltr;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid #999;
+}
+
+.sheet {
+  width: 210mm;
+  height: 297mm;
+  margin: 12px auto;
+  padding: 10mm;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, .4);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+}
+
+.voucher {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px dashed #666;
+  direction: ltr;
+  text-align: left;
+  overflow: hidden;
+}
+
+.voucher .help {
+  margin: 0;
+  padding: 8px 10px;
+  border-bottom: 1px dotted #666;
+  white-space: pre-line;
+  text-align: justify;
+}
+
+.voucher .credentials {
+  margin: 0;
+  padding: 8px 10px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.empty { padding: 24px; text-align: center; }
+
+@media print {
+  body { background: #fff; }
+  .toolbar { display: none; }
+  .sheet {
+    margin: 0;
+    height: 296mm; /* 1 mm under A4: browser rounding must not spill an empty page after the last sheet */
+    overflow: hidden;
+    box-shadow: none;
+    break-after: page;
+    page-break-after: always;
+  }
+  .sheet:last-of-type {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

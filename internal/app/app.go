@@ -153,14 +153,15 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		sessOpts = append(sessOpts, session.WithBeforeCommit(opts.AccountingBeforeCommit))
 	}
 	sess := session.New(sessionRepo{st}, disc, opts.Clock, sessOpts...)
+	members := member.New(st, box, sess, opts.Clock) // kicks go through the session service: ACK => session ended
 	a.svc = services{
 		auth:      auth.New(st, opts.Clock),
 		evaluator: auth.NewEvaluator(st, box, opts.Clock, log),
-		member:    member.New(st, box, sess, opts.Clock), // kicks go through the session service: ACK => session ended
+		member:    members,
 		plan:      plan.New(st, opts.Clock),
 		settings:  settings.New(st, opts.Clock),
 		session:   sess,
-		voucher:   voucher.New(opts.Clock),
+		voucher:   voucher.New(st, box, members, opts.Clock), // batch delete reuses the member delete path (kick, then remove)
 	}
 	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, log)
 	pack, err := routerpack.New()
@@ -168,7 +169,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		return fail(err)
 	}
 	a.httpSrv = &http.Server{Handler: pageapi.Handler(pageapi.Deps{Accounts: a.svc.evaluator, Settings: a.svc.settings, Clock: opts.Clock, Log: log}), ReadHeaderTimeout: 10 * time.Second}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Sessions: a.svc.session, Settings: a.svc.settings, Router: pack, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Settings: a.svc.settings, Router: pack, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 

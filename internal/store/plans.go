@@ -17,6 +17,7 @@ import (
 const (
 	sqliteConstraint       = 19
 	sqliteConstraintUnique = 2067
+	sqliteConstraintFK     = 787
 )
 
 func isConstraint(err error) bool { return sqliteCode(err)&0xff == sqliteConstraint }
@@ -108,8 +109,12 @@ func (s *Store) DeletePlan(ctx context.Context, id int64) error {
 		if def, derr := s.IsDefaultPlan(ctx, id); derr == nil && def {
 			return domain.ErrDefault
 		}
-		n, _ := s.CountMembersOnPlan(ctx, id)
-		return &domain.InUseError{Members: n}
+		// One statement, so both counts come from the same snapshot.
+		var n, b int
+		if err := s.db.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM member WHERE plan_id=?1), (SELECT count(*) FROM batch WHERE plan_id=?1)`, id).Scan(&n, &b); err != nil {
+			return err
+		}
+		return &domain.InUseError{Members: n, Batches: b}
 	}
 	if err != nil {
 		return err

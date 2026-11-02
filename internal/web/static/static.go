@@ -6,7 +6,7 @@ import (
 	"io/fs"
 )
 
-//go:embed htmx.min.js tabler.min.css app.css
+//go:embed htmx.min.js tabler.min.css app.css voucher.css
 var files embed.FS
 
 // Files returns the asset tree served under /admin/static/.

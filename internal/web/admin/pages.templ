@@ -185,7 +185,7 @@ templ SettingsFormView(p SettingsProps) {
 		@ui.Field(ui.FieldProps{Label: "Next voucher number", Name: "batch_counter", Value: p.Form.BatchCounter, Error: p.Errors["batch_counter"]})
 		@ui.Field(ui.FieldProps{Label: "Maximum vouchers per batch", Name: "batch_max_count", Value: p.Form.BatchMaxCount, Error: p.Errors["batch_max_count"]})
 		@ui.Field(ui.FieldProps{Label: "Voucher password length", Name: "voucher_password_length", Value: p.Form.VoucherPasswordLength, Error: p.Errors["voucher_password_length"], Hint: "4-20 digits."})
-		@ui.Textarea(ui.TextareaProps{Label: "Voucher help text", Name: "voucher_help", Value: p.Form.VoucherHelp, Error: p.Errors["voucher_help"]})
+		@ui.Textarea(ui.TextareaProps{Label: "Voucher help text", Name: "voucher_help", Value: p.Form.VoucherHelp, Error: p.Errors["voucher_help"], Hint: "Printed on every voucher. Empty = the default English text."})
 		@ui.Field(ui.FieldProps{Label: "Keep finished sessions (days)", Name: "session_retention_days", Value: p.Form.SessionRetentionDays, Error: p.Errors["session_retention_days"], Hint: "0 = keep forever."})
 		<div class="d-flex gap-2 mt-3">
 			<button type="submit" class="btn btn-primary">Save</button>

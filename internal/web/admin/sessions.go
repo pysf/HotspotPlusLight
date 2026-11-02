@@ -110,7 +110,7 @@ func sentence(s string) string {
 
 // memberKick disconnects all open sessions of one member (BR-18, E5.07).
 func (h handlers) memberKick(w http.ResponseWriter, r *http.Request) {
-	id, ok := memberID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Member")
 		return

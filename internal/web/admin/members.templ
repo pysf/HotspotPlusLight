@@ -242,6 +242,7 @@ templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 				</form>
 			</div>
 			<div class="d-flex gap-2 mt-3">
+				<a class="btn btn-outline-secondary" href={ templ.SafeURL(memberURL(m.ID) + "/voucher") } target="_blank" rel="noopener">Print voucher</a>
 				@ui.ConfirmAction("Disconnect", "post", memberURL(m.ID)+"/disconnections", "Disconnect all open sessions of this member?")
 				@ui.ConfirmAction("Renew now", "post", memberURL(m.ID)+"/renewals", "Restart this member's validity window? Used data, time and extra data are cleared.")
 				@ui.ConfirmDelete("Delete member", memberURL(m.ID), "Delete this member? Open sessions are disconnected first.")
@@ -292,7 +293,7 @@ templ BulkConfirm(st member.BulkStats, sel url.Values) {
 }
 
 // DeletedNotice reports a delete whose Disconnect-Requests partly failed (BR-18, BR-23).
-templ DeletedNotice(res member.DeleteResult) {
+templ DeletedNotice(res member.DeleteResult, backURL, backLabel string) {
 	@ui.Flash("warn", fmt.Sprintf("Deleted %d members. %d of %d open sessions could not be disconnected.", res.Deleted, res.Kick.Failed, res.Kick.Attempted))
-	<p><a href="/admin/members">Back to members</a></p>
+	<p><a href={ templ.SafeURL(backURL) }>{ backLabel }</a></p>
 }
