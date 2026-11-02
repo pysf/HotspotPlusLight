@@ -1,4 +1,4 @@
-// Package static embeds the admin panel's assets: htmx and Bootstrap CSS (vendored, pinned) and app.css.
+// Package static embeds the admin panel's assets: htmx and Tabler CSS (vendored, pinned) and app.css.
 package static
 
 import (
@@ -6,7 +6,7 @@ import (
 	"io/fs"
 )
 
-//go:embed htmx.min.js bootstrap.min.css app.css
+//go:embed htmx.min.js tabler.min.css app.css
 var files embed.FS
 
 // Files returns the asset tree served under /admin/static/.

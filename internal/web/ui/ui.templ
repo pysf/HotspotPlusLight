@@ -6,10 +6,11 @@ import "strconv"
 
 type NavItem struct{ Label, Href string }
 
-// LayoutData configures the page shell. An empty CSRF means "not logged in":
-// no nav, no logout, no hx-headers.
+// LayoutData configures the page shell. Bare is the logged-out shell (login
+// page): a centered card, no nav, no logout, no hx-headers.
 type LayoutData struct {
 	Title     string
+	Bare      bool
 	CSRF      string
 	Nav       []NavItem
 	Active    string // Href of the current nav item
@@ -20,8 +21,17 @@ type LayoutData struct {
 // like successes (502 = the router did not do what was asked); other 4xx/5xx stay errors (PLAN 8.2).
 const htmxConfig = `{"responseHandling":[{"code":"422|409|502","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
 
+// bodyClass switches Tabler's boxed layout on (layout-boxed) for the logged-in shell;
+// the login page is Tabler's centered card (page-center) instead.
+func bodyClass(d LayoutData) string {
+	if d.Bare {
+		return "d-flex flex-column"
+	}
+	return "layout-boxed"
+}
+
 func bodyAttrs(d LayoutData) templ.Attributes {
-	if d.CSRF == "" {
+	if d.Bare {
 		return nil
 	}
 	h, _ := templ.JSONString(map[string]string{"X-CSRF-Token": d.CSRF}) //nolint: map of strings cannot fail
@@ -36,30 +46,45 @@ templ Layout(d LayoutData) {
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<meta name="htmx-config" content={ htmxConfig }/>
 			<title>{ d.Title } - HotspotPlusLight</title>
-			<link rel="stylesheet" href="/admin/static/bootstrap.min.css"/>
+			<link rel="stylesheet" href="/admin/static/tabler.min.css"/>
 			<link rel="stylesheet" href="/admin/static/app.css"/>
 			<script src="/admin/static/htmx.min.js" defer></script>
 		</head>
-		<body class="bg-body-tertiary" { bodyAttrs(d)... }>
-			<nav class="navbar bg-body border-bottom">
-				<div class="container">
-					<span class="navbar-brand">HotspotPlusLight</span>
-					<ul class="navbar-nav flex-row flex-wrap me-auto gap-2">
-						for _, n := range d.Nav {
-							<li class="nav-item">
-								<a href={ templ.SafeURL(n.Href) } class={ "nav-link", templ.KV("active", n.Href == d.Active) } aria-current?={ n.Href == d.Active }>{ n.Label }</a>
-							</li>
-						}
-					</ul>
-					if d.LogoutURL != "" {
-						<button type="button" class="btn btn-outline-secondary btn-sm" hx-post={ d.LogoutURL }>Log out</button>
-					}
+		<body class={ bodyClass(d) } { bodyAttrs(d)... }>
+			if d.Bare {
+				<div class="page page-center">
+					<div class="container-tight py-4">
+						<div id="flash" aria-live="polite"></div>
+						{ children... }
+					</div>
 				</div>
-			</nav>
-			<main class="container py-4">
-				<div id="flash" aria-live="polite"></div>
-				{ children... }
-			</main>
+			} else {
+				<div class="page">
+					<header class="navbar d-print-none">
+						<div class="container-xl">
+							<span class="navbar-brand">HotspotPlusLight</span>
+							<ul class="navbar-nav flex-row flex-wrap me-auto gap-2">
+								for _, n := range d.Nav {
+									<li class="nav-item">
+										<a href={ templ.SafeURL(n.Href) } class={ "nav-link", templ.KV("active", n.Href == d.Active) } aria-current?={ n.Href == d.Active }>{ n.Label }</a>
+									</li>
+								}
+							</ul>
+							if d.LogoutURL != "" {
+								<button type="button" class="btn btn-outline-secondary btn-sm" hx-post={ d.LogoutURL }>Log out</button>
+							}
+						</div>
+					</header>
+					<div class="page-wrapper">
+						<main class="page-body">
+							<div class="container-xl">
+								<div id="flash" aria-live="polite"></div>
+								{ children... }
+							</div>
+						</main>
+					</div>
+				</div>
+			}
 		</body>
 	</html>
 }

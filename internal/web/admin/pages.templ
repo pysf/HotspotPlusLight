@@ -9,17 +9,19 @@ import (
 )
 
 templ LoginPage(username, errMsg string) {
-	@ui.Layout(ui.LayoutData{Title: "Log in"}) {
-		<div class="login card card-body mx-auto mt-5">
-			<h1 class="h4">Admin login</h1>
+	@ui.Layout(ui.LayoutData{Title: "Log in", Bare: true}) {
+		<div class="card card-md">
+			<div class="card-body">
+			<h1 class="h2 text-center mb-4">Admin login</h1>
 			if errMsg != "" {
 				@ui.ErrorFragment(errMsg)
 			}
 			<form method="post" action="/admin/login">
 				@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: username, Attrs: templ.Attributes{"autocomplete": "username", "autofocus": true}})
 				@ui.Field(ui.FieldProps{Label: "Password", Name: "password", Type: "password", Attrs: templ.Attributes{"autocomplete": "current-password"}})
-				<button type="submit" class="btn btn-primary">Log in</button>
+				<button type="submit" class="btn btn-primary w-100">Log in</button>
 			</form>
+			</div>
 		</div>
 	}
 }

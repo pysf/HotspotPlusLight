@@ -335,6 +335,7 @@ type memberVM struct {
 	PlanName                    string
 	Status                      string
 	Data, Time, WindowEnd       string
+	DataMain, DataLeft          string // list cell: "used / allowed" and the muted "N left" line
 	VerdictCode, VerdictText    string
 	Online                      bool
 	ExtraBulk                   string // in the plan's unit, e.g. "1.5 GB"
@@ -359,6 +360,7 @@ func newVM(v member.View) memberVM {
 		ExtraBulk: domain.FormatBytes(m.ExtraBulkBytes, p.BulkUnit), ExtraBulkValue: domain.BytesIn(m.ExtraBulkBytes, p.BulkUnit),
 		PlanUnit: p.BulkUnit, UnlimitedData: p.BulkValue == 0, Member: m,
 	}
+	vm.DataMain, vm.DataLeft = s.Quota.DataParts(p.BulkUnit)
 	if s.Decision.Allowed() && s.Decision.Renew {
 		vm.VerdictText = "renews at next login"
 	}

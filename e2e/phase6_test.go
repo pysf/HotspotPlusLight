@@ -358,11 +358,12 @@ func TestE6_06_FiguresMatchAdmin(t *testing.T) {
 	}
 	list := f.c.Get("/admin/members?per=100").Doc(t)
 	row := list.Find(fmt.Sprintf(`tr[data-member][data-id="%d"]`, id1))
-	if got := text(row.Find(`[data-col="data"]`)); got != "2.5 GB / 11 GB (8.5 GB left)" {
-		t.Errorf("admin list data %q", got)
+	// The list shows "used / allowed" with a muted "N left" line; time lives on the member page only.
+	if got, left := text(row.Find(`[data-col="data"]`)), text(row.Find(`[data-col="data-left"]`)); got != "2.5 GB / 11 GB 8.5 GB left" || left != "8.5 GB left" {
+		t.Errorf("admin list data %q, left %q", got, left)
 	}
-	if got := text(row.Find(`[data-col="time"]`)); got != "30 min / 60 min (30 min left)" {
-		t.Errorf("admin list time %q", got)
+	if got := text(f.c.Get(fmt.Sprintf("/admin/members/%d", id1)).Doc(t).Find(`[data-summary] [data-col="time"]`)); got != "30 min / 60 min (30 min left)" {
+		t.Errorf("member page time %q", got)
 	}
 
 	m = f.account("free", "pw").JSON(t)

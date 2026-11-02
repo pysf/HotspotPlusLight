@@ -49,6 +49,7 @@ Multi-tenancy/Business entity, resellers, operators, roles/ACL/tokens, invoices,
 | D7 | Dropped: SMS/verification, payments, invoices, coupons, campaigns, tickets, departments, resellers, operators, reports, roles/ACL/tokens, themes. |
 | D8 | Admin can **view** member passwords → stored reversibly (AES-GCM), not hashed. |
 | D9 | Local network deployment; plain HTTP is acceptable — **also for the admin listener; HTTPS (self-signed or own cert) was offered and declined, owner 2026-11-01.** |
+| D24 | **Admin UI = Tabler 1.6.1, CSS only, boxed layout (owner 2026-11-02).** Supersedes the Bootstrap 5.3.8-only restyle of 2026-11-01. Vendored pinned `tabler.min.css` (no CDN, no npm, no Tabler JS, no icon/web fonts: system font stack); `layout-boxed` on `<body>`, horizontal top nav; the member list is trimmed to checkbox, username, online, status, data. See `docs/ui-notes.md`. |
 | D23 | **Two HTTP listeners (owner 2026-11-01).** The *public* listener (`HTTP_ADDR`, :8080) serves only the page API (§8.1) and `/healthz`; the *admin* listener (`ADMIN_ADDR`, :8081) serves only the admin panel (§8.2). Only the public port goes in the router's walled garden; the admin port is not reachable from the hotspot network (README: block it in the router firewall). Admin routes return 404 on the public port and the reverse. |
 | D10 | The member login page is a **static HTML page hosted on the router** (not by us), customized by the admin by hand from a downloadable starter pack; the server only offers a small JSON API for it (P1–P3). |
 | D11 | Members are created by the admin: **one by one** and **bulk-generate (printable vouchers)**. **CSV import is dropped.** No self-signup. |
@@ -149,7 +150,7 @@ Legend: **Keep** = same behaviour · **Change** = kept, behaviour differs (see n
 | `destroyMembersById` | Keep | Single + bulk delete (also kicks open sessions) |
 | `importMemberFromCsv` | Drop | D11 |
 | `sendMessageToAll`, `getSmsCostForAllMembers`, SMS cost calc | Drop | D7 |
-| `loadMemberUsage` | Keep | Usage columns in member list |
+| `loadMemberUsage` | Keep | Usage columns in member list. The list intentionally shows only username / online / status / data (owner, 2026-11-02); the blocked reason (verdict) is visible on the member page only (`data-verdict` stays on the list row as a hidden hook for tests) |
 | `getAllMembersCount`, `getNewMembersCount` | Keep | Dashboard counters |
 | `getMembersChart` (stub), `getDailyUsage` (throws "not implemented") | Drop | |
 | `InternetPlan` CRUD (name, duration, speed, bulk, timeDuration, accessType, autoResubscribe, extraBulkPrice, price, ip pool, from/to window, type) | Change | Keeps name/duration/speed/bulk/time/autoResubscribe The from/to time-of-day window is **dropped** (Q40, D17). Drops price, extraBulkPrice, ipPoolName, bindMemberSigninToMac (D18), accessType public/private (O9), plan `type` (UI only created `dynamic`) |
@@ -530,7 +531,7 @@ HotspotPlusLight/
   internal/web/pageapi/        JSON API v1 + CORS + throttling — calls auth/member services
   internal/web/admin/          handlers + templ components (reusable: layout, table, pagination, filter bar, form field, confirm dialog, flash)
   internal/routerpack/         starter hotspot folder (Phase 6): theme registry, shared login page layout (`layout/login.html.tmpl`, one `logo.png`), router pages (`pages/`), 38 theme manifests + backgrounds (`themes/<category>/<style>/{theme.json,background.jpg}`), zip packaging; `go:embed`
-  internal/web/static/         htmx and Bootstrap 5.3.8 CSS only (vendored, pinned; D24, 2026-11-01, `docs/ui-notes.md`), app.css overrides
+  internal/web/static/         htmx and Tabler 1.6.1 CSS only (vendored, pinned; D24, 2026-11-02, `docs/ui-notes.md`), app.css overrides
   e2e/                         black-box tests, harness, fake router
   docs/
 ```

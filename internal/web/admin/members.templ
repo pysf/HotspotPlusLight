@@ -76,7 +76,7 @@ templ MembersPage(l ui.LayoutData, p MembersProps) {
 					<button type="submit" class="btn btn-outline-danger btn-sm">Delete selected</button>
 				</div>
 				<div id="bulk-result"></div>
-				@ui.Table([]string{"", "Username", "Name", "Mobile", "Plan", "Status", "Data", "Time", "Window ends", "Verdict", "MAC", "Online"}) {
+				@ui.Table([]string{"", "Username", "Online", "Status", "Data"}) {
 					for _, v := range p.Result.Rows {
 						@MemberRow(newVM(v))
 					}
@@ -87,7 +87,7 @@ templ MembersPage(l ui.LayoutData, p MembersProps) {
 	}
 }
 
-// UsageCells are the data / time / window / verdict cells, shared by the list rows and the member page (BR-22).
+// UsageCells are the data / time / window / verdict cells of the member page summary (BR-22).
 templ UsageCells(m memberVM) {
 	<td data-col="data">{ m.Data }</td>
 	<td data-col="time">{ m.Time }</td>
@@ -99,13 +99,14 @@ templ MemberRow(m memberVM) {
 	<tr data-member data-id={ strconv.FormatInt(m.ID, 10) } data-username={ m.Username } data-status={ m.Status } data-verdict={ m.VerdictCode } data-online={ strconv.FormatBool(m.Online) }>
 		<td><input type="checkbox" class="form-check-input" name="id" value={ strconv.FormatInt(m.ID, 10) }/></td>
 		<td><a href={ templ.SafeURL(memberURL(m.ID)) }>{ m.Username }</a></td>
-		<td>{ m.Name }</td>
-		<td>{ m.Mobile }</td>
-		<td>{ m.PlanName }</td>
+		<td data-col="online"><span class={ "dot", templ.KV("on", m.Online) } title={ onlineTitle(m.Online) } role="img" aria-label={ onlineLabel(m.Online) }></span></td>
 		<td data-col="status"><span class={ "badge", statusBadge(m.Status) }>{ m.Status }</span></td>
-		@UsageCells(m)
-		<td>{ m.MAC }</td>
-		<td data-col="online"><span class={ "dot", templ.KV("on", m.Online) } title={ onlineTitle(m.Online) }></span></td>
+		<td data-col="data">
+			{ m.DataMain }
+			if m.DataLeft != "" {
+				<div class="text-secondary small" data-col="data-left">{ m.DataLeft }</div>
+			}
+		</td>
 	</tr>
 }
 
@@ -117,6 +118,13 @@ func statusBadge(s string) string {
 		return "text-bg-danger"
 	}
 	return "text-bg-secondary"
+}
+
+func onlineLabel(on bool) string {
+	if on {
+		return "Online"
+	}
+	return "Offline"
 }
 
 func onlineTitle(on bool) string {
@@ -185,7 +193,7 @@ templ MemberFormView(p MemberFormProps) {
 // MemberStatus is the plan / status / online line. With oob it is sent as an
 // out-of-band swap, so a kick response refreshes it next to the flash.
 templ MemberStatus(m memberVM, oob bool) {
-	<p id="member-status" class="text-body-secondary" { oobAttrs(oob)... }>
+	<p id="member-status" class="text-secondary" { oobAttrs(oob)... }>
 		Plan { m.PlanName } · status { m.Status }
 		if m.Online {
 			· online
@@ -217,7 +225,7 @@ templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 			<div class="card card-body">
 				<h2 class="h5">Extra data</h2>
 				if m.UnlimitedData {
-					<p class="text-body-secondary">This plan has unlimited data.</p>
+					<p class="text-secondary">This plan has unlimited data.</p>
 				} else {
 					<p>Current extra data: <strong data-extra-bulk>{ m.ExtraBulk }</strong></p>
 					@ExtraBulkFormView(ExtraBulkProps{URL: memberURL(m.ID) + "/extra-bulk", Value: m.ExtraBulkValue, Unit: m.PlanUnit})

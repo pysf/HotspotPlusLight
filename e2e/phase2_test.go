@@ -164,6 +164,48 @@ func TestE2_11_DefaultPlanPreselected(t *testing.T) {
 	}
 }
 
+// E2.01b the member page shows every field the list leaves out (names, mobile, plan, MAC, expiry, status, online).
+func TestE2_01b_MemberPageShowsFields(t *testing.T) {
+	f := newP2(t)
+	p := f.plan("Basic")
+	id := f.member(p, "full", "first_name", "Zoe", "last_name", "Quinn", "mobile", "+98 912 345 6789",
+		"mac", "aa-bb-cc-dd-ee-ff", "expires_at", "2027-01-15T10:30")
+	f.openSession(id, "full", "s1", t0)
+	d := f.c.Get(mpath(id)).Doc(t)
+	for name, want := range map[string]string{"first_name": "Zoe", "last_name": "Quinn", "mobile": "9123456789",
+		"mac": "AA:BB:CC:DD:EE:FF", "expires_at": "2027-01-15T10:30"} {
+		if got := d.Find(`#member-form input[name="`+name+`"]`).AttrOr("value", ""); got != want {
+			t.Errorf("member page %s = %q, want %q", name, got, want)
+		}
+	}
+	// The stored instant is the settings-timezone wall time.
+	loc, err := time.LoadLocation(scalar[string](t, f.db, `SELECT timezone FROM settings`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := time.Date(2027, 1, 15, 10, 30, 0, 0, loc).Unix()
+	if got := scalar[int64](t, f.db, `SELECT expires_at FROM member WHERE id=?`, id); got != want {
+		t.Errorf("expires_at %d, want %d", got, want)
+	}
+	if got := d.Find(`#member-form select[name="plan_id"] option[selected]`).Text(); strings.TrimSpace(got) != "Basic" {
+		t.Errorf("member page plan %q", got)
+	}
+	st := text(d.Find("#member-status"))
+	if !strings.Contains(st, "status active") || !strings.Contains(st, "online") {
+		t.Errorf("member status line %q", st)
+	}
+	// The online dot is not colour-only.
+	dot := f.c.Get("/admin/members").Doc(t).Find(`tr[data-username="full"] .dot`)
+	if dot.AttrOr("role", "") != "img" || dot.AttrOr("aria-label", "") != "Online" {
+		t.Errorf("online dot a11y: role=%q label=%q", dot.AttrOr("role", ""), dot.AttrOr("aria-label", ""))
+	}
+	f.member(p, "idle")
+	dot = f.c.Get("/admin/members").Doc(t).Find(`tr[data-username="idle"] .dot`)
+	if dot.AttrOr("aria-label", "") != "Offline" {
+		t.Errorf("offline dot label %q", dot.AttrOr("aria-label", ""))
+	}
+}
+
 // E2.02 username rules (BR-1, O13).
 func TestE2_02_UsernameRules(t *testing.T) {
 	f := newP2(t)
@@ -240,6 +282,10 @@ func TestE2_04_MAC(t *testing.T) {
 		if r := f.c.Send("POST", "/admin/members", harness.MemberForm(p, "x", "mac", bad)); r.StatusCode != 422 || fieldError(r, t, "mac") == "" {
 			t.Errorf("mac %q: %d", bad, r.StatusCode)
 		}
+	}
+	// The member page shows the canonical form.
+	if got := f.c.Get(mpath(scalar[int64](t, f.db, `SELECT id FROM member WHERE username='m0'`))).Doc(t).Find(`input[name="mac"]`).AttrOr("value", ""); got != "AA:BB:CC:DD:EE:FF" {
+		t.Errorf("member page mac %q", got)
 	}
 	// Editing normalizes too.
 	id := f.member(p, "edit")
@@ -725,7 +771,7 @@ func TestE2_13_UsageSummaryAndVerdict(t *testing.T) {
 		{"nodata", capped, `used_download_bytes=?`, []any{10 * gb}, "10 GB / 10 GB (0 GB left)", "0 min / 60 min (60 min left)", end, "OUT_OF_BULK", "out of data"},
 		{"notime", capped, `used_seconds=3600`, nil, "0 GB / 10 GB (10 GB left)", "60 min / 60 min (0 min left)", end, "OUT_OF_TIME", "out of time"},
 		{"lapsed", capped, `subscription_date=?`, []any{t0.Unix() - 31*dayS}, "0 GB / 10 GB (10 GB left)", "0 min / 60 min (60 min left)", "2026-10-31 15:30", "NO_ACTIVE_SUBSCRIPTION", "window ended"},
-		{"autorenew", auto, `subscription_date=?, used_download_bytes=?`, []any{t0.Unix() - 31*dayS, 10 * gb}, "10 GB / 10 GB (0 GB left)", "0 min / unlimited", "2026-10-31 15:30", "", ""},
+		{"autorenew", auto, `subscription_date=?, used_download_bytes=?`, []any{t0.Unix() - 31*dayS, 10 * gb}, "10 GB / 10 GB (0 GB left)", "0 min / unlimited", "2026-10-31 15:30", "", "renews at next login"},
 		{"expired", capped, `expires_at=?`, []any{t0.Unix() - 1}, "0 GB / 10 GB (10 GB left)", "0 min / 60 min (60 min left)", end, "EXPIRED", "expired"},
 		{"inactive", capped, `active=0`, nil, "0 GB / 10 GB (10 GB left)", "0 min / 60 min (60 min left)", end, "INACTIVE_USER", "inactive"},
 		{"unlimited", unl, `used_download_bytes=?, used_seconds=500`, []any{gb}, "1 GB / unlimited", "8.3 min / unlimited", end, "", ""},
@@ -754,11 +800,20 @@ func TestE2_13_UsageSummaryAndVerdict(t *testing.T) {
 	}
 	list := f.c.Get("/admin/members?per=100").Doc(t)
 	for _, c := range cases {
-		check("list", list.Find(fmt.Sprintf(`tr[data-member][data-id="%d"]`, ids[c.name])), c)
+		// The trimmed list keeps the verdict code (row attribute) and the data cell only.
+		row := list.Find(fmt.Sprintf(`tr[data-member][data-id="%d"]`, ids[c.name]))
+		if v := row.AttrOr("data-verdict", "?"); v != c.verdict {
+			t.Errorf("list/%s: verdict %q, want %q", c.name, v, c.verdict)
+		}
+		wantMain, wantLeft, _ := strings.Cut(c.data, " (")
+		wantLeft = strings.TrimSuffix(wantLeft, ")")
+		if got := text(row.Find(`[data-col="data"]`)); got != strings.TrimSpace(wantMain+" "+wantLeft) {
+			t.Errorf("list/%s: data cell %q, want %q", c.name, got, strings.TrimSpace(wantMain+" "+wantLeft))
+		}
+		if got := text(row.Find(`[data-col="data-left"]`)); got != wantLeft {
+			t.Errorf("list/%s: data-left %q, want %q", c.name, got, wantLeft)
+		}
 		check("page", f.c.Get(mpath(ids[c.name])).Doc(t).Find("[data-summary]"), c)
-	}
-	if !strings.Contains(text(list.Find(`tr[data-username="autorenew"] [data-col="verdict"]`)), "renew") {
-		t.Error("a lapsed auto-resubscribe member should be marked as renewing at the next login")
 	}
 
 	t.Run("matches Access-Request", func(t *testing.T) {

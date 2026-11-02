@@ -66,14 +66,14 @@ func RouterPage(l ui.LayoutData, noBaseURL bool, defaultTheme string) templ.Comp
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\">Download hotspot folder</a> <a class=\"btn btn-outline-secondary\" href=\"/admin/router/themes\">Choose another theme</a> <span class=\"text-body-secondary ms-2\">Default theme: ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\">Download hotspot folder</a> <a class=\"btn btn-outline-secondary\" href=\"/admin/router/themes\">Choose another theme</a> <span class=\"text-secondary ms-2\">Default theme: ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(defaultTheme)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/router.templ`, Line: 27, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/router.templ`, Line: 27, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {

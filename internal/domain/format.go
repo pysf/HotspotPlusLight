@@ -33,10 +33,19 @@ func FormatMinutes(seconds int64) string {
 
 // DataText is "used / allowed (left left)" in the plan's unit, or "used / unlimited" (BR-22).
 func (q Quota) DataText(unit string) string {
-	if q.DataUnlimited {
-		return FormatBytes(q.UsedBytes, unit) + " / unlimited"
+	main, left := q.DataParts(unit)
+	if left == "" {
+		return main
 	}
-	return FormatBytes(q.UsedBytes, unit) + " / " + FormatBytes(q.AllowedBytes, unit) + " (" + FormatBytes(q.RemainingBytes, unit) + " left)"
+	return main + " (" + left + ")"
+}
+
+// DataParts splits DataText: "used / allowed" and "N left" (empty when unlimited), for the member list cell.
+func (q Quota) DataParts(unit string) (main, left string) {
+	if q.DataUnlimited {
+		return FormatBytes(q.UsedBytes, unit) + " / unlimited", ""
+	}
+	return FormatBytes(q.UsedBytes, unit) + " / " + FormatBytes(q.AllowedBytes, unit), FormatBytes(q.RemainingBytes, unit) + " left"
 }
 
 // TimeText is "used / limit (left left)" in minutes, or "used / unlimited" (BR-22).
