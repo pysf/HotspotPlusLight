@@ -102,6 +102,14 @@ func (t *AcctTx) AddUsage(ctx context.Context, memberID int64, d domain.Counters
 	return err
 }
 
+// AddDailyUsage upserts the delta into the member's day row, in the packet's transaction (D12).
+func (t *AcctTx) AddDailyUsage(ctx context.Context, memberID int64, day string, d domain.Counters) error {
+	_, err := t.tx.ExecContext(ctx, `INSERT INTO usage_daily(member_id, day, down, up, seconds) VALUES (?,?,?,?,?)
+		ON CONFLICT(member_id, day) DO UPDATE SET down=down+excluded.down, up=up+excluded.up, seconds=seconds+excluded.seconds`,
+		memberID, day, d.Download, d.Upload, d.Seconds)
+	return err
+}
+
 // SessionRetentionDays is read at each pruning run, so the setting applies without restart (O18).
 func (s *Store) SessionRetentionDays(ctx context.Context) (int, error) {
 	var n int

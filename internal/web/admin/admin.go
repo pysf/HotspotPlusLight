@@ -73,6 +73,7 @@ type Deps struct {
 	Members  MemberService
 	Batches  BatchService
 	Sessions SessionService
+	Usage    UsageService
 	Settings SettingsService
 	Router   RouterPack
 	Link     LinkStatus
@@ -133,6 +134,7 @@ func Handler(d Deps) http.Handler {
 				r.Get("/table", h.sessionsTable)
 				r.Post("/{id}/disconnections", h.sessionKick)
 			})
+			r.Get("/usage", h.usagePage)
 			r.Route("/plans", func(r chi.Router) {
 				r.Get("/", h.plansList)
 				r.Post("/", h.planCreate)
@@ -170,7 +172,7 @@ func redirect(to string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, to, http.StatusSeeOther) }
 }
 
-var nav = []ui.NavItem{{Label: "Members", Href: "/admin/members"}, {Label: "Batches", Href: batchesHome}, {Label: "Online", Href: sessionsHome}, {Label: "Plans", Href: "/admin/plans"}, {Label: "Router", Href: "/admin/router"}, {Label: "Settings", Href: "/admin/settings"}}
+var nav = []ui.NavItem{{Label: "Members", Href: "/admin/members"}, {Label: "Batches", Href: batchesHome}, {Label: "Online", Href: sessionsHome}, {Label: "Usage", Href: usageHome}, {Label: "Plans", Href: "/admin/plans"}, {Label: "Router", Href: "/admin/router"}, {Label: "Settings", Href: "/admin/settings"}}
 
 func layout(r *http.Request, title, active string) ui.LayoutData {
 	csrf, _ := r.Context().Value(ctxKey{}).(string)

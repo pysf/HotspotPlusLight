@@ -53,7 +53,7 @@ Multi-tenancy/Business entity, resellers, operators, roles/ACL/tokens, invoices,
 | D23 | **Two HTTP listeners (owner 2026-11-01).** The *public* listener (`HTTP_ADDR`, :8080) serves only the page API (§8.1) and `/healthz`; the *admin* listener (`ADMIN_ADDR`, :8081) serves only the admin panel (§8.2). Only the public port goes in the router's walled garden; the admin port is not reachable from the hotspot network (README: block it in the router firewall). Admin routes return 404 on the public port and the reverse. |
 | D10 | The member login page is a **static HTML page hosted on the router** (not by us), customized by the admin by hand from a downloadable starter pack; the server only offers a small JSON API for it (P1–P3). |
 | D11 | Members are created by the admin: **one by one** and **bulk-generate (printable vouchers)**. **CSV import is dropped.** No self-signup. |
-| D12 | Usage = quota enforcement + online list + kick. **No usage charts/reports.** |
+| D12 | Usage = quota enforcement + online list + kick. ~~No usage charts/reports.~~ **Superseded 2026-11-02 (owner asked for Phase 9):** a daily usage history (`usage_daily`), a 30-day chart and a top-10 members list on `/admin/usage`. Still no other reports (netflow, DNS, per-session history, exports). |
 | D13 | Plan features kept: extra bulk (admin grant), auto-resubscribe, an optional default plan (preselected on the new-member form; the admin creates plans in the web UI — nothing is created at startup; plans are mandatory — O10, Q19). Dropped: plan history, IP pool, per-plan burst settings (the legacy default burst is still sent — O2), hotel fields, public/private plan flag. |
 | D14 | Router/RADIUS/portal config lives in a single-row **`settings`** table. |
 | D15 | No data migration. |
@@ -160,7 +160,7 @@ Legend: **Keep** = same behaviour · **Change** = kept, behaviour differs (see n
 | `defaultInternetPlan {id, period, count, autoAssign}` | Change | Only `settings.default_plan_id` remains; period/count/autoAssign dropped (O10) |
 | `ClientSession.getOnlineUsers/getOnlineSessionCount/killOnlineSession` | Keep | Online page (no dashboard counter) |
 | `Nas` CRUD, `loadRadiusInfo`, `downloadScripts` | Change | "Router setup" page (O16) |
-| `Usage.getUsage/getTopMembers/reportStatus`, `Business.getTrafficUsage`, dashboard charts | Drop | D12 (optional Phase 9) |
+| `Usage.getUsage/getTopMembers/reportStatus`, `Business.getTrafficUsage`, dashboard charts | Change | Phase 9 (2026-11-02): daily rollup `usage_daily` + `/admin/usage` chart and top-10 list; no other reports |
 | Charge/credit ledger, `buyCredit`, `adminChargeCredit`, `getBalance`, service packages (`economic`), modules, subscription expiry | Drop | D7 |
 | `makeBackup`, `restoreBackup`, `restoreBackupFromApi` | Drop | O17 (dropped for now) |
 | FileStorage, BigFile, Dropbox, Payping OAuth | Drop | |
@@ -236,12 +236,12 @@ Use these as the spec; each is exercised by named E2E tests (§10). Legacy refer
 **BR-11 Accounting → usage** (replaces ClickHouse + Redis):
 - `upload = Acct-Input-Octets (+ Acct-Input-Gigawords<<32)`; `download = Acct-Output-Octets (+ Acct-Output-Gigawords<<32)`; `seconds = Acct-Session-Time`. These are **cumulative per session**.
 - On every Start/Interim/Stop for a known user: `delta = new_cumulative − stored_cumulative` (per field; if negative the counter restarted ⇒ `delta = new_cumulative`).
-- `member.used_* += delta`; update the session row. This makes retransmitted packets idempotent (delta 0).
+- `member.used_* += delta`; update the session row. This makes retransmitted packets idempotent (delta 0). Phase 9: the same non-zero delta is also upserted into `usage_daily` (member, day = date of the server receive time in `settings.timezone`) inside the same transaction.
 - Usage counters are **per validity window**: they reset when the window restarts (BR-13). This reproduces the legacy behaviour where only usage *after* `subscriptionDate` counts.
 
 **BR-12 MAC capture** — on the first accounting packet for a member whose `mac` is empty, store `Calling-Station-Id` (BR-3). Never overwritten automatically. Legacy: `setMemberMac`.
 
-**BR-13 Plan assignment** — (a) *create / change plan*: on member creation `subscription_date = now`, counters 0, extra bulk 0. **Changing an existing member's plan only sets `plan_id`** — window start, usage counters and extra bulk are kept (owner 2026-11-01, legacy behaviour); it takes effect at the member's next login, running sessions are untouched and no Disconnect is sent. Only the *renew* action resets. Renew discards the old window's totals; no usage history is kept (owner 2026-11-01). (b) *renew* (admin "Reset subscription" button / auto-resubscribe): `subscription_date = now`, `extra_bulk_bytes = 0`, usage counters = 0, **`last_renewed_at = now`, `renewal_count += 1`** (counts automatic and manual renewals; the member page shows "Renewed N times, last on <date> (automatic|manual)" — owner 2026-11-01, Q21; the manual/automatic label is kept in `member.last_renewal_kind` TEXT `'auto'|'manual'`). Legacy: `assignPlanToMember`, `resetMemberSubscription`.
+**BR-13 Plan assignment** — (a) *create / change plan*: on member creation `subscription_date = now`, counters 0, extra bulk 0. **Changing an existing member's plan only sets `plan_id`** — window start, usage counters and extra bulk are kept (owner 2026-11-01, legacy behaviour); it takes effect at the member's next login, running sessions are untouched and no Disconnect is sent. Only the *renew* action resets. Renew discards the old window's totals on the `member` row; the per-day history table `usage_daily` (Phase 9, 2026-11-02) is **not** touched by renew and survives it (this supersedes the earlier "no usage history is kept", for that table only). (b) *renew* (admin "Reset subscription" button / auto-resubscribe): `subscription_date = now`, `extra_bulk_bytes = 0`, usage counters = 0, **`last_renewed_at = now`, `renewal_count += 1`** (counts automatic and manual renewals; the member page shows "Renewed N times, last on <date> (automatic|manual)" — owner 2026-11-01, Q21; the manual/automatic label is kept in `member.last_renewal_kind` TEXT `'auto'|'manual'`). Legacy: `assignPlanToMember`, `resetMemberSubscription`.
 
 **BR-14a Member password characters (Phase 3 review, 2026-11-01)** — a member password (create, set-password) must be valid UTF-8 and contain no control characters (< 0x20, 0x7f), because the RADIUS edge treats a `User-Password` that decrypts to such bytes as a wrong shared secret and drops it (§7.1). The form shows "No control characters.". Batch passwords are digits only.
 
@@ -380,6 +380,17 @@ CREATE INDEX session_open_key ON session(username, acct_session_id, nas_ip) WHER
 CREATE INDEX session_started ON session(started_at);
 ```
 
+**Migration 0002 (Phase 9, 2026-11-02): `usage_daily`**
+```sql
+CREATE TABLE usage_daily (
+  member_id INTEGER NOT NULL REFERENCES member(id) ON DELETE CASCADE,
+  day TEXT NOT NULL,                  -- 'YYYY-MM-DD' in settings.timezone at receive time (sorts as text)
+  down INTEGER NOT NULL DEFAULT 0, up INTEGER NOT NULL DEFAULT 0, seconds INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (member_id, day)) WITHOUT ROWID;
+CREATE INDEX usage_daily_day ON usage_daily(day);
+```
+Rows are never pruned (about 1 row per active member per day), never touched by renew, removed with the member. If `settings.timezone` is changed later, old rows keep the day keys they were written with.
+
 **Why usage counters live on `member`** (design choice D-A — **CONFIRMED by the owner, 2026-11-01**): it keeps the legacy semantics exactly (usage counted since `subscription_date`, resets on renew (a plan change keeps them, BR-13a), mid-session resets handled by deltas) and makes login checks O(1) instead of summing sessions. Sessions remain as per-session upserted rows (your choice) for the online list, kick and short history. The alternative — pure per-session rows summed by window — cannot attribute a session that spans a reset correctly.
 
 **Dropped legacy fields** (member): `gender` (owner 2026-11-01, Q33; only this field was dropped — email, national code and names are kept), `fullName` (derive), `age`, `birthday/Day/Month/Year`, `verification*`, `passportNumber`, `roomNumber`, `studentGrade`, `studentId`, `groupIdentity*`, `manualVerification`, `internetPlanName`, `internetPlanHistory`, `uniqueUserId`, `passwordText`/`salt`. (plan): `price`, `extraBulkPrice`, `type`, `burst*`, `ipPoolName`, `bindMemberSigninToMac`, `accessType` (the from/to window `fromToCheck/fromHour/fromMinute/toHour/toMinute` is dropped too, Q40).
@@ -501,6 +512,7 @@ There is **no** server-rendered member page, cookie, language switch, plan list,
 | `GET /admin/batches/{id}/vouchers`, `PUT /admin/batches/{id}`, `DELETE /admin/batches/{id}` | Print (or reprint) the batch's vouchers (BR-16, decrypted passwords read at print time); rename the label; delete the batch with its members (BR-23, Q25). |
 | `GET /admin/members/{id}/voucher` | **Print voucher** for a single member: the same template as BR-16 with one voucher (Q24); button on the member page. Works for any member, batch or not. |
 | `GET /admin/plans`, `GET /admin/plans/new`, `POST /admin/plans`, `GET /admin/plans/{id}`, `PUT /admin/plans/{id}`, `DELETE /admin/plans/{id}` | CRUD with validation; editing a plan used by N members shows a warning "N members use this plan; changes apply to all of them at their next login" (Q16); delete answers `409` when the plan is in use (O12) or is the default plan (clear it first). |
+| `GET /admin/usage` (`?days=7\|30\|90`, default 30) | Phase 9: 30-day daily traffic chart (all members, download + upload) and top 10 members by traffic for the chosen range (D12). |
 | `GET /admin/sessions`, `GET /admin/sessions/table`, `POST /admin/sessions/{id}/disconnections` | BR-17/18 (Phase 5: `/table` is the polled fragment; a failed kick answers `422` missing identifiers, `502` NAK/no answer, `409` already ended, `404` unknown; success `200` + `HX-Redirect`). Columns: username, IP, MAC, started at, duration, data used in this session (↓/↑), disconnect button. The table refreshes itself every **10 s** (htmx polling) and shows the note "Updated by the router every <accounting_interval> s" (Q30). |
 | `GET /admin/settings`, `PUT /admin/settings` | All `settings` columns (secret masked, reveal button). Validation ranges as in DDL. |
 | `GET /admin/router` ; `GET /admin/router/themes` ; `GET /admin/router/themes/{id}` (+ `/login.html`, `/background.jpg`, `/logo.png`: the live preview and its assets) ; `GET /admin/router/files.zip?theme={id}` | Router setup, theme gallery (38 themes grouped by 6 categories, live previews) and theme download (§9.4). Default theme (no parameter): `alpha-fall`. *(Phase 6 built the entry page with the download and gallery links and a warning when `public_base_url` is empty; Phase 8, 2026-11-02, added the setup script (E8.03) and the link status panel; the secret appears in the script only, see open-questions row 38.)* The page also shows a **router link status** panel (in-memory, resets on restart): time + source IP of the last Access-Request, Accounting packet and Disconnect result, plus counters and source IPs of packets dropped for a bad shared secret (owner 2026-11-01). |
@@ -627,8 +639,9 @@ Tasks: voucher generator, print template (port of `memberPrintTemplate.dust.html
 E2E first: **E8.07** `/admin/router` status panel shows last Access-Request/Accounting/Disconnect times and sources, and counts a bad-shared-secret packet with its source IP (in-memory only, no DB writes) · **E8.03** `/admin/router` script contains secret, ports, interval and the server walled-garden entry · **E8.04** `files.zip` contains the customizable `login.html` (API base baked from `public_base_url`, no server template tokens) and the router pages, with no `plain-passwd` in any redirect· **E8.05** settings secret masked in HTML source · **E8.06** graceful shutdown completes in-flight accounting.
 Tasks: router link status panel (in-memory counters fed by the RADIUS server and CoA client), README (run the single binary; example systemd unit as a README snippet only — **no Dockerfile**, owner 2026-11-01: ship the binary for now; install, router config, key/DB backup note, hardware lab checklist) (install, router config, hardware lab checklist), log format.
 
-### Phase 9 (optional, not in scope unless you ask) — Usage history
-Daily rollup table + dashboard chart and top-N members; would reintroduce per-day deltas (extra table `usage_daily(member_id, day, down, up, seconds)`).
+### Phase 9 — Usage history (built 2026-11-02, owner asked for it)
+E2E first: **E9.01** accounting deltas feed the day row (zero delta writes nothing, retransmission counts once, second session adds to the same row) · **E9.02** day = date in `settings.timezone` · **E9.03** Gigawords/counter-restart delta equals the member counter delta · **E9.04** same transaction (rolled-back packet leaves no row; retransmit counts once) · **E9.05** renew keeps history (supersedes BR-13 "no history", table only) · **E9.06** member delete removes only its rows · **E9.07** `/admin/usage` 30-day chart, all members summed, empty days zero · **E9.08** top 10 by download+upload for 7/30/90 days (default 30, ties by username) · **E9.09** nav link, login required. E0.09 now asserts the shipped migration count (2).
+Built: migration `0002_usage_daily.sql`; `domain/usage.go` (day key, window, fill, ranges); `session.Service.Account` upserts the day row; `internal/usage` (report service); `GET /admin/usage[?days=7|30|90]`; reusable `ui.BarChart` (inline SVG, no JS). The member page does not show per-member history (skipped, not trivial).
 
 ---
 

@@ -1,0 +1,38 @@
+package admin
+
+import (
+	"strconv"
+
+	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/usage"
+	"hotspotpluslight/internal/web/ui"
+)
+
+templ UsagePage(l ui.LayoutData, v usage.View) {
+	@ui.Layout(l) {
+		<h1 class="h3 mb-3">Usage</h1>
+		<h2 class="h5">Daily traffic, last { strconv.Itoa(len(v.Days)) } days</h2>
+		@ui.BarChart(usageBars(v), v.MaxTotal, "download + upload, all members; peak "+domain.FormatSize(v.MaxTotal))
+		<h2 class="h5">Top members</h2>
+		<div class="btn-group mb-3" role="group" aria-label="Range">
+			for _, d := range domain.UsageRanges {
+				<a class={ "btn btn-outline-secondary", templ.KV("active", d == v.Range) } data-range={ strconv.Itoa(d) } href={ templ.SafeURL(usageHref(d)) }>{ strconv.Itoa(d) } days</a>
+			}
+		</div>
+		if len(v.Top) == 0 {
+			<p class="card card-body">No traffic recorded in the last { strconv.Itoa(v.Range) } days.</p>
+		} else {
+			@ui.Table([]string{"Username", "Total", "Download", "Upload", "Time"}) {
+				for _, u := range v.Top {
+					<tr data-top data-username={ u.Username }>
+						<td data-col="username"><a href={ templ.SafeURL(memberURL(u.MemberID)) }>{ u.Username }</a></td>
+						<td data-col="total">{ domain.FormatSize(u.Total()) }</td>
+						<td data-col="down">{ domain.FormatSize(u.Down) }</td>
+						<td data-col="up">{ domain.FormatSize(u.Up) }</td>
+						<td data-col="time">{ domain.FormatDuration(u.Seconds) }</td>
+					</tr>
+				}
+			}
+		}
+	}
+}

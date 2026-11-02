@@ -298,3 +298,42 @@ templ CodeBlock(id, text string) {
 		<button type="button" class="btn btn-outline-secondary" data-copy-target={ id }>Copy</button>
 	</div>
 }
+
+// Bar is one column of BarChart. Attrs are extra attributes on its <rect> (data hooks).
+type Bar struct {
+	Label string // shown under the first and last bar
+	Value int64
+	Tip   string // tooltip text
+	Attrs templ.Attributes
+}
+
+// BarChart is a dependency-free bar chart: one inline SVG, bars scaled to top (0 = all empty),
+// the first and last labels printed underneath. Colors come from the Tabler theme (currentColor).
+templ BarChart(bars []Bar, top int64, caption string) {
+	if len(bars) > 0 {
+		<figure class="mb-3">
+			<svg class="w-100 text-primary border-bottom" height="160" viewBox={ barViewBox(len(bars)) } preserveAspectRatio="none" role="img" aria-label={ caption }>
+				for i, b := range bars {
+					<rect x={ strconv.Itoa(i*10 + 1) } y={ strconv.Itoa(100 - barHeight(b.Value, top)) } width="8" height={ strconv.Itoa(barHeight(b.Value, top)) } fill="currentColor" { b.Attrs... }>
+						<title>{ b.Tip }</title>
+					</rect>
+				}
+			</svg>
+			<figcaption class="d-flex justify-content-between text-secondary small">
+				<span>{ bars[0].Label }</span>
+				<span>{ caption }</span>
+				<span>{ bars[len(bars)-1].Label }</span>
+			</figcaption>
+		</figure>
+	}
+}
+
+func barViewBox(n int) string { return "0 0 " + strconv.Itoa(n*10) + " 100" }
+
+// barHeight scales v to 0..100 against top; a non-zero value gets at least 1 so that it stays visible.
+func barHeight(v, top int64) int {
+	if v <= 0 || top <= 0 {
+		return 0
+	}
+	return int(min(100, max(1, v*100/top)))
+}

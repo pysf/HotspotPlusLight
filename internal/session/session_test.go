@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +24,7 @@ type fakeDB struct {
 	retDays  int
 	endErr   error // EndSession fails with it
 	pruned   time.Time
+	daily    map[string]domain.Counters // "id/day" -> sum
 }
 
 func newDB() *fakeDB {
@@ -80,7 +83,9 @@ func (f *fakeDB) InAcctTx(_ context.Context, fn func(AcctTx) error) error {
 		snapM[k] = *v
 	}
 	snapS := append([]domain.Session(nil), f.sessions...)
+	snapD := maps.Clone(f.daily)
 	if err := fn(f); err != nil {
+		f.daily = snapD
 		f.members = map[string]*domain.Member{}
 		for k, v := range snapM {
 			v := v
@@ -134,6 +139,17 @@ func (f *fakeDB) AddUsage(_ context.Context, id int64, d domain.Counters, _ time
 	return nil
 }
 
+func (f *fakeDB) AddDailyUsage(_ context.Context, id int64, day string, d domain.Counters) error {
+	if f.daily == nil {
+		f.daily = map[string]domain.Counters{}
+	}
+	k := fmt.Sprintf("%d/%s", id, day)
+	c := f.daily[k]
+	c.Download, c.Upload, c.Seconds = c.Download+d.Download, c.Upload+d.Upload, c.Seconds+d.Seconds
+	f.daily[k] = c
+	return nil
+}
+
 // FakeDisconnector records targets; reusable by later phases' tests.
 type FakeDisconnector struct {
 	Calls []Target
@@ -176,6 +192,30 @@ func TestAccountAppliesDeltasAndCapturesMACOnce(t *testing.T) {
 	s.Account(ctx, r)
 	if db.members["alice"].MAC != "AA:BB:CC:DD:EE:FF" {
 		t.Fatal("MAC overwritten")
+	}
+}
+
+// The day row gets the same deltas as the member, under the date in settings.timezone (D12).
+func TestAccountFeedsDayRowAndRollsItBack(t *testing.T) {
+	db := newDB()
+	s := New(db, &FakeDisconnector{}, clock.NewFake(t0))
+	ctx := context.Background()
+	for _, r := range []domain.AcctRecord{rec(domain.AcctStart, "alice", 0), rec(domain.AcctInterim, "alice", 100), rec(domain.AcctInterim, "alice", 100), rec(domain.AcctInterim, "alice", 250)} {
+		if err := s.Account(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	key := "1/" + t0.Format(domain.DayFormat)
+	if got := db.daily[key]; got.Download != 250 || len(db.daily) != 1 {
+		t.Fatalf("daily %+v", db.daily)
+	}
+	boom := errors.New("crash")
+	s2 := New(db, &FakeDisconnector{}, clock.NewFake(t0), WithBeforeCommit(func() error { return boom }))
+	if err := s2.Account(ctx, rec(domain.AcctInterim, "alice", 900)); !errors.Is(err, boom) {
+		t.Fatal(err)
+	}
+	if db.daily[key].Download != 250 {
+		t.Fatalf("daily not rolled back: %+v", db.daily)
 	}
 }
 

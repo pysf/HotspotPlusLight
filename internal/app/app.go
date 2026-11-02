@@ -31,6 +31,7 @@ import (
 	"hotspotpluslight/internal/session"
 	"hotspotpluslight/internal/settings"
 	"hotspotpluslight/internal/store"
+	"hotspotpluslight/internal/usage"
 	"hotspotpluslight/internal/voucher"
 	"hotspotpluslight/internal/web/admin"
 	"hotspotpluslight/internal/web/pageapi"
@@ -61,6 +62,7 @@ type services struct {
 	plan      *plan.Service
 	settings  *settings.Service
 	session   *session.Service
+	usage     *usage.Service
 	voucher   *voucher.Service
 }
 
@@ -166,6 +168,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		plan:      plan.New(st, opts.Clock),
 		settings:  settings.New(st, opts.Clock),
 		session:   sess,
+		usage:     usage.New(st, opts.Clock),
 		voucher:   voucher.New(st, box, members, opts.Clock), // batch delete reuses the member delete path (kick, then remove)
 	}
 	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, link, log)
@@ -174,7 +177,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		return fail(err)
 	}
 	a.httpSrv = &http.Server{Handler: pageapi.Handler(pageapi.Deps{Accounts: a.svc.evaluator, Settings: a.svc.settings, Clock: opts.Clock, Log: log}), ReadHeaderTimeout: 10 * time.Second}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 

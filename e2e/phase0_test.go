@@ -203,32 +203,36 @@ func TestE0_08_NoPlanAtFirstStart(t *testing.T) {
 	}
 }
 
+// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily).
+const wantMigrations = 2
+
 // E0.09 (startup side) failing migration aborts startup at the previous version;
 // editing an applied migration is refused by checksum.
 func TestE0_09_MigrationsAtStartup(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	db := harness.DB(t, s.DataDir)
-	if n := scalar[int](t, db, `SELECT count(*) FROM schema_migrations`); n != 1 {
-		t.Fatalf("migrations applied: %d", n)
+	if n := scalar[int](t, db, `SELECT count(*) FROM schema_migrations`); n != wantMigrations {
+		t.Fatalf("migrations applied: %d, want %d", n, wantMigrations)
 	}
 	s.Stop()
 
 	// a second start applies nothing
 	harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey}).Stop()
-	if n := scalar[int](t, db, `SELECT count(*) FROM schema_migrations`); n != 1 {
+	if n := scalar[int](t, db, `SELECT count(*) FROM schema_migrations`); n != wantMigrations {
 		t.Fatalf("second start applied migrations: %d", n)
 	}
 
-	// deliberately failing migration 0002
+	// deliberately failing migration after the shipped ones
 	fsys := fstest.MapFS{
-		"0001_init.sql": {Data: mustRead(t, "internal/store/migrations/0001_init.sql")},
-		"0002_bad.sql":  {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
+		"0001_init.sql":        {Data: mustRead(t, "internal/store/migrations/0001_init.sql")},
+		"0002_usage_daily.sql": {Data: mustRead(t, "internal/store/migrations/0002_usage_daily.sql")},
+		"0003_bad.sql":         {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
 	}
 	_, err := harness.TryStart(harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey, Migrations: fsys})
 	if err == nil {
 		t.Fatal("startup must abort on failing migration")
 	}
-	if n := scalar[int](t, db, `SELECT count(*) FROM schema_migrations`); n != 1 {
+	if n := scalar[int](t, db, `SELECT count(*) FROM schema_migrations`); n != wantMigrations {
 		t.Fatalf("version moved: %d", n)
 	}
 	if n := scalar[int](t, db, `SELECT count(*) FROM sqlite_master WHERE name='half'`); n != 0 {

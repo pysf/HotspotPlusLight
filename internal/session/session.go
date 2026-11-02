@@ -24,6 +24,8 @@ type AcctTx interface {
 	InsertSession(ctx context.Context, s domain.Session) error
 	UpdateSession(ctx context.Context, s domain.Session) error
 	AddUsage(ctx context.Context, memberID int64, d domain.Counters, now time.Time) error
+	// AddDailyUsage adds the same delta to the member's row of the given day (D12, Phase 9).
+	AddDailyUsage(ctx context.Context, memberID int64, day string, d domain.Counters) error
 }
 
 type Repo interface {
@@ -177,6 +179,16 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 		s.log.Warn("unparsable Calling-Station-Id in accounting; stored without MAC", "session", rec.SessionID, "value", raw)
 	}
 	rec.MAC = mac
+	st, err := s.repo.GetSettings(ctx)
+	if err != nil {
+		return err
+	}
+	loc, err := st.Location()
+	if err != nil { // history must never block quota accounting
+		s.log.Warn("invalid settings timezone; booking usage history in UTC", "err", err)
+		loc = time.UTC
+	}
+	day := domain.DayKey(now, loc)
 	return s.repo.InAcctTx(ctx, func(tx AcctTx) error {
 		m, err := tx.MemberByUsername(ctx, rec.Username)
 		if errors.Is(err, domain.ErrNotFound) {
@@ -208,6 +220,9 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 			}
 			if !res.Delta.IsZero() {
 				if err := tx.AddUsage(ctx, m.ID, res.Delta, now); err != nil {
+					return err
+				}
+				if err := tx.AddDailyUsage(ctx, m.ID, day, res.Delta); err != nil {
 					return err
 				}
 			}
