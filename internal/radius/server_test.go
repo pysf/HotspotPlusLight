@@ -245,3 +245,26 @@ func TestLinkRecorderSeesGoodAndBadPackets(t *testing.T) {
 		t.Errorf("access=%d accounting=%d bad=%d, want 0 1 1", a, c, b)
 	}
 }
+
+// A wrong-secret User-Password decrypts to random bytes. The library cuts it at the first
+// zero byte, which used to make about 1 in 150 of them look like a short valid password.
+func TestWrongSecretPasswordNeverPasses(t *testing.T) {
+	for range 300000 {
+		p := radius.New(radius.CodeAccessRequest, []byte("wrong-secret"))
+		rfc2865.UserPassword_SetString(p, "pw123456")
+		p.Secret = []byte("right")
+		raw, err := rfc2865.UserPassword_Lookup(p)
+		// A full 16-byte block of random bytes that is valid text cannot be told from a real
+		// password (about 1 in 300000); only padded (shorter) results must always be caught.
+		if err == nil && len(raw) < 16 && plausiblePassword(raw) && zeroPadded(p) {
+			t.Fatalf("a wrong-secret password passed: %q", raw)
+		}
+	}
+	for _, pw := range []string{"pw123456", "0123456789abcdef", "0123456789abcdefg", "x"} {
+		good := radius.New(radius.CodeAccessRequest, []byte("right"))
+		rfc2865.UserPassword_SetString(good, pw)
+		if !zeroPadded(good) {
+			t.Errorf("a good password %q failed the padding check", pw)
+		}
+	}
+}

@@ -4,11 +4,14 @@
 package radius
 
 import (
+	"bytes"
 	"context"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"time"
 	"unicode/utf8"
 
@@ -171,7 +174,7 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 		s.link.AccessRequest(from)
 		s.log.Warn("Access-Request with a malformed User-Password dropped", "from", from, "err", err)
 		return
-	case !plausiblePassword(raw):
+	case !plausiblePassword(raw) || !zeroPadded(r.Packet):
 		// layeh does not authenticate Access-Requests, so a wrong shared secret
 		// shows up only as a User-Password that decrypts to noise. Never answer it.
 		s.link.BadSecret(from) // MONITOR: spoofable on UDP, see internal/linkstatus
@@ -233,6 +236,29 @@ func isCHAP(p *radius.Packet) bool {
 		}
 	}
 	return false
+}
+
+// zeroPadded checks the padding of the decrypted User-Password. A real router pads
+// with zero bytes only. The library cuts the plaintext at the first zero byte and
+// hides what follows, so a wrong-secret block of random bytes with an early zero
+// byte would look like a short, valid password (about 1 in 150 packets).
+// RFC 2865 §5.2 requires zero padding. VERIFY-ON-HARDWARE: confirm RouterOS pads with zeros.
+func zeroPadded(p *radius.Packet) bool {
+	a, ok := p.Lookup(rfc2865.UserPassword_Type)
+	if !ok || len(a) < 16 || len(a)%16 != 0 || len(p.Secret) == 0 {
+		return false
+	}
+	dec := make([]byte, 0, len(a))
+	prev := p.Authenticator[:]
+	for i := 0; i < len(a); i += 16 {
+		h := md5.Sum(append(append([]byte{}, p.Secret...), prev...))
+		for j := 0; j < 16; j++ {
+			dec = append(dec, h[j]^a[i+j])
+		}
+		prev = a[i : i+16]
+	}
+	i := bytes.IndexByte(dec, 0)
+	return i < 0 || !slices.ContainsFunc(dec[i:], func(b byte) bool { return b != 0 })
 }
 
 // plausiblePassword is true for text a person could have typed: valid UTF-8
