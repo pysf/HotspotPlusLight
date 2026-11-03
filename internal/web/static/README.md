@@ -6,4 +6,4 @@ Upgrading = replace the file and change the version here.
 `@fontsource-variable/inter` 5.2.5 (https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.2.5/files/inter-latin-wght-normal.woff2).
 Licence: SIL Open Font License 1.1, see `OFL-Inter.txt`.
 
-`app.css` is generated: do not edit it. Source is `internal/web/ui/input.css`; run `make css`. See `docs/ui-notes.md`.
+`css/` and `js/` are our own files, edited by hand (no build step). `static.go` inlines `css/app.css` imports and hashes everything at startup. See `docs/ui-notes.md`.

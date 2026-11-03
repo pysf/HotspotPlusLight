@@ -20,6 +20,7 @@ type Config struct {
 	RadiusSharedSecret string // first-boot seed only; empty = generate
 	LogLevel           slog.Level
 	LogFormat          string // "text" (key=value) or "json"
+	Dev                bool   // HSP_DEV=1: serve the component gallery at /admin/dev/components
 }
 
 // Load builds a Config from getenv (os.Getenv in production).
@@ -53,6 +54,7 @@ func Load(getenv func(string) string) (Config, error) {
 			return c, fmt.Errorf("HSP_LOG_LEVEL invalid: %w", err)
 		}
 	}
+	c.Dev = get("DEV", "") == "1"
 	c.LogFormat = strings.ToLower(get("LOG_FORMAT", "text"))
 	if c.LogFormat != "text" && c.LogFormat != "json" {
 		return c, fmt.Errorf("HSP_LOG_FORMAT invalid: %q (use text or json)", c.LogFormat)

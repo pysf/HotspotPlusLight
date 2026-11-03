@@ -195,12 +195,12 @@ func TestE2_01b_MemberPageShowsFields(t *testing.T) {
 		t.Errorf("member status line %q", st)
 	}
 	// The online dot is not colour-only.
-	dot := f.c.Get("/admin/members").Doc(t).Find(`tr[data-username="full"] .dot`)
+	dot := f.c.Get("/admin/members").Doc(t).Find(`tr[data-username="full"] .c-dot`)
 	if dot.AttrOr("role", "") != "img" || dot.AttrOr("aria-label", "") != "Online" {
 		t.Errorf("online dot a11y: role=%q label=%q", dot.AttrOr("role", ""), dot.AttrOr("aria-label", ""))
 	}
 	f.member(p, "idle")
-	dot = f.c.Get("/admin/members").Doc(t).Find(`tr[data-username="idle"] .dot`)
+	dot = f.c.Get("/admin/members").Doc(t).Find(`tr[data-username="idle"] .c-dot`)
 	if dot.AttrOr("aria-label", "") != "Offline" {
 		t.Errorf("offline dot label %q", dot.AttrOr("aria-label", ""))
 	}

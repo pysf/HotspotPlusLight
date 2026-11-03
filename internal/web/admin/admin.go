@@ -79,7 +79,11 @@ type Deps struct {
 	Link     LinkStatus
 	// RadiusPorts gives the RADIUS UDP ports for the router setup script, read when the page is rendered.
 	RadiusPorts func() (authPort, acctPort int)
-	Log         *slog.Logger
+	// Assets serves the CSS, JS, font and htmx files under /admin/static/ (built once at startup).
+	Assets *static.Assets
+	// Dev turns on /admin/dev/components (HSP_DEV=1). Off = 404.
+	Dev bool
+	Log *slog.Logger
 }
 
 type handlers struct{ Deps }
@@ -88,77 +92,105 @@ type ctxKey struct{}
 
 // Handler builds the admin listener's router. Everything outside /admin is 404.
 func Handler(d Deps) http.Handler {
+	if d.Assets == nil {
+		panic("admin.Handler: Deps.Assets is required")
+	}
 	h := handlers{d}
 	r := chi.NewRouter()
 	r.Route("/admin", func(r chi.Router) {
-		r.Use(noStore)
-		r.Handle("/static/*", http.StripPrefix("/admin/static/", http.FileServerFS(static.Files())))
-		r.Get("/login", h.loginPage)
-		r.Post("/login", h.loginSubmit)
+		// Assets cache by their hash; pages are never cached.
+		r.Handle("/static/*", http.StripPrefix(static.Prefix, h.Assets.Handler()))
 		r.Group(func(r chi.Router) {
-			// MONITOR: sessions are opaque server-side rows (sliding 1 h); a stolen
-			// cookie is valid until it idles out or the admin logs out / changes password.
-			r.Use(h.requireSession, h.requireCSRF)
-			r.Get("/", redirect("/admin/members"))
-			r.Post("/logout", h.logout)
-			r.Route("/members", func(r chi.Router) {
-				r.Get("/", h.members)
-				r.Post("/", h.memberCreate)
-				r.Get("/new", h.memberNew)
-				r.Post("/bulk-delete", h.memberBulkDelete)
-				// Digits only: "/members/delete" and friends are plain 404s, not 405s.
-				r.Route("/{id:[0-9]+}", func(r chi.Router) {
-					r.Get("/", h.memberPage)
-					r.Put("/", h.memberUpdate)
-					r.Delete("/", h.memberDelete)
-					r.Post("/renewals", h.memberRenew)
-					r.Put("/extra-bulk", h.memberExtraBulk)
-					r.Get("/password", h.passwordReveal)
-					r.Put("/password", h.passwordSet)
-					r.Post("/disconnections", h.memberKick)
-					r.Get("/voucher", h.memberPrint)
+			r.Use(noStore, h.pageEnv)
+			r.Get("/login", h.loginPage)
+			r.Post("/login", h.loginSubmit)
+			r.Group(func(r chi.Router) {
+				// MONITOR: sessions are opaque server-side rows (sliding 1 h); a stolen
+				// cookie is valid until it idles out or the admin logs out / changes password.
+				r.Use(h.requireSession, h.requireCSRF)
+				r.Get("/", redirect("/admin/members"))
+				r.Post("/logout", h.logout)
+				r.Route("/members", func(r chi.Router) {
+					r.Get("/", h.members)
+					r.Post("/", h.memberCreate)
+					r.Get("/new", h.memberNew)
+					r.Post("/bulk-delete", h.memberBulkDelete)
+					// Digits only: "/members/delete" and friends are plain 404s, not 405s.
+					r.Route("/{id:[0-9]+}", func(r chi.Router) {
+						r.Get("/", h.memberPage)
+						r.Put("/", h.memberUpdate)
+						r.Delete("/", h.memberDelete)
+						r.Post("/renewals", h.memberRenew)
+						r.Put("/extra-bulk", h.memberExtraBulk)
+						r.Get("/password", h.passwordReveal)
+						r.Put("/password", h.passwordSet)
+						r.Post("/disconnections", h.memberKick)
+						r.Get("/voucher", h.memberPrint)
+					})
 				})
-			})
-			r.Route("/batches", func(r chi.Router) {
-				r.Get("/", h.batches)
-				r.Post("/", h.batchCreate)
-				r.Get("/new", h.batchNew)
-				r.Route("/{id:[0-9]+}", func(r chi.Router) {
-					r.Put("/", h.batchRename)
-					r.Delete("/", h.batchDelete)
-					r.Get("/vouchers", h.batchPrint)
+				r.Route("/batches", func(r chi.Router) {
+					r.Get("/", h.batches)
+					r.Post("/", h.batchCreate)
+					r.Get("/new", h.batchNew)
+					r.Route("/{id:[0-9]+}", func(r chi.Router) {
+						r.Put("/", h.batchRename)
+						r.Delete("/", h.batchDelete)
+						r.Get("/vouchers", h.batchPrint)
+					})
 				})
-			})
-			r.Route("/sessions", func(r chi.Router) {
-				r.Get("/", h.sessionsPage)
-				r.Get("/table", h.sessionsTable)
-				r.Post("/{id}/disconnections", h.sessionKick)
-			})
-			r.Get("/usage", h.usagePage)
-			r.Route("/plans", func(r chi.Router) {
-				r.Get("/", h.plansList)
-				r.Post("/", h.planCreate)
-				r.Get("/new", h.planNew)
-				r.Get("/{id}", h.planEdit)
-				r.Put("/{id}", h.planUpdate)
-				r.Delete("/{id}", h.planDelete)
-			})
-			r.Route("/router", func(r chi.Router) {
-				r.Get("/", h.routerPage)
-				r.Get("/files.zip", h.packDownload)
-				r.Get("/themes", h.themeGallery)
-				r.Route("/themes/{id}", func(r chi.Router) {
-					r.Get("/", h.themePage)
-					r.Get("/login.html", h.themePreview)
-					r.Get("/background.jpg", h.themeBackground)
-					r.Get("/logo.png", h.themeLogo)
+				r.Route("/sessions", func(r chi.Router) {
+					r.Get("/", h.sessionsPage)
+					r.Get("/table", h.sessionsTable)
+					r.Post("/{id}/disconnections", h.sessionKick)
 				})
+				r.Get("/usage", h.usagePage)
+				r.Route("/plans", func(r chi.Router) {
+					r.Get("/", h.plansList)
+					r.Post("/", h.planCreate)
+					r.Get("/new", h.planNew)
+					r.Get("/{id}", h.planEdit)
+					r.Put("/{id}", h.planUpdate)
+					r.Delete("/{id}", h.planDelete)
+				})
+				r.Route("/router", func(r chi.Router) {
+					r.Get("/", h.routerPage)
+					r.Get("/files.zip", h.packDownload)
+					r.Get("/themes", h.themeGallery)
+					r.Route("/themes/{id}", func(r chi.Router) {
+						r.Get("/", h.themePage)
+						r.Get("/login.html", h.themePreview)
+						r.Get("/background.jpg", h.themeBackground)
+						r.Get("/logo.png", h.themeLogo)
+					})
+				})
+				r.Get("/settings", h.settingsPage)
+				r.Put("/settings", h.settingsUpdate)
+				r.Get("/dev/components", h.devComponents)
 			})
-			r.Get("/settings", h.settingsPage)
-			r.Put("/settings", h.settingsUpdate)
 		})
 	})
 	return r
+}
+
+// pageEnv puts the theme (from the cookie) and the asset URLs into the request context for ui.Layout.
+func (h handlers) pageEnv(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		theme := ""
+		if c, err := r.Cookie(ui.ThemeCookie); err == nil {
+			theme = c.Value
+		}
+		env := ui.Env{Theme: ui.ParseTheme(theme), Asset: h.Assets.URL}
+		next.ServeHTTP(w, r.WithContext(ui.WithEnv(r.Context(), env)))
+	})
+}
+
+// devComponents is the component gallery. It exists only with HSP_DEV=1.
+func (h handlers) devComponents(w http.ResponseWriter, r *http.Request) {
+	if !h.Dev {
+		http.NotFound(w, r)
+		return
+	}
+	h.render(w, r, http.StatusOK, DevComponentsPage(layout(r, "Components", "")))
 }
 
 func noStore(next http.Handler) http.Handler {

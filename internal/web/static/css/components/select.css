@@ -1,0 +1,22 @@
+/* Native <select> with the input box and a chevron. */
+@layer components {
+  .c-select {
+    inline-size: 100%;
+    block-size: var(--h-input);
+    padding-inline: var(--s-3) var(--s-8);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background-color: var(--panel);
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-size: var(--size-chevron) var(--size-chevron);
+    background-repeat: no-repeat;
+    background-position: calc(100% - var(--s-4) - var(--size-chevron)) 50%, calc(100% - var(--s-4)) 50%;
+    box-shadow: 0 0 0 1px var(--line-strong);
+    appearance: none;
+    outline: none;
+    transition: box-shadow var(--ease);
+  }
+  .c-select:focus-visible { box-shadow: 0 0 0 var(--ring-w) var(--accent); }
+  .c-select[aria-invalid="true"] { box-shadow: 0 0 0 1px var(--bad); }
+  .c-select[data-auto] { inline-size: auto; min-inline-size: var(--w-select); }
+}

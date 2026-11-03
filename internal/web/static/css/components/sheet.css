@@ -1,0 +1,45 @@
+/* Right-side drawer on a native <dialog>. */
+@layer components {
+  .c-sheet {
+    inset: 0 0 0 auto;
+    inline-size: var(--w-sheet);
+    max-inline-size: 100%;
+    block-size: 100dvh;
+    max-block-size: 100dvh;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-start-start-radius: var(--r-sheet);
+    border-end-start-radius: var(--r-sheet);
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: var(--shadow-pop);
+    overflow: hidden;
+  }
+  .c-sheet[open] { display: flex; flex-direction: column; }
+  .c-sheet::backdrop { background: var(--scrim); backdrop-filter: blur(var(--blur-backdrop)); }
+  .c-sheet__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--s-4) var(--s-5h);
+    border-block-end: 1px solid var(--line);
+  }
+  .c-sheet__title { font-size: var(--fs-head); font-weight: var(--fw-semibold); letter-spacing: var(--ls-head); }
+  .c-sheet__body { flex: 1; overflow: auto; padding: var(--s-5h); }
+  .c-sheet__foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-5h);
+    border-block-start: 1px solid var(--line);
+  }
+  .c-sheet__section { margin-block-start: var(--s-2); padding-block-start: var(--s-4); border-block-start: 1px solid var(--line); }
+  .c-sheet__section > h3 { margin-block-end: var(--s-3); color: var(--muted); font-size: var(--fs-small); font-weight: var(--fw-medium); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .c-sheet { transition: translate var(--dur-sheet) ease, display var(--dur-sheet) allow-discrete, overlay var(--dur-sheet) allow-discrete; translate: 100% 0; }
+    .c-sheet[open] { translate: 0 0; }
+    @starting-style { .c-sheet[open] { translate: 100% 0; } }
+  }
+}

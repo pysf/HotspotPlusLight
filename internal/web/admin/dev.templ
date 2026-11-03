@@ -1,0 +1,153 @@
+package admin
+
+import "hotspotpluslight/internal/web/ui"
+
+templ galleryItem(title string) {
+	<div class="c-gallery-item">
+		<h3>{ title }</h3>
+		<div class="l-cluster">
+			{ children... }
+		</div>
+	</div>
+}
+
+// DevComponentsPage shows every component in every variant and state (HSP_DEV=1 only).
+templ DevComponentsPage(l ui.LayoutData) {
+	@ui.Layout(l) {
+		@ui.PageHeader("Components")
+		@galleryItem("Button") {
+			@ui.Button("secondary", "Default", nil)
+			@ui.Button("primary", "Primary", nil)
+			@ui.Button("danger", "Danger", nil)
+			@ui.Button("ghost", "Ghost", nil)
+			@ui.Button("secondary", "Disabled", templ.Attributes{"disabled": true})
+			@ui.LinkButton("secondary", "#", "Link button", nil)
+		}
+		@galleryItem("Button, block") {
+			<div class="l-login">
+				@ui.Button("primary", "Continue", templ.Attributes{"data-size": "block"})
+			</div>
+		}
+		@galleryItem("Icon button") {
+			@ui.IconButton("plus", "Add", nil)
+			@ui.IconButton("close", "Close", nil)
+			@ui.IconButton("copy", "Copy", nil)
+		}
+		@galleryItem("Field, input, select") {
+			<div class="l-stack l-narrow">
+				@ui.Field(ui.FieldProps{Label: "Username", Name: "g_user", Value: "alice", Hint: "A hint under the field."})
+				@ui.Field(ui.FieldProps{Label: "With error", Name: "g_err", Value: "x", Error: "This value is not valid."})
+				@ui.Select(ui.SelectProps{Label: "Plan", Name: "g_plan", Value: "b", Options: []ui.Option{{Value: "a", Label: "Basic"}, {Value: "b", Label: "Premium"}}})
+				@ui.Checkbox(ui.CheckboxProps{Label: "Active", Name: "g_active", Checked: true})
+			</div>
+		}
+		@galleryItem("Search") {
+			@ui.Search(ui.SearchProps{Name: "g_search", Placeholder: "Search members"})
+		}
+		@galleryItem("Chip") {
+			@ui.Chip(ui.ChipProps{Label: "All", Count: "143", Href: "#", Selected: true})
+			@ui.Chip(ui.ChipProps{Label: "Active", Count: "120", Href: "#"})
+			@ui.Chip(ui.ChipProps{Label: "Expired", Count: "9", Href: "#"})
+		}
+		@galleryItem("Card, notice") {
+			@ui.Card() {
+				<p>Card content.</p>
+			}
+			@ui.Flash("ok", "Saved.")
+			@ui.Flash("warn", "Check this.")
+			@ui.Flash("error", "Something failed.")
+		}
+		@galleryItem("Pill and online dot") {
+			@ui.Pill("active", "Active")
+			@ui.Pill("expiring", "Expiring")
+			@ui.Pill("expired", "Expired")
+			@ui.Pill("disabled", "Disabled")
+			@ui.OnlineDot(true)
+			@ui.OnlineDot(false)
+		}
+		@galleryItem("Meter") {
+			<div class="l-narrow">
+				@ui.Meter(2, 10, "2 of 10 GB")
+				<br/>
+				@ui.Meter(8.5, 10, "8.5 of 10 GB")
+				<br/>
+				@ui.Meter(10, 10, "10 of 10 GB")
+			</div>
+		}
+		@galleryItem("Table") {
+			@ui.Table("Sample", []string{"User", "Plan", "Status", ""}) {
+				<tr>
+					<td data-label="User">alice</td>
+					<td data-label="Plan">Premium</td>
+					<td data-label="Status">@ui.Pill("active", "Active")</td>
+					<td data-slot="actions">
+						@ui.Menu("g-menu-row", "Row actions") {
+							@ui.MenuItem("Edit", false, nil)
+							@ui.MenuSep()
+							@ui.MenuItem("Delete", true, nil)
+						}
+					</td>
+				</tr>
+				<tr>
+					<td data-label="User">bob</td>
+					<td data-label="Plan">Basic</td>
+					<td data-label="Status">@ui.Pill("expired", "Expired")</td>
+					<td data-slot="actions"></td>
+				</tr>
+			}
+		}
+		@galleryItem("Pager") {
+			@ui.Pagination(ui.PageProps{Page: 2, Pages: 5, Href: galleryHref})
+		}
+		@galleryItem("Empty") {
+			@ui.EmptyState("Nothing here yet.")
+		}
+		@galleryItem("Menu, sheet, modal, toast") {
+			@ui.Menu("g-menu", "More") {
+				@ui.MenuItem("Edit", false, nil)
+				@ui.MenuItem("Renew", false, nil)
+				@ui.MenuSep()
+				@ui.MenuItem("Delete", true, nil)
+			}
+			@ui.Button("secondary", "Open sheet", templ.Attributes{"data-open-dialog": "g-sheet"})
+			@ui.Button("secondary", "Open modal", templ.Attributes{"data-open-dialog": "g-modal"})
+			@ui.Button("secondary", "Confirm (hx-confirm)", templ.Attributes{"hx-get": "/admin/dev/components", "hx-confirm": "Do the thing?", "hx-swap": "none"})
+			@ui.Button("secondary", "Show toast", templ.Attributes{"data-toast": "Saved."})
+		}
+		@galleryItem("Credentials") {
+			<div class="l-narrow">
+				@ui.Credentials([]ui.CredRow{{Label: "Username", Value: "alice"}, {Label: "Password", Value: "493021"}, {Label: "Plan", Value: "Premium"}}, "Username: alice\nPassword: 493021")
+			</div>
+		}
+		@galleryItem("Code block") {
+			<div class="l-narrow">
+				@ui.CodeBlock("g-code", "/ip hotspot print")
+			</div>
+		}
+		@galleryItem("Bar chart") {
+			<div class="l-narrow">
+				@ui.BarChart([]ui.Bar{{Label: "Mon", Value: 3}, {Label: "Tue", Value: 8}, {Label: "Wed", Value: 5}, {Label: "Thu", Value: 10}}, 10, "sample")
+			</div>
+		}
+		@galleryItem("Icons") {
+			for _, n := range []string{"users", "ticket", "wifi", "chart", "layers", "router", "settings", "logout", "menu", "search", "plus", "more", "sun", "close", "copy", "check"} {
+				@ui.Icon(n)
+			}
+		}
+		@ui.Sheet("g-sheet", "Sample sheet") {
+			@ui.SheetBody() {
+				@ui.Field(ui.FieldProps{Label: "Name", Name: "g_sheet_name"})
+			}
+			@ui.SheetFoot() {
+				@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
+				@ui.Button("primary", "Save", nil)
+			}
+		}
+		@ui.Modal("g-modal", "Delete member?", "This cannot be undone.") {
+			@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
+			@ui.Button("danger", "Delete", templ.Attributes{"data-close": true})
+		}
+	}
+}
+
+func galleryHref(n int) string { return "#page-" + string(rune('0'+n)) }

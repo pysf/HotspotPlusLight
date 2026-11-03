@@ -1,0 +1,26 @@
+/* Button or link-button. data-variant: default | primary | danger | ghost. data-size="block" = full width. */
+@layer components {
+  .c-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    block-size: var(--h-btn);
+    padding-inline: var(--btn-pad-x);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-btn);
+    background: var(--elev);
+    color: var(--text);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+    transition: border-color var(--ease), background var(--ease), color var(--ease);
+  }
+  .c-btn:hover { border-color: var(--faint); text-decoration: none; }
+  .c-btn[data-variant="primary"] { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+  .c-btn[data-variant="primary"]:hover { filter: brightness(var(--brightness-hover)); }
+  .c-btn[data-variant="danger"] { color: var(--bad); }
+  .c-btn[data-variant="ghost"] { background: none; border-color: transparent; color: var(--muted); }
+  .c-btn[data-variant="ghost"]:hover { color: var(--text); }
+  .c-btn[data-size="block"] { inline-size: 100%; block-size: var(--h-btn-block); }
+  .c-btn:disabled, .c-btn[aria-disabled="true"], .c-btn.htmx-request { opacity: var(--opacity-disabled); pointer-events: none; }
+}

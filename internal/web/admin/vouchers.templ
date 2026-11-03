@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"hotspotpluslight/internal/voucher"
+	"hotspotpluslight/internal/web/ui"
 )
 
 func pageCount(p voucher.Print) string { return strconv.Itoa(len(p.Pages)) }
@@ -18,11 +19,12 @@ templ VoucherSheets(p voucher.Print, backURL string) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ p.Title } - HotspotPlusLight</title>
-			<link rel="stylesheet" href="/admin/static/voucher.css"/>
+			<link rel="stylesheet" href={ ui.EnvFrom(ctx).Asset("voucher.css") }/>
+			<script type="module" src={ ui.EnvFrom(ctx).Asset("js/print.js") }></script>
 		</head>
 		<body>
 			<div class="toolbar" data-page-count={ pageCount(p) }>
-				<button type="button" onclick="window.print()">Print</button>
+				<button type="button" data-print>Print</button>
 				<a href={ templ.SafeURL(backURL) }>Back</a>
 				<span>{ plural(p.Total, "voucher") } on { plural(len(p.Pages), "page") }</span>
 			</div>

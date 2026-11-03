@@ -1,0 +1,38 @@
+/* Minimal reset, typography and the one focus ring. Zero-specificity selectors. */
+@layer base {
+  :where(*, *::before, *::after) { box-sizing: border-box; }
+  :where(body, h1, h2, h3, h4, p, ul, ol, figure, dl, dd, fieldset) { margin: 0; }
+  :where(ul, ol) { padding: 0; list-style: none; }
+  :where(html) { -webkit-text-size-adjust: 100%; }
+  :where(body) {
+    background: var(--bg);
+    color: var(--text);
+    font: var(--fs-base) / var(--lh-base) var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :where(button, input, select, textarea) { font: inherit; color: inherit; }
+  :where(button) { cursor: pointer; background: none; border: 0; padding: 0; }
+  :where(a) { color: var(--accent); text-decoration: none; }
+  :where(a:hover) { text-decoration: underline; }
+  :where(code, kbd, samp) { font-family: var(--font-mono); }
+  :where(h1) { font-size: var(--fs-title); font-weight: var(--fw-semibold); letter-spacing: var(--ls-title); }
+  :where(h2, h3) { font-size: var(--fs-head); font-weight: var(--fw-semibold); }
+  :where(table) { border-collapse: collapse; }
+  :where(input[type="checkbox"]) { accent-color: var(--accent); }
+  :where(img, svg) { max-inline-size: 100%; }
+  :where([hidden]) { display: none; }
+  ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+
+  :focus-visible {
+    outline: var(--ring-w) solid var(--accent);
+    outline-offset: var(--ring-offset);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition: none;
+      animation: none;
+      scroll-behavior: auto;
+    }
+  }
+}

@@ -610,7 +610,7 @@ func TestE6_14_ThemeRegistry(t *testing.T) {
 	if n := d.Find("[data-category]").Length(); n != 6 {
 		t.Fatalf("%d categories, want 6", n)
 	}
-	if n := d.Find("[data-theme]").Length(); n != 38 {
+	if n := d.Find("body [data-theme]").Length(); n != 38 {
 		t.Fatalf("%d themes listed, want 38", n)
 	}
 	for _, e := range expectedThemes {

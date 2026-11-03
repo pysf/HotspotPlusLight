@@ -35,6 +35,7 @@ import (
 	"hotspotpluslight/internal/voucher"
 	"hotspotpluslight/internal/web/admin"
 	"hotspotpluslight/internal/web/pageapi"
+	"hotspotpluslight/internal/web/static"
 )
 
 // Options carries the process-level dependencies; zero values select production defaults.
@@ -176,8 +177,12 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return fail(err)
 	}
+	assets, err := static.New()
+	if err != nil {
+		return fail(err)
+	}
 	a.httpSrv = &http.Server{Handler: pageapi.Handler(pageapi.Deps{Accounts: a.svc.evaluator, Settings: a.svc.settings, Clock: opts.Clock, Log: log}), ReadHeaderTimeout: 10 * time.Second}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, Assets: assets, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 

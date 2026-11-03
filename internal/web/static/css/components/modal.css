@@ -1,0 +1,16 @@
+/* Confirm dialog on a native <dialog>. Danger confirm uses a danger button. */
+@layer components {
+  .c-modal {
+    inline-size: min(var(--w-modal), calc(100% - var(--s-8)));
+    padding: var(--s-5h);
+    border: 0;
+    border-radius: var(--r-sheet);
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: var(--shadow-pop);
+  }
+  .c-modal::backdrop { background: var(--scrim); backdrop-filter: blur(var(--blur-backdrop)); }
+  .c-modal__title { font-size: var(--fs-head); font-weight: var(--fw-semibold); margin-block-end: var(--s-1h); }
+  .c-modal__text { color: var(--muted); margin-block-end: var(--s-5); }
+  .c-modal__foot { display: flex; justify-content: flex-end; gap: var(--s-3); }
+}

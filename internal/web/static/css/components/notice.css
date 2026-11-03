@@ -1,0 +1,13 @@
+/* Message box. data-kind: ok | warn | error. */
+@layer components {
+  .c-notice {
+    margin-block-end: var(--s-4);
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-ctl);
+    background: var(--elev);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+  .c-notice[data-kind="ok"] { box-shadow: inset 0 0 0 1px var(--ok); }
+  .c-notice[data-kind="warn"] { box-shadow: inset 0 0 0 1px var(--warn); }
+  .c-notice[data-kind="error"] { box-shadow: inset 0 0 0 1px var(--bad); color: var(--bad); }
+}

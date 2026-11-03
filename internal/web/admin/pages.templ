@@ -10,15 +10,16 @@ import (
 
 templ LoginPage(username, errMsg string) {
 	@ui.Layout(ui.LayoutData{Title: "Log in", Bare: true}) {
-		<div class="card form">
-			<h1>Admin login</h1>
+		<div class="l-stack">
+			<span class="l-logo" aria-hidden="true"></span>
+			<h1 class="l-login__title">Admin login</h1>
 			if errMsg != "" {
 				@ui.ErrorFragment(errMsg)
 			}
-			<form class="grid gap-4" method="post" action="/admin/login">
+			<form class="l-stack" method="post" action="/admin/login">
 				@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: username, Attrs: templ.Attributes{"autocomplete": "username", "autofocus": true}})
 				@ui.Field(ui.FieldProps{Label: "Password", Name: "password", Type: "password", Attrs: templ.Attributes{"autocomplete": "current-password"}})
-				@ui.Button("primary", "Log in", templ.Attributes{"type": "submit"})
+				@ui.Button("primary", "Log in", templ.Attributes{"type": "submit", "data-size": "block"})
 			</form>
 		</div>
 	}
@@ -48,16 +49,16 @@ templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
 		if len(plans) == 0 {
 			@ui.EmptyState("No plans yet. Create the first one.")
 		} else {
-			@ui.Table([]string{"Name", "Validity", "Speed", "Data", "Time", "Devices", ""}) {
+			@ui.Table("Plans", []string{"Name", "Validity", "Speed", "Data", "Time", "Devices", ""}) {
 				for _, p := range plans {
 					<tr>
-						<td><a href={ templ.SafeURL(fmt.Sprintf("/admin/plans/%d", p.ID)) }>{ p.Name }</a></td>
-						<td class="tabular-nums">{ strconv.Itoa(p.DurationDays) } days</td>
-						<td>{ limit(p.SpeedValue, p.SpeedUnit) }</td>
-						<td>{ limit(p.BulkValue, p.BulkUnit) }</td>
-						<td>{ minutes(p.TimeLimitMinutes) }</td>
-						<td>{ strconv.Itoa(p.MaxSessions) }</td>
-						<td>
+						<td data-label="Name"><a href={ templ.SafeURL(fmt.Sprintf("/admin/plans/%d", p.ID)) }>{ p.Name }</a></td>
+						<td data-label="Validity" class="u-nums">{ strconv.Itoa(p.DurationDays) } days</td>
+						<td data-label="Speed">{ limit(p.SpeedValue, p.SpeedUnit) }</td>
+						<td data-label="Data">{ limit(p.BulkValue, p.BulkUnit) }</td>
+						<td data-label="Time">{ minutes(p.TimeLimitMinutes) }</td>
+						<td data-label="Devices">{ strconv.Itoa(p.MaxSessions) }</td>
+						<td data-slot="actions">
 							@ui.Actions() {
 								@ui.ConfirmDelete("Delete", fmt.Sprintf("/admin/plans/%d", p.ID), "Delete plan "+p.Name+"?")
 							}
@@ -107,16 +108,16 @@ func unitOptions(units []string) []ui.Option {
 }
 
 func planFormAttrs(p PlanFormProps) templ.Attributes {
-	a := templ.Attributes{"hx-target": "this", "hx-swap": "outerHTML"}
+	a := templ.Attributes{"id": "plan-form", "hx-target": "this", "hx-swap": "outerHTML"}
 	a["hx-"+p.Action] = p.URL
 	return a
 }
 
 // PlanFormView is both the new and edit form; it is also the 422 response body.
 templ PlanFormView(p PlanFormProps) {
-	<form id="plan-form" class="card form max-w-xl" { planFormAttrs(p)... }>
+	@ui.FormCard(planFormAttrs(p)) {
 		if p.Members > 0 {
-			<div class="notice notice-warn" data-plan-warning>{ membersWarning(p.Members) }</div>
+			<div class="c-notice" data-kind="warn" data-plan-warning>{ membersWarning(p.Members) }</div>
 		}
 		@ui.Field(ui.FieldProps{Label: "Name", Name: "name", Value: p.Form.Name, Error: p.Errors["name"]})
 		@ui.Field(ui.FieldProps{Label: "Validity (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Whole number, at least 1."})
@@ -138,7 +139,7 @@ templ PlanFormView(p PlanFormProps) {
 				@ui.ConfirmDelete("Delete plan", p.URL, "Delete this plan?")
 			}
 		}
-	</form>
+	}
 }
 
 type SettingsProps struct {
@@ -166,7 +167,7 @@ func planOptions(plans []domain.Plan) []ui.Option {
 // SettingsFormView is the settings form and the PUT response body (200 with a
 // flash, or 422 with field errors).
 templ SettingsFormView(p SettingsProps) {
-	<form id="settings-form" class="card form max-w-xl" hx-put="/admin/settings" hx-target="this" hx-swap="outerHTML">
+	@ui.FormCard(templ.Attributes{"id": "settings-form", "hx-put": "/admin/settings", "hx-target": "this", "hx-swap": "outerHTML"}) {
 		if p.Saved {
 			@ui.Flash("ok", "Settings saved.")
 		}
@@ -174,7 +175,7 @@ templ SettingsFormView(p SettingsProps) {
 		@ui.Field(ui.FieldProps{Label: "Time zone", Name: "timezone", Value: p.Form.Timezone, Error: p.Errors["timezone"], Hint: "IANA name, e.g. Europe/London. Dates are shown in this zone."})
 		@ui.FieldPair(ui.PairProps{Label: "RADIUS shared secret", For: "radius_shared_secret", Hint: "Must match the secret configured on the router. Changes apply immediately.", Errors: []ui.NamedError{{Name: "radius_shared_secret", Msg: p.Errors["radius_shared_secret"]}}}) {
 			@ui.InputControl(ui.FieldProps{Name: "radius_shared_secret", Type: "password", Value: p.Form.RadiusSharedSecret, Error: p.Errors["radius_shared_secret"], Attrs: templ.Attributes{"autocomplete": "off"}})
-			@ui.Button("secondary", "Reveal", templ.Attributes{"type": "button", "id": "reveal-secret", "onclick": "var i=document.getElementById('radius_shared_secret');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'Reveal':'Hide'"})
+			@ui.Button("secondary", "Reveal", templ.Attributes{"type": "button", "id": "reveal-secret", "data-reveal": "radius_shared_secret"})
 		}
 		@ui.Field(ui.FieldProps{Label: "Disconnect (CoA) port", Name: "coa_port", Value: p.Form.CoaPort, Error: p.Errors["coa_port"], Hint: "1-65535. Router default: 3799."})
 		@ui.Field(ui.FieldProps{Label: "Accounting interval (seconds)", Name: "accounting_interval_seconds", Value: p.Form.AccountingIntervalSeconds, Error: p.Errors["accounting_interval_seconds"], Hint: "At least 10."})
@@ -191,5 +192,5 @@ templ SettingsFormView(p SettingsProps) {
 		@ui.Actions() {
 			@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
 		}
-	</form>
+	}
 }

@@ -1,69 +1,61 @@
-# Admin UI: styling concept
+# Admin UI: concept and how to extend it
 
-Decision (owner, 2026-11-02, D24): plain server-rendered HTML plus **our own small CSS**, built with
-**Tailwind CSS v4** (standalone CLI, no Node). No UI kit. Earlier steps (Bootstrap, then Tabler 1.6.1) are history only;
-nothing of them is left in the code.
+Decision (owner, 2026-11-03, D24): plain server-rendered HTML (templ) + htmx + **our own hand-written CSS and small JS**.
+No Tailwind, no Node, no build step, no UI kit. The look is in `docs/DESIGN.md`. The code rules are in `docs/FRONTEND.md`.
+`reference/index.html` is a picture of the look only; none of its code is used.
 
-## Look
-Linear-like, Vercel-clean: minimal, compact, calm. Light mode only. English only.
-Flat: 1px borders, no shadows, no gradients. Radius 6px (controls) and 8px (cards). 8px spacing rhythm.
-The accent color is used sparingly: links, focus ring, the chart bars, checkboxes.
+## Where things are
+- `internal/web/static/css/`: `app.css` (layer order and the `@import` list), `tokens.css`, `base.css`, `layout.css`,
+  `components/<name>.css`, `utilities.css`.
+- `internal/web/static/js/`: one small ES module per job (`theme`, `dialog`, `clipboard`, `toast`, `shortcuts`, `nav`, `forms`, `menu`, `print`).
+- `internal/web/static/static.go`: at startup it inlines the `@import`s of `css/app.css` into one stylesheet, hashes every asset,
+  and serves them under `/admin/static/` as `name?v=hash` with `Cache-Control: public, max-age=31536000, immutable`.
+  A URL without the right hash gets `no-cache`. Pages stay `no-store`.
+- `internal/web/ui/ui.templ`: the shared components. `internal/web/ui/env.go`: the theme and the asset URLs, passed through the request context.
+- `internal/web/admin/dev.templ`: the component gallery. It is served at `/admin/dev/components` only when `HSP_DEV=1`.
+- The voucher print page keeps its own `voucher.css` (no app CSS). The router starter pack (`internal/routerpack`) is not touched.
 
-## Tokens
-All design values are in one `@theme` block in `internal/web/ui/input.css`. Tailwind's own palette, radii,
-fonts and text sizes are switched off there (`--color-*: initial` and so on), so only our tokens exist.
-Components (`@layer components` in the same file) and templates use tokens only.
+## Themes
+Two themes, chosen by `data-theme` on `<html>`: `air` (default) and `air-dark` (the Dark colors with Air's shape tokens).
+The server reads the `theme` cookie (a bad value means `air`) and renders the attribute, so there is no flash.
+`theme.js` toggles it and writes the cookie. Components never name a theme; only `tokens.css` does.
 
-| Token | Value | Use |
-|---|---|---|
-| `bg` | #FAFAFA | page background, row hover |
-| `surface` | #FFFFFF | cards, sidebar, top bar, inputs |
-| `fg` | #18181B | text, primary button |
-| `muted` | #71717A | secondary text (4.8:1 on white) |
-| `line` | #E4E4E7 | hairlines, card borders |
-| `control` | #8E8E98 | input borders (3:1 on white, WCAG non-text contrast) |
-| `hover` | #F4F4F5 | light hover and active nav background |
-| `accent` | #4F46E5 | links, focus ring |
-| `success` / `warning` / `error` | #16A34A / #D97706 / #DC2626 | dots, borders, error text |
-| `*-soft`, `*-ink` | tints and dark text for them | badges and notices (the ink colors pass AA on the tint) |
+## Shell
+Same menu as before the redesign: Manage (Members, Batches, Online, Usage) and Setup (Plans, Router, Settings), each with an icon
+and an active state (`aria-current="page"`). The top bar has the breadcrumb, the Theme button and Log out.
+Up to 820px the sidebar is a drawer behind the menu button (`data-nav-toggle`).
 
-Type: Inter variable (one file, Latin subset), page title 24px semibold, section 16px semibold, body 14px,
-labels 12px. Bytes, durations, timestamps and counts use `tabular-nums`.
+## Deviations from DESIGN.md and FRONTEND.md
+- **templ, not `html/template`** (O1). One templ func per component in `internal/web/ui`.
+- **Existing routes, field names and "Members" naming stay.**
+- **Fragment or full page** is decided by the `HX-Target` header (step B), not `HX-Request`, because the e2e harness sends
+  `HX-Request` on every request.
+- **Confirm modal:** the server still renders `hx-confirm` text. `dialog.js` catches `htmx:confirm` and shows one shared `<dialog>`.
+  No new routes, no `window.confirm`.
+- **Two themes only:** Air and Air dark. No Light or plain Dark.
+- **The current menu is kept** (the design has two items; this app has seven).
+- **Layout classes `l-`** (shell, stack, cluster) next to the `c-` components. Responsive table-to-card rules are in `layout.css`
+  with the other breakpoints (980, 820, 560), because breakpoints may live only there.
+- **Row menu** needs `menu.js` to place the popover next to its button (CSS anchor positioning is not wide enough yet).
+- **Pager** keeps numbered links (tests and filters use them) and adds Previous and Next.
+- Component sizes are rem tokens; px only in theme shape tokens (radii, heights) as in DESIGN.md.
 
-Text and spacing use logical utilities (`ps-`, `pe-`, `start-`, `end-`, `border-e`, `text-start`) so RTL stays possible.
+## How to add a component
+1. Add a templ func in `internal/web/ui/ui.templ` (props struct if it has more than two inputs). Variants are `data-*` attributes.
+2. Add `static/css/components/<name>.css` with a `@layer components { .c-<name> ... }` block. Tokens only: no hex, no magic
+   numbers, logical properties, no `!important`, no `[data-theme]`. Add its `@import` line to `css/app.css`.
+3. Add it, in every variant and state, to `internal/web/admin/dev.templ`.
+4. Run `make generate`, then look at it with `HSP_DEV=1 make run` in both themes.
 
-## Build
-- Source: `internal/web/ui/input.css`. Output (committed, minified): `internal/web/static/app.css`.
-  It is embedded in the binary with `go:embed`; nothing is loaded from a CDN.
-- `make css` writes the output. It downloads the pinned Tailwind standalone CLI (v4.3.3) to `tools/`
-  (gitignored) if missing and checks its sha256 (the table is in the Makefile).
-  Tailwind scans `internal/web/ui/*.templ|go` and `internal/web/admin/*.templ|go` (not the generated `*_templ.go`).
-- `make css-check` (part of `make ci`) rebuilds into a temp file and fails if the committed CSS differs.
-- Rule: write each class name whole in the source (never build `"btn-" + kind`), or Tailwind will not see it.
-  After changing a class or `input.css`, run `make css` and commit the result.
+## How to add a page
+Write a templ page in `internal/web/admin/<name>.templ` that wraps `@ui.Layout(l)` and uses only `ui` components. Add the handler and
+route in `admin.go`. Give every `<td>` a `data-label` so rows become cards on phones. No inline `style`, `onclick`, `hx-on` or `<script>`
+(E10.01 checks this).
 
 ## Font
-`internal/web/static/inter-latin-wght-normal.woff2` is the Latin subset, variable weight axis, of Inter 4
-(package `@fontsource-variable/inter` 5.2.5, from `cdn.jsdelivr.net`). Licence: SIL Open Font License 1.1, in
-`internal/web/static/OFL-Inter.txt`. It is served from `/admin/static/` with `font-display: swap`; system fonts are the fallback.
-
-## Layout and components
-- Shell (`ui.Layout`): fixed 220px sidebar (brand, grouped nav, icons), compact top bar (breadcrumb and Log out), then
-  `main` (max 72rem). The sidebar item of the current page has `aria-current="page"`.
-  Below 1024px the sidebar is hidden; the menu button in the top bar (`data-nav-toggle`, tiny code in `static/app.js`) shows it.
-- Login page (`Bare` layout): one centered card, no shell.
-- Form pages are at most `max-w-xl`; tables use the full width. Tables scroll sideways on narrow screens.
-- Reusable components, all in `internal/web/ui/ui.templ`: `Layout`, `Icon`, `PageHeader`, `Card`, `EmptyState`, `Actions`,
-  `FilterBar`, `StatusBadge`, `Button`, `LinkButton`, `Flash`, `ErrorFragment`, `Field`/`Select`/`Textarea`/`Checkbox`/`FieldPair`,
-  `Table`, `Pagination`, `ConfirmDelete`/`ConfirmAction`, `CodeBlock`, `BarChart`. Pages build only from these.
-- Icons: one `Icon(name)` component with a handful of inline 24px SVGs (stroke, `currentColor`). No icon library.
-- Confirmation uses htmx `hx-confirm` (the browser's own dialog, keyboard accessible). No other JavaScript besides htmx and `app.js`.
-- Voucher print page and the router page pack are separate and have their own CSS (`voucher.css`, `internal/routerpack`).
-
-## Member list
-Shows only: checkbox, username (link), online dot, status badge, data ("used / allowed", with a muted "N left" line).
-Everything else is on the member page.
+`internal/web/static/inter-latin-wght-normal.woff2` is the Latin subset, variable weight, of Inter 4 (SIL OFL 1.1, `OFL-Inter.txt`).
+`font-display: swap`; system fonts are the fallback.
 
 ## Not verified
-Nobody has looked at this UI in a browser yet. Check the member list, member form, login, plans, batches,
-online, usage, settings and router pages at 1280px and 390px wide, and print one voucher sheet.
+Only checked with headless Chrome screenshots (gallery, members, plan form, login) at 1280px and 500px. Nobody has used it in a
+normal browser yet. Check: keyboard (Esc closes the modal, focus returns), the nav drawer, Safari and Firefox, and the print page.

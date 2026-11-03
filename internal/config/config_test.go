@@ -28,3 +28,13 @@ func TestLoadDefaultsAndRequired(t *testing.T) {
 		t.Fatal("bad key accepted")
 	}
 }
+
+func TestDevFlag(t *testing.T) {
+	key := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	for v, want := range map[string]bool{"": false, "0": false, "1": true} {
+		c, err := Load(env(map[string]string{"HSP_SECRET_KEY": key, "HSP_DEV": v}))
+		if err != nil || c.Dev != want {
+			t.Errorf("HSP_DEV=%q: Dev=%v err=%v", v, c.Dev, err)
+		}
+	}
+}

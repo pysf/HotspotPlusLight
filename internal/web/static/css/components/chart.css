@@ -1,0 +1,6 @@
+/* Bar chart drawn as one inline SVG. */
+@layer components {
+  .c-chart { margin-block-end: var(--s-6); padding: var(--s-4); }
+  .c-chart__svg { display: block; inline-size: 100%; block-size: var(--h-chart); border-block-end: 1px solid var(--line); color: var(--accent); }
+  .c-chart__caption { display: flex; justify-content: space-between; gap: var(--s-2); margin-block-start: var(--s-2); color: var(--muted); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+}

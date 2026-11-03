@@ -1,0 +1,12 @@
+/* Panel with rounded corners. */
+@layer components {
+  .c-card {
+    border: 1px solid var(--card-border);
+    border-radius: var(--r-card);
+    background: var(--panel);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+  }
+  .c-card[data-pad] { padding: var(--s-6); }
+  .c-card__title { margin-block-end: var(--s-3); }
+}

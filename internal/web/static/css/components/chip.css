@@ -1,0 +1,20 @@
+/* Filter pill (link or button). Selected = aria-pressed="true" or aria-current="page". */
+@layer components {
+  .c-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1h);
+    block-size: var(--h-chip);
+    padding-inline: var(--s-3);
+    border: 1px solid transparent;
+    border-radius: var(--r-pill);
+    background: var(--panel);
+    color: var(--muted);
+    font-size: var(--fs-chip);
+    font-weight: var(--fw-medium);
+    transition: color var(--ease), background var(--ease), border-color var(--ease);
+  }
+  .c-chip:hover { color: var(--text); border-color: var(--line-strong); text-decoration: none; }
+  .c-chip[aria-pressed="true"], .c-chip[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+  .c-chip__count { opacity: var(--opacity-count); font-weight: var(--fw-medium); }
+}

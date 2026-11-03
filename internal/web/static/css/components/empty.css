@@ -1,0 +1,5 @@
+/* Nothing to show. */
+@layer components {
+  .c-empty { padding: var(--s-14) var(--s-5); color: var(--muted); text-align: center; }
+  .c-empty > * + * { margin-block-start: var(--s-2); }
+}

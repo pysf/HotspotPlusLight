@@ -1,0 +1,20 @@
+/* Text input and textarea. The border is a ring, so the focus ring can replace it. */
+@layer components {
+  .c-input {
+    inline-size: 100%;
+    block-size: var(--h-input);
+    padding-inline: var(--s-3);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--panel);
+    box-shadow: 0 0 0 1px var(--line-strong);
+    outline: none;
+    transition: box-shadow var(--ease);
+  }
+  textarea.c-input { block-size: auto; padding-block: var(--s-3); resize: vertical; }
+  .c-input::placeholder { color: var(--faint); }
+  .c-input:focus-visible { box-shadow: 0 0 0 var(--ring-w) var(--accent); }
+  .c-input[aria-invalid="true"] { box-shadow: 0 0 0 1px var(--bad); }
+  .c-input:disabled { opacity: var(--opacity-disabled); }
+  .c-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-small); }
+}

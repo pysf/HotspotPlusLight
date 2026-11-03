@@ -110,7 +110,9 @@ func TestE8_03_SetupScript(t *testing.T) {
 			t.Errorf("script lacks %q\n%s", want, script)
 		}
 	}
-	if strings.Contains(script, portOf(t, f.s.Addrs.Admin)) && portOf(t, f.s.Addrs.Admin) != portOf(t, f.s.Addrs.HTTP) {
+	// match the port as a whole number, so a random port that is a substring of other digits does not trip the check
+	adminPort := regexp.MustCompile(`(^|[^0-9])` + portOf(t, f.s.Addrs.Admin) + `([^0-9]|$)`)
+	if adminPort.MatchString(script) && portOf(t, f.s.Addrs.Admin) != portOf(t, f.s.Addrs.HTTP) {
 		t.Error("the admin port appears in the script")
 	}
 	// every RouterOS command line sits under a comment, and every unverified command says so
@@ -659,8 +661,14 @@ func TestE8_12_RouterPageAssets(t *testing.T) {
 		t.Errorf("Cache-Control %q", r.Header.Get("Cache-Control"))
 	}
 	d := r.Doc(t)
-	if d.Find(`script[src="/admin/static/app.js"]`).Length() != 1 {
-		t.Error("page does not load /admin/static/app.js")
+	clip := ""
+	d.Find("script[src]").Each(func(_ int, s *goquery.Selection) {
+		if src := s.AttrOr("src", ""); strings.HasPrefix(src, "/admin/static/js/clipboard.js?v=") {
+			clip = src
+		}
+	})
+	if clip == "" {
+		t.Error("page does not load /admin/static/js/clipboard.js?v=<hash>")
 	}
 	d.Find("script").Each(func(_ int, s *goquery.Selection) {
 		if _, has := s.Attr("src"); !has {
@@ -670,8 +678,8 @@ func TestE8_12_RouterPageAssets(t *testing.T) {
 	if d.Find("button[data-copy-target]").Length() != 1 || d.Find("button[onclick]").Length() != 0 {
 		t.Error("copy button must be markup-only with data-copy-target")
 	}
-	js := f.c.Get("/admin/static/app.js")
+	js := f.c.Get(clip)
 	if js.StatusCode != 200 || !strings.Contains(js.Body, "data-copy-target") {
-		t.Errorf("app.js: %d", js.StatusCode)
+		t.Errorf("clipboard.js: %d", js.StatusCode)
 	}
 }

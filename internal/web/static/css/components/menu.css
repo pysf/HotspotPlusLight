@@ -1,0 +1,27 @@
+/* Row actions in a native popover. menu.js places it next to its button. */
+@layer components {
+  .c-menu {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    min-inline-size: var(--w-menu);
+    padding: var(--s-1h);
+    border: 1px solid var(--line);
+    border-radius: var(--r-card);
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: var(--shadow-pop);
+  }
+  .c-menu__item {
+    display: flex;
+    inline-size: 100%;
+    align-items: center;
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-ctl);
+    text-align: start;
+    color: var(--text);
+  }
+  .c-menu__item:hover { background: var(--elev); text-decoration: none; }
+  .c-menu__item[data-danger] { color: var(--bad); }
+  .c-menu__sep { margin-block: var(--s-1h); border: 0; border-block-start: 1px solid var(--line); }
+}

@@ -36,7 +36,7 @@ templ BatchesPage(l ui.LayoutData, res voucher.ListResult) {
 		if res.Total == 0 {
 			@ui.EmptyState("No batches yet. Create the first one.")
 		} else {
-			@ui.Table([]string{"Label", "Rename", "Plan", "Created", "Members", "Unused", ""}) {
+			@ui.Table("Batches", []string{"Label", "Rename", "Plan", "Created", "Members", "Unused", ""}) {
 				for _, r := range res.Rows {
 					@BatchRow(r, res)
 				}
@@ -48,18 +48,18 @@ templ BatchesPage(l ui.LayoutData, res voucher.ListResult) {
 
 templ BatchRow(r domain.BatchRow, res voucher.ListResult) {
 	<tr data-batch data-id={ strconv.FormatInt(r.Batch.ID, 10) } data-members={ strconv.Itoa(r.Members) } data-online={ strconv.Itoa(r.Online) }>
-		<td data-col="label">{ labelText(r.Batch.Label) }</td>
-		<td data-col="rename">
-			<form class="flex gap-2" hx-put={ batchURL(r.Batch.ID) } hx-target="#flash" hx-swap="innerHTML">
-				<input name="label" class="input h-8" value={ r.Batch.Label } maxlength="100" aria-label="Label"/>
+		<td data-col="label" data-label="Label">{ labelText(r.Batch.Label) }</td>
+		<td data-col="rename" data-label="Rename">
+			<form class="l-split" hx-put={ batchURL(r.Batch.ID) } hx-target="#flash" hx-swap="innerHTML">
+				<input name="label" class="c-input" value={ r.Batch.Label } maxlength="100" aria-label="Label"/>
 				@ui.Button("secondary", "Save", templ.Attributes{"type": "submit"})
 			</form>
 		</td>
-		<td data-col="plan">{ r.PlanName }</td>
-		<td data-col="created" class="tabular-nums">{ fmtTime(r.Batch.CreatedAt, res.Loc) }</td>
-		<td data-col="members" class="tabular-nums">{ strconv.Itoa(r.Members) }</td>
-		<td data-col="unused" class="tabular-nums">{ strconv.Itoa(r.Unused) }</td>
-		<td>
+		<td data-col="plan" data-label="Plan">{ r.PlanName }</td>
+		<td data-col="created" data-label="Created" class="u-nums">{ fmtTime(r.Batch.CreatedAt, res.Loc) }</td>
+		<td data-col="members" data-label="Members" class="u-nums">{ strconv.Itoa(r.Members) }</td>
+		<td data-col="unused" data-label="Unused" class="u-nums">{ strconv.Itoa(r.Unused) }</td>
+		<td data-slot="actions">
 			@ui.Actions() {
 				@ui.LinkButton("secondary", batchURL(r.Batch.ID)+"/vouchers", "Reprint", templ.Attributes{"data-reprint": true, "target": "_blank", "rel": "noopener"})
 				@ui.ConfirmDelete("Delete", batchURL(r.Batch.ID), deleteBatchConfirm(r))
@@ -73,7 +73,7 @@ templ BatchNewPage(l ui.LayoutData, p BatchFormProps) {
 		@ui.PageHeader("New batch")
 		if len(p.Plans) == 0 {
 			@ui.EmptyState("No plans exist yet. Create a plan first, then create batches.") {
-				<p class="mt-2"><a href="/admin/plans/new">New plan</a></p>
+				<p><a href="/admin/plans/new">New plan</a></p>
 			}
 		} else {
 			@BatchFormView(p)
@@ -90,7 +90,7 @@ type BatchFormProps struct {
 
 // BatchFormView is the new-batch form and its 422 / 409 response body.
 templ BatchFormView(p BatchFormProps) {
-	<form id="batch-form" class="card form max-w-xl" hx-post="/admin/batches" hx-target="this" hx-swap="outerHTML">
+	@ui.FormCard(templ.Attributes{"id": "batch-form", "hx-post": "/admin/batches", "hx-target": "this", "hx-swap": "outerHTML"}) {
 		if p.Conflict != "" {
 			@ui.Flash("error", p.Conflict)
 		}
@@ -102,5 +102,5 @@ templ BatchFormView(p BatchFormProps) {
 			@ui.Button("primary", "Create and print", templ.Attributes{"type": "submit"})
 			@ui.LinkButton("secondary", "/admin/batches", "Cancel", nil)
 		}
-	</form>
+	}
 }

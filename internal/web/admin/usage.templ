@@ -8,35 +8,28 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
-func rangeAttrs(d, current int) templ.Attributes {
-	if d == current {
-		return templ.Attributes{"aria-current": "page"}
-	}
-	return nil
-}
-
 templ UsagePage(l ui.LayoutData, v usage.View) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Usage")
-		<h2 class="mb-3">Daily traffic, last { strconv.Itoa(len(v.Days)) } days</h2>
+		<h2 class="l-gap-bottom">Daily traffic, last { strconv.Itoa(len(v.Days)) } days</h2>
 		@ui.BarChart(usageBars(v), v.MaxTotal, "download + upload, all members; peak "+domain.FormatSize(v.MaxTotal))
-		<h2 class="mb-3">Top members</h2>
-		<nav class="pagination" aria-label="Range">
+		<h2 class="l-gap-bottom">Top members</h2>
+		<nav class="l-toolbar" aria-label="Range">
 			for _, d := range domain.UsageRanges {
-				<a data-range={ strconv.Itoa(d) } href={ templ.SafeURL(usageHref(d)) } { rangeAttrs(d, v.Range)... }>{ strconv.Itoa(d) } days</a>
+				@ui.Chip(ui.ChipProps{Label: strconv.Itoa(d) + " days", Href: usageHref(d), Selected: d == v.Range, Attrs: templ.Attributes{"data-range": strconv.Itoa(d)}})
 			}
 		</nav>
 		if len(v.Top) == 0 {
 			@ui.EmptyState("No traffic recorded in the last " + strconv.Itoa(v.Range) + " days.")
 		} else {
-			@ui.Table([]string{"Username", "Total", "Download", "Upload", "Time"}) {
+			@ui.Table("Top members", []string{"Username", "Total", "Download", "Upload", "Time"}) {
 				for _, u := range v.Top {
 					<tr data-top data-username={ u.Username }>
-						<td data-col="username"><a href={ templ.SafeURL(memberURL(u.MemberID)) }>{ u.Username }</a></td>
-						<td data-col="total" class="tabular-nums">{ domain.FormatSize(u.Total()) }</td>
-						<td data-col="down" class="tabular-nums">{ domain.FormatSize(u.Down) }</td>
-						<td data-col="up" class="tabular-nums">{ domain.FormatSize(u.Up) }</td>
-						<td data-col="time" class="tabular-nums">{ domain.FormatDuration(u.Seconds) }</td>
+						<td data-col="username" data-label="Username"><a href={ templ.SafeURL(memberURL(u.MemberID)) }>{ u.Username }</a></td>
+						<td data-col="total" data-label="Total" class="u-nums">{ domain.FormatSize(u.Total()) }</td>
+						<td data-col="down" data-label="Download" class="u-nums">{ domain.FormatSize(u.Down) }</td>
+						<td data-col="up" data-label="Upload" class="u-nums">{ domain.FormatSize(u.Up) }</td>
+						<td data-col="time" data-label="Time" class="u-nums">{ domain.FormatDuration(u.Seconds) }</td>
 					</tr>
 				}
 			}

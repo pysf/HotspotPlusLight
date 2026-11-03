@@ -1,0 +1,19 @@
+/* Page links with Previous and Next. */
+@layer components {
+  .c-pager { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1h); margin-block-end: var(--s-4); }
+  .c-pager__link {
+    display: inline-grid;
+    place-items: center;
+    min-inline-size: var(--w-pager-btn);
+    block-size: var(--w-pager-btn);
+    padding-inline: var(--s-2);
+    border-radius: var(--r-btn);
+    background: var(--panel);
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    transition: background var(--ease);
+  }
+  .c-pager__link:hover { background: var(--elev); text-decoration: none; }
+  .c-pager__link[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+  .c-pager__link[aria-disabled="true"] { opacity: var(--opacity-disabled); pointer-events: none; }
+}

@@ -1,0 +1,13 @@
+/* Label above a control, optional hint and error below. Also the form card, the pair row and the checkbox. */
+@layer components {
+  .c-form { display: grid; gap: var(--s-4); padding: var(--s-6); }
+  .c-field { display: grid; gap: var(--s-1h); }
+  .c-field__label { color: var(--muted); font-size: var(--fs-small); }
+  .c-field__hint { color: var(--faint); font-size: var(--fs-small); }
+  .c-field__error { color: var(--bad); font-size: var(--fs-small); }
+  .c-field__pair { display: flex; gap: var(--s-2); }
+  .c-field__pair > :first-child { flex: 1; min-inline-size: 0; }
+  .c-field__pair > .c-select { inline-size: auto; }
+  .c-check { display: flex; align-items: center; gap: var(--s-2); }
+  .c-check input { inline-size: var(--size-check); block-size: var(--size-check); accent-color: var(--accent); }
+}

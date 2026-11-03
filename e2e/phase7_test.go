@@ -412,8 +412,11 @@ func TestE7_06_PrintLayout(t *testing.T) {
 		}
 	}
 	// A print button for the screen view that print media hides.
-	if d.Find("button[onclick*=print]").Length() != 1 {
-		t.Error("no print button")
+	if d.Find("button[data-print]").Length() != 1 || d.Find("[onclick]").Length() != 0 {
+		t.Error("no print button (button[data-print], no inline onclick)")
+	}
+	if src := d.Find(`script[src]`).AttrOr("src", ""); !strings.HasPrefix(src, "/admin/static/js/print.js?v=") || f.c.Get(src).StatusCode != 200 {
+		t.Errorf("print script %q", src)
 	}
 }
 

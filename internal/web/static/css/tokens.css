@@ -1,0 +1,157 @@
+/* Design tokens. Two themes: air (default) and air-dark. Components read only these. */
+@layer tokens {
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("/admin/static/inter-latin-wght-normal.woff2") format("woff2");
+  }
+
+  :root {
+    --font-sans: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Spacing scale (rem, 16px root). */
+    --s-1: .25rem;
+    --s-1h: .375rem;
+    --s-2: .5rem;
+    --s-3: .75rem;
+    --s-4: 1rem;
+    --s-5: 1.25rem;
+    --s-5h: 1.375rem;
+    --s-6: 1.5rem;
+    --s-8: 2rem;
+    --s-9: 2.25rem;
+    --s-11: 2.75rem;
+    --s-14: 3.5rem;
+
+    /* Type. */
+    --fs-base: .875rem;
+    --fs-small: .75rem;
+    --fs-chip: .8125rem;
+    --fs-head: 1rem;
+    --fs-hero: 1.5rem;
+    --lh-base: 1.45;
+    --fw-medium: 500;
+    --fw-semibold: 600;
+    --ls-title: -.025em;
+
+    /* Status colors (same in every theme). */
+    --ok: #3ecf8e;
+    --warn: #f5a524;
+    --bad: #ff5d5d;
+
+    /* Sizes shared by all themes. */
+    --size-icon: 1rem;
+    --size-chevron: .3125rem;
+    --ls-head: -.01em;
+    --brightness-hover: 1.1;
+    --btn-pad-x: calc(var(--s-4) + 2px);
+    --h-btn-block: calc(var(--h-btn) + 6px);
+    --size-icon-btn: 2rem;
+    --size-dot: .4375rem;
+    --size-logo: 3.25rem;
+    --size-check: 1rem;
+    --w-sidebar: 14.5rem;
+    --w-page: 73.75rem;
+    --w-form: 36rem;
+    --w-sheet: 26.875rem;
+    --w-modal: 23.75rem;
+    --w-menu: 11rem;
+    --w-login: 22.5rem;
+    --w-search: 26.25rem;
+    --w-select: 9.5rem;
+    --w-meter: 8.75rem;
+    --h-meter: .3125rem;
+    --h-chip: 1.875rem;
+    --h-topbar: 3.25rem;
+    --h-chart: 10rem;
+    --h-preview: 40rem;
+    --h-code: 22rem;
+    --w-preview: 30rem;
+    --w-swatch: 1rem;
+    --w-pager-btn: 2rem;
+    --w-label: 5rem;
+    --w-act: 2.75rem;
+    --w-confirm: 20rem;
+    --r-pill: 99px;
+    --r-dot: 50%;
+    --r-logo: .875rem;
+
+    /* Motion and layers. */
+    --ease: 150ms ease;
+    --dur-sheet: 250ms;
+    --dur-toast: 2200ms;
+    --z-sidebar: 20;
+    --z-topbar: 30;
+    --z-toast: 90;
+    --opacity-disabled: .4;
+    --opacity-count: .6;
+    --blur-backdrop: 2px;
+    --blur-sidebar: 20px;
+    --scrim: rgb(0 0 0 / .5);
+    --ring-w: 2px;
+    --ring-offset: 2px;
+  }
+
+  /* Air (default, light). */
+  :root, :root[data-theme="air"] {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #fff;
+    --elev: #f0f0f3;
+    --line: rgb(0 0 0 / .06);
+    --line-strong: rgb(0 0 0 / .12);
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --faint: #a1a1a6;
+    --accent: #0071e3;
+    --on-accent: #fff;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / .04), 0 10px 30px rgb(0 0 0 / .05);
+    --shadow-pop: 0 12px 40px rgb(0 0 0 / .10);
+    --shadow-nav: 0 1px 2px rgb(0 0 0 / .06);
+    --card-border: transparent;
+    --sidebar-bg: rgb(245 245 247 / .8);
+    --login-glow: rgb(0 113 227 / .10);
+    --r-ctl: 12px;
+    --r-card: 18px;
+    --r-btn: 99px;
+    --r-sheet: 20px;
+    --h-btn: 2.25rem;
+    --h-input: 2.625rem;
+    --cell-y: 1.125rem;
+    --cell-x: 1.375rem;
+    --fs-title: 2rem;
+  }
+
+  /* Air dark: dark colors, Air shape. */
+  :root[data-theme="air-dark"] {
+    color-scheme: dark;
+    --bg: #0b0b0c;
+    --panel: #111113;
+    --elev: #17171a;
+    --line: rgb(255 255 255 / .07);
+    --line-strong: rgb(255 255 255 / .13);
+    --text: #f2f2f3;
+    --muted: #8b8b93;
+    --faint: #5d5d65;
+    --accent: #4c8dff;
+    --on-accent: #fff;
+    --shadow-card: none;
+    --shadow-pop: 0 10px 40px rgb(0 0 0 / .45);
+    --shadow-nav: none;
+    --card-border: var(--line);
+    --sidebar-bg: rgb(11 11 12 / .8);
+    --login-glow: rgb(76 141 255 / .16);
+    --r-ctl: 12px;
+    --r-card: 18px;
+    --r-btn: 99px;
+    --r-sheet: 20px;
+    --h-btn: 2.25rem;
+    --h-input: 2.625rem;
+    --cell-y: 1.125rem;
+    --cell-x: 1.375rem;
+    --fs-title: 2rem;
+  }
+}

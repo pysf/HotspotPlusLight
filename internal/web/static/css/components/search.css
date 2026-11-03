@@ -1,0 +1,25 @@
+/* Input with a leading search icon and a "/" hint. */
+@layer components {
+  .c-search { position: relative; flex: 1 1 var(--w-select); max-inline-size: var(--w-search); }
+  .c-search .c-input { padding-inline: var(--s-9) var(--s-9); }
+  .c-search__icon {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: var(--s-3);
+    translate: 0 -50%;
+    color: var(--faint);
+    pointer-events: none;
+  }
+  .c-search__hint {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-end: var(--s-3);
+    translate: 0 -50%;
+    padding: 0 var(--s-1h);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--s-1);
+    color: var(--faint);
+    font-size: var(--fs-small);
+    pointer-events: none;
+  }
+}

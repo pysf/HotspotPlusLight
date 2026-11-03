@@ -1,0 +1,24 @@
+/* Data table. At small widths rows become cards (rules in layout.css, labels from data-label). */
+@layer components {
+  .c-table-wrap { margin-block-end: var(--s-4); overflow-x: auto; }
+  .c-table { inline-size: 100%; }
+  .c-table th {
+    padding: calc(var(--cell-y) - var(--s-1)) var(--cell-x);
+    border-block-end: 1px solid var(--line);
+    color: var(--muted);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    text-align: start;
+    white-space: nowrap;
+  }
+  .c-table td {
+    padding: var(--cell-y) var(--cell-x);
+    border-block-end: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  .c-table tbody tr { transition: background var(--ease); }
+  .c-table tbody tr:hover { background: var(--elev); }
+  .c-table tbody tr:last-child td { border-block-end: 0; }
+  .c-table td[data-slot="actions"] { text-align: end; inline-size: var(--w-act); }
+  .c-table__sub { margin-block-start: 1px; color: var(--muted); font-size: var(--fs-small); }
+}

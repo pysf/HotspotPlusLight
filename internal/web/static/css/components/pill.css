@@ -1,0 +1,32 @@
+/* Status: dot plus text. data-status: active | expiring | expired | disabled. Also the online dot. */
+@layer components {
+  .c-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--muted);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+  }
+  .c-pill::before {
+    content: "";
+    inline-size: var(--size-dot);
+    block-size: var(--size-dot);
+    border-radius: var(--r-dot);
+    background: currentcolor;
+  }
+  .c-pill[data-status="active"] { color: var(--ok); }
+  .c-pill[data-status="expiring"] { color: var(--warn); }
+  .c-pill[data-status="expired"] { color: var(--bad); }
+  .c-pill[data-status="disabled"] { color: var(--faint); }
+
+  .c-dot {
+    display: inline-block;
+    inline-size: var(--size-dot);
+    block-size: var(--size-dot);
+    border-radius: var(--r-dot);
+    box-shadow: inset 0 0 0 1px var(--faint);
+  }
+  .c-dot[data-on] { background: var(--ok); box-shadow: none; }
+}

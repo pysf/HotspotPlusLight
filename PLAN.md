@@ -49,7 +49,7 @@ Multi-tenancy/Business entity, resellers, operators, roles/ACL/tokens, invoices,
 | D7 | Dropped: SMS/verification, payments, invoices, coupons, campaigns, tickets, departments, resellers, operators, reports, roles/ACL/tokens, themes. |
 | D8 | Admin can **view** member passwords → stored reversibly (AES-GCM), not hashed. |
 | D9 | Local network deployment; plain HTTP is acceptable — **also for the admin listener; HTTPS (self-signed or own cert) was offered and declined, owner 2026-11-01.** |
-| D24 | **Admin UI = our own small CSS built with Tailwind CSS v4 (owner 2026-11-02).** Supersedes Tabler 1.6.1 (same day) and the Bootstrap restyle of 2026-11-01. Plain server-rendered HTML; tokens in one `@theme` block; Inter variable font vendored; pinned Tailwind standalone CLI (v4.3.3, no Node) via `make css`; committed minified `internal/web/static/app.css`; `make css-check` in `make ci` fails if it is stale. Fixed sidebar + compact top bar; light mode only; English only. No Tabler, no UI kit. See `docs/ui-notes.md`. |
+| D24 | **Admin UI = our own hand-written CSS, no Tailwind, no build step (owner 2026-11-03).** Supersedes the Tailwind v4 version of 2026-11-02 (and Tabler, Bootstrap before it). Look and code rules: `docs/DESIGN.md` and `docs/FRONTEND.md`; deviations and how-to: `docs/ui-notes.md`. Plain server-rendered templ (O1 kept) + htmx + small vanilla JS modules. CSS in `internal/web/static/css/` (tokens, base, layout, one file per `c-` component, cascade layers). Go inlines the `@import`s at startup and serves every asset with a content hash in the URL and a long cache. Themes: `air` (default) and `air-dark`, chosen by the `theme` cookie. Same menu as before. See Phase 10. |
 | D23 | **Two HTTP listeners (owner 2026-11-01).** The *public* listener (`HTTP_ADDR`, :8080) serves only the page API (§8.1) and `/healthz`; the *admin* listener (`ADMIN_ADDR`, :8081) serves only the admin panel (§8.2). Only the public port goes in the router's walled garden; the admin port is not reachable from the hotspot network (README: block it in the router firewall). Admin routes return 404 on the public port and the reverse. |
 | D10 | The member login page is a **static HTML page hosted on the router** (not by us), customized by the admin by hand from a downloadable starter pack; the server only offers a small JSON API for it (P1–P3). |
 | D11 | Members are created by the admin: **one by one** and **bulk-generate (printable vouchers)**. **CSV import is dropped.** No self-signup. |
@@ -543,7 +543,7 @@ HotspotPlusLight/
   internal/web/pageapi/        JSON API v1 + CORS + throttling — calls auth/member services
   internal/web/admin/          handlers + templ components (reusable: layout, table, pagination, filter bar, form field, confirm dialog, flash)
   internal/routerpack/         starter hotspot folder (Phase 6): theme registry, shared login page layout (`layout/login.html.tmpl`, one `logo.png`), router pages (`pages/`), 38 theme manifests + backgrounds (`themes/<category>/<style>/{theme.json,background.jpg}`), zip packaging; `go:embed`
-  internal/web/static/         htmx and the Inter font (vendored, pinned), app.css built by Tailwind from `internal/web/ui/input.css` (D24, 2026-11-02, `docs/ui-notes.md`)
+  internal/web/static/         htmx, the Inter font (vendored, pinned), our CSS (`css/`) and JS (`js/`); `static.go` bundles and hashes them at startup (D24, 2026-11-03, `docs/ui-notes.md`)
   e2e/                         black-box tests, harness, fake router
   docs/
 ```
@@ -554,7 +554,7 @@ HotspotPlusLight/
 - Unit tests cover `domain` and each service with fakes; e2e tests drive the real assembled binary.
 
 ### 9.2 Configuration (environment, all `HSP_` prefixed)
-`DATA_DIR` (db + branding), `HTTP_ADDR` (:8080, page API + `/healthz`), `ADMIN_ADDR` (:8081, admin panel — D23), `RADIUS_AUTH_ADDR` (:1812), `RADIUS_ACCT_ADDR` (:1813), `SECRET_KEY` (base64 32 bytes: AES-GCM key; **required**, losing it makes stored passwords unrecoverable), first-boot seeds: `ADMIN_USERNAME` (default `admin`; the password is generated and printed once, O15), `RADIUS_SHARED_SECRET`; `LOG_LEVEL`.
+`DATA_DIR` (db + branding), `HTTP_ADDR` (:8080, page API + `/healthz`), `ADMIN_ADDR` (:8081, admin panel — D23), `RADIUS_AUTH_ADDR` (:1812), `RADIUS_ACCT_ADDR` (:1813), `SECRET_KEY` (base64 32 bytes: AES-GCM key; **required**, losing it makes stored passwords unrecoverable), first-boot seeds: `ADMIN_USERNAME` (default `admin`; the password is generated and printed once, O15), `RADIUS_SHARED_SECRET`; `LOG_LEVEL`; `DEV` (`1` = serve the component gallery at `/admin/dev/components`, off by default, Phase 10).
 
 ### 9.3 Concurrency and time
 SQLite single writer: all mutating work in short transactions; accounting handlers run synchronously per packet (fast). `Clock` is injected everywhere so tests control time. Background jobs: session pruning (daily), nothing else.
@@ -642,6 +642,9 @@ Tasks: router link status panel (in-memory counters fed by the RADIUS server and
 ### Phase 9 — Usage history (built 2026-11-02, owner asked for it)
 E2E first: **E9.01** accounting deltas feed the day row (zero delta writes nothing, retransmission counts once, second session adds to the same row) · **E9.02** day = date in `settings.timezone` · **E9.03** Gigawords/counter-restart delta equals the member counter delta · **E9.04** same transaction (rolled-back packet leaves no row; retransmit counts once) · **E9.05** renew keeps history (supersedes BR-13 "no history", table only) · **E9.06** member delete removes only its rows · **E9.07** `/admin/usage` 30-day chart, all members summed, empty days zero · **E9.08** top 10 by download+upload for 7/30/90 days (default 30, ties by username) · **E9.09** nav link, login required. E0.09 now asserts the shipped migration count (2).
 Built: migration `0002_usage_daily.sql`; `domain/usage.go` (day key, window, fill, ranges); `session.Service.Account` upserts the day row; `internal/usage` (report service); `GET /admin/usage[?days=7|30|90]`; reusable `ui.BarChart` (inline SVG, no JS). The member page does not show per-member history (skipped, not trivial).
+
+### Phase 10 — Own CSS, new look (2026-11-03, owner asked for it)
+Step A (this step): remove Tailwind; own CSS with tokens and `c-` components; themes `air` and `air-dark`; every admin page restyled; behaviour, routes and field names unchanged. E2E first: **E10.01** no inline `style`/`onclick`/`hx-on`/inline script on any admin page · **E10.02** theme cookie sets `data-theme` (bad value = `air`) · **E10.03** asset URLs carry a hash, assets are cached for a year, pages are `no-store` · **E10.04** the gallery is 404 without `HSP_DEV=1` · **E10.05** the shell keeps the menu, Theme and Log out in the top bar. Existing selectors adapted (E1.20, E2.01, E6.14, E7.06, E8.12). Notes: `docs/phase10-notes.md`. Step B (sheets, row menus, toasts, credentials card, status chips) is a later step.
 
 ---
 

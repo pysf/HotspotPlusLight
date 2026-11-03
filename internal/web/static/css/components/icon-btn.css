@@ -1,0 +1,13 @@
+/* Square icon-only button. Needs aria-label. */
+@layer components {
+  .c-icon-btn {
+    display: inline-grid;
+    place-items: center;
+    inline-size: var(--size-icon-btn);
+    block-size: var(--size-icon-btn);
+    border-radius: var(--r-ctl);
+    color: var(--muted);
+    transition: background var(--ease), color var(--ease);
+  }
+  .c-icon-btn:hover { background: var(--elev); color: var(--text); text-decoration: none; }
+}

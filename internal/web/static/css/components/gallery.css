@@ -1,0 +1,10 @@
+/* Theme picker cards, theme preview, and the dev component gallery. */
+@layer components {
+  .c-swatch { display: inline-block; inline-size: var(--w-swatch); block-size: var(--w-swatch); border-radius: var(--r-dot); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .c-swatch svg { display: block; inline-size: 100%; block-size: 100%; }
+  .c-theme-card__img { display: block; block-size: auto; inline-size: 100%; }
+  .c-theme-card__foot { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2); }
+  .c-preview { inline-size: 100%; max-inline-size: var(--w-preview); block-size: var(--h-preview); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--panel); }
+  .c-gallery-item { display: grid; gap: var(--s-2); padding-block: var(--s-4); border-block-end: 1px solid var(--line); }
+  .c-gallery-item > h3 { color: var(--muted); font-size: var(--fs-small); font-weight: var(--fw-medium); }
+}
