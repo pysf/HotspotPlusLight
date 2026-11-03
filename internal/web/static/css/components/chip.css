@@ -1,4 +1,4 @@
-/* Filter pill (link or button). Selected = aria-pressed="true" or aria-current="page". */
+/* Filter pill (link or button). Selected = aria-current="true" or "page". */
 @layer components {
   .c-chip {
     display: inline-flex;
@@ -15,6 +15,6 @@
     transition: color var(--ease), background var(--ease), border-color var(--ease);
   }
   .c-chip:hover { color: var(--text); border-color: var(--line-strong); text-decoration: none; }
-  .c-chip[aria-pressed="true"], .c-chip[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+  .c-chip[aria-current="true"], .c-chip[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
   .c-chip__count { opacity: var(--opacity-count); font-weight: var(--fw-medium); }
 }

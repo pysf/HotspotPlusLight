@@ -2,6 +2,8 @@
 @layer components {
   .c-meter {
     appearance: none;
+    display: block;
+    margin-block-end: var(--s-1);
     inline-size: 100%;
     min-inline-size: var(--w-meter);
     block-size: var(--h-meter);

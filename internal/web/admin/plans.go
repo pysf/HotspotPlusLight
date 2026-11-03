@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -34,6 +35,17 @@ func planID(r *http.Request) (int64, bool) {
 func planURL(id int64) string { return fmt.Sprintf("%s/%d", plansHome, id) }
 
 func (h handlers) notFound(w http.ResponseWriter, r *http.Request, what string) {
+	// A row in a list or sheet that is gone: refresh the list and say so in a toast.
+	if changed := map[string]string{"Member": membersChanged, "Plan": plansChanged}[what]; changed != "" && fromApp(r) {
+		ev := map[string]any{changed: true, "toast": "This " + strings.ToLower(what) + " no longer exists."}
+		if inSheet(r) {
+			ev["close-sheet"] = true
+		}
+		setTrigger(w, ev)
+		w.Header().Set("HX-Reswap", "none")
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
 	h.render(w, r, http.StatusNotFound, ui.ErrorFragment(what+" not found."))
 }
 
@@ -43,10 +55,18 @@ func (h handlers) plansList(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
+	if hxTarget(r) == planListID {
+		h.render(w, r, http.StatusOK, PlanListFragment(plans))
+		return
+	}
 	h.render(w, r, http.StatusOK, PlansPage(layout(r, "Plans", plansHome), plans))
 }
 
 func (h handlers) planNew(w http.ResponseWriter, r *http.Request) {
+	if inSheet(r) {
+		h.render(w, r, http.StatusOK, PlanFormView(PlanFormProps{Form: domain.NewPlanForm(), Action: "post", URL: plansHome, Sheet: true}))
+		return
+	}
 	h.render(w, r, http.StatusOK, PlanNewPage(layout(r, "New plan", plansHome)))
 }
 
@@ -57,9 +77,13 @@ func (h handlers) planCreate(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		h.serverError(w, r, err)
 	case len(errs) > 0:
-		h.render(w, r, http.StatusUnprocessableEntity, PlanFormView(PlanFormProps{Form: f, Errors: errs, Action: "post", URL: plansHome}))
+		h.render(w, r, http.StatusUnprocessableEntity, PlanFormView(PlanFormProps{Form: f, Errors: errs, Action: "post", URL: plansHome, Sheet: inSheet(r)}))
 	default:
 		w.Header().Set("Location", planURL(id))
+		if inSheet(r) {
+			h.appDone(w, r, http.StatusCreated, plansChanged, "Plan created.")
+			return
+		}
 		htmxRedirect(w, r, http.StatusCreated, plansHome)
 	}
 }
@@ -76,6 +100,8 @@ func (h handlers) planEdit(w http.ResponseWriter, r *http.Request) {
 		h.notFound(w, r, "Plan")
 	case err != nil:
 		h.serverError(w, r, err)
+	case inSheet(r):
+		h.render(w, r, http.StatusOK, PlanFormView(PlanFormProps{Form: domain.FormFromPlan(d.Plan), Action: "put", URL: planURL(id), Members: d.Members, Sheet: true}))
 	default:
 		h.render(w, r, http.StatusOK, PlanEditPage(layout(r, "Edit plan", plansHome),
 			PlanFormProps{Form: domain.FormFromPlan(d.Plan), Action: "put", URL: planURL(id), Members: d.Members}))
@@ -101,7 +127,9 @@ func (h handlers) planUpdate(w http.ResponseWriter, r *http.Request) {
 			h.serverError(w, r, err)
 			return
 		}
-		h.render(w, r, http.StatusUnprocessableEntity, PlanFormView(PlanFormProps{Form: f, Errors: errs, Action: "put", URL: planURL(id), Members: d.Members}))
+		h.render(w, r, http.StatusUnprocessableEntity, PlanFormView(PlanFormProps{Form: f, Errors: errs, Action: "put", URL: planURL(id), Members: d.Members, Sheet: inSheet(r)}))
+	case inSheet(r):
+		h.appDone(w, r, http.StatusOK, plansChanged, "Plan saved.")
 	default:
 		htmxRedirect(w, r, http.StatusOK, plansHome)
 	}
@@ -123,11 +151,13 @@ func (h handlers) planDelete(w http.ResponseWriter, r *http.Request) {
 		if inUse.Members == 0 {
 			msg = fmt.Sprintf("This plan is used by %s and cannot be deleted. Delete the batches first.", plural(inUse.Batches, "batch"))
 		}
-		h.render(w, r, http.StatusConflict, ui.ErrorFragment(msg))
+		h.appOrFlash(w, r, http.StatusConflict, msg)
 	case errors.Is(err, domain.ErrDefault):
-		h.render(w, r, http.StatusConflict, ui.ErrorFragment("This plan is the default plan. Clear the default plan in Settings first."))
+		h.appOrFlash(w, r, http.StatusConflict, "This plan is the default plan. Clear the default plan in Settings first.")
 	case err != nil:
 		h.serverError(w, r, err)
+	case fromApp(r):
+		h.appDone(w, r, http.StatusOK, plansChanged, "Plan deleted.")
 	default:
 		htmxRedirect(w, r, http.StatusOK, plansHome)
 	}

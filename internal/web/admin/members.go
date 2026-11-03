@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 
@@ -40,7 +41,7 @@ func filterFrom(get func(string) string) domain.MemberFilter {
 	plan, _ := strconv.ParseInt(get("plan"), 10, 64)
 	f := domain.MemberFilter{Query: get("q"), PlanID: max(plan, 0)}
 	switch s := get("status"); s {
-	case domain.StatusActive, domain.StatusInactive, domain.StatusExpired:
+	case domain.StatusActive, domain.StatusExpiring, domain.StatusInactive, domain.StatusExpired:
 		f.Status = s
 	}
 	return f
@@ -56,12 +57,17 @@ func (h handlers) members(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	plans, err := h.Plans.List(r.Context())
-	if err != nil {
+	props := MembersProps{Result: res, Filter: filter, URL: r.URL.RequestURI()}
+	// Only the list region asks for a fragment (HX-Target); the harness sends HX-Request on every request.
+	if hxTarget(r) == listID {
+		h.render(w, r, http.StatusOK, MemberListFragment(props))
+		return
+	}
+	if props.Plans, err = h.Plans.List(r.Context()); err != nil {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, MembersPage(layout(r, "Members", membersHome), MembersProps{Result: res, Filter: filter, Plans: plans}))
+	h.render(w, r, http.StatusOK, MembersPage(layout(r, "Members", membersHome), props))
 }
 
 // formProps builds the props of the member form (new or edit).
@@ -82,6 +88,11 @@ func (h handlers) memberNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Create, p.URL = true, membersHome
+	if inSheet(r) {
+		p.Sheet = true
+		h.render(w, r, http.StatusOK, MemberNewSheet(p))
+		return
+	}
 	h.render(w, r, http.StatusOK, MemberNewPage(layout(r, "New member", membersHome), p))
 }
 
@@ -92,18 +103,44 @@ func (h handlers) memberCreate(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
+	sheet := inSheet(r)
 	if len(errs) > 0 {
 		p, err := h.formProps(r, f, errs)
 		if err != nil {
 			h.serverError(w, r, err)
 			return
 		}
-		p.Create, p.URL = true, membersHome
+		p.Create, p.URL, p.Sheet = true, membersHome, sheet
 		h.render(w, r, http.StatusUnprocessableEntity, MemberFormView(p))
 		return
 	}
 	w.Header().Set("Location", memberURL(id))
-	htmxRedirect(w, r, http.StatusCreated, memberURL(id))
+	if !sheet {
+		htmxRedirect(w, r, http.StatusCreated, memberURL(id))
+		return
+	}
+	// From the sheet: the credentials card is the answer; the sheet stays open until "Done".
+	card, err := h.createdCard(r, id)
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	setTrigger(w, map[string]any{membersChanged: true, "toast": "Member created."})
+	h.render(w, r, http.StatusCreated, MemberCreated(card))
+}
+
+// createdCard gathers what the credentials card shows (the password may be the generated one).
+func (h handlers) createdCard(r *http.Request, id int64) (createdVM, error) {
+	v, err := h.Members.Get(r.Context(), id)
+	if err != nil {
+		return createdVM{}, err
+	}
+	pw, err := h.Members.RevealPassword(r.Context(), id)
+	if err != nil {
+		return createdVM{}, err
+	}
+	vm := newVM(v)
+	return createdVM{Username: vm.Username, Password: pw, Plan: vm.PlanName, Expires: vm.ExpiresFull}, nil
 }
 
 func (h handlers) memberPage(w http.ResponseWriter, r *http.Request) {
@@ -127,6 +164,11 @@ func (h handlers) memberPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.URL = memberURL(id)
+	if inSheet(r) { // the edit sheet is this same resource (GET /admin/members/{id}) as a fragment
+		p.Sheet = true
+		h.render(w, r, http.StatusOK, MemberEditSheet(p, newVM(v)))
+		return
+	}
 	h.render(w, r, http.StatusOK, MemberPage(layout(r, v.Row.Member.Username, membersHome), newVM(v), p))
 }
 
@@ -146,7 +188,12 @@ func (h handlers) memberUpdate(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
+	sheet := inSheet(r)
 	if len(errs) == 0 && kick.Failed == 0 {
+		if sheet {
+			h.appDone(w, r, http.StatusOK, membersChanged, "Member saved.")
+			return
+		}
 		htmxRedirect(w, r, http.StatusOK, memberURL(id))
 		return
 	}
@@ -155,14 +202,90 @@ func (h handlers) memberUpdate(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	p.URL = memberURL(id)
+	p.URL, p.Sheet = memberURL(id), sheet
+	status := http.StatusOK
 	if len(errs) > 0 {
-		h.render(w, r, http.StatusUnprocessableEntity, MemberFormView(p))
+		status = http.StatusUnprocessableEntity
+	} else {
+		// Saved, but some sessions could not be disconnected (BR-18): tell the admin.
+		p.Warning = fmt.Sprintf("Saved. %d of %d open sessions could not be disconnected.", kick.Failed, kick.Attempted)
+		if sheet {
+			setTrigger(w, map[string]any{membersChanged: true})
+		}
+	}
+	h.renderMemberForm(w, r, status, id, p)
+}
+
+// renderMemberForm answers with the form: in the sheet it is the whole edit sheet (form and actions).
+func (h handlers) renderMemberForm(w http.ResponseWriter, r *http.Request, status int, id int64, p MemberFormProps) {
+	if !p.Sheet {
+		h.render(w, r, status, MemberFormView(p))
 		return
 	}
-	// Saved, but some sessions could not be disconnected (BR-18): tell the admin.
-	p.Warning = fmt.Sprintf("Saved. %d of %d open sessions could not be disconnected.", kick.Failed, kick.Attempted)
-	h.render(w, r, http.StatusOK, MemberFormView(p))
+	v, err := h.Members.Get(r.Context(), id)
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	h.render(w, r, status, MemberEditSheet(p, newVM(v)))
+}
+
+// memberToggle sets the member to the state in the form value active (1 or 0). The target
+// state is explicit, so a double click does the same thing twice. Disabling goes through
+// SetActive, which disconnects the open sessions exactly as unticking "Active" does.
+func (h handlers) memberToggle(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r)
+	if !ok {
+		h.notFound(w, r, "Member")
+		return
+	}
+	var active bool
+	switch r.PostFormValue("active") {
+	case "1":
+		active = true
+	case "0":
+	default:
+		h.appOrFlash(w, r, http.StatusBadRequest, "Missing target state.")
+		return
+	}
+	kick, err := h.Members.SetActive(r.Context(), id, active)
+	switch {
+	case errors.Is(err, domain.ErrNotFound):
+		h.notFound(w, r, "Member")
+		return
+	case err != nil:
+		h.serverError(w, r, err)
+		return
+	}
+	msg := "Member enabled."
+	if !active {
+		msg = "Member disabled."
+	}
+	if kick.Failed > 0 { // same wording as the edit form (BR-18)
+		msg = fmt.Sprintf("%s %d of %d open sessions could not be disconnected.", msg, kick.Failed, kick.Attempted)
+		if !fromApp(r) {
+			h.render(w, r, http.StatusOK, ui.Flash("warn", msg))
+			return
+		}
+	}
+	if fromApp(r) {
+		h.appDone(w, r, http.StatusOK, membersChanged, msg)
+		return
+	}
+	htmxRedirect(w, r, http.StatusOK, memberURL(id))
+}
+
+// firstError returns the message of the first field error in a fixed field order, so the toast is stable.
+func firstError(errs domain.FieldErrors) string {
+	keys := make([]string, 0, len(errs))
+	for k := range errs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	if len(keys) == 0 {
+		return ""
+	}
+	return errs[keys[0]]
 }
 
 func (h handlers) memberDelete(w http.ResponseWriter, r *http.Request) {
@@ -177,6 +300,12 @@ func (h handlers) memberDelete(w http.ResponseWriter, r *http.Request) {
 		h.notFound(w, r, "Member")
 	case err != nil:
 		h.serverError(w, r, err)
+	case fromApp(r):
+		msg := "Member deleted."
+		if res.Kick.Failed > 0 {
+			msg = fmt.Sprintf("Member deleted. %d of %d open sessions could not be disconnected.", res.Kick.Failed, res.Kick.Attempted)
+		}
+		h.appDone(w, r, http.StatusOK, membersChanged, msg)
 	case res.Kick.Failed > 0:
 		h.render(w, r, http.StatusOK, DeletedNotice(res, membersHome, "Back to members"))
 	default:
@@ -195,6 +324,8 @@ func (h handlers) memberRenew(w http.ResponseWriter, r *http.Request) {
 		h.notFound(w, r, "Member")
 	case err != nil:
 		h.serverError(w, r, err)
+	case fromApp(r):
+		h.appDone(w, r, http.StatusOK, membersChanged, "Member renewed.")
 	default:
 		htmxRedirect(w, r, http.StatusOK, memberURL(id))
 	}
@@ -305,26 +436,35 @@ func (h handlers) memberBulkDelete(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 	case res.Kick.Failed > 0:
 		h.render(w, r, http.StatusOK, DeletedNotice(res, membersHome, "Back to members"))
+	case hxTarget(r) != "": // from the page: refresh the list, chips and pager; the empty body clears the confirm box
+		setTrigger(w, map[string]any{membersChanged: true, "toast": "Members deleted."})
+		w.WriteHeader(http.StatusOK)
 	default:
 		htmxRedirect(w, r, http.StatusOK, membersHome)
 	}
 }
 
+// listURL builds the link to the list with the filter and page size; page 0 leaves the page out.
+func listURL(f domain.MemberFilter, per, page int) string {
+	v := url.Values{"per": {strconv.Itoa(per)}}
+	if page > 0 {
+		v.Set("page", strconv.Itoa(page))
+	}
+	if f.Query != "" {
+		v.Set("q", f.Query)
+	}
+	if f.PlanID > 0 {
+		v.Set("plan", strconv.FormatInt(f.PlanID, 10))
+	}
+	if f.Status != "" {
+		v.Set("status", f.Status)
+	}
+	return membersHome + "?" + v.Encode()
+}
+
 // listHref builds the link to a page of the list, keeping the filters.
 func listHref(f domain.MemberFilter, per int) func(int) string {
-	return func(page int) string {
-		v := url.Values{"page": {strconv.Itoa(page)}, "per": {strconv.Itoa(per)}}
-		if f.Query != "" {
-			v.Set("q", f.Query)
-		}
-		if f.PlanID > 0 {
-			v.Set("plan", strconv.FormatInt(f.PlanID, 10))
-		}
-		if f.Status != "" {
-			v.Set("status", f.Status)
-		}
-		return membersHome + "?" + v.Encode()
-	}
+	return func(page int) string { return listURL(f, per, page) }
 }
 
 // memberVM is a member prepared for display: one place that turns the domain
@@ -336,6 +476,12 @@ type memberVM struct {
 	Status                      string
 	Data, Time, WindowEnd       string
 	DataMain, DataLeft          string // list cell: "used / allowed" and the muted "N left" line
+	Active                      bool
+	PlanSpeed                   string
+	HasMeter                    bool // false on an unlimited plan
+	MeterUsed, MeterMax         float64
+	Expires, ExpiresRel         string // list cell: the date and "in 2 days"; "—" and "" when there is none
+	ExpiresFull                 string // date and time, or "No expiry"
 	VerdictCode, VerdictText    string
 	Online                      bool
 	ExtraBulk                   string // in the plan's unit, e.g. "1.5 GB"
@@ -361,6 +507,16 @@ func newVM(v member.View) memberVM {
 		PlanUnit: p.BulkUnit, UnlimitedData: p.BulkValue == 0, Member: m,
 	}
 	vm.DataMain, vm.DataLeft = s.Quota.DataParts(p.BulkUnit)
+	vm.Active, vm.PlanSpeed = m.Active, limit(p.SpeedValue, p.SpeedUnit)
+	if !s.Quota.DataUnlimited && s.Quota.AllowedBytes > 0 {
+		vm.HasMeter, vm.MeterUsed, vm.MeterMax = true, float64(s.Quota.UsedBytes), float64(s.Quota.AllowedBytes)
+	}
+	vm.Expires, vm.ExpiresFull = "—", "No expiry"
+	if m.ExpiresAt != nil {
+		vm.Expires = m.ExpiresAt.In(v.Loc).Format("2006-01-02")
+		vm.ExpiresRel = domain.FormatRelative(v.Now, *m.ExpiresAt)
+		vm.ExpiresFull = fmtTime(*m.ExpiresAt, v.Loc)
+	}
 	if s.Decision.Allowed() && s.Decision.Renew {
 		vm.VerdictText = "renews at next login"
 	}

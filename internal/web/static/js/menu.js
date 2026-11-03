@@ -8,3 +8,9 @@ document.addEventListener("toggle", (e) => {
   menu.style.top = Math.min(r.bottom + 4, window.innerHeight - menu.offsetHeight - 8) + "px";
   menu.style.left = Math.max(8, r.right - menu.offsetWidth) + "px";
 }, true);
+
+// Choosing an item closes the menu (a popover does not close itself on a click inside).
+document.addEventListener("click", (e) => {
+  const item = e.target.closest(".c-menu__item");
+  if (item) { item.closest(".c-menu")?.hidePopover(); }
+});

@@ -286,11 +286,19 @@ templ Actions() {
 	</div>
 }
 
-// FilterBar is a GET form that holds the fields and a submit button of a list.
-templ FilterBar(id, action string) {
-	<form id={ id } class="l-toolbar" method="get" action={ action }>
+// FilterBar is a GET form that holds the fields of a list. Without JavaScript it submits as a
+// plain GET; attrs add the hx-* attributes that update the list in place.
+templ FilterBar(id, action string, attrs templ.Attributes) {
+	<form id={ id } class="l-toolbar" method="get" action={ action } { attrs... }>
 		{ children... }
 	</form>
+}
+
+// Refresher reloads a list region when an event arrives on the body (sent with HX-Trigger after a
+// change). url must be the list's current address, so the filter and page survive. It lives inside
+// the region it reloads and is replaced with it.
+templ Refresher(url, event, target string) {
+	<div hidden hx-get={ url } hx-trigger={ event + " from:body" } hx-target={ target } hx-swap="innerHTML"></div>
 }
 
 // Pill is a status: a dot and a text. status is "active", "expiring", "expired" or "disabled".
@@ -362,11 +370,15 @@ func linkAttrs(in templ.Attributes) templ.Attributes {
 }
 
 // buttonAttrs is linkAttrs plus a type limited to button, submit or reset (default button).
+// A submit button disables itself while its htmx request is running.
 func buttonAttrs(in templ.Attributes) templ.Attributes {
 	out := linkAttrs(in)
 	switch in["type"] {
-	case "submit", "reset":
-		out["type"] = in["type"]
+	case "submit":
+		out["type"] = "submit"
+		out["hx-disabled-elt"] = "this"
+	case "reset":
+		out["type"] = "reset"
 	default:
 		out["type"] = "button"
 	}
@@ -542,12 +554,12 @@ func chipAttrs(p ChipProps) templ.Attributes {
 		out[k] = v
 	}
 	if p.Selected {
-		out["aria-current"] = "page"
+		out["aria-current"] = "true"
 	}
 	return out
 }
 
-// Chip is a filter pill that links to the filtered list.
+// Chip is a filter pill that links to the filtered list. The current one has aria-current="true".
 templ Chip(p ChipProps) {
 	<a class="c-chip" href={ templ.SafeURL(p.Href) } { chipAttrs(p)... }>
 		{ p.Label }
@@ -558,8 +570,9 @@ templ Chip(p ChipProps) {
 }
 
 // Meter is a usage bar on a native <meter>: accent below 80 %, warning from 80 %, red when full.
+// It has no text inside: put the figures next to it.
 templ Meter(value, max float64, label string) {
-	<meter class="c-meter" value={ strconv.FormatFloat(value, 'f', -1, 64) } min="0" max={ strconv.FormatFloat(max, 'f', -1, 64) } low={ strconv.FormatFloat(max*0.8, 'f', -1, 64) } high={ strconv.FormatFloat(max*0.9999, 'f', -1, 64) } optimum="0" aria-label={ label }>{ label }</meter>
+	<meter class="c-meter" value={ strconv.FormatFloat(value, 'f', -1, 64) } min="0" max={ strconv.FormatFloat(max, 'f', -1, 64) } low={ strconv.FormatFloat(max*0.8, 'f', -1, 64) } high={ strconv.FormatFloat(max*0.9999, 'f', -1, 64) } optimum="0" aria-label={ label }></meter>
 }
 
 // Table is a card with a table: caption (for screen readers), header row, and your <tr> children in the body.
@@ -666,6 +679,36 @@ templ Sheet(id, title string) {
 	</dialog>
 }
 
+// SheetHost is the one page-level sheet that htmx fills: pages open it by loading a fragment
+// into its body (id+"-body"). dialog.js sets the title from the fragment's data-sheet-title,
+// opens the dialog, and empties the body when it closes.
+templ SheetHost(id string) {
+	<dialog id={ id } class="c-sheet" data-sheet-host aria-labelledby={ id + "-title" }>
+		<div class="c-sheet__head">
+			<h2 class="c-sheet__title" id={ id + "-title" }></h2>
+			<button type="button" class="c-icon-btn" data-close aria-label="Close">
+				@Icon("close")
+			</button>
+		</div>
+		<div class="c-sheet__body" id={ id + "-body" }></div>
+	</dialog>
+}
+
+// SheetSection is a titled block inside a sheet body, set off by a line. attrs add data hooks.
+templ SheetSection(title string, attrs templ.Attributes) {
+	<section class="c-sheet__section" { attrs... }>
+		<h3>{ title }</h3>
+		{ children... }
+	</section>
+}
+
+// SheetForm is a form inside a sheet: no card, no padding. attrs hold id and the hx-* attributes.
+templ SheetForm(attrs templ.Attributes) {
+	<form class="c-form" data-flush { attrs... }>
+		{ children... }
+	</form>
+}
+
 templ SheetBody() {
 	<div class="c-sheet__body">
 		{ children... }
@@ -678,8 +721,15 @@ templ SheetFoot() {
 	</div>
 }
 
-// CredRow is one line of the credentials card.
-type CredRow struct{ Label, Value string }
+// CredRow is one line of the credentials card. Key is a data-key hook for the value ("" = none).
+type CredRow struct{ Label, Value, Key string }
+
+func credKey(k string) templ.Attributes {
+	if k == "" {
+		return nil
+	}
+	return templ.Attributes{"data-key": k}
+}
 
 // Credentials is what staff hands to a guest: the rows and a Copy button. copyText is what the button copies.
 templ Credentials(rows []CredRow, copyText string) {
@@ -687,7 +737,7 @@ templ Credentials(rows []CredRow, copyText string) {
 		for _, r := range rows {
 			<div class="c-credentials__row">
 				<dt>{ r.Label }</dt>
-				<dd>{ r.Value }</dd>
+				<dd { credKey(r.Key)... }>{ r.Value }</dd>
 			</div>
 		}
 	</dl>
@@ -699,6 +749,21 @@ templ Credentials(rows []CredRow, copyText string) {
 type PageProps struct {
 	Page, Pages int
 	Href        func(page int) string
+	// Target (a CSS selector such as "#member-list") makes the links update that region in place
+	// with hx-get and hx-push-url. The href stays, so the links also work without JavaScript.
+	Target string
+}
+
+// pageLink adds the htmx attributes to a pager link when the pager updates a region.
+func pageLink(p PageProps, href string, extra templ.Attributes) templ.Attributes {
+	out := templ.Attributes{}
+	for k, v := range extra {
+		out[k] = v
+	}
+	if p.Target != "" {
+		out["hx-get"], out["hx-target"], out["hx-push-url"] = href, p.Target, "true"
+	}
+	return out
 }
 
 // pageNumbers lists the pages to link: the first, the last and two either side of the current one.
@@ -733,11 +798,11 @@ func stepTarget(target, pages int) int { return min(max(target, 1), pages) }
 templ Pagination(p PageProps) {
 	if p.Pages > 1 {
 		<nav aria-label="Pages" class="c-pager">
-			<a class="c-pager__link" data-step="prev" href={ templ.SafeURL(p.Href(stepTarget(p.Page-1, p.Pages))) } { stepAttrs(p.Page-1, p.Page, p.Pages)... }>Previous</a>
+			<a class="c-pager__link" data-step="prev" href={ templ.SafeURL(p.Href(stepTarget(p.Page-1, p.Pages))) } { pageLink(p, p.Href(stepTarget(p.Page-1, p.Pages)), stepAttrs(p.Page-1, p.Page, p.Pages))... }>Previous</a>
 			for _, n := range pageNumbers(p.Page, p.Pages) {
-				<a class="c-pager__link" data-page={ strconv.Itoa(n) } href={ templ.SafeURL(p.Href(n)) } { pageAttrs(n, p.Page)... }>{ strconv.Itoa(n) }</a>
+				<a class="c-pager__link" data-page={ strconv.Itoa(n) } href={ templ.SafeURL(p.Href(n)) } { pageLink(p, p.Href(n), pageAttrs(n, p.Page))... }>{ strconv.Itoa(n) }</a>
 			}
-			<a class="c-pager__link" data-step="next" href={ templ.SafeURL(p.Href(stepTarget(p.Page+1, p.Pages))) } { stepAttrs(p.Page+1, p.Page, p.Pages)... }>Next</a>
+			<a class="c-pager__link" data-step="next" href={ templ.SafeURL(p.Href(stepTarget(p.Page+1, p.Pages))) } { pageLink(p, p.Href(stepTarget(p.Page+1, p.Pages)), stepAttrs(p.Page+1, p.Page, p.Pages))... }>Next</a>
 		</nav>
 	}
 }

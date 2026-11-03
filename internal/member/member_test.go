@@ -78,6 +78,16 @@ func (f *fakeRepo) UpdateMember(_ context.Context, id int64, in domain.MemberInp
 	return nil
 }
 
+func (f *fakeRepo) SetMemberActive(_ context.Context, id int64, active bool, _ time.Time) error {
+	m, ok := f.members[id]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	m.Active = active
+	f.members[id] = m
+	return nil
+}
+
 func (f *fakeRepo) GetMemberPassword(_ context.Context, id int64) ([]byte, error) {
 	if e, ok := f.enc[id]; ok {
 		return e, nil
@@ -101,6 +111,10 @@ func (f *fakeRepo) SetExtraBulk(_ context.Context, id int64, b int64, _ time.Tim
 
 func (f *fakeRepo) CountFiltered(context.Context, domain.MemberFilter, time.Time) (int, error) {
 	return len(f.members), nil
+}
+
+func (f *fakeRepo) CountStatuses(context.Context, domain.MemberFilter, time.Time) (domain.StatusCounts, error) {
+	return domain.StatusCounts{All: len(f.members)}, nil
 }
 
 func (f *fakeRepo) ListMembers(context.Context, domain.MemberFilter, int, int, time.Time, time.Time) ([]domain.MemberRow, error) {
@@ -218,6 +232,28 @@ func TestUpdateKicksOnlyOnDeactivation(t *testing.T) {
 		t.Fatal("member must be inactive even though the kick failed")
 	}
 	if _, _, err := s.Update(ctx, 99, domain.MemberForm{Username: "a", PlanID: "1"}); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("unknown member: %v", err)
+	}
+}
+
+func TestSetActiveKicksOnceAndIsIdempotent(t *testing.T) {
+	s, r, d := setup()
+	ctx := context.Background()
+	id, _, _ := s.Create(ctx, domain.MemberForm{Username: "a", PlanID: "1", Active: true})
+	r.sessions = []domain.SessionTarget{{NASIP: "10.0.0.1", Username: "a", AcctSessionID: "s1"}}
+	d.fail = true
+	kick, err := s.SetActive(ctx, id, false)
+	if err != nil || kick.Attempted != 1 || kick.Failed != 1 || r.members[id].Active {
+		t.Fatalf("disable: %+v %v active=%v", kick, err, r.members[id].Active)
+	}
+	kick, err = s.SetActive(ctx, id, false)
+	if err != nil || kick.Attempted != 0 || len(d.calls) != 1 {
+		t.Fatalf("second disable must not kick: %+v %v calls=%d", kick, err, len(d.calls))
+	}
+	if kick, err = s.SetActive(ctx, id, true); err != nil || kick.Attempted != 0 || !r.members[id].Active {
+		t.Fatalf("enable: %+v %v", kick, err)
+	}
+	if _, err := s.SetActive(ctx, 99, true); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("unknown member: %v", err)
 	}
 }

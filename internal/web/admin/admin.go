@@ -5,6 +5,7 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"math"
@@ -46,6 +47,7 @@ type MemberService interface {
 	Create(ctx context.Context, f domain.MemberForm) (int64, domain.FieldErrors, error)
 	Get(ctx context.Context, id int64) (member.View, error)
 	Update(ctx context.Context, id int64, f domain.MemberForm) (domain.FieldErrors, member.KickResult, error)
+	SetActive(ctx context.Context, id int64, active bool) (member.KickResult, error)
 	Renew(ctx context.Context, id int64) error
 	SetExtraBulk(ctx context.Context, id int64, value, unit string) (domain.FieldErrors, error)
 	RevealPassword(ctx context.Context, id int64) (string, error)
@@ -121,6 +123,7 @@ func Handler(d Deps) http.Handler {
 						r.Put("/", h.memberUpdate)
 						r.Delete("/", h.memberDelete)
 						r.Post("/renewals", h.memberRenew)
+						r.Post("/toggle", h.memberToggle)
 						r.Put("/extra-bulk", h.memberExtraBulk)
 						r.Get("/password", h.passwordReveal)
 						r.Put("/password", h.passwordSet)
@@ -229,7 +232,75 @@ func (h handlers) render(w http.ResponseWriter, r *http.Request, status int, c t
 
 func (h handlers) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	h.Log.Error("admin request failed", "method", r.Method, "path", r.URL.Path, "err", err)
+	if fromApp(r) {
+		h.appFail(w, http.StatusInternalServerError, "", "Something went wrong. Try again.")
+		return
+	}
 	h.render(w, r, http.StatusInternalServerError, ui.ErrorFragment("Something went wrong. Check the server log."))
+}
+
+// Element ids that htmx targets. A request whose HX-Target is one of them wants a fragment
+// (or, for a change, events and a toast instead of a redirect). The e2e harness sends
+// HX-Request on every request, so HX-Request alone never decides this.
+const (
+	listID      = "member-list" // the members list region
+	planListID  = "plan-list"   // the plans list region
+	sheetBodyID = "sheet-body"  // the body of the one sheet (new/edit forms)
+
+	membersChanged = "members-changed" // events sent in HX-Trigger; the list regions refresh on them
+	plansChanged   = "plans-changed"
+)
+
+func hxTarget(r *http.Request) string { return r.Header.Get("HX-Target") }
+
+// inSheet is true for a request that comes from the sheet.
+func inSheet(r *http.Request) bool { return hxTarget(r) == sheetBodyID }
+
+// fromApp is true for a request from a list region or the sheet: it gets events and a toast.
+func fromApp(r *http.Request) bool {
+	t := hxTarget(r)
+	return t == listID || t == planListID || t == sheetBodyID
+}
+
+// setTrigger sets the HX-Trigger header: one event per key (a string value is the toast text).
+func setTrigger(w http.ResponseWriter, events map[string]any) {
+	b, err := json.Marshal(events)
+	if err == nil {
+		w.Header().Set("HX-Trigger", string(b))
+	}
+}
+
+// appDone answers a change made from a list or the sheet: the list refreshes (changed), a toast
+// shows msg, the sheet closes. The body is empty and never swapped (HX-Reswap).
+func (h handlers) appDone(w http.ResponseWriter, r *http.Request, status int, changed, msg string) {
+	ev := map[string]any{changed: true, "toast": msg}
+	if inSheet(r) {
+		ev["close-sheet"] = true
+	}
+	setTrigger(w, ev)
+	w.Header().Set("HX-Reswap", "none")
+	w.WriteHeader(status)
+}
+
+// appFail answers a failed change made from a list or the sheet: only a toast, nothing swapped.
+// changed (may be "") also refreshes the list, when part of the work was done.
+func (h handlers) appFail(w http.ResponseWriter, status int, changed, msg string) {
+	ev := map[string]any{"toast": msg}
+	if changed != "" {
+		ev[changed] = true
+	}
+	setTrigger(w, ev)
+	w.Header().Set("HX-Reswap", "none")
+	w.WriteHeader(status)
+}
+
+// appOrFlash is appFail for list and sheet requests, else the usual error box for #flash.
+func (h handlers) appOrFlash(w http.ResponseWriter, r *http.Request, status int, msg string) {
+	if fromApp(r) {
+		h.appFail(w, status, "", msg)
+		return
+	}
+	h.render(w, r, status, ui.ErrorFragment(msg))
 }
 
 func isHTMX(r *http.Request) bool { return r.Header.Get("HX-Request") == "true" }

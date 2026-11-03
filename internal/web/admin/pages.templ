@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"fmt"
 	"strconv"
 
 	"hotspotpluslight/internal/domain"
@@ -44,30 +43,45 @@ func minutes(m int) string {
 templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Plans") {
-			@ui.LinkButton("primary", "/admin/plans/new", "New plan", nil)
+			@ui.LinkButton("primary", "/admin/plans/new", "New plan", sheetOpen("/admin/plans/new"))
 		}
-		if len(plans) == 0 {
-			@ui.EmptyState("No plans yet. Create the first one.")
-		} else {
-			@ui.Table("Plans", []string{"Name", "Validity", "Speed", "Data", "Time", "Devices", ""}) {
-				for _, p := range plans {
-					<tr>
-						<td data-label="Name"><a href={ templ.SafeURL(fmt.Sprintf("/admin/plans/%d", p.ID)) }>{ p.Name }</a></td>
-						<td data-label="Validity" class="u-nums">{ strconv.Itoa(p.DurationDays) } days</td>
-						<td data-label="Speed">{ limit(p.SpeedValue, p.SpeedUnit) }</td>
-						<td data-label="Data">{ limit(p.BulkValue, p.BulkUnit) }</td>
-						<td data-label="Time">{ minutes(p.TimeLimitMinutes) }</td>
-						<td data-label="Devices">{ strconv.Itoa(p.MaxSessions) }</td>
-						<td data-slot="actions">
-							@ui.Actions() {
-								@ui.ConfirmDelete("Delete", fmt.Sprintf("/admin/plans/%d", p.ID), "Delete plan "+p.Name+"?")
-							}
-						</td>
-					</tr>
-				}
+		<div id="plan-list" aria-live="polite" aria-busy="false">
+			@PlanListBody(plans)
+		</div>
+		@ui.SheetHost("sheet")
+	}
+}
+
+// PlanListFragment is the answer to a request from the plan list region.
+templ PlanListFragment(plans []domain.Plan) {
+	@PlanListBody(plans)
+}
+
+templ PlanListBody(plans []domain.Plan) {
+	if len(plans) == 0 {
+		@ui.EmptyState("No plans yet. Create the first one.")
+	} else {
+		@ui.Table("Plans", []string{"Name", "Validity", "Speed", "Data", "Time", "Devices", ""}) {
+			for _, p := range plans {
+				<tr>
+					<td data-label="Name"><a href={ templ.SafeURL(planURL(p.ID)) }>{ p.Name }</a></td>
+					<td data-label="Validity" class="u-nums">{ strconv.Itoa(p.DurationDays) } days</td>
+					<td data-label="Speed">{ limit(p.SpeedValue, p.SpeedUnit) }</td>
+					<td data-label="Data">{ limit(p.BulkValue, p.BulkUnit) }</td>
+					<td data-label="Time">{ minutes(p.TimeLimitMinutes) }</td>
+					<td data-label="Devices">{ strconv.Itoa(p.MaxSessions) }</td>
+					<td data-slot="actions">
+						@ui.Menu("plan-menu-"+strconv.FormatInt(p.ID, 10), "Actions for "+p.Name) {
+							@ui.MenuItem("Edit", false, sheetOpen(planURL(p.ID)))
+							@ui.MenuSep()
+							@ui.MenuItem("Delete", true, templ.Attributes{"hx-delete": planURL(p.ID), "hx-target": "#" + planListID, "hx-swap": "none", "hx-confirm": "Delete plan " + p.Name + "?"})
+						}
+					</td>
+				</tr>
 			}
 		}
 	}
+	@ui.Refresher(plansHome, plansChanged, "#"+planListID)
 }
 
 templ PlanNewPage(l ui.LayoutData) {
@@ -90,6 +104,7 @@ type PlanFormProps struct {
 	Action  string // "post" or "put"
 	URL     string
 	Members int // members using the plan (edit only)
+	Sheet   bool // shown in the sheet: targets the sheet body, no card
 }
 
 func membersWarning(n int) string {
@@ -109,31 +124,52 @@ func unitOptions(units []string) []ui.Option {
 
 func planFormAttrs(p PlanFormProps) templ.Attributes {
 	a := templ.Attributes{"id": "plan-form", "hx-target": "this", "hx-swap": "outerHTML"}
+	if p.Sheet {
+		a["hx-target"], a["hx-swap"] = "#"+sheetBodyID, "innerHTML"
+		a["data-sheet-title"] = "Edit plan"
+		if p.Action == "post" {
+			a["data-sheet-title"] = "New plan"
+		}
+	}
 	a["hx-"+p.Action] = p.URL
 	return a
 }
 
-// PlanFormView is both the new and edit form; it is also the 422 response body.
+// PlanFormView is both the new and edit form; it is also the 422 response body. In the sheet it has no card.
 templ PlanFormView(p PlanFormProps) {
-	@ui.FormCard(planFormAttrs(p)) {
-		if p.Members > 0 {
-			<div class="c-notice" data-kind="warn" data-plan-warning>{ membersWarning(p.Members) }</div>
+	if p.Sheet {
+		@ui.SheetForm(planFormAttrs(p)) {
+			@planFields(p)
 		}
-		@ui.Field(ui.FieldProps{Label: "Name", Name: "name", Value: p.Form.Name, Error: p.Errors["name"]})
-		@ui.Field(ui.FieldProps{Label: "Validity (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Whole number, at least 1."})
-		@ui.FieldPair(ui.PairProps{Label: "Speed limit", For: "speed_value", Hint: "0 = no speed limit. Decimals allowed.", Errors: []ui.NamedError{{Name: "speed_value", Msg: p.Errors["speed_value"]}, {Name: "speed_unit", Msg: p.Errors["speed_unit"]}}}) {
-			@ui.InputControl(ui.FieldProps{Name: "speed_value", Value: p.Form.SpeedValue, Error: p.Errors["speed_value"]})
-			@ui.SelectControl(ui.SelectProps{Name: "speed_unit", Value: p.Form.SpeedUnit, Options: unitOptions(domain.SpeedUnits), Error: p.Errors["speed_unit"]})
+	} else {
+		@ui.FormCard(planFormAttrs(p)) {
+			@planFields(p)
 		}
-		@ui.FieldPair(ui.PairProps{Label: "Data limit", For: "bulk_value", Hint: "0 = unlimited data. Decimals allowed.", Errors: []ui.NamedError{{Name: "bulk_value", Msg: p.Errors["bulk_value"]}, {Name: "bulk_unit", Msg: p.Errors["bulk_unit"]}}}) {
-			@ui.InputControl(ui.FieldProps{Name: "bulk_value", Value: p.Form.BulkValue, Error: p.Errors["bulk_value"]})
-			@ui.SelectControl(ui.SelectProps{Name: "bulk_unit", Value: p.Form.BulkUnit, Options: unitOptions(domain.BulkUnits), Error: p.Errors["bulk_unit"]})
-		}
-		@ui.Field(ui.FieldProps{Label: "Time limit (minutes)", Name: "time_limit_minutes", Value: p.Form.TimeLimitMinutes, Error: p.Errors["time_limit_minutes"], Hint: "0 = unlimited time."})
-		@ui.Field(ui.FieldProps{Label: "Simultaneous devices", Name: "max_sessions", Value: p.Form.MaxSessions, Error: p.Errors["max_sessions"], Hint: "Whole number, at least 1."})
-		@ui.Checkbox(ui.CheckboxProps{Label: "Renew automatically when the validity ends", Name: "auto_resubscribe", Checked: p.Form.AutoResubscribe})
-		@ui.Actions() {
-			@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
+	}
+}
+
+templ planFields(p PlanFormProps) {
+	if p.Members > 0 {
+		<div class="c-notice" data-kind="warn" data-plan-warning>{ membersWarning(p.Members) }</div>
+	}
+	@ui.Field(ui.FieldProps{Label: "Name", Name: "name", Value: p.Form.Name, Error: p.Errors["name"]})
+	@ui.Field(ui.FieldProps{Label: "Validity (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Whole number, at least 1."})
+	@ui.FieldPair(ui.PairProps{Label: "Speed limit", For: "speed_value", Hint: "0 = no speed limit. Decimals allowed.", Errors: []ui.NamedError{{Name: "speed_value", Msg: p.Errors["speed_value"]}, {Name: "speed_unit", Msg: p.Errors["speed_unit"]}}}) {
+		@ui.InputControl(ui.FieldProps{Name: "speed_value", Value: p.Form.SpeedValue, Error: p.Errors["speed_value"]})
+		@ui.SelectControl(ui.SelectProps{Name: "speed_unit", Value: p.Form.SpeedUnit, Options: unitOptions(domain.SpeedUnits), Error: p.Errors["speed_unit"]})
+	}
+	@ui.FieldPair(ui.PairProps{Label: "Data limit", For: "bulk_value", Hint: "0 = unlimited data. Decimals allowed.", Errors: []ui.NamedError{{Name: "bulk_value", Msg: p.Errors["bulk_value"]}, {Name: "bulk_unit", Msg: p.Errors["bulk_unit"]}}}) {
+		@ui.InputControl(ui.FieldProps{Name: "bulk_value", Value: p.Form.BulkValue, Error: p.Errors["bulk_value"]})
+		@ui.SelectControl(ui.SelectProps{Name: "bulk_unit", Value: p.Form.BulkUnit, Options: unitOptions(domain.BulkUnits), Error: p.Errors["bulk_unit"]})
+	}
+	@ui.Field(ui.FieldProps{Label: "Time limit (minutes)", Name: "time_limit_minutes", Value: p.Form.TimeLimitMinutes, Error: p.Errors["time_limit_minutes"], Hint: "0 = unlimited time."})
+	@ui.Field(ui.FieldProps{Label: "Simultaneous devices", Name: "max_sessions", Value: p.Form.MaxSessions, Error: p.Errors["max_sessions"], Hint: "Whole number, at least 1."})
+	@ui.Checkbox(ui.CheckboxProps{Label: "Renew automatically when the validity ends", Name: "auto_resubscribe", Checked: p.Form.AutoResubscribe})
+	@ui.Actions() {
+		@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
+		if p.Sheet {
+			@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
+		} else {
 			@ui.LinkButton("secondary", "/admin/plans", "Cancel", nil)
 			if p.Action == "put" {
 				@ui.ConfirmDelete("Delete plan", p.URL, "Delete this plan?")

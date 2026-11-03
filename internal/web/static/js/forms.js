@@ -3,6 +3,7 @@
 //   [data-select-all="sel"]  a checkbox that ticks every checkbox matching sel
 //   [data-clear="id"]        a button that empties the element #id
 //   [data-bulk-guard]        a form: htmx does not send it when nothing is ticked
+//   [aria-busy]              a region that htmx updates: aria-busy is "true" while the request runs
 document.addEventListener("click", (e) => {
   const reveal = e.target.closest("[data-reveal]");
   if (reveal) {
@@ -31,3 +32,10 @@ document.addEventListener("htmx:configRequest", (e) => {
   e.preventDefault();
   document.getElementById("bulk-result")?.replaceChildren(note.content.cloneNode(true));
 });
+
+function setBusy(e, busy) {
+  const t = e.detail.target;
+  if (t instanceof HTMLElement && t.hasAttribute("aria-busy")) { t.setAttribute("aria-busy", busy ? "true" : "false"); }
+}
+document.body.addEventListener("htmx:beforeRequest", (e) => setBusy(e, true));
+document.body.addEventListener("htmx:afterRequest", (e) => setBusy(e, false));

@@ -75,11 +75,29 @@ templ DevComponentsPage(l ui.LayoutData) {
 			</div>
 		}
 		@galleryItem("Table") {
-			@ui.Table("Sample", []string{"User", "Plan", "Status", ""}) {
+			@ui.Table("Sample", []string{"User", "Plan", "Usage", "Expires", "Status", ""}) {
 				<tr>
-					<td data-label="User">alice</td>
-					<td data-label="Plan">Premium</td>
-					<td data-label="Status">@ui.Pill("active", "Active")</td>
+					<td data-label="User">
+						alice
+						<div class="c-table__sub">9123456789</div>
+					</td>
+					<td data-label="Plan">
+						Premium
+						<div class="c-table__sub">5 Mbps</div>
+					</td>
+					<td data-label="Usage" class="u-nums">
+						@ui.Meter(8.5, 10, "8.5 of 10 GB")
+						8.5 GB / 10 GB
+						<div class="c-table__sub">1.5 GB left</div>
+					</td>
+					<td data-label="Expires">
+						2026-11-05
+						<div class="c-table__sub">in 2 days</div>
+					</td>
+					<td data-label="Status">
+						@ui.Pill("expiring", "Expiring")
+						@ui.OnlineDot(true)
+					</td>
 					<td data-slot="actions">
 						@ui.Menu("g-menu-row", "Row actions") {
 							@ui.MenuItem("Edit", false, nil)
@@ -91,7 +109,12 @@ templ DevComponentsPage(l ui.LayoutData) {
 				<tr>
 					<td data-label="User">bob</td>
 					<td data-label="Plan">Basic</td>
-					<td data-label="Status">@ui.Pill("expired", "Expired")</td>
+					<td data-label="Usage" class="u-nums">0 GB / unlimited</td>
+					<td data-label="Expires">—</td>
+					<td data-label="Status">
+						@ui.Pill("disabled", "Disabled")
+						@ui.OnlineDot(false)
+					</td>
 					<td data-slot="actions"></td>
 				</tr>
 			}
@@ -119,6 +142,9 @@ templ DevComponentsPage(l ui.LayoutData) {
 				@ui.Credentials([]ui.CredRow{{Label: "Username", Value: "alice"}, {Label: "Password", Value: "493021"}, {Label: "Plan", Value: "Premium"}}, "Username: alice\nPassword: 493021")
 			</div>
 		}
+		@galleryItem("Credentials in a sheet (after a member is created)") {
+			@ui.Button("secondary", "Open sheet", templ.Attributes{"data-open-dialog": "g-cred-sheet"})
+		}
 		@galleryItem("Code block") {
 			<div class="l-narrow">
 				@ui.CodeBlock("g-code", "/ip hotspot print")
@@ -136,11 +162,26 @@ templ DevComponentsPage(l ui.LayoutData) {
 		}
 		@ui.Sheet("g-sheet", "Sample sheet") {
 			@ui.SheetBody() {
-				@ui.Field(ui.FieldProps{Label: "Name", Name: "g_sheet_name"})
+				@ui.SheetForm(templ.Attributes{"id": "g-sheet-form"}) {
+					@ui.Field(ui.FieldProps{Label: "Name", Name: "g_sheet_name"})
+					@ui.Field(ui.FieldProps{Label: "With error", Name: "g_sheet_err", Value: "x", Error: "This value is not valid."})
+				}
+				@ui.SheetSection("Actions", nil) {
+					@ui.Actions() {
+						@ui.Button("secondary", "Renew", nil)
+						@ui.Button("danger", "Delete", nil)
+						@ui.LinkButton("ghost", "#", "Open details", nil)
+					}
+				}
 			}
 			@ui.SheetFoot() {
 				@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
 				@ui.Button("primary", "Save", nil)
+			}
+		}
+		@ui.Sheet("g-cred-sheet", "Member created") {
+			@ui.SheetBody() {
+				@MemberCreated(createdVM{Username: "alice", Password: "493021", Plan: "Premium", Expires: "No expiry"})
 			}
 		}
 		@ui.Modal("g-modal", "Delete member?", "This cannot be undone.") {

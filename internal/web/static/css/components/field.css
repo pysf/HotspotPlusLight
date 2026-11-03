@@ -1,6 +1,7 @@
 /* Label above a control, optional hint and error below. Also the form card, the pair row and the checkbox. */
 @layer components {
   .c-form { display: grid; gap: var(--s-4); padding: var(--s-6); }
+  .c-form[data-flush] { padding: 0; }
   .c-field { display: grid; gap: var(--s-1h); }
   .c-field__label { color: var(--muted); font-size: var(--fs-small); }
   .c-field__hint { color: var(--faint); font-size: var(--fs-small); }

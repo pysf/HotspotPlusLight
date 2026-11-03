@@ -15,6 +15,20 @@ No Tailwind, no Node, no build step, no UI kit. The look is in `docs/DESIGN.md`.
 - `internal/web/admin/dev.templ`: the component gallery. It is served at `/admin/dev/components` only when `HSP_DEV=1`.
 - The voucher print page keeps its own `voucher.css` (no app CSS). The router starter pack (`internal/routerpack`) is not touched.
 
+## Patterns of step B (2026-11-03)
+- **Fragments by `HX-Target` only.** The list regions are `#member-list` and `#plan-list`; the one sheet is `<dialog id="sheet">` with the body `#sheet-body`.
+  A GET with that `HX-Target` returns only the fragment. Anything else returns the full page. Changes (`POST`/`PUT`/`DELETE`) from the list or sheet
+  answer with `HX-Trigger` (`members-changed` / `plans-changed`, `toast`, `close-sheet`) and `HX-Reswap: none`. Without the target nothing changed: redirects as before.
+- **The edit sheet is `GET /admin/members/{id}`** with `HX-Target: sheet-body` (no extra route). The member page stays for the usage summary, extra data and password.
+- **Lists refresh themselves.** Each list fragment holds `ui.Refresher`: a hidden element with `hx-get` (the list's current address) and
+  `hx-trigger="members-changed from:body"`. No JavaScript.
+- **Search and chips.** The toolbar form has `hx-get`, `hx-push-url`, `hx-trigger="input delay:300ms, submit"`, `hx-sync="this:replace"`. The status is a hidden
+  field inside `#member-chips`, which comes back out of band (`hx-swap-oob`) with the list, so chips and counts stay current.
+- **Sheet title and opening** are done by `dialog.js` after the swap (`data-sheet-title` in the fragment). The host body is emptied on close.
+- **Creating a member from the sheet** answers the credentials card (`201`, sheet stays open, events `members-changed` + `toast`, no `close-sheet`) until "Done".
+- **Errors from lists and the sheet are toasts** (status code kept, `HX-Reswap: none`). `#flash` is still used by the full pages and the other sections.
+- `ui.Meter` has no text inside; the figures are printed next to it. `ui.Chip` uses `aria-current="true"` (it is a link). A submit button gets `hx-disabled-elt="this"`.
+
 ## Themes
 Two themes, chosen by `data-theme` on `<html>`: `air` (default) and `air-dark` (the Dark colors with Air's shape tokens).
 The server reads the `theme` cookie (a bad value means `air`) and renders the attribute, so there is no flash.

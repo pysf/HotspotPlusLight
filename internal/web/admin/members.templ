@@ -14,6 +14,7 @@ type MembersProps struct {
 	Result member.ListResult
 	Filter domain.MemberFilter
 	Plans  []domain.Plan
+	URL    string // the address of this request, kept by the refresher
 }
 
 func planFilterOptions(plans []domain.Plan, anyLabel string) []ui.Option {
@@ -31,8 +32,6 @@ func planFilterValue(id int64) string {
 	return strconv.FormatInt(id, 10)
 }
 
-var statusOptions = []ui.Option{{Value: "", Label: "Any status"}, {Value: "active", Label: "Active"}, {Value: "inactive", Label: "Inactive"}, {Value: "expired", Label: "Expired"}}
-
 func pageSizeOptions() []ui.Option {
 	o := make([]ui.Option, len(domain.PageSizes))
 	for i, n := range domain.PageSizes {
@@ -41,43 +40,111 @@ func pageSizeOptions() []ui.Option {
 	return o
 }
 
+// sheetOpen makes a button or link load a form into the sheet (the href stays as the no-JS fallback).
+func sheetOpen(url string) templ.Attributes {
+	return templ.Attributes{"hx-get": url, "hx-target": "#" + sheetBodyID, "hx-swap": "innerHTML"}
+}
+
+// filterAttrs make the toolbar update the list in place: typing is debounced, a newer request
+// replaces a running one, and the address is pushed so the page can be reloaded or shared.
+var filterAttrs = templ.Attributes{
+	"hx-get": membersHome, "hx-target": "#" + listID, "hx-push-url": "true",
+	"hx-trigger": "input delay:300ms, submit", "hx-sync": "this:replace",
+}
+
+// statusChips lists the status chips in order; Status "" is "All".
+var statusChips = []struct{ Key, Status, Label string }{
+	{"all", "", "All"},
+	{"active", domain.StatusActive, "Active"},
+	{"expiring", domain.StatusExpiring, "Expiring soon"},
+	{"expired", domain.StatusExpired, "Expired"},
+	{"inactive", domain.StatusInactive, "Disabled"},
+}
+
+func chipCountOf(c domain.StatusCounts, key string) int {
+	switch key {
+	case "active":
+		return c.Active
+	case "expiring":
+		return c.Expiring
+	case "expired":
+		return c.Expired
+	case "inactive":
+		return c.Inactive
+	}
+	return c.All
+}
+
+func chipProps(p MembersProps, key, status, label string) ui.ChipProps {
+	href := listURL(domain.MemberFilter{Query: p.Filter.Query, PlanID: p.Filter.PlanID, Status: status}, p.Result.Per, 0)
+	return ui.ChipProps{
+		Label: label, Href: href, Count: strconv.Itoa(chipCountOf(p.Result.Counts, key)), Selected: p.Filter.Status == status,
+		Attrs: templ.Attributes{"data-chip": key, "hx-get": href, "hx-target": "#" + listID, "hx-push-url": "true"},
+	}
+}
+
+// MemberChips are the status filter chips with their counts, and the hidden status the toolbar form
+// submits. With oob they come with the list fragment and replace the ones on the page.
+templ MemberChips(p MembersProps, oob bool) {
+	<div id="member-chips" class="l-cluster" { oobAttrs(oob)... }>
+		<input type="hidden" name="status" value={ p.Filter.Status }/>
+		for _, c := range statusChips {
+			@ui.Chip(chipProps(p, c.Key, c.Status, c.Label))
+		}
+	</div>
+}
+
 templ MembersPage(l ui.LayoutData, p MembersProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Members") {
-			@ui.LinkButton("primary", "/admin/members/new", "New member", nil)
+			@ui.LinkButton("primary", "/admin/members/new", "New member", sheetOpen("/admin/members/new"))
 		}
-		@ui.FilterBar("member-filter", "/admin/members") {
+		@ui.FilterBar("member-filter", "/admin/members", filterAttrs) {
 			@ui.Search(ui.SearchProps{Name: "q", Value: p.Filter.Query, Placeholder: "Search members"})
 			@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan", Value: planFilterValue(p.Filter.PlanID), Options: planFilterOptions(p.Plans, "Any plan")})
-			@ui.Select(ui.SelectProps{Label: "Status", Name: "status", Value: p.Filter.Status, Options: statusOptions})
 			@ui.Select(ui.SelectProps{Label: "Page size", Name: "per", Value: strconv.Itoa(p.Result.Per), Options: pageSizeOptions()})
-			@ui.Button("secondary", "Filter", templ.Attributes{"type": "submit"})
+			@MemberChips(p, false)
 		}
-		if p.Result.Total == 0 {
-			@ui.EmptyState("No members match.")
-		} else {
-			<form id="bulk-form" data-bulk-guard hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML">
-				<input type="hidden" name="q" value={ p.Filter.Query }/>
-				<input type="hidden" name="plan" value={ planFilterValue(p.Filter.PlanID) }/>
-				<input type="hidden" name="status" value={ p.Filter.Status }/>
-				<div class="l-toolbar">
-					<label class="c-check"><input type="checkbox" data-select-all="#bulk-form input[name=id]"/> Select all on this page</label>
-					<label class="c-check" data-select-all-results><input type="checkbox" name="all_results" value="1"/> Select all { strconv.Itoa(p.Result.Total) } results of this filter</label>
-					@ui.Button("danger", "Delete selected", templ.Attributes{"type": "submit"})
-				</div>
-				<div id="bulk-result"></div>
-				<template id="no-selection-notice">
-					@ui.ErrorFragment("No member selected.")
-				</template>
-				@ui.Table("Members", []string{"", "Username", "Online", "Status", "Data"}) {
-					for _, v := range p.Result.Rows {
-						@MemberRow(newVM(v))
-					}
-				}
-			</form>
-			@ui.Pagination(ui.PageProps{Page: p.Result.Page, Pages: p.Result.Pages, Href: listHref(p.Filter, p.Result.Per)})
-		}
+		<div id="member-list" aria-live="polite" aria-busy="false">
+			@MemberListBody(p)
+		</div>
+		@ui.SheetHost("sheet")
 	}
+}
+
+// MemberListFragment is the answer to a request from the list region: the new list, and the chips out of band.
+templ MemberListFragment(p MembersProps) {
+	@MemberListBody(p)
+	@MemberChips(p, true)
+}
+
+// MemberListBody is the inside of the list region: bulk bar, table, pager, and the refresher.
+templ MemberListBody(p MembersProps) {
+	if p.Result.Total == 0 {
+		@ui.EmptyState("No members match.")
+	} else {
+		<form id="bulk-form" data-bulk-guard hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML">
+			<input type="hidden" name="q" value={ p.Filter.Query }/>
+			<input type="hidden" name="plan" value={ planFilterValue(p.Filter.PlanID) }/>
+			<input type="hidden" name="status" value={ p.Filter.Status }/>
+			<div class="l-toolbar">
+				<label class="c-check"><input type="checkbox" data-select-all="#bulk-form input[name=id]"/> Select all on this page</label>
+				<label class="c-check" data-select-all-results><input type="checkbox" name="all_results" value="1"/> Select all { strconv.Itoa(p.Result.Total) } results of this filter</label>
+				@ui.Button("danger", "Delete selected", templ.Attributes{"type": "submit"})
+			</div>
+			<div id="bulk-result"></div>
+			<template id="no-selection-notice">
+				@ui.ErrorFragment("No member selected.")
+			</template>
+			@ui.Table("Members", []string{"", "User", "Plan", "Usage", "Expires", "Status", ""}) {
+				for _, v := range p.Result.Rows {
+					@MemberRow(newVM(v))
+				}
+			}
+		</form>
+		@ui.Pagination(ui.PageProps{Page: p.Result.Page, Pages: p.Result.Pages, Href: listHref(p.Filter, p.Result.Per), Target: "#" + listID})
+	}
+	@ui.Refresher(p.URL, membersChanged, "#"+listID)
 }
 
 // UsageCells are the data / time / window / verdict cells of the member page summary (BR-22).
@@ -91,25 +158,103 @@ templ UsageCells(m memberVM) {
 templ MemberRow(m memberVM) {
 	<tr data-member data-id={ strconv.FormatInt(m.ID, 10) } data-username={ m.Username } data-status={ m.Status } data-verdict={ m.VerdictCode } data-online={ strconv.FormatBool(m.Online) }>
 		<td data-slot="select"><input type="checkbox" aria-label="Select" name="id" value={ strconv.FormatInt(m.ID, 10) }/></td>
-		<td data-label="Username"><a href={ templ.SafeURL(memberURL(m.ID)) }>{ m.Username }</a></td>
-		<td data-col="online" data-label="Online">@ui.OnlineDot(m.Online)</td>
-		<td data-col="status" data-label="Status">@ui.Pill(statusPill(m.Status), m.Status)</td>
-		<td data-col="data" data-label="Data" class="u-nums">
+		<td data-label="User">
+			<a href={ templ.SafeURL(memberURL(m.ID)) }>{ m.Username }</a>
+			if m.Mobile != "" {
+				<div class="c-table__sub">{ m.Mobile }</div>
+			}
+		</td>
+		<td data-label="Plan">
+			{ m.PlanName }
+			<div class="c-table__sub">{ m.PlanSpeed }</div>
+		</td>
+		<td data-col="data" data-label="Usage" class="u-nums">
+			if m.HasMeter {
+				@ui.Meter(m.MeterUsed, m.MeterMax, m.DataMain)
+			}
 			{ m.DataMain }
 			if m.DataLeft != "" {
 				<div class="c-table__sub" data-col="data-left">{ m.DataLeft }</div>
 			}
 		</td>
+		<td data-label="Expires">
+			{ m.Expires }
+			if m.ExpiresRel != "" {
+				<div class="c-table__sub">{ m.ExpiresRel }</div>
+			}
+		</td>
+		<td data-col="status" data-label="Status">
+			@ui.Pill(statusPill(m.Status), statusLabel(m.Status))
+			@ui.OnlineDot(m.Online)
+		</td>
+		<td data-slot="actions">
+			@MemberMenu(m)
+		</td>
 	</tr>
+}
+
+// rowAction is a menu or sheet button that changes a member and sends the answer to the toasts and
+// the list refresh (hx-swap none). target is the list region or the sheet body: it tells the server where
+// the request comes from. confirm is the server-rendered text of the confirm dialog ("" = none).
+func rowAction(method, url, target, confirm string) templ.Attributes {
+	a := templ.Attributes{"hx-" + method: url, "hx-target": "#" + target, "hx-swap": "none"}
+	if confirm != "" {
+		a["hx-confirm"] = confirm
+	}
+	return a
+}
+
+const (
+	confirmRenew      = "Restart this member's validity window? Used data, time and extra data are cleared."
+	confirmDisconnect = "Disconnect all open sessions of this member?"
+	confirmDisable    = "Disable this member? Open sessions are disconnected."
+	confirmDelete     = "Delete this member? Open sessions are disconnected first."
+)
+
+// toggleAction is Disable (with a confirm: it disconnects) or Enable.
+func toggleAction(m memberVM, target string) (string, templ.Attributes) {
+	if m.Active {
+		a := rowAction("post", memberURL(m.ID)+"/toggle", target, confirmDisable)
+		a["hx-vals"] = `{"active":"0"}`
+		return "Disable", a
+	}
+	a := rowAction("post", memberURL(m.ID)+"/toggle", target, "")
+	a["hx-vals"] = `{"active":"1"}`
+	return "Enable", a
+}
+
+templ MemberMenu(m memberVM) {
+	{{ toggleLabel, toggle := toggleAction(m, listID) }}
+	@ui.Menu("member-menu-"+strconv.FormatInt(m.ID, 10), "Actions for "+m.Username) {
+		@ui.MenuItem("Edit", false, sheetOpen(memberURL(m.ID)))
+		@ui.MenuItem("Renew", false, rowAction("post", memberURL(m.ID)+"/renewals", listID, confirmRenew))
+		@ui.MenuItem(toggleLabel, false, toggle)
+		@ui.MenuItem("Disconnect", false, rowAction("post", memberURL(m.ID)+"/disconnections", listID, confirmDisconnect))
+		@ui.MenuSep()
+		@ui.MenuItem("Delete", true, rowAction("delete", memberURL(m.ID), listID, confirmDelete))
+	}
 }
 
 // statusPill maps a member status to the data-status of the pill.
 func statusPill(s string) string {
 	switch s {
-	case "active", "expired":
+	case domain.StatusActive, domain.StatusExpiring, domain.StatusExpired:
 		return s
 	}
 	return "disabled"
+}
+
+// statusLabel is the status in words ("inactive" is shown as "Disabled").
+func statusLabel(s string) string {
+	switch s {
+	case domain.StatusActive:
+		return "Active"
+	case domain.StatusExpiring:
+		return "Expiring"
+	case domain.StatusExpired:
+		return "Expired"
+	}
+	return "Disabled"
 }
 
 templ MemberNewPage(l ui.LayoutData, p MemberFormProps) {
@@ -132,10 +277,18 @@ type MemberFormProps struct {
 	Create  bool
 	URL     string
 	Warning string // shown above the form (e.g. a failed kick)
+	Sheet   bool   // the form is shown in the sheet (targets the sheet body, no card)
 }
 
 func memberFormAttrs(p MemberFormProps) templ.Attributes {
 	a := templ.Attributes{"id": "member-form", "hx-target": "this", "hx-swap": "outerHTML"}
+	if p.Sheet {
+		a["hx-target"], a["hx-swap"] = "#"+sheetBodyID, "innerHTML"
+		a["data-sheet-title"] = "Edit member"
+		if p.Create {
+			a["data-sheet-title"] = "New member"
+		}
+	}
 	if p.Create {
 		a["hx-post"] = p.URL
 	} else {
@@ -144,30 +297,91 @@ func memberFormAttrs(p MemberFormProps) templ.Attributes {
 	return a
 }
 
-// MemberFormView is both the new and edit form and the 422 response body.
+// MemberFormView is both the new and edit form and the 422 response body. In the sheet it has no card.
 templ MemberFormView(p MemberFormProps) {
-	@ui.FormCard(memberFormAttrs(p)) {
-		if p.Warning != "" {
-			@ui.Flash("warn", p.Warning)
+	if p.Sheet {
+		@ui.SheetForm(memberFormAttrs(p)) {
+			@memberFields(p)
 		}
-		@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: p.Form.Username, Error: p.Errors["username"], Hint: "English letters and digits, up to 64. Case-insensitive. Empty = use the mobile number."})
-		if p.Create {
-			@ui.Field(ui.FieldProps{Label: "Password", Name: "password", Value: p.Form.Password, Error: p.Errors["password"], Hint: "Empty = a random 6-digit number.", Attrs: templ.Attributes{"autocomplete": "off"}})
+	} else {
+		@ui.FormCard(memberFormAttrs(p)) {
+			@memberFields(p)
 		}
-		@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan_id", Value: p.Form.PlanID, Options: planFilterOptions(p.Plans, "Choose a plan"), Error: p.Errors["plan_id"]})
-		@ui.Field(ui.FieldProps{Label: "First name", Name: "first_name", Value: p.Form.FirstName, Error: p.Errors["first_name"]})
-		@ui.Field(ui.FieldProps{Label: "Last name", Name: "last_name", Value: p.Form.LastName, Error: p.Errors["last_name"]})
-		@ui.Field(ui.FieldProps{Label: "Mobile", Name: "mobile", Value: p.Form.Mobile, Error: p.Errors["mobile"], Hint: "The last 10 digits are kept."})
-		@ui.Field(ui.FieldProps{Label: "Email", Name: "email", Value: p.Form.Email, Error: p.Errors["email"]})
-		@ui.Field(ui.FieldProps{Label: "National code", Name: "national_code", Value: p.Form.NationalCode, Error: p.Errors["national_code"]})
-		@ui.Field(ui.FieldProps{Label: "MAC address", Name: "mac", Value: p.Form.MAC, Error: p.Errors["mac"], Hint: "Optional. Filled in automatically from the first session."})
-		@ui.Field(ui.FieldProps{Label: "Expires at", Name: "expires_at", Type: "datetime-local", Value: p.Form.ExpiresAt, Error: p.Errors["expires_at"], Hint: "Optional. Logins after this moment are refused. Settings time zone."})
-		@ui.Checkbox(ui.CheckboxProps{Label: "Active", Name: "active", Checked: p.Form.Active, Hint: "Deactivating disconnects the member's open sessions."})
-		@ui.Actions() {
-			@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
+	}
+}
+
+templ memberFields(p MemberFormProps) {
+	if p.Warning != "" {
+		@ui.Flash("warn", p.Warning)
+	}
+	@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: p.Form.Username, Error: p.Errors["username"], Hint: "English letters and digits, up to 64. Case-insensitive. Empty = use the mobile number."})
+	if p.Create {
+		@ui.Field(ui.FieldProps{Label: "Password", Name: "password", Value: p.Form.Password, Error: p.Errors["password"], Hint: "Empty = a random 6-digit number.", Attrs: templ.Attributes{"autocomplete": "off"}})
+	}
+	@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan_id", Value: p.Form.PlanID, Options: planFilterOptions(p.Plans, "Choose a plan"), Error: p.Errors["plan_id"]})
+	@ui.Field(ui.FieldProps{Label: "First name", Name: "first_name", Value: p.Form.FirstName, Error: p.Errors["first_name"]})
+	@ui.Field(ui.FieldProps{Label: "Last name", Name: "last_name", Value: p.Form.LastName, Error: p.Errors["last_name"]})
+	@ui.Field(ui.FieldProps{Label: "Mobile", Name: "mobile", Value: p.Form.Mobile, Error: p.Errors["mobile"], Hint: "The last 10 digits are kept."})
+	@ui.Field(ui.FieldProps{Label: "Email", Name: "email", Value: p.Form.Email, Error: p.Errors["email"]})
+	@ui.Field(ui.FieldProps{Label: "National code", Name: "national_code", Value: p.Form.NationalCode, Error: p.Errors["national_code"]})
+	@ui.Field(ui.FieldProps{Label: "MAC address", Name: "mac", Value: p.Form.MAC, Error: p.Errors["mac"], Hint: "Optional. Filled in automatically from the first session."})
+	@ui.Field(ui.FieldProps{Label: "Expires at", Name: "expires_at", Type: "datetime-local", Value: p.Form.ExpiresAt, Error: p.Errors["expires_at"], Hint: "Optional. Logins after this moment are refused. Settings time zone."})
+	@ui.Checkbox(ui.CheckboxProps{Label: "Active", Name: "active", Checked: p.Form.Active, Hint: "Deactivating disconnects the member's open sessions."})
+	@ui.Actions() {
+		@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
+		if p.Sheet {
+			@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
+		} else {
 			@ui.LinkButton("secondary", "/admin/members", "Cancel", nil)
 		}
 	}
+}
+
+// MemberNewSheet is the new-member form for the sheet (or a hint when there is no plan to choose).
+templ MemberNewSheet(p MemberFormProps) {
+	if len(p.Plans) == 0 {
+		<div data-sheet-title="New member">
+			@ui.EmptyState("No plans exist yet. Create a plan first, then add members.") {
+				<p><a href="/admin/plans/new">New plan</a></p>
+			}
+		</div>
+	} else {
+		@MemberFormView(p)
+	}
+}
+
+// MemberEditSheet is the edit form plus the member's actions. "Open details" is the member page,
+// which keeps the usage summary, extra data and the password.
+templ MemberEditSheet(p MemberFormProps, m memberVM) {
+	@MemberFormView(p)
+	{{ toggleLabel, toggle := toggleAction(m, sheetBodyID) }}
+	@ui.SheetSection("Actions", templ.Attributes{"data-actions": true}) {
+		@ui.Actions() {
+			@ui.Button("secondary", "Renew", rowAction("post", memberURL(m.ID)+"/renewals", sheetBodyID, confirmRenew))
+			@ui.Button("secondary", toggleLabel, toggle)
+			@ui.Button("secondary", "Disconnect", rowAction("post", memberURL(m.ID)+"/disconnections", sheetBodyID, confirmDisconnect))
+			@ui.Button("danger", "Delete", rowAction("delete", memberURL(m.ID), sheetBodyID, confirmDelete))
+			@ui.LinkButton("ghost", memberURL(m.ID), "Open details", nil)
+		}
+	}
+}
+
+type createdVM struct{ Username, Password, Plan, Expires string }
+
+// MemberCreated is the credentials card shown in the sheet after a member was created.
+templ MemberCreated(c createdVM) {
+	<div class="l-stack" data-sheet-title="Member created">
+		@ui.Credentials([]ui.CredRow{
+			{Label: "Username", Value: c.Username, Key: "username"},
+			{Label: "Password", Value: c.Password, Key: "password"},
+			{Label: "Plan", Value: c.Plan, Key: "plan"},
+			{Label: "Expires", Value: c.Expires, Key: "expires"},
+		}, "Username: "+c.Username+"\nPassword: "+c.Password+"\nPlan: "+c.Plan+"\nExpires: "+c.Expires)
+		@ui.Actions() {
+			@ui.Button("secondary", "Create another", sheetOpen("/admin/members/new"))
+			@ui.Button("primary", "Done", templ.Attributes{"data-close": true})
+		}
+	</div>
 }
 
 // MemberStatus is the plan / status / online line. With oob it is sent as an

@@ -211,30 +211,43 @@ func parseLocal(raw string, loc *time.Location) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// Member list filters (E2.09, E2.14).
+// Member list statuses and filters (E2.09, E2.14, BR-24).
 const (
 	StatusActive   = "active"
-	StatusInactive = "inactive"
+	StatusExpiring = "expiring"
+	StatusInactive = "inactive" // shown as "Disabled"
 	StatusExpired  = "expired"
 )
 
-// MemberStatus is the status shown in the list: expired once now is strictly
-// after expires_at (O7), else active/inactive.
+// ExpiringSoon is how long before expires_at a member counts as "expiring soon" (BR-24).
+const ExpiringSoon = 3 * 24 * time.Hour
+
+// MemberStatus is the status shown in the list (BR-24). Precedence: expired,
+// inactive, expiring, active. Expired once now is strictly after expires_at
+// (O7). Expiring: active, expires_at set, not expired, at most ExpiringSoon left
+// (exactly 3 days left still counts). All times are compared in whole seconds,
+// like the SQL in store.statusClause, which must give the same answer.
 func MemberStatus(active bool, expiresAt *time.Time, now time.Time) string {
+	n := now.Unix()
 	switch {
-	case expiresAt != nil && now.After(*expiresAt):
+	case expiresAt != nil && n > expiresAt.Unix():
 		return StatusExpired
-	case active:
-		return StatusActive
+	case !active:
+		return StatusInactive
+	case expiresAt != nil && expiresAt.Unix() <= n+int64(ExpiringSoon/time.Second):
+		return StatusExpiring
 	}
-	return StatusInactive
+	return StatusActive
 }
+
+// StatusCounts is how many members have each status (the chips of the member list).
+type StatusCounts struct{ All, Active, Expiring, Expired, Inactive int }
 
 // MemberFilter narrows the member list (and bulk selections). Zero value = everything.
 type MemberFilter struct {
 	Query  string
 	PlanID int64  // 0 = any plan
-	Status string // "" = any, else StatusActive | StatusInactive | StatusExpired
+	Status string // "" = any, else StatusActive | StatusExpiring | StatusInactive | StatusExpired
 }
 
 // MemberSelection is the set a bulk action applies to: explicit ids, or every

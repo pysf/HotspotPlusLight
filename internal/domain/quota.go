@@ -166,7 +166,7 @@ func RenewedState(m MemberState, now time.Time) MemberState {
 type Summary struct {
 	Quota    Quota
 	Decision Decision
-	Status   string // active | inactive | expired
+	Status   string // active | expiring | inactive | expired (MemberStatus)
 }
 
 // Summarize builds the summary from the same functions the login uses.

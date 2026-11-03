@@ -98,6 +98,15 @@ func (s *Store) UpdateMember(ctx context.Context, id int64, in domain.MemberInpu
 	return affected(res)
 }
 
+// SetMemberActive changes only the active flag (and updated_at).
+func (s *Store) SetMemberActive(ctx context.Context, id int64, active bool, now time.Time) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE member SET active=?, updated_at=? WHERE id=?`, boolInt(active), now.Unix(), id)
+	if err != nil {
+		return err
+	}
+	return affected(res)
+}
+
 func affected(res sql.Result) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return domain.ErrNotFound
@@ -145,6 +154,25 @@ func likePattern(q string) string {
 	return "%" + r.Replace(q) + "%"
 }
 
+// statusClause is the SQL form of domain.MemberStatus (BR-24): the four statuses
+// exclude each other and cover every member. Times are whole seconds, as in the Go rule.
+// An unknown status matches nothing.
+func statusClause(status string, now time.Time) (string, []any) {
+	n := now.Unix()
+	soon := n + int64(domain.ExpiringSoon/time.Second)
+	switch status {
+	case domain.StatusExpired:
+		return `(m.expires_at IS NOT NULL AND m.expires_at < ?)`, []any{n}
+	case domain.StatusInactive:
+		return `(m.active = 0 AND (m.expires_at IS NULL OR m.expires_at >= ?))`, []any{n}
+	case domain.StatusExpiring:
+		return `(m.active = 1 AND m.expires_at IS NOT NULL AND m.expires_at >= ? AND m.expires_at <= ?)`, []any{n, soon}
+	case domain.StatusActive:
+		return `(m.active = 1 AND (m.expires_at IS NULL OR m.expires_at > ?))`, []any{soon}
+	}
+	return `0`, nil
+}
+
 // filterClause builds the WHERE fragment (alias m) for a filter. Only fixed SQL
 // text is concatenated; every value is a bound parameter.
 func filterClause(f domain.MemberFilter, now time.Time) (string, []any) {
@@ -160,17 +188,10 @@ func filterClause(f domain.MemberFilter, now time.Time) (string, []any) {
 		parts = append(parts, `m.plan_id = ?`)
 		args = append(args, f.PlanID)
 	}
-	const expired = `(m.expires_at IS NOT NULL AND m.expires_at < ?)`
-	switch f.Status {
-	case domain.StatusExpired:
-		parts = append(parts, expired)
-		args = append(args, now.Unix())
-	case domain.StatusActive:
-		parts = append(parts, `m.active = 1 AND NOT `+expired)
-		args = append(args, now.Unix())
-	case domain.StatusInactive:
-		parts = append(parts, `m.active = 0 AND NOT `+expired)
-		args = append(args, now.Unix())
+	if f.Status != "" {
+		c, a := statusClause(f.Status, now)
+		parts = append(parts, c)
+		args = append(args, a...)
 	}
 	if len(parts) == 0 {
 		return `1`, nil
@@ -208,6 +229,24 @@ func (s *Store) CountFiltered(ctx context.Context, f domain.MemberFilter, now ti
 	var n int
 	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM member m WHERE `+where, args...).Scan(&n)
 	return n, err
+}
+
+// CountStatuses counts the members matching the query and plan of a filter (its
+// Status is ignored), in total and per status, in one query (the list chips).
+func (s *Store) CountStatuses(ctx context.Context, f domain.MemberFilter, now time.Time) (domain.StatusCounts, error) {
+	f.Status = ""
+	where, wargs := filterClause(f, now)
+	var cols []string
+	var args []any
+	for _, st := range []string{domain.StatusActive, domain.StatusExpiring, domain.StatusExpired, domain.StatusInactive} {
+		c, a := statusClause(st, now)
+		cols = append(cols, `coalesce(sum(CASE WHEN `+c+` THEN 1 ELSE 0 END), 0)`)
+		args = append(args, a...)
+	}
+	var c domain.StatusCounts
+	err := s.db.QueryRowContext(ctx, `SELECT count(*), `+strings.Join(cols, `, `)+` FROM member m WHERE `+where,
+		append(args, wargs...)...).Scan(&c.All, &c.Active, &c.Expiring, &c.Expired, &c.Inactive)
+	return c, err
 }
 
 // ListMembers returns one page of members (newest first) with their plan and online flag.

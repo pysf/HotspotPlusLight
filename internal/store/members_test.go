@@ -73,8 +73,12 @@ func TestFilterSelectionAndDelete(t *testing.T) {
 	if n := count(domain.MemberFilter{Status: domain.StatusExpired}); n != 2 {
 		t.Fatalf("expired: %d", n)
 	}
-	if n := count(domain.MemberFilter{Status: domain.StatusActive}); n != 2 { // edge + plain
+	// BR-24: "edge" expires exactly now, so it is expiring (not active).
+	if n := count(domain.MemberFilter{Status: domain.StatusActive}); n != 1 { // plain
 		t.Fatalf("active: %d", n)
+	}
+	if n := count(domain.MemberFilter{Status: domain.StatusExpiring}); n != 1 { // edge
+		t.Fatalf("expiring: %d", n)
 	}
 	if n := count(domain.MemberFilter{Status: domain.StatusExpired, PlanID: p2}); n != 1 {
 		t.Fatalf("expired+plan: %d", n)
@@ -120,5 +124,70 @@ func TestListMembersPagingAndJoin(t *testing.T) {
 	}
 	if rows, _ = s.ListMembers(ctx, domain.MemberFilter{}, 2, 2, fixed(), fixed()); len(rows) != 1 || rows[0].Member.Username != "a" {
 		t.Fatalf("page 2: %+v", rows)
+	}
+}
+
+// The SQL status filter and the Go rule give the same answer at every boundary (BR-24).
+func TestStatusClauseMatchesGoRule(t *testing.T) {
+	s := seeded(t)
+	ctx := context.Background()
+	now := fixed()
+	p, _ := s.CreatePlan(ctx, samplePlan("P"), now)
+	soon := domain.ExpiringSoon
+	offsets := []time.Duration{-time.Second, 0, time.Second, soon - time.Second, soon, soon + time.Second, 30 * 24 * time.Hour}
+	type want struct{ name, status string }
+	var all []want
+	for i, active := range []bool{true, false} {
+		for j, off := range append([]time.Duration{-1}, offsets...) {
+			name := "m" + string(rune('a'+i)) + string(rune('a'+j))
+			var exp *time.Time
+			if off != -1 {
+				e := now.Add(off)
+				exp = &e
+			}
+			id, err := s.CreateMember(ctx, domain.MemberInput{Username: name, Active: active, PlanID: p, ExpiresAt: exp}, []byte("x"), now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = id
+			all = append(all, want{name, domain.MemberStatus(active, exp, now)})
+		}
+	}
+	counts := map[string]int{}
+	for _, st := range []string{domain.StatusActive, domain.StatusExpiring, domain.StatusExpired, domain.StatusInactive} {
+		rows, err := s.ListMembers(ctx, domain.MemberFilter{Status: st}, 100, 0, now, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range rows {
+			counts[st]++
+			for _, w := range all {
+				if w.name == r.Member.Username && w.status != st {
+					t.Errorf("%s listed under %s, Go rule says %s", w.name, st, w.status)
+				}
+			}
+		}
+	}
+	exp := map[string]int{}
+	for _, w := range all {
+		exp[w.status]++
+	}
+	for st, n := range exp {
+		if counts[st] != n {
+			t.Errorf("%s: SQL %d, Go %d", st, counts[st], n)
+		}
+	}
+	c, err := s.CountStatuses(ctx, domain.MemberFilter{Status: domain.StatusExpired}, now) // Status is ignored
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.All != len(all) || c.Active != exp["active"] || c.Expiring != exp["expiring"] || c.Expired != exp["expired"] || c.Inactive != exp["inactive"] {
+		t.Errorf("counts %+v, want %v of %d", c, exp, len(all))
+	}
+	if c.Active+c.Expiring+c.Expired+c.Inactive != c.All {
+		t.Errorf("statuses do not add up: %+v", c)
+	}
+	if n, _ := s.CountStatuses(ctx, domain.MemberFilter{Query: "zzz"}, now); n.All != 0 {
+		t.Errorf("query not applied to the counts: %+v", n)
 	}
 }

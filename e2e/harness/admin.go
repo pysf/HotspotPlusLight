@@ -52,6 +52,13 @@ func NewAdminClient(t *testing.T, s *Server) *AdminClient {
 // Do sends a request. csrf is the X-CSRF-Token value ("" = header omitted).
 func (c *AdminClient) Do(method, path string, form url.Values, csrf string) Resp {
 	c.t.Helper()
+	return c.DoHX(method, path, form, csrf, "")
+}
+
+// DoHX is Do plus the HX-Target header htmx sends ("" = omitted): the list region
+// or the sheet body asks for a fragment instead of the full page.
+func (c *AdminClient) DoHX(method, path string, form url.Values, csrf, target string) Resp {
+	c.t.Helper()
 	var body io.Reader
 	if form != nil {
 		body = strings.NewReader(form.Encode())
@@ -67,6 +74,9 @@ func (c *AdminClient) Do(method, path string, form url.Values, csrf string) Resp
 		req.Header.Set("X-CSRF-Token", csrf)
 	}
 	req.Header.Set("HX-Request", "true")
+	if target != "" {
+		req.Header.Set("HX-Target", target)
+	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		c.t.Fatal(err)
@@ -78,6 +88,18 @@ func (c *AdminClient) Do(method, path string, form url.Values, csrf string) Resp
 
 // Get is a plain GET.
 func (c *AdminClient) Get(path string) Resp { c.t.Helper(); return c.Do("GET", path, nil, "") }
+
+// GetHX is a GET sent with the given HX-Target.
+func (c *AdminClient) GetHX(path, target string) Resp {
+	c.t.Helper()
+	return c.DoHX("GET", path, nil, "", target)
+}
+
+// SendHX is Send with the given HX-Target.
+func (c *AdminClient) SendHX(method, path string, form url.Values, target string) Resp {
+	c.t.Helper()
+	return c.DoHX(method, path, form, c.CSRF, target)
+}
 
 // Send performs a non-GET request with the client's current CSRF token.
 func (c *AdminClient) Send(method, path string, form url.Values) Resp {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"time"
 )
 
 // FormatNumber prints v with at most 2 decimals and no trailing zeros.
@@ -80,4 +81,28 @@ func FormatDuration(seconds int64) string {
 		return fmt.Sprintf("%d min %02d s", m, s)
 	}
 	return fmt.Sprintf("%d s", s)
+}
+
+// FormatRelative says how far t is from now: "in 5 min", "47 h ago", "in 3 days" (member list).
+func FormatRelative(now, t time.Time) string {
+	d := t.Sub(now)
+	past := d < 0
+	if past {
+		d = -d
+	}
+	var s string
+	switch {
+	case d < time.Minute:
+		s = "under 1 min"
+	case d < time.Hour:
+		s = strconv.Itoa(int(d/time.Minute)) + " min"
+	case d < 48*time.Hour:
+		s = strconv.Itoa(int(d/time.Hour)) + " h"
+	default:
+		s = strconv.Itoa(int(d/(24*time.Hour))) + " days"
+	}
+	if past {
+		return s + " ago"
+	}
+	return "in " + s
 }

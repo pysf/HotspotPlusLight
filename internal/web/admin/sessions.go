@@ -121,11 +121,17 @@ func (h handlers) memberKick(w http.ResponseWriter, r *http.Request) {
 		h.notFound(w, r, "Member")
 	case err != nil:
 		h.serverError(w, r, err)
+	case res.Failed > 0 && fromApp(r):
+		h.appFail(w, http.StatusBadGateway, membersChanged, fmt.Sprintf("%d of %d open sessions could not be disconnected.", res.Failed, res.Attempted))
 	case res.Failed > 0:
 		// Some sessions did end: refresh the member's status line next to the error (out-of-band).
 		h.render(w, r, http.StatusBadGateway, h.withStatus(r, id, ui.ErrorFragment(fmt.Sprintf("%d of %d open sessions could not be disconnected.", res.Failed, res.Attempted))))
+	case res.Attempted == 0 && fromApp(r):
+		h.appDone(w, r, http.StatusOK, membersChanged, "This member has no open sessions.")
 	case res.Attempted == 0:
 		h.render(w, r, http.StatusOK, h.withStatus(r, id, ui.Flash("ok", "This member has no open sessions.")))
+	case fromApp(r):
+		h.appDone(w, r, http.StatusOK, membersChanged, "Member disconnected.")
 	default:
 		htmxRedirect(w, r, http.StatusOK, memberURL(id))
 	}

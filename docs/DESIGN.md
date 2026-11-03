@@ -88,7 +88,7 @@ Each component is one Go template partial (`components/<name>`) plus one CSS fil
 | `c-input` | height `--h-input`, padding 0 12px, radius `--r-ctl`, 1px strong border (Air: shadow-ring instead), panel bg. Focus: accent border + 3px accent ring at 22% (Air: 2px accent ring). |
 | `c-select` | native `<select>`, same box as input, custom chevron, 32px right padding. Use `<datalist>`/small module only if search-in-select is truly needed. |
 | `c-search` | input with leading search icon (36px left padding) and a `/` keyboard hint; max-width 420px. `/` focuses it. |
-| `c-chip` | filter pill, height 28–30px, 13px, muted; count at 60% opacity. `aria-pressed` for selected: inverted (Light/Dark) or accent fill (Air). Chips are links/buttons that trigger the list request. |
+| `c-chip` | filter pill, height 28–30px, 13px, muted; count at 60% opacity. `aria-current="true"` for selected: inverted (Light/Dark) or accent fill (Air). Chips are links/buttons that trigger the list request. |
 | `c-card` | panel bg, `--r-card`, 1px line border (Air: none + `--shadow-card`), overflow hidden. |
 | `c-table` | header 12px muted; cell padding `--cell-y` `--cell-x`; row hairline dividers; row hover elev; whole row opens edit. Columns (Users): User (name + mobile below), Plan (+ speed), Usage, Expires (+ relative), Devices, Status, actions. |
 | `c-meter` | usage bar: **native `<progress>`/`<meter>`** styled with CSS (no inline `style` attributes). 4–5px high, rounded; accent, warn ≥80%, bad at 100%. Text above: `used / total GB`. |

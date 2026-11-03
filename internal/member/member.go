@@ -22,11 +22,14 @@ type Repo interface {
 	GetMember(ctx context.Context, id int64) (domain.Member, error)
 	GetMemberRow(ctx context.Context, id int64, onlineSince time.Time) (domain.MemberRow, error)
 	UpdateMember(ctx context.Context, id int64, in domain.MemberInput, now time.Time) error
+	SetMemberActive(ctx context.Context, id int64, active bool, now time.Time) error
 	GetMemberPassword(ctx context.Context, id int64) ([]byte, error)
 	SetMemberPassword(ctx context.Context, id int64, passwordEnc []byte, now time.Time) error
 	RenewMember(ctx context.Context, id int64, kind string, now time.Time) error
 	SetExtraBulk(ctx context.Context, id int64, bytes int64, now time.Time) error
 	CountFiltered(ctx context.Context, f domain.MemberFilter, now time.Time) (int, error)
+	// CountStatuses counts per status under the query and plan of f (its Status is ignored).
+	CountStatuses(ctx context.Context, f domain.MemberFilter, now time.Time) (domain.StatusCounts, error)
 	ListMembers(ctx context.Context, f domain.MemberFilter, limit, offset int, now, onlineSince time.Time) ([]domain.MemberRow, error)
 	SelectionStats(ctx context.Context, sel domain.MemberSelection, now, onlineSince time.Time) (members, online int, err error)
 	OpenSessions(ctx context.Context, sel domain.MemberSelection, now time.Time) ([]domain.SessionTarget, error)
@@ -85,10 +88,11 @@ type View struct {
 	Row     domain.MemberRow
 	Summary domain.Summary
 	Loc     *time.Location
+	Now     time.Time
 }
 
 func newView(r domain.MemberRow, e env) View {
-	return View{Row: r, Summary: domain.Summarize(r.Member, r.Plan, e.now), Loc: e.loc}
+	return View{Row: r, Summary: domain.Summarize(r.Member, r.Plan, e.now), Loc: e.loc, Now: e.now}
 }
 
 // NewForm is the form for a new member: the default plan is preselected, never assigned (O10, Q19).
@@ -252,11 +256,34 @@ func (s *Service) Update(ctx context.Context, id int64, f domain.MemberForm) (do
 	if err != nil {
 		return nil, KickResult{}, err
 	}
-	var kick KickResult
-	if before.Active && !in.Active {
-		kick, _, err = s.kick(ctx, domain.MemberSelection{IDs: []int64{id}}, e.now)
-	}
+	kick, err := s.kickIfDeactivated(ctx, id, before.Active, in.Active, e.now)
 	return nil, kick, err
+}
+
+// kickIfDeactivated disconnects the open sessions when a member went from active to inactive (BR-18).
+func (s *Service) kickIfDeactivated(ctx context.Context, id int64, was, now bool, at time.Time) (KickResult, error) {
+	if !was || now {
+		return KickResult{}, nil
+	}
+	kick, _, err := s.kick(ctx, domain.MemberSelection{IDs: []int64{id}}, at)
+	return kick, err
+}
+
+// SetActive sets the active flag and nothing else. Deactivating an active member kicks the
+// open sessions like Update does; setting the state it already has changes nothing.
+func (s *Service) SetActive(ctx context.Context, id int64, active bool) (KickResult, error) {
+	before, err := s.repo.GetMember(ctx, id)
+	if err != nil {
+		return KickResult{}, err
+	}
+	if before.Active == active {
+		return KickResult{}, nil
+	}
+	now := s.clock.Now()
+	if err := s.repo.SetMemberActive(ctx, id, active, now); err != nil {
+		return KickResult{}, err
+	}
+	return s.kickIfDeactivated(ctx, id, before.Active, active, now)
 }
 
 // Renew restarts the member's validity window by hand (BR-13b, kind "manual").
@@ -320,6 +347,7 @@ type ListQuery struct {
 type ListResult struct {
 	Rows                    []View
 	Total, Page, Pages, Per int
+	Counts                  domain.StatusCounts // under the query and plan of the filter, any status
 	Loc                     *time.Location
 }
 
@@ -339,7 +367,11 @@ func (s *Service) List(ctx context.Context, q ListQuery) (ListResult, error) {
 	if err != nil {
 		return ListResult{}, err
 	}
-	res := ListResult{Total: total, Page: page, Pages: pages, Per: per, Loc: e.loc}
+	counts, err := s.repo.CountStatuses(ctx, q.Filter, e.now)
+	if err != nil {
+		return ListResult{}, err
+	}
+	res := ListResult{Total: total, Page: page, Pages: pages, Per: per, Counts: counts, Loc: e.loc}
 	for _, r := range rows {
 		res.Rows = append(res.Rows, newView(r, e))
 	}

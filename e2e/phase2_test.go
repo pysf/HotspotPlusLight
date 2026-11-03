@@ -534,7 +534,9 @@ func TestE2_12_StatusDisplay(t *testing.T) {
 	got := map[string]string{}
 	d.Find("tr[data-member]").Each(func(_ int, s *goquery.Selection) {
 		got[s.AttrOr("data-username", "")] = s.AttrOr("data-status", "")
-		if text(s.Find(`[data-col="status"]`)) != s.AttrOr("data-status", "?") {
+		// The cell shows the status as a word: "inactive" is worded "Disabled" (Phase 10 step B).
+		word := map[string]string{"active": "active", "expiring": "expiring", "expired": "expired", "inactive": "disabled"}[s.AttrOr("data-status", "?")]
+		if strings.ToLower(text(s.Find(`[data-col="status"]`))) != word {
 			t.Errorf("status cell %q != row status %q", text(s.Find(`[data-col="status"]`)), s.AttrOr("data-status", ""))
 		}
 	})

@@ -58,14 +58,47 @@ func TestParseMember(t *testing.T) {
 
 func TestMemberStatusBoundary(t *testing.T) {
 	now := time.Unix(1000, 0)
+	soon := int64(ExpiringSoon / time.Second)
 	at := func(s int64) *time.Time { v := time.Unix(s, 0); return &v }
 	for _, tc := range []struct {
+		name   string
 		active bool
 		exp    *time.Time
 		want   string
-	}{{true, nil, "active"}, {false, nil, "inactive"}, {true, at(999), "expired"}, {true, at(1000), "active"}, {false, at(999), "expired"}} {
+	}{
+		{"no expiry", true, nil, "active"},
+		{"disabled", false, nil, "inactive"},
+		{"one second past", true, at(999), "expired"},
+		{"exactly now", true, at(1000), "expiring"},
+		{"disabled and past", false, at(999), "expired"},
+		{"disabled and soon", false, at(1000 + 60), "inactive"},
+		{"exactly 3 days left", true, at(1000 + soon), "expiring"},
+		{"3 days and 1 s left", true, at(1000 + soon + 1), "active"},
+		{"far away", true, at(1000 + 30*soon), "active"},
+	} {
 		if got := MemberStatus(tc.active, tc.exp, now); got != tc.want {
-			t.Errorf("%v %v: %s, want %s", tc.active, tc.exp, got, tc.want)
+			t.Errorf("%s: %s, want %s", tc.name, got, tc.want)
+		}
+	}
+	// Sub-second clock: compared in whole seconds, like the SQL filter.
+	if got := MemberStatus(true, at(1000), time.Unix(1000, 900_000_000)); got != StatusExpiring {
+		t.Errorf("same second: %s", got)
+	}
+}
+
+func TestFormatRelative(t *testing.T) {
+	now := time.Unix(1_000_000, 0)
+	for _, tc := range []struct {
+		d    time.Duration
+		want string
+	}{
+		{30 * time.Second, "in under 1 min"}, {-30 * time.Second, "under 1 min ago"},
+		{5 * time.Minute, "in 5 min"}, {-5 * time.Minute, "5 min ago"},
+		{3 * time.Hour, "in 3 h"}, {-47 * time.Hour, "47 h ago"},
+		{48 * time.Hour, "in 2 days"}, {-72 * time.Hour, "3 days ago"}, {100 * 24 * time.Hour, "in 100 days"},
+	} {
+		if got := FormatRelative(now, now.Add(tc.d)); got != tc.want {
+			t.Errorf("%v: %q, want %q", tc.d, got, tc.want)
 		}
 	}
 }
