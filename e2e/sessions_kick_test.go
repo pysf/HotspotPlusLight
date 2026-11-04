@@ -15,62 +15,7 @@ import (
 
 	"hotspotpluslight/e2e/fakenas"
 	"hotspotpluslight/e2e/harness"
-	"hotspotpluslight/internal/clock"
 )
-
-// p5 is the Phase 5 fixture: the Phase 4 fixture, but with the REAL Disconnect
-// client, talking to a fake router listener (coa) whose port is in settings.
-type p5 struct {
-	*p4
-	coa *fakenas.CoA
-}
-
-func newP5(t *testing.T) *p5 {
-	t.Helper()
-	fc := clock.NewFake(t0)
-	hook := &beforeCommit{}
-	s := harness.Start(t, harness.Options{Clock: fc, AccountingBeforeCommit: hook.run})
-	f := &p2{t: t, s: s, fc: fc, c: harness.LoginAsAdmin(t, s), db: harness.DB(t, s.DataDir)}
-	secret := scalar[string](t, f.db, `SELECT radius_shared_secret FROM settings`)
-	nas := fakenas.New(s.Addrs.RadiusAuth, secret)
-	nas.AcctAddr = s.Addrs.RadiusAcct
-	coa := fakenas.ListenCoA(t, secret)
-	f.exec(`UPDATE settings SET coa_port=?`, coa.Port())
-	return &p5{p4: &p4{p3: &p3{p2: f, nas: nas, log: &harness.SafeBuffer{}}, hook: hook}, coa: coa}
-}
-
-// online starts a session the way the router does: an Accounting Start with the identifiers a kick needs.
-func (f *p5) online(user, sid, ip, mac string) {
-	f.t.Helper()
-	f.acct(fakenas.Acct{Type: rfc2866.AcctStatusType_Value_Start, User: user, SessionID: sid, FramedIP: ip, MAC: mac})
-}
-
-// sessionDBID is the id of the session row of an Acct-Session-Id.
-func (f *p5) sessionDBID(sid string) int64 {
-	return scalar[int64](f.t, f.db, `SELECT id FROM session WHERE acct_session_id=? ORDER BY id DESC LIMIT 1`, sid)
-}
-
-func spath(id int64) string {
-	return "/admin/sessions/" + strconv.FormatInt(id, 10) + "/disconnections"
-}
-
-// onlineUsers lists the usernames shown on the online page, in order.
-func onlineUsers(f *p2) []string {
-	f.t.Helper()
-	r := f.c.Get("/admin/sessions")
-	if r.StatusCode != 200 {
-		f.t.Fatalf("online page: %d", r.StatusCode)
-	}
-	return sessionUsers(r.Doc(f.t))
-}
-
-func sessionUsers(d *goquery.Document) []string {
-	var out []string
-	d.Find("tr[data-session]").Each(func(_ int, s *goquery.Selection) {
-		out = append(out, s.AttrOr("data-username", ""))
-	})
-	return out
-}
 
 func sameSet(a, b []string) bool {
 	if len(a) != len(b) {

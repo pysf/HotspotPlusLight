@@ -162,3 +162,5 @@ Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **
 - **Phase 13b (public site) is built (2026-11-04), not committed.** `site/` (home + 11 docs pages), `.github/workflows/pages.yml`, tests E13.03-E13.17. Notes: `docs/phase13-notes.md`.
 
 - **Business name (2026-11-04, owner)** replaces "Site title": empty by default, shown on vouchers, in the admin header and in the tab title when set. Migration 0005, tests E14.01-E14.03. Notes: `docs/phase14-notes.md`.
+
+- **Phase 15 (tests grouped by feature, 2026-11-04):** the e2e tests in `e2e/` live in feature files (`ops_startup`, `admin_auth`, `admin_password`, `plans`, `members`, `radius_auth`, `radius_accounting`, `enforcement`, `sessions_kick`, `batches_vouchers`, `router_pages`, `usage`, `site`, ...), shared helpers in `e2e/helpers_test.go`, not by phase. Test names and ids stay `E<phase>.<nn>`. Old `phaseN_test.go` names in `docs/phaseN-notes.md` are history.

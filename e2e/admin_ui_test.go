@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -29,28 +30,6 @@ func adminPages(t *testing.T, c *harness.AdminClient) []string {
 		"/admin/batches", "/admin/batches/new", r.Header.Get("Location"),
 		"/admin/sessions", "/admin/usage", "/admin/router", "/admin/settings",
 	}
-}
-
-// pageIsClean reports inline style, inline handlers, hx-on and inline scripts/styles in a page.
-func pageIsClean(d *goquery.Document) []string {
-	var bad []string
-	d.Find("*").Each(func(_ int, s *goquery.Selection) {
-		for _, a := range s.Get(0).Attr {
-			k := strings.ToLower(a.Key)
-			if k == "style" || strings.HasPrefix(k, "on") || strings.HasPrefix(k, "hx-on") {
-				bad = append(bad, goquery.NodeName(s)+"["+k+"]")
-			}
-		}
-	})
-	d.Find("script").Each(func(_ int, s *goquery.Selection) {
-		if _, has := s.Attr("src"); !has {
-			bad = append(bad, "inline <script>")
-		}
-	})
-	if n := d.Find("style").Length(); n > 0 {
-		bad = append(bad, "inline <style>")
-	}
-	return bad
 }
 
 // E10.01 no inline style, onclick, hx-on or inline script on any admin page (a strict CSP would pass).
@@ -206,4 +185,158 @@ func TestE10_05_ShellKeepsMenu(t *testing.T) {
 	if d.Find("dialog#confirm-modal").Length() != 1 || d.Find("#toast[role=status]").Length() != 1 {
 		t.Error("shared confirm modal or toast area missing")
 	}
+}
+
+// E10.21 errors keep going to #flash; the rest of the UI hooks: toasts, busy state, no inline code.
+func TestE10_21_ToastsAndHooks(t *testing.T) {
+	f := newP2(t)
+	p := f.plan("Basic")
+	f.member(p, "alice")
+	for _, path := range []string{"/admin/members", "/admin/plans"} {
+		d := f.c.Get(path).Doc(t)
+		if d.Find("#toast[role=status]").Length() != 1 || d.Find("#flash").Length() != 1 {
+			t.Errorf("%s: toast or flash area missing", path)
+		}
+		if bad := pageIsClean(d); len(bad) > 0 {
+			t.Errorf("%s: %v", path, bad)
+		}
+	}
+	// Fragments are clean too (a strict CSP would pass).
+	for _, c := range []struct{ path, target string }{
+		{"/admin/members", listTarget}, {"/admin/members/new", sheetTarget}, {mpath(f.idOf("alice")), sheetTarget},
+		{"/admin/plans", planTarget}, {"/admin/plans/new", sheetTarget},
+	} {
+		r := f.c.GetHX(c.path, c.target)
+		if bad := pageIsClean(fragmentDoc(t, r)); len(bad) > 0 {
+			t.Errorf("fragment %s: %v", c.path, bad)
+		}
+	}
+	// JS: dialog.js opens the sheet; the sheet title is set from the fragment.
+	js := f.c.Get(f.c.Get("/admin/members").Doc(t).Find(`script[src*="js/dialog.js"]`).AttrOr("src", "")).Body
+	if !strings.Contains(js, "sheet-body") {
+		t.Error("dialog.js does not handle the sheet body")
+	}
+}
+
+// E1.19 resource-style routes (Q39): verbs, statuses, htmx config, removed verb routes.
+func TestE1_19_ResourceStyleRoutes(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	db := harness.DB(t, s.DataDir)
+
+	// POST create: 201 + Location + HX-Redirect.
+	r := c.Send("POST", "/admin/plans", harness.PlanForm("Res"))
+	if r.StatusCode != 201 || r.Header.Get("HX-Redirect") != "/admin/plans" || !strings.HasPrefix(r.Header.Get("Location"), "/admin/plans/") {
+		t.Fatalf("create: %d %v", r.StatusCode, r.Header)
+	}
+	id := strings.TrimPrefix(r.Header.Get("Location"), "/admin/plans/")
+	path := "/admin/plans/" + id
+
+	// PUT / DELETE: CSRF required.
+	if r := c.Do("PUT", path, harness.PlanForm("Res", "duration_days", "5"), ""); r.StatusCode != 403 {
+		t.Errorf("PUT without token: %d", r.StatusCode)
+	}
+	if r := c.Do("DELETE", path, nil, ""); r.StatusCode != 403 {
+		t.Errorf("DELETE without token: %d", r.StatusCode)
+	}
+	if r := c.Send("PUT", path, harness.PlanForm("Res", "duration_days", "5")); r.StatusCode != 200 || r.Header.Get("HX-Redirect") != "/admin/plans" {
+		t.Errorf("PUT: %d", r.StatusCode)
+	}
+	if scalar[int](t, db, `SELECT duration_days FROM plan`) != 5 {
+		t.Error("PUT did not update")
+	}
+
+	// 405 for wrong verbs.
+	for _, tc := range [][2]string{{"POST", path}, {"PATCH", path}, {"PUT", "/admin/plans"}, {"DELETE", "/admin/plans"}, {"POST", "/admin/plans/new"}, {"PUT", "/admin/settings/x"}} {
+		want := 405
+		if tc[1] == "/admin/settings/x" {
+			want = 404
+		}
+		if r := c.Send(tc[0], tc[1], url.Values{}); r.StatusCode != want {
+			t.Errorf("%s %s: %d (want %d)", tc[0], tc[1], r.StatusCode, want)
+		}
+	}
+	if r := c.Send("POST", "/admin/settings", url.Values{}); r.StatusCode != 405 {
+		t.Errorf("POST /admin/settings: %d", r.StatusCode)
+	}
+	if r := c.Send("DELETE", "/admin/settings", nil); r.StatusCode != 405 {
+		t.Errorf("DELETE /admin/settings: %d", r.StatusCode)
+	}
+
+	// 404 for unknown ids (also non-numeric) on every verb.
+	for _, id := range []string{"9999", "abc", "0"} {
+		p := "/admin/plans/" + id
+		if r := c.Get(p); r.StatusCode != 404 {
+			t.Errorf("GET %s: %d", p, r.StatusCode)
+		}
+		if r := c.Send("PUT", p, harness.PlanForm("Z")); r.StatusCode != 404 {
+			t.Errorf("PUT %s: %d", p, r.StatusCode)
+		}
+		if r := c.Send("DELETE", p, nil); r.StatusCode != 404 {
+			t.Errorf("DELETE %s: %d", p, r.StatusCode)
+		}
+	}
+
+	// 422 re-renders the form fragment (no layout) with field messages and an htmx-ready form.
+	r = c.Send("PUT", path, harness.PlanForm("Res", "duration_days", "0", "max_sessions", "0"))
+	d := r.Doc(t)
+	if r.StatusCode != 422 || d.Find("html").Length() > 0 && d.Find("nav").Length() > 0 {
+		t.Errorf("422: %d (must be a fragment)", r.StatusCode)
+	}
+	if fieldError(r, t, "duration_days") == "" || fieldError(r, t, "max_sessions") == "" {
+		t.Error("422 lacks field messages")
+	}
+	if v, _ := d.Find("form").Attr("hx-put"); v != path {
+		t.Errorf("re-rendered form hx-put %q", v)
+	}
+
+	// Edit page is an htmx form and the layout configures htmx for 422/409.
+	page := c.Get(path).Doc(t)
+	if v, _ := page.Find("form#plan-form").Attr("hx-put"); v != path {
+		t.Errorf("edit form hx-put %q", v)
+	}
+	cfg, _ := page.Find(`meta[name="htmx-config"]`).Attr("content")
+	if !strings.Contains(cfg, "422") || !strings.Contains(cfg, "409") {
+		t.Errorf("htmx-config %q", cfg)
+	}
+	src, _ := page.Find(`script[src]`).First().Attr("src")
+	resp, err := http.Get(c.Base + src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	js, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || !strings.Contains(string(js), "htmx") {
+		t.Errorf("htmx asset %s: %d", src, resp.StatusCode)
+	}
+
+	// The old verb-style routes do not exist.
+	for _, tc := range [][2]string{{"POST", "/admin/members/delete"}, {"POST", "/admin/members/1/kick"}, {"POST", "/admin/members/1/renew"}, {"GET", "/admin/members/print"}, {"GET", "/admin/print"}, {"POST", "/admin/plans/delete"}} {
+		if r := c.Do(tc[0], tc[1], url.Values{}, c.CSRF); r.StatusCode != 404 && !(tc[1] == "/admin/plans/delete" && r.StatusCode == 405) {
+			t.Errorf("%s %s: %d (want 404)", tc[0], tc[1], r.StatusCode)
+		}
+	}
+}
+
+// Sidebar: every group has a heading and every link an icon.
+func TestE1_20_SidebarGroupsAndIcons(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	d := c.Get("/admin/members").Doc(t)
+	if d.Find("#sidebar .l-nav__heading").Length() != 2 {
+		t.Errorf("want 2 nav groups")
+	}
+	d.Find("#sidebar .l-nav__heading").Each(func(_ int, h *goquery.Selection) {
+		if strings.TrimSpace(h.Text()) == "" {
+			t.Errorf("empty nav group heading")
+		}
+	})
+	if d.Find("#sidebar a.l-nav__link").Length() != 7 {
+		t.Errorf("want 7 nav links")
+	}
+	d.Find("#sidebar a.l-nav__link").Each(func(_ int, a *goquery.Selection) {
+		if a.Find("svg > path, svg > rect, svg > circle").Length() == 0 {
+			t.Errorf("nav link %q has no icon", strings.TrimSpace(a.Text()))
+		}
+	})
 }

@@ -2,6 +2,8 @@ package e2e
 
 import (
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -11,8 +13,6 @@ import (
 
 	"hotspotpluslight/e2e/harness"
 )
-
-// Phase 11b: first start is admin/admin, the admin must set a new password (O15, BR-20).
 
 const goodNew = "correct horse battery"
 
@@ -255,4 +255,122 @@ func TestE11_25_CLIClearsFlag(t *testing.T) {
 	if r := c.PostLogin("admin", goodNew); r.StatusCode != 303 || r.Header.Get("Location") != "/admin/members" {
 		t.Fatalf("login after the CLI change: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
+}
+
+var pwName = regexp.MustCompile(`^(current_|new_|old_|confirm_)?password(_confirm)?$`)
+
+// E1.05 (inverted in Phase 11b) the password page exists, is the only password UI, and stays out of the other pages.
+func TestE1_05_PasswordPageOnly(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	for _, p := range []string{"/admin/account/password", "/admin/account"} {
+		for _, m := range []string{"GET", "POST", "PUT"} {
+			if r := c.Do(m, p, url.Values{"x": {"y"}}, c.CSRF); r.StatusCode != 404 {
+				t.Errorf("%s %s: %d (want 404)", m, p, r.StatusCode)
+			}
+		}
+	}
+	d := c.Get("/admin/password").Doc(t)
+	for _, n := range []string{"current_password", "new_password", "confirm_password"} {
+		if d.Find(`input[type=password][name=`+n+`]`).Length() != 1 {
+			t.Errorf("password page lacks the %s input", n)
+		}
+	}
+	for _, p := range []string{"/admin/members", "/admin/plans", "/admin/plans/new", "/admin/settings"} {
+		d := c.Get(p).Doc(t)
+		d.Find("input").Each(func(_ int, in *goquery.Selection) {
+			n, _ := in.Attr("name")
+			typ, _ := in.Attr("type")
+			if pwName.MatchString(n) || (typ == "password" && n != "radius_shared_secret") {
+				t.Errorf("%s has a password input %q", p, n)
+			}
+		})
+	}
+}
+
+// E1.06 `admin set-password` (stdin): new password works, old does not, all sessions end, secrets not echoed.
+func TestE1_06_SetPasswordCLI(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	old := adminPassword(t, s)
+	c := harness.LoginAsAdmin(t, s)
+	db := harness.DB(t, s.DataDir)
+	hashBefore := scalar[string](t, db, `SELECT password_hash FROM admin`)
+
+	const np = "Brand-New-Passw0rd!x"
+	if scalar[int](t, db, `SELECT count(*) FROM admin_session`) == 0 {
+		t.Fatal("no session to end")
+	}
+	so, se, code := runCLI(t, s, np+"\n", "admin", "set-password", "--stdin")
+	if code != 0 {
+		t.Fatalf("exit %d: %s %s", code, so, se)
+	}
+	if strings.Contains(so+se, np) || strings.Contains(so+se, old) {
+		t.Fatal("password printed by the CLI")
+	}
+	hash := scalar[string](t, db, `SELECT password_hash FROM admin`)
+	if hash == hashBefore || bcrypt.CompareHashAndPassword([]byte(hash), []byte(np)) != nil || strings.Contains(hash, np) {
+		t.Fatal("hash not updated to bcrypt(new)")
+	}
+	if n := scalar[int](t, db, `SELECT count(*) FROM admin_session`); n != 0 {
+		t.Fatalf("sessions left: %d", n)
+	}
+	if r := c.Get("/admin/members"); r.StatusCode != 303 {
+		t.Fatalf("old session still valid: %d", r.StatusCode)
+	}
+	fresh := harness.NewAdminClient(t, s)
+	if r := fresh.PostLogin("admin", old); r.StatusCode != 401 {
+		t.Fatalf("old password: %d", r.StatusCode)
+	}
+	if r := fresh.PostLogin("admin", np); r.StatusCode != 303 {
+		t.Fatalf("new password: %d", r.StatusCode)
+	}
+}
+
+// E1.14 first start: admin/admin works, no password is printed, the second start prints no first-start block (O15, Phase 11b).
+func TestE1_14_DefaultPasswordOnce(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	if !strings.Contains(s.Stdout.String(), "password: admin") {
+		t.Fatalf("first-start block lacks the default password:\n%s", s.Stdout.String())
+	}
+	harness.NewAdminClient(t, s).Login("admin", "admin")
+	s.Stop()
+	s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey})
+	if strings.Contains(s2.Stdout.String(), "first start") {
+		t.Fatalf("second start printed the block again:\n%s", s2.Stdout.String())
+	}
+	harness.NewAdminClient(t, s2).Login("admin", "admin") // still forced to change it
+}
+
+// E1.15 BR-20 via `admin set-password`: 10+ characters, at most 72 bytes, not the username, not "admin", not common.
+func TestE1_15_PasswordStrength(t *testing.T) {
+	const username = "Str0ng-Passw0rd-OK!"
+	s := harness.Start(t, harness.Options{Env: map[string]string{"ADMIN_USERNAME": username}})
+	db := harness.DB(t, s.DataDir)
+	hash0 := scalar[string](t, db, `SELECT password_hash FROM admin`)
+	for _, bad := range []string{
+		"short9abc",               // < 10
+		strings.Repeat("a", 73),   // > 72 bytes
+		username,                  // equals username
+		strings.ToUpper(username), // equals, ignoring case
+		"Password123",             // common
+		"qwertyuiop",              // common
+		"",                        // empty
+	} {
+		_, se, code := runCLI(t, s, bad+"\n", "admin", "set-password", "--stdin")
+		if code == 0 {
+			t.Errorf("accepted %q", bad)
+		}
+		if bad != "" && strings.Contains(se, bad) {
+			t.Errorf("stderr echoes the rejected password")
+		}
+	}
+	if scalar[string](t, db, `SELECT password_hash FROM admin`) != hash0 {
+		t.Fatal("hash changed by a rejected password")
+	}
+	// No character-class rules: lower-case words are fine.
+	good := "correct horse battery"
+	if _, se, code := runCLI(t, s, good+"\n", "admin", "set-password", "--stdin"); code != 0 {
+		t.Fatalf("compliant rejected: %s", se)
+	}
+	harness.NewAdminClient(t, s).Login(username, good)
 }

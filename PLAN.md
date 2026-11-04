@@ -583,6 +583,8 @@ Passwords: AES-256-GCM with random nonce (legacy used the deprecated `crypto.cre
 
 **Principle:** tests drive the product only through its real interfaces: UDP RADIUS, HTTP, and the CLI. They are written before the feature code.
 
+**File layout (Phase 15, 2026-11-04):** the test files in `e2e/` are grouped by feature (`ops_startup_test.go`, `admin_auth_test.go`, `members_test.go`, `radius_auth_test.go`, `enforcement_test.go`, `site_test.go`, ...), not by phase. Shared helpers are in `e2e/helpers_test.go`. Test names and ids stay `E<phase>.<nn>`.
+
 **Harness (`e2e/harness`)**
 - Starts the whole app **in-process** on ephemeral ports with a temp data dir and a **controllable fake `Clock`** (still black-box over sockets).
 - `fakenas` — a fake MikroTik: RADIUS client (`Authenticate`, `AcctStart/Interim/Stop/On/Off` with octets/gigawords/session-time) and a UDP listener answering Disconnect-Request with ACK/NAK/timeout on demand, recording every packet.
@@ -737,4 +739,4 @@ Owner decisions are in the Phase 13 plan. This step is only the repo part; the s
 ## Phase 13b: the public site (built 2026-11-04)
 - `site/`: landing page and 11 docs pages (plain HTML, CSS, small ES modules; dark Terminal look; no build step, no third-party requests, no inline code). Deployed by `.github/workflows/pages.yml` (checkout@v5, configure-pages@v6, upload-pages-artifact@v5, deploy-pages@v5; Node 24).
 - Base URL `https://pysf.github.io/HotspotPlusLight/` is in the canonical/OG tags, `sitemap.xml`, `robots.txt` and `404.html`; the README says how to change it. All other links are relative.
-- Tests E13.03 to E13.17 (`e2e/phase13b_test.go`), including the moved README checks (hard exit item of 13a). Notes: `docs/phase13-notes.md`.
+- Tests E13.03 to E13.17 (`e2e/site_test.go`), including the moved README checks (hard exit item of 13a). Notes: `docs/phase13-notes.md`.

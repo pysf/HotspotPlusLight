@@ -18,25 +18,9 @@ import (
 	"hotspotpluslight/e2e/harness"
 )
 
-// p7 is the Phase 7 fixture: the Phase 5 fixture (real Disconnect client + fake
-// router listener) plus batch helpers.
-type p7 struct{ *p5 }
-
 func newP7(t *testing.T) *p7 { return &p7{newP5(t)} }
 
 func bpath(id int64) string { return "/admin/batches/" + strconv.FormatInt(id, 10) }
-
-func batchForm(planID int64, count int, kv ...string) url.Values {
-	v := url.Values{"plan_id": {strconv.FormatInt(planID, 10)}, "count": {strconv.Itoa(count)}}
-	for i := 0; i+1 < len(kv); i += 2 {
-		if kv[i+1] == "-" {
-			v.Del(kv[i])
-		} else {
-			v.Set(kv[i], kv[i+1])
-		}
-	}
-	return v
-}
 
 // batch creates a batch through the admin UI, expects 201 and returns its id.
 func (f *p7) batch(planID int64, count int, kv ...string) int64 {
@@ -56,34 +40,6 @@ func (f *p7) batch(planID int64, count int, kv ...string) int64 {
 	}
 	return id
 }
-
-func (f *p7) strs(q string, args ...any) []string {
-	f.t.Helper()
-	rows, err := f.db.Query(q, args...)
-	if err != nil {
-		f.t.Fatal(err)
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var s string
-		if err := rows.Scan(&s); err != nil {
-			f.t.Fatal(err)
-		}
-		out = append(out, s)
-	}
-	return out
-}
-
-func (f *p7) users(batchID int64) []string {
-	return f.strs(`SELECT username FROM member WHERE batch_id=? ORDER BY id`, batchID)
-}
-
-func (f *p7) memberID(username string) int64 {
-	return scalar[int64](f.t, f.db, `SELECT id FROM member WHERE username=?`, username)
-}
-
-func (f *p7) counter() int { return scalar[int](f.t, f.db, `SELECT batch_counter FROM settings`) }
 
 func (f *p7) rowCount(table string) int {
 	return scalar[int](f.t, f.db, `SELECT count(*) FROM `+table)
@@ -516,10 +472,6 @@ func batchRows(d *goquery.Document) map[string]*goquery.Selection {
 	out := map[string]*goquery.Selection{}
 	d.Find("tr[data-batch]").Each(func(_ int, s *goquery.Selection) { out[s.AttrOr("data-id", "")] = s })
 	return out
-}
-
-func cell(row *goquery.Selection, col string) string {
-	return text(row.Find("td[data-col=" + col + "]"))
 }
 
 // E7.10 batch list and labels (BR-15).

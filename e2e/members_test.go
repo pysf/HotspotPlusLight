@@ -17,75 +17,7 @@ import (
 
 	"hotspotpluslight/e2e/fakenas"
 	"hotspotpluslight/e2e/harness"
-	"hotspotpluslight/internal/clock"
 )
-
-// p2 is the Phase 2 fixture: app with a fake clock and a recording disconnector.
-type p2 struct {
-	t    *testing.T
-	s    *harness.Server
-	fc   *clock.Fake
-	c    *harness.AdminClient
-	db   *sql.DB
-	disc *harness.FakeDisconnector
-}
-
-func newP2(t *testing.T) *p2 {
-	t.Helper()
-	fc := clock.NewFake(t0)
-	disc := &harness.FakeDisconnector{}
-	s := harness.Start(t, harness.Options{Clock: fc, Disconnector: disc})
-	return &p2{t: t, s: s, fc: fc, c: harness.LoginAsAdmin(t, s), db: harness.DB(t, s.DataDir), disc: disc}
-}
-
-func (f *p2) plan(name string, kv ...string) int64 {
-	return f.c.CreatePlan(harness.PlanForm(name, kv...))
-}
-
-func (f *p2) member(planID int64, username string, kv ...string) int64 {
-	return f.c.CreateMember(harness.MemberForm(planID, username, kv...))
-}
-
-func (f *p2) exec(q string, args ...any) {
-	f.t.Helper()
-	if _, err := f.db.Exec(q, args...); err != nil {
-		f.t.Fatalf("%s: %v", q, err)
-	}
-}
-
-// openSession inserts an open router session row for the member (what Phase 4 accounting will create).
-func (f *p2) openSession(memberID int64, username, acctID string, lastUpdate time.Time) {
-	f.exec(`INSERT INTO session(member_id, username, acct_session_id, nas_ip, framed_ip, mac, status, started_at, last_update_at)
-		VALUES (?,?,?,?,?,?,3,?,?)`, memberID, username, acctID, "10.0.0.1", "192.168.88.10", "AA:BB:CC:DD:EE:FF", lastUpdate.Unix()-100, lastUpdate.Unix())
-}
-
-// advance moves the clock in steps shorter than the admin session's idle limit,
-// touching a page in between so the session stays alive.
-func (f *p2) advance(d time.Duration) {
-	for d > 0 {
-		step := min(d, 30*time.Minute)
-		f.fc.Advance(step)
-		d -= step
-		f.c.Get("/admin/plans")
-	}
-}
-
-func mpath(id int64) string { return "/admin/members/" + strconv.FormatInt(id, 10) }
-
-func text(s *goquery.Selection) string { return strings.Join(strings.Fields(s.Text()), " ") }
-
-func memberCount(t *testing.T, db *sql.DB) int {
-	return scalar[int](t, db, `SELECT count(*) FROM member`)
-}
-
-func revealed(f *p2, id int64) string {
-	f.t.Helper()
-	r := f.c.Get(mpath(id) + "/password")
-	if r.StatusCode != 200 {
-		f.t.Fatalf("reveal: %d", r.StatusCode)
-	}
-	return text(r.Doc(f.t).Find("[data-password]"))
-}
 
 // E2.01 create member defaults (BR-14, Q19); no plan => the form says to create one.
 func TestE2_01_CreateDefaults(t *testing.T) {
@@ -449,12 +381,6 @@ func TestE2_08_ExtraBulk(t *testing.T) {
 	if r := f.c.Send("PUT", mpath(9999)+"/extra-bulk", url.Values{"value": {"1"}, "unit": {"GB"}}); r.StatusCode != 404 {
 		t.Fatalf("unknown member: %d", r.StatusCode)
 	}
-}
-
-func rows(d *goquery.Document) []string {
-	var out []string
-	d.Find("tr[data-member]").Each(func(_ int, s *goquery.Selection) { out = append(out, s.AttrOr("data-username", "")) })
-	return out
 }
 
 // E2.09 search, pagination, per-page.

@@ -1,10 +1,8 @@
 package e2e
 
 import (
-	"database/sql"
 	"fmt"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -15,118 +13,6 @@ import (
 	"hotspotpluslight/e2e/harness"
 	"hotspotpluslight/internal/clock"
 )
-
-// p4 is the Phase 4 fixture: the Phase 3 fixture plus the router's accounting port
-// and a switchable crash-injection hook (E4.15).
-type p4 struct {
-	*p3
-	hook *beforeCommit
-}
-
-// beforeCommit is the test side of Options.AccountingBeforeCommit.
-type beforeCommit struct {
-	mu sync.Mutex
-	fn func() error
-}
-
-func (b *beforeCommit) run() error {
-	b.mu.Lock()
-	fn := b.fn
-	b.mu.Unlock()
-	if fn == nil {
-		return nil
-	}
-	return fn()
-}
-
-func (b *beforeCommit) set(fn func() error) {
-	b.mu.Lock()
-	b.fn = fn
-	b.mu.Unlock()
-}
-
-func newP4(t *testing.T) *p4 {
-	t.Helper()
-	fc := clock.NewFake(t0)
-	disc := &harness.FakeDisconnector{}
-	hook := &beforeCommit{}
-	s := harness.Start(t, harness.Options{Clock: fc, Disconnector: disc, AccountingBeforeCommit: hook.run})
-	f := &p2{t: t, s: s, fc: fc, c: harness.LoginAsAdmin(t, s), db: harness.DB(t, s.DataDir), disc: disc}
-	secret := scalar[string](t, f.db, `SELECT radius_shared_secret FROM settings`)
-	nas := fakenas.New(s.Addrs.RadiusAuth, secret)
-	nas.AcctAddr = s.Addrs.RadiusAcct
-	return &p4{p3: &p3{p2: f, nas: nas, log: &harness.SafeBuffer{}}, hook: hook}
-}
-
-// acct sends one accounting packet and requires an Accounting-Response.
-func (f *p4) acct(a fakenas.Acct) *radius.Packet {
-	f.t.Helper()
-	r, err := f.nas.Account(a)
-	if err != nil {
-		f.t.Fatalf("accounting %v %q: %v", a.Type, a.User, err)
-	}
-	if r.Code != radius.CodeAccountingResponse {
-		f.t.Fatalf("accounting %v %q: reply %v", a.Type, a.User, r.Code)
-	}
-	return r
-}
-
-func acct(typ rfc2866.AcctStatusType, user, sid string, dl, ul uint64, secs uint32) fakenas.Acct {
-	return fakenas.Acct{Type: typ, User: user, SessionID: sid, Download: dl, Upload: ul, Seconds: secs}
-}
-
-func (f *p4) start(user, sid string) *radius.Packet {
-	return f.acct(acct(rfc2866.AcctStatusType_Value_Start, user, sid, 0, 0, 0))
-}
-func (f *p4) interim(user, sid string, dl, ul uint64, secs uint32) *radius.Packet {
-	return f.acct(acct(rfc2866.AcctStatusType_Value_InterimUpdate, user, sid, dl, ul, secs))
-}
-func (f *p4) stop(user, sid string, dl, ul uint64, secs uint32) *radius.Packet {
-	return f.acct(acct(rfc2866.AcctStatusType_Value_Stop, user, sid, dl, ul, secs))
-}
-
-type usage struct{ dl, ul, secs int64 }
-
-func (f *p4) usage(id int64) usage {
-	f.t.Helper()
-	var u usage
-	if err := f.db.QueryRow(`SELECT used_download_bytes, used_upload_bytes, used_seconds FROM member WHERE id=?`, id).Scan(&u.dl, &u.ul, &u.secs); err != nil {
-		f.t.Fatal(err)
-	}
-	return u
-}
-
-func (f *p4) wantUsage(id int64, want usage) {
-	f.t.Helper()
-	if got := f.usage(id); got != want {
-		f.t.Fatalf("member usage %+v, want %+v", got, want)
-	}
-}
-
-func (f *p4) sessions(where string, args ...any) int {
-	return scalar[int](f.t, f.db, `SELECT count(*) FROM session WHERE `+where, args...)
-}
-
-// sessRow is a session row as the tests look at it.
-type sessRow struct {
-	status                                int
-	startedAt, lastUpdate                 int64
-	ended                                 sql.NullInt64
-	cause, nasIP, framedIP, mac, nasIdent string
-	dl, ul, secs                          int64
-}
-
-func (f *p4) session(sid string) sessRow {
-	f.t.Helper()
-	var r sessRow
-	err := f.db.QueryRow(`SELECT status, started_at, last_update_at, ended_at, terminate_cause, nas_ip, framed_ip, mac, nas_identifier,
-		download_bytes, upload_bytes, session_seconds FROM session WHERE acct_session_id=? ORDER BY id DESC LIMIT 1`, sid).
-		Scan(&r.status, &r.startedAt, &r.lastUpdate, &r.ended, &r.cause, &r.nasIP, &r.framedIP, &r.mac, &r.nasIdent, &r.dl, &r.ul, &r.secs)
-	if err != nil {
-		f.t.Fatalf("session %q: %v", sid, err)
-	}
-	return r
-}
 
 // E4.01 Start creates a session row; the MAC is captured once (BR-12).
 func TestE4_01_StartCreatesSession(t *testing.T) {
@@ -617,36 +503,4 @@ func TestE4_17_DowntimeCatchUp(t *testing.T) {
 	if n := scalar[int](t, db, `SELECT count(*) FROM session`); n != 1 {
 		t.Fatalf("%d session rows", n)
 	}
-}
-
-// E3.12 (accounting-driven variant) concurrent sessions counted through real Start/Interim/Stop packets (BR-9, Q27).
-func TestE3_12b_ConcurrentSessionsViaAccounting(t *testing.T) {
-	f := newP4(t) // accounting interval 60 s: a session is active for 120 s after its last packet
-	f.member(f.plan("One", "max_sessions", "1"), "one", "password", "pw")
-	f.member(f.plan("Two", "max_sessions", "2"), "two", "password", "pw")
-
-	f.accepted("one", "pw")
-	f.start("one", "s1")
-	f.start("two", "s1")
-	f.rejected("one", "pw", "NO_MORE_SESSION")
-	f.accepted("two", "pw")
-	f.start("two", "s2")
-	f.rejected("two", "pw", "NO_MORE_SESSION")
-
-	// A stopped session does not count.
-	f.stop("one", "s1", 10, 10, 5)
-	f.accepted("one", "pw")
-	f.stop("two", "s2", 10, 10, 5)
-	f.accepted("two", "pw")
-
-	// A silent session goes stale: active while now - last_update <= interval + 60 s.
-	f.start("one", "s3")
-	f.fc.Advance(120 * time.Second)
-	f.rejected("one", "pw", "NO_MORE_SESSION")
-	f.interim("one", "s3", 5, 5, 120) // an Interim keeps it alive
-	f.fc.Advance(120 * time.Second)
-	f.rejected("one", "pw", "NO_MORE_SESSION")
-	f.fc.Advance(time.Second)
-	f.accepted("one", "pw")
-	f.accepted("two", "pw") // two's open session s1 is stale as well
 }

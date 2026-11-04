@@ -2,9 +2,7 @@ package e2e
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"strings"
 	"testing"
@@ -14,131 +12,93 @@ import (
 	"layeh.com/radius/rfc2865"
 	"layeh.com/radius/rfc2869"
 	"layeh.com/radius/vendors/microsoft"
-	"layeh.com/radius/vendors/mikrotik"
 
 	"hotspotpluslight/e2e/fakenas"
 	"hotspotpluslight/e2e/harness"
-	"hotspotpluslight/internal/clock"
+	"hotspotpluslight/internal/domain"
 )
 
-// p3 is the Phase 3 fixture: the Phase 2 fixture plus a fake router that talks to the RADIUS port.
-type p3 struct {
-	*p2
-	nas *fakenas.NAS
-	log *harness.SafeBuffer
-}
+// E12.07 (O20, changed 2026-11-04) the Reply-Message of every Access-Reject is exactly the code, and
+// the sweep covers every reason the server can send over RADIUS.
+func TestE12_07_ReplyMessageIsOnlyTheCode(t *testing.T) {
+	f := newP3(t)
+	day := int64(24 * 3600)
+	seen := map[domain.Reason]bool{}
+	check := func(r *radius.Packet, want domain.Reason) {
+		t.Helper()
+		if r.Code != radius.CodeAccessReject {
+			t.Fatalf("%s: got %v, want Access-Reject", want, r.Code)
+		}
+		if got := rfc2865.ReplyMessage_GetString(r); got != string(want) {
+			t.Errorf("%s: Reply-Message %q, want exactly the code", want, got)
+		}
+		seen[want] = true
+	}
+	basic := f.plan("Basic")
+	alice := f.member(basic, "alice", "password", "pw")
+	check(f.login("alice", "wrong"), domain.ReasonInvalidCredentials)
+	f.exec(`UPDATE member SET active=0 WHERE id=?`, alice)
+	check(f.login("alice", "pw"), domain.ReasonInactive)
+	f.exec(`UPDATE member SET active=1, expires_at=? WHERE id=?`, t0.Unix()-1, alice)
+	check(f.login("alice", "pw"), domain.ReasonExpired)
+	f.exec(`UPDATE member SET expires_at=NULL, subscription_date=? WHERE id=?`, t0.Unix()-400*day, alice)
+	check(f.login("alice", "pw"), domain.ReasonNoSubscription)
 
-func newP3(t *testing.T) *p3 {
-	t.Helper()
-	fc := clock.NewFake(t0)
-	disc := &harness.FakeDisconnector{}
-	logs := &harness.SafeBuffer{}
-	s := harness.Start(t, harness.Options{Clock: fc, Disconnector: disc, Logger: slog.New(slog.NewTextHandler(logs, nil))})
-	f := &p2{t: t, s: s, fc: fc, c: harness.LoginAsAdmin(t, s), db: harness.DB(t, s.DataDir), disc: disc}
-	secret := scalar[string](t, f.db, `SELECT radius_shared_secret FROM settings`)
-	return &p3{p2: f, nas: fakenas.New(s.Addrs.RadiusAuth, secret), log: logs}
-}
+	small := f.member(f.plan("Small", "bulk_value", "100", "bulk_unit", "MB"), "small", "password", "pw")
+	f.exec(`UPDATE member SET used_download_bytes=?, used_upload_bytes=0 WHERE id=?`, 200*mb, small)
+	check(f.login("small", "pw"), domain.ReasonOutOfBulk)
 
-// login sends a PAP Access-Request and fails the test when no verifiable reply arrives.
-func (f *p3) login(user, pw string) *radius.Packet {
-	f.t.Helper()
-	r, err := f.nas.Authenticate(user, pw)
+	hour := f.member(f.plan("Hour", "time_limit_minutes", "60"), "hour", "password", "pw")
+	f.exec(`UPDATE member SET used_seconds=3600 WHERE id=?`, hour)
+	check(f.login("hour", "pw"), domain.ReasonOutOfTime)
+
+	one := f.member(f.plan("One", "max_sessions", "1"), "one", "password", "pw")
+	f.openSession(one, "one", "s1", f.fc.Now())
+	check(f.login("one", "pw"), domain.ReasonNoMoreSession)
+
+	// NO_PLAN and PLAN_REMOVED need rows the UI never creates (see E3.04): foreign keys off.
+	np := f.member(basic, "noplan", "password", "pw")
+	conn, err := f.db.Conn(context.Background())
 	if err != nil {
-		f.t.Fatalf("Access-Request %q: %v", user, err)
+		t.Fatal(err)
 	}
-	return r
-}
-
-// accepted asserts an Access-Accept.
-func (f *p3) accepted(user, pw string) *radius.Packet {
-	f.t.Helper()
-	r := f.login(user, pw)
-	if r.Code != radius.CodeAccessAccept {
-		f.t.Fatalf("%q: want Accept, got %v %q", user, r.Code, rfc2865.ReplyMessage_GetString(r))
+	defer conn.Close()
+	if _, err := conn.ExecContext(context.Background(), `PRAGMA foreign_keys=OFF`); err != nil {
+		t.Fatal(err)
 	}
-	return r
-}
-
-// rejected asserts an Access-Reject whose Reply-Message is exactly "<code>" (O20, Phase 12a).
-func (f *p3) rejected(user, pw, code string) *radius.Packet {
-	f.t.Helper()
-	r := f.login(user, pw)
-	msg := rfc2865.ReplyMessage_GetString(r)
-	if r.Code != radius.CodeAccessReject || msg != code {
-		f.t.Fatalf("%q: want Reject %s, got %v %q", user, code, r.Code, msg)
-	}
-	return r
-}
-
-// vsa returns the value of the MikroTik (vendor 14988) attribute of the given
-// type, parsed from the raw packet bytes without the radius library's
-// dictionary, so the attribute ids of PLAN 7.5 are checked independently.
-func vsa(t *testing.T, p *radius.Packet, typ byte) []byte {
-	t.Helper()
-	for _, a := range p.Attributes {
-		if a.Type != rfc2865.VendorSpecific_Type || len(a.Attribute) < 6 || binary.BigEndian.Uint32(a.Attribute[:4]) != 14988 {
-			continue
+	for _, c := range []struct {
+		plan int64
+		want domain.Reason
+	}{{0, domain.ReasonNoPlan}, {9999, domain.ReasonPlanRemoved}} {
+		if _, err := conn.ExecContext(context.Background(), `UPDATE member SET plan_id=? WHERE id=?`, c.plan, np); err != nil {
+			t.Fatal(err)
 		}
-		sub := []byte(a.Attribute[4:])
-		if sub[0] == typ && int(sub[1]) == len(sub) {
-			return sub[2:]
+		check(f.login("noplan", "pw"), c.want)
+	}
+
+	chap := radius.New(radius.CodeAccessRequest, []byte(f.nas.Secret))
+	rfc2865.UserName_SetString(chap, "alice")
+	rfc2865.CHAPChallenge_Set(chap, []byte("0123456789abcdef"))
+	rfc2865.CHAPPassword_Set(chap, append([]byte{1}, make([]byte, 16)...))
+	ms := radius.New(radius.CodeAccessRequest, []byte(f.nas.Secret))
+	rfc2865.UserName_SetString(ms, "alice")
+	microsoft.MSCHAPChallenge_Add(ms, []byte("0123456789abcdef"))
+	microsoft.MSCHAPResponse_Add(ms, make([]byte, 50))
+	for _, p := range []*radius.Packet{chap, ms} {
+		r, err := f.nas.Exchange(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(r, domain.ReasonUnsupportedAuth)
+	}
+
+	// Every reason is covered.
+	for _, r := range domain.AllReasons() {
+		if !seen[r] {
+			t.Errorf("reason %s was not exercised", r)
 		}
 	}
-	return nil
 }
-
-func xmitLimit(t *testing.T, p *radius.Packet) uint32 {
-	t.Helper()
-	v := vsa(t, p, 2)
-	if len(v) != 4 {
-		t.Fatalf("Mikrotik-Xmit-Limit missing or malformed: %v", v)
-	}
-	if lib := mikrotik.MikrotikXmitLimit_Get(p); uint32(lib) != binary.BigEndian.Uint32(v) {
-		t.Fatalf("xmit limit mismatch %d vs %d", lib, binary.BigEndian.Uint32(v))
-	}
-	return binary.BigEndian.Uint32(v)
-}
-
-// dataLimits returns the data-limit attributes of an Accept as full byte counts:
-// Recv-Limit (id 1) and Xmit-Limit (id 2), each joined with its Gigawords
-// attribute (ids 14 and 15). present is false when neither limit is there.
-func dataLimits(t *testing.T, p *radius.Packet) (recv, xmit uint64, present bool) {
-	t.Helper()
-	get := func(typ byte) (uint64, bool) {
-		v := vsa(t, p, typ)
-		if v == nil {
-			return 0, false
-		}
-		if len(v) != 4 {
-			t.Fatalf("attribute %d malformed: %v", typ, v)
-		}
-		return uint64(binary.BigEndian.Uint32(v)), true
-	}
-	r, rok := get(1)
-	x, xok := get(2)
-	rg, rgok := get(14)
-	xg, xgok := get(15)
-	if rok != xok || rgok != xgok || (rgok && !rok) {
-		t.Fatalf("limit attributes do not match: recv=%v xmit=%v recv-gw=%v xmit-gw=%v", rok, xok, rgok, xgok)
-	}
-	return r | rg<<32, x | xg<<32, rok
-}
-
-func rateLimit(t *testing.T, p *radius.Packet) (string, bool) {
-	t.Helper()
-	v := vsa(t, p, 8)
-	if v == nil {
-		return "", false
-	}
-	return string(v), true
-}
-
-func sessionTimeout(p *radius.Packet) uint32 { return uint32(rfc2865.SessionTimeout_Get(p)) }
-
-const (
-	mb = int64(1 << 20)
-	gb = int64(1 << 30)
-)
 
 // E3.01 valid member -> Accept with Acct-Interim-Interval, Session-Timeout, Mikrotik-Rate-Limit (BR-10).
 func TestE3_01_AcceptWithAttributes(t *testing.T) {
@@ -550,4 +510,36 @@ func TestE3_18_DatabaseFailureNoReply(t *testing.T) {
 	}
 	f.exec(`ALTER TABLE member_broken RENAME TO member`)
 	f.accepted("alice", "pw") // recovers
+}
+
+// E3.12 (accounting-driven variant) concurrent sessions counted through real Start/Interim/Stop packets (BR-9, Q27).
+func TestE3_12b_ConcurrentSessionsViaAccounting(t *testing.T) {
+	f := newP4(t) // accounting interval 60 s: a session is active for 120 s after its last packet
+	f.member(f.plan("One", "max_sessions", "1"), "one", "password", "pw")
+	f.member(f.plan("Two", "max_sessions", "2"), "two", "password", "pw")
+
+	f.accepted("one", "pw")
+	f.start("one", "s1")
+	f.start("two", "s1")
+	f.rejected("one", "pw", "NO_MORE_SESSION")
+	f.accepted("two", "pw")
+	f.start("two", "s2")
+	f.rejected("two", "pw", "NO_MORE_SESSION")
+
+	// A stopped session does not count.
+	f.stop("one", "s1", 10, 10, 5)
+	f.accepted("one", "pw")
+	f.stop("two", "s2", 10, 10, 5)
+	f.accepted("two", "pw")
+
+	// A silent session goes stale: active while now - last_update <= interval + 60 s.
+	f.start("one", "s3")
+	f.fc.Advance(120 * time.Second)
+	f.rejected("one", "pw", "NO_MORE_SESSION")
+	f.interim("one", "s3", 5, 5, 120) // an Interim keeps it alive
+	f.fc.Advance(120 * time.Second)
+	f.rejected("one", "pw", "NO_MORE_SESSION")
+	f.fc.Advance(time.Second)
+	f.accepted("one", "pw")
+	f.accepted("two", "pw") // two's open session s1 is stale as well
 }

@@ -14,22 +14,6 @@ import (
 	"hotspotpluslight/internal/clock"
 )
 
-// Phase 11a: enforcement in two layers (O3/O4, changed 2026-11-04).
-// Layer 1: exact limits in the Access-Accept (E11.01-03).
-// Layer 2: the server disconnects on an Interim (E11.04-12).
-
-// waitUntil polls cond until it is true; it fails the test after 10 s.
-func waitUntil(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	end := time.Now().Add(10 * time.Second)
-	for !cond() {
-		if time.Now().After(end) {
-			t.Fatalf("timed out waiting for: %s", what)
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
 // newP11 is the Phase 5 fixture (real Disconnect client, fake router) with a server log we can read.
 func newP11(t *testing.T) *p5 {
 	t.Helper()
@@ -69,10 +53,6 @@ func (f *p5) noKicks() {
 	if n := len(f.coa.Requests()); n != 0 {
 		f.t.Fatalf("%d Disconnect-Requests, want none", n)
 	}
-}
-
-func (f *p5) cause(sid string) string {
-	return f.session(sid).cause
 }
 
 // E11.01 data left: Xmit-Limit and Recv-Limit carry the bytes left; from 4 GiB the high 32 bits go to the

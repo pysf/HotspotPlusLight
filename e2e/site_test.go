@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"image"
 	_ "image/png" // registers the PNG decoder for E13.03
-	"io/fs"
 	"math"
 	"os"
 	"path"
@@ -27,26 +26,6 @@ const (
 	ghLegacy = "https://github.com/pysf/hotspotplus"
 )
 
-func siteRoot() string { return filepath.Join(harness.ModuleRoot(), "site") }
-
-// sitePages returns every html file of the site as a slash path relative to site/.
-func sitePages(t *testing.T) []string {
-	t.Helper()
-	var out []string
-	err := filepath.WalkDir(siteRoot(), func(p string, d fs.DirEntry, err error) error {
-		if err == nil && !d.IsDir() && strings.HasSuffix(p, ".html") {
-			rel, _ := filepath.Rel(siteRoot(), p)
-			out = append(out, filepath.ToSlash(rel))
-		}
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	slices.Sort(out)
-	return out
-}
-
 func siteRead(t *testing.T, rel string) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(siteRoot(), filepath.FromSlash(rel)))
@@ -54,20 +33,6 @@ func siteRead(t *testing.T, rel string) string {
 		t.Fatal(err)
 	}
 	return string(b)
-}
-
-func siteDoc(t *testing.T, rel string) *goquery.Document {
-	t.Helper()
-	f, err := os.Open(filepath.Join(siteRoot(), filepath.FromSlash(rel)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	d, err := goquery.NewDocumentFromReader(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return d
 }
 
 // siteBase returns the canonical base URL, read from the home page.
@@ -78,20 +43,6 @@ func siteBase(t *testing.T) string {
 		t.Fatalf("home canonical %q is not a base url", b)
 	}
 	return b
-}
-
-// siteText returns the visible text of the given pages, or of every page when none is given.
-func siteText(t *testing.T, pages ...string) string {
-	t.Helper()
-	if len(pages) == 0 {
-		pages = sitePages(t)
-	}
-	var b strings.Builder
-	for _, p := range pages {
-		b.WriteString(siteDoc(t, p).Find("body").Text())
-		b.WriteString("\n")
-	}
-	return b.String()
 }
 
 func docsPages(t *testing.T) []string {
@@ -627,43 +578,6 @@ func TestE13_10_DownloadNames(t *testing.T) {
 			t.Errorf("os panel command %q does not end in an asset name", c)
 		}
 	})
-}
-
-// TestE13_11_MovedReadmeChecks asserts, on the page that owns each, the README checks that moved to the site in Phase 13a (E13.11).
-// This is the hard exit item of docs/phase13-notes.md.
-func TestE13_11_MovedReadmeChecks(t *testing.T) {
-	want := map[string][]string{
-		"docs/installation/index.html": {"make build", "first start", "HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "8081", "firewall"},
-		"docs/configuration/index.html": {"HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "HSP_LOG_LEVEL", "HSP_LOG_FORMAT",
-			"make set-password", "admin set-password"},
-		"docs/first-login/index.html":          {"admin set-password", "make set-password", "first-start block"},
-		"docs/router-setup/index.html":         {"/admin/router", "hotspot folder", "8081", "firewall", "UDP 1812", "UDP 3799"},
-		"docs/running-as-a-service/index.html": {"[Unit]", "ExecStart=", "systemd", "HSP_SECRET_KEY", "HSP_DATA_DIR", "8081", "firewall"},
-		"docs/backup-and-upgrade/index.html":   {`sqlite3 hsp.db ".backup`, "HSP_SECRET_KEY", "unrecoverable"},
-	}
-	for page, strs := range want {
-		text := siteText(t, page)
-		for _, s := range strs {
-			if !strings.Contains(text, s) {
-				t.Errorf("%s lacks %q", page, s)
-			}
-		}
-	}
-	all := siteText(t)
-	for _, s := range []string{"make build", "HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "HSP_LOG_LEVEL", "HSP_LOG_FORMAT",
-		"first start", "make set-password", "admin set-password", "/admin/router", "hotspot folder", "8081", "firewall", "sqlite3 hsp.db", ".backup",
-		"unrecoverable", "[Unit]", "ExecStart=", "systemd"} {
-		if !strings.Contains(all, s) {
-			t.Errorf("the site lacks %q", s)
-		}
-	}
-	// The Makefile has the targets that the pages tell people to run.
-	mk := readRoot(t, "Makefile")
-	for _, target := range []string{"build:", "set-password", "run:"} {
-		if !strings.Contains(mk, target) {
-			t.Errorf("Makefile has no %s", target)
-		}
-	}
 }
 
 // TestE13_12_FirstStartBlock checks that the first-start output on the site is what the program prints (E13.12).

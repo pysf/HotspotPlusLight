@@ -1,10 +1,6 @@
 package e2e
 
-// Phase 10, step B: expiring soon (BR-24), the filterable member list, sheets,
-// credentials card, row menus, toggle route, toasts.
-
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,12 +12,6 @@ import (
 
 	"hotspotpluslight/e2e/fakenas"
 	"hotspotpluslight/e2e/harness"
-)
-
-const (
-	listTarget  = "member-list"
-	sheetTarget = "sheet-body"
-	planTarget  = "plan-list"
 )
 
 // setExpiry puts an exact expires_at on a member (unix seconds).
@@ -37,25 +27,6 @@ func rowStatuses(d *goquery.Document) map[string]string {
 		out[s.AttrOr("data-username", "")] = s.AttrOr("data-status", "")
 	})
 	return out
-}
-
-func fragmentDoc(t *testing.T, r harness.Resp) *goquery.Document {
-	t.Helper()
-	return r.Doc(t)
-}
-
-// hxTrigger parses the HX-Trigger header of a response.
-func hxTrigger(t *testing.T, r harness.Resp) map[string]any {
-	t.Helper()
-	raw := r.Header.Get("HX-Trigger")
-	if raw == "" {
-		return nil
-	}
-	var m map[string]any
-	if err := json.Unmarshal([]byte(raw), &m); err != nil {
-		t.Fatalf("HX-Trigger %q: %v", raw, err)
-	}
-	return m
 }
 
 func chipCount(d *goquery.Document, chip string) string {
@@ -134,10 +105,6 @@ func TestE10_10_ExpiringSoonBoundaries(t *testing.T) {
 	if !strings.Contains(text(f.c.Get(mpath(f.idOf("in3d"))).Doc(t).Find("#member-status")), "status expiring") {
 		t.Error("member page does not show the new status")
 	}
-}
-
-func (f *p2) idOf(username string) int64 {
-	return scalar[int64](f.t, f.db, `SELECT id FROM member WHERE username=?`, username)
 }
 
 // E10.11 the chips show counts under the current search and plan filter; the status is not applied to them.
@@ -690,6 +657,7 @@ func TestE10_24_VanishedAndFailed(t *testing.T) {
 		t.Errorf("500 from list: %d %v", r.StatusCode, r.Header)
 	}
 }
+
 func TestE10_19_ListActions(t *testing.T) {
 	f := newP5(t)
 	p := f.plan("Basic")
@@ -740,87 +708,5 @@ func TestE10_19_ListActions(t *testing.T) {
 	g := f.member(p, "gone")
 	if r := f.c.Send("DELETE", mpath(g), nil); r.Header.Get("HX-Redirect") != "/admin/members" {
 		t.Errorf("delete without target: %v", r.Header)
-	}
-}
-
-// E10.20 plans: list region, row menu, delete from the list, a blocked delete shows a clear toast.
-func TestE10_20_PlansListAndMenu(t *testing.T) {
-	f := newP2(t)
-	used := f.plan("Used")
-	free := f.plan("Free")
-	f.member(used, "alice")
-	d := f.c.Get("/admin/plans").Doc(t)
-	if list := d.Find("#plan-list"); list.Length() != 1 || list.AttrOr("aria-live", "") != "polite" || list.Find("tbody tr").Length() != 2 {
-		t.Fatal("plans page lacks the list region")
-	}
-	menu := d.Find("tbody tr").Last().Find(".c-menu")
-	var items []string
-	menu.Find(".c-menu__item").Each(func(_ int, s *goquery.Selection) { items = append(items, text(s)) })
-	if strings.Join(items, "|") != "Edit|Delete" {
-		t.Errorf("plan menu %q", items)
-	}
-	if menu.Find(".c-menu__item").Last().AttrOr("data-danger", "x") == "x" || menu.Find("hr.c-menu__sep").Length() != 1 {
-		t.Error("Delete must be danger after a divider")
-	}
-	del := d.Find(`.c-menu__item[hx-delete="/admin/plans/` + strconv.FormatInt(free, 10) + `"]`)
-	if del.AttrOr("hx-confirm", "") == "" || del.AttrOr("hx-target", "") != "#plan-list" {
-		t.Errorf("plan delete item: %v", del.Nodes)
-	}
-	edit := d.Find(`.c-menu__item[hx-get="/admin/plans/` + strconv.FormatInt(free, 10) + `"]`)
-	if edit.AttrOr("hx-target", "") != "#sheet-body" {
-		t.Errorf("plan edit item: %v", edit.Nodes)
-	}
-	// The fragment for the list region.
-	frag := f.c.GetHX("/admin/plans", planTarget)
-	if strings.Contains(frag.Body, "<html") || fragmentDoc(t, frag).Find("tbody tr").Length() != 2 {
-		t.Error("plan list fragment")
-	}
-	if rf := fragmentDoc(t, frag).Find(`[hx-trigger*="plans-changed"]`); rf.Length() != 1 || rf.AttrOr("hx-get", "") != "/admin/plans" {
-		t.Error("plan list does not refresh itself")
-	}
-	// Delete blocked: 409 with the clear message in a toast, nothing swapped.
-	r := f.c.SendHX("DELETE", "/admin/plans/"+strconv.FormatInt(used, 10), nil, planTarget)
-	ev := hxTrigger(t, r)
-	if r.StatusCode != 409 || r.Header.Get("HX-Reswap") != "none" || ev["toast"] == nil || !strings.Contains(ev["toast"].(string), "used by 1 members and cannot be deleted") {
-		t.Errorf("blocked delete: %d %v", r.StatusCode, r.Header)
-	}
-	// Delete works.
-	r = f.c.SendHX("DELETE", "/admin/plans/"+strconv.FormatInt(free, 10), nil, planTarget)
-	if ev := hxTrigger(t, r); r.StatusCode != 200 || ev["plans-changed"] == nil || ev["toast"] == nil || r.Header.Get("HX-Redirect") != "" {
-		t.Errorf("delete: %d %v", r.StatusCode, r.Header)
-	}
-	if r := f.c.Send("DELETE", "/admin/plans/"+strconv.FormatInt(used, 10), nil); r.StatusCode != 409 || !strings.Contains(r.Body, "used by 1 members") {
-		t.Errorf("blocked delete without target must keep its body: %d %s", r.StatusCode, r.Body)
-	}
-}
-
-// E10.21 errors keep going to #flash; the rest of the UI hooks: toasts, busy state, no inline code.
-func TestE10_21_ToastsAndHooks(t *testing.T) {
-	f := newP2(t)
-	p := f.plan("Basic")
-	f.member(p, "alice")
-	for _, path := range []string{"/admin/members", "/admin/plans"} {
-		d := f.c.Get(path).Doc(t)
-		if d.Find("#toast[role=status]").Length() != 1 || d.Find("#flash").Length() != 1 {
-			t.Errorf("%s: toast or flash area missing", path)
-		}
-		if bad := pageIsClean(d); len(bad) > 0 {
-			t.Errorf("%s: %v", path, bad)
-		}
-	}
-	// Fragments are clean too (a strict CSP would pass).
-	for _, c := range []struct{ path, target string }{
-		{"/admin/members", listTarget}, {"/admin/members/new", sheetTarget}, {mpath(f.idOf("alice")), sheetTarget},
-		{"/admin/plans", planTarget}, {"/admin/plans/new", sheetTarget},
-	} {
-		r := f.c.GetHX(c.path, c.target)
-		if bad := pageIsClean(fragmentDoc(t, r)); len(bad) > 0 {
-			t.Errorf("fragment %s: %v", c.path, bad)
-		}
-	}
-	// JS: dialog.js opens the sheet; the sheet title is set from the fragment.
-	js := f.c.Get(f.c.Get("/admin/members").Doc(t).Find(`script[src*="js/dialog.js"]`).AttrOr("src", "")).Body
-	if !strings.Contains(js, "sheet-body") {
-		t.Error("dialog.js does not handle the sheet body")
 	}
 }

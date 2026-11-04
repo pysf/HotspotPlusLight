@@ -3,7 +3,6 @@ package e2e
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"fmt"
 	"html"
 	"io"
@@ -15,190 +14,17 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"testing/fstest"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"layeh.com/radius"
-	"layeh.com/radius/rfc2865"
-	"layeh.com/radius/vendors/microsoft"
+	"layeh.com/radius/rfc2866"
 
+	"hotspotpluslight/e2e/fakenas"
 	"hotspotpluslight/e2e/harness"
+	"hotspotpluslight/internal/clock"
 	"hotspotpluslight/internal/domain"
 )
-
-// E12.07 (O20, changed 2026-11-04) the Reply-Message of every Access-Reject is exactly the code, and
-// the sweep covers every reason the server can send over RADIUS.
-func TestE12_07_ReplyMessageIsOnlyTheCode(t *testing.T) {
-	f := newP3(t)
-	day := int64(24 * 3600)
-	seen := map[domain.Reason]bool{}
-	check := func(r *radius.Packet, want domain.Reason) {
-		t.Helper()
-		if r.Code != radius.CodeAccessReject {
-			t.Fatalf("%s: got %v, want Access-Reject", want, r.Code)
-		}
-		if got := rfc2865.ReplyMessage_GetString(r); got != string(want) {
-			t.Errorf("%s: Reply-Message %q, want exactly the code", want, got)
-		}
-		seen[want] = true
-	}
-	basic := f.plan("Basic")
-	alice := f.member(basic, "alice", "password", "pw")
-	check(f.login("alice", "wrong"), domain.ReasonInvalidCredentials)
-	f.exec(`UPDATE member SET active=0 WHERE id=?`, alice)
-	check(f.login("alice", "pw"), domain.ReasonInactive)
-	f.exec(`UPDATE member SET active=1, expires_at=? WHERE id=?`, t0.Unix()-1, alice)
-	check(f.login("alice", "pw"), domain.ReasonExpired)
-	f.exec(`UPDATE member SET expires_at=NULL, subscription_date=? WHERE id=?`, t0.Unix()-400*day, alice)
-	check(f.login("alice", "pw"), domain.ReasonNoSubscription)
-
-	small := f.member(f.plan("Small", "bulk_value", "100", "bulk_unit", "MB"), "small", "password", "pw")
-	f.exec(`UPDATE member SET used_download_bytes=?, used_upload_bytes=0 WHERE id=?`, 200*mb, small)
-	check(f.login("small", "pw"), domain.ReasonOutOfBulk)
-
-	hour := f.member(f.plan("Hour", "time_limit_minutes", "60"), "hour", "password", "pw")
-	f.exec(`UPDATE member SET used_seconds=3600 WHERE id=?`, hour)
-	check(f.login("hour", "pw"), domain.ReasonOutOfTime)
-
-	one := f.member(f.plan("One", "max_sessions", "1"), "one", "password", "pw")
-	f.openSession(one, "one", "s1", f.fc.Now())
-	check(f.login("one", "pw"), domain.ReasonNoMoreSession)
-
-	// NO_PLAN and PLAN_REMOVED need rows the UI never creates (see E3.04): foreign keys off.
-	np := f.member(basic, "noplan", "password", "pw")
-	conn, err := f.db.Conn(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-	if _, err := conn.ExecContext(context.Background(), `PRAGMA foreign_keys=OFF`); err != nil {
-		t.Fatal(err)
-	}
-	for _, c := range []struct {
-		plan int64
-		want domain.Reason
-	}{{0, domain.ReasonNoPlan}, {9999, domain.ReasonPlanRemoved}} {
-		if _, err := conn.ExecContext(context.Background(), `UPDATE member SET plan_id=? WHERE id=?`, c.plan, np); err != nil {
-			t.Fatal(err)
-		}
-		check(f.login("noplan", "pw"), c.want)
-	}
-
-	chap := radius.New(radius.CodeAccessRequest, []byte(f.nas.Secret))
-	rfc2865.UserName_SetString(chap, "alice")
-	rfc2865.CHAPChallenge_Set(chap, []byte("0123456789abcdef"))
-	rfc2865.CHAPPassword_Set(chap, append([]byte{1}, make([]byte, 16)...))
-	ms := radius.New(radius.CodeAccessRequest, []byte(f.nas.Secret))
-	rfc2865.UserName_SetString(ms, "alice")
-	microsoft.MSCHAPChallenge_Add(ms, []byte("0123456789abcdef"))
-	microsoft.MSCHAPResponse_Add(ms, make([]byte, 50))
-	for _, p := range []*radius.Packet{chap, ms} {
-		r, err := f.nas.Exchange(p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		check(r, domain.ReasonUnsupportedAuth)
-	}
-
-	// Every reason is covered.
-	for _, r := range domain.AllReasons() {
-		if !seen[r] {
-			t.Errorf("reason %s was not exercised", r)
-		}
-	}
-}
-
-// E12.08 one listener: HSP_HTTP_ADDR is ignored (nothing listens there), /healthz is on the admin listener
-// without a login, and the old page API routes are 404 even for a logged-in admin.
-func TestE12_08_OnlyTheAdminListener(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	old := l.Addr().String()
-	l.Close() // a free port that the old public listener would have used
-	s := harness.Start(t, harness.Options{Env: map[string]string{"HTTP_ADDR": old}})
-	if c, err := net.DialTimeout("tcp", old, 300*time.Millisecond); err == nil {
-		c.Close()
-		t.Fatalf("something listens on the old public address %s", old)
-	}
-	resp, body := harness.Get(t, "http://"+s.Addrs.Admin+"/healthz")
-	if resp.StatusCode != 200 || strings.TrimSpace(body) != "ok" || resp.Header.Get("Cache-Control") != "no-store" {
-		t.Errorf("/healthz: %d %q cache=%q", resp.StatusCode, body, resp.Header.Get("Cache-Control"))
-	}
-	c := harness.LoginAsAdmin(t, s)
-	for _, p := range []string{"/api/v1/account", "/api/v1/config", "/api/v1/devices/aabbccddeeff/credentials", "/api/v1/nope"} {
-		if r, _ := harness.Get(t, "http://"+s.Addrs.Admin+p); r.StatusCode != 404 {
-			t.Errorf("anonymous %s: %d, want 404", p, r.StatusCode)
-		}
-		if r := c.Get(p); r.StatusCode != 404 {
-			t.Errorf("admin %s: %d, want 404", p, r.StatusCode)
-		}
-	}
-}
-
-// E12.09 migration 0004 drops the three page-API settings columns and keeps every other value.
-func TestE12_09_Migration0004(t *testing.T) {
-	root := harness.ModuleRoot()
-	read := func(name string) []byte {
-		b, err := os.ReadFile(filepath.Join(root, "internal/store/migrations", name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return b
-	}
-	old := fstest.MapFS{
-		"0001_init.sql":              {Data: read("0001_init.sql")},
-		"0002_usage_daily.sql":       {Data: read("0002_usage_daily.sql")},
-		"0003_admin_must_change.sql": {Data: read("0003_admin_must_change.sql")},
-	}
-	s := harness.Start(t, harness.Options{Migrations: old})
-	db := harness.DB(t, s.DataDir)
-	cols := func() map[string]bool {
-		rows, err := db.Query(`SELECT name FROM pragma_table_info('settings')`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer rows.Close()
-		m := map[string]bool{}
-		for rows.Next() {
-			var n string
-			rows.Scan(&n)
-			m[n] = true
-		}
-		return m
-	}
-	gone := []string{"mac_auto_login", "after_login_url", "public_base_url"}
-	for _, g := range gone {
-		if !cols()[g] {
-			t.Fatalf("before 0004 the column %s should exist", g)
-		}
-	}
-	if _, err := db.Exec(`UPDATE settings SET site_title='Kept Cafe', timezone='Asia/Tehran', coa_port=3800, voucher_help='help text',
-		mac_auto_login=1, after_login_url='https://example.com/x', public_base_url='http://10.0.0.2:8080'`); err != nil {
-		t.Fatal(err)
-	}
-	secret := scalar[string](t, db, `SELECT radius_shared_secret FROM settings`)
-	s.Stop()
-
-	s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey})
-	defer s2.Stop()
-	if n := scalar[int](t, db, `SELECT count(*) FROM schema_migrations`); n != wantMigrations {
-		t.Errorf("%d migrations, want %d", n, wantMigrations)
-	}
-	after := cols()
-	for _, g := range gone {
-		if after[g] {
-			t.Errorf("column %s still exists", g)
-		}
-	}
-	if scalar[string](t, db, `SELECT business_name FROM settings`) != "Kept Cafe" || scalar[string](t, db, `SELECT timezone FROM settings`) != "Asia/Tehran" ||
-		scalar[int](t, db, `SELECT coa_port FROM settings`) != 3800 || scalar[string](t, db, `SELECT voucher_help FROM settings`) != "help text" ||
-		scalar[string](t, db, `SELECT radius_shared_secret FROM settings`) != secret || scalar[int](t, db, `SELECT count(*) FROM admin`) != 1 {
-		t.Error("existing data did not survive the migration")
-	}
-}
 
 // E12.10 the setup script has no walled-garden and no html-directory lines; it keeps login-by=http-pap and
 // tells the admin that the downloaded hotspot folder replaces the default one.
@@ -217,8 +43,6 @@ func TestE12_10_SetupScript(t *testing.T) {
 		}
 	}
 }
-
-// ---- Phase 12b: router page designs (E12.00 to E12.06) ----
 
 var themeKeys = []string{"air", "midnight", "aurora", "dusk", "ripple", "sunrise", "ocean"}
 
@@ -335,8 +159,6 @@ func TestE12_01_FileListsAndNoExternalRequests(t *testing.T) {
 		}
 	}
 }
-
-func attr(d *goquery.Document, sel, name string) string { return d.Find(sel).First().AttrOr(name, "") }
 
 func doc(t *testing.T, b []byte) *goquery.Document {
 	t.Helper()
@@ -581,5 +403,272 @@ func TestE12_06_AdminRouterPage(t *testing.T) {
 		if !strings.Contains(c.Get("/admin/router").Body, text) {
 			t.Errorf("router page help lacks %q", text)
 		}
+	}
+}
+
+func portOf(t *testing.T, addr string) string {
+	t.Helper()
+	_, p, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// E8.03 the setup script carries the secret, ports, interval and CoA port, and follows settings.
+func TestE8_03_SetupScript(t *testing.T) {
+	f := newP8(t)
+	f.exec(`UPDATE settings SET accounting_interval_seconds=120, coa_port=3799, radius_shared_secret='Sup3r-Secret-Value'`)
+	script, _ := f.script()
+	for _, want := range []string{
+		"/radius add",
+		"service=hotspot",
+		"address=<SERVER-IP>", // no public base URL any more: the admin fills in the server address (Phase 12a)
+		`secret="Sup3r-Secret-Value"`,
+		"authentication-port=" + portOf(t, f.s.Addrs.RadiusAuth),
+		"accounting-port=" + portOf(t, f.s.Addrs.RadiusAcct),
+		"timeout=5s",
+		"/radius incoming set accept=yes port=3799",
+		"use-radius=yes",
+		"login-by=http-pap",
+		"radius-accounting=yes",
+		"radius-interim-update=120s",
+		"VERIFY-ON-HARDWARE",
+		"extracted hotspot folder",
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("script lacks %q\n%s", want, script)
+		}
+	}
+	// match the port as a whole number, so a random port that is a substring of other digits does not trip the check
+	adminPort := regexp.MustCompile(`(^|[^0-9])` + portOf(t, f.s.Addrs.Admin) + `([^0-9]|$)`)
+	if adminPort.MatchString(script) {
+		t.Error("the admin port appears in the script")
+	}
+	// every RouterOS command line sits under a comment, and every unverified command says so
+	lines := strings.Split(script, "\n")
+	for i, l := range lines {
+		if strings.HasPrefix(l, "/") && (i == 0 || !strings.HasPrefix(lines[i-1], "#")) {
+			t.Errorf("command without a comment line above it: %q", l)
+		}
+	}
+	// settings changes show immediately
+	f.exec(`UPDATE settings SET accounting_interval_seconds=300, coa_port=3800, radius_shared_secret='another-one'`)
+	script, _ = f.script()
+	if !strings.Contains(script, "radius-interim-update=300s") || !strings.Contains(script, "port=3800") || !strings.Contains(script, `secret="another-one"`) || strings.Contains(script, "Sup3r-Secret-Value") {
+		t.Errorf("script did not follow the settings:\n%s", script)
+	}
+}
+
+// E8.03b characters RouterOS treats specially in the secret are escaped, and the server address stays a placeholder.
+func TestE8_03b_ScriptVariants(t *testing.T) {
+	f := newP8(t)
+	f.exec(`UPDATE settings SET radius_shared_secret=?`, `a"b$c\d?e`)
+	script, _ := f.script()
+	if !strings.Contains(script, `secret="a\"b\$c\\d\?e"`) {
+		t.Errorf("secret not escaped for RouterOS:\n%s", script)
+	}
+	// /radius needs an address, not a name: say so instead of guessing.
+	if !strings.Contains(script, "address=<SERVER-IP>") {
+		t.Errorf("the RADIUS address must be a placeholder:\n%s", script)
+	}
+	// a blind paste must not half-apply: no executable line may contain a placeholder
+	for _, l := range strings.Split(script, "\n") {
+		if strings.Contains(l, "<") && !strings.HasPrefix(l, "#") {
+			t.Errorf("placeholder in an executable line: %q", l)
+		}
+	}
+	if !strings.Contains(script, "# EDIT THEN UNCOMMENT") {
+		t.Error("commented-out commands lack the edit marker")
+	}
+}
+
+// E8.03c the page needs a login.
+func TestE8_03c_RouterPageNeedsLogin(t *testing.T) {
+	f := newP8(t)
+	anon := harness.NewAdminClient(t, f.s)
+	if r := anon.Get("/admin/router"); r.StatusCode == 200 {
+		t.Errorf("anonymous GET /admin/router: %d", r.StatusCode)
+	}
+}
+
+// E8.04 every download (all 8): a zip under hotspot/, no server template tokens, no plain-passwd anywhere,
+// no password in a URL. (Rewritten in Phase 12b for the 8 designs; the file lists are E12.01.)
+func TestE8_04_PackContents(t *testing.T) {
+	f := newP8(t)
+	for _, key := range []string{"mikrotik", "air", "midnight", "aurora", "dusk", "ripple", "sunrise", "ocean"} {
+		path := "/admin/router/pages/" + key + ".zip"
+		r := f.c.Get(path)
+		if r.StatusCode != 200 || r.Header.Get("Content-Type") != "application/zip" {
+			t.Fatalf("%s: %d %s", path, r.StatusCode, r.Header.Get("Content-Type"))
+		}
+		zr, err := zip.NewReader(bytes.NewReader([]byte(r.Body)), int64(len(r.Body)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, zf := range zr.File {
+			if !strings.HasPrefix(zf.Name, "hotspot/") {
+				t.Errorf("%s: %s is outside hotspot/", path, zf.Name)
+			}
+			rc, err := zf.Open()
+			if err != nil {
+				t.Fatal(err)
+			}
+			b, _ := io.ReadAll(rc)
+			rc.Close()
+			if bytes.Contains(b, []byte("plain-passwd")) {
+				t.Errorf("%s: %s contains plain-passwd", path, zf.Name)
+			}
+			if strings.HasSuffix(zf.Name, ".html") {
+				body := string(b)
+				for _, tok := range []string{"{{", "}}", "{%", "%}", "<no value>", "%!", "@THEME@", "@MESSAGES@"} {
+					if strings.Contains(body, tok) {
+						t.Errorf("%s: %s contains the template token %q", path, zf.Name, tok)
+					}
+				}
+				if regexp.MustCompile(`(?i)[?&;](pap|password|passwd)=`).MatchString(body) {
+					t.Errorf("%s: %s puts a password into a URL", path, zf.Name)
+				}
+			}
+		}
+	}
+}
+
+// E8.07 the router link status panel: last Access-Request / Accounting / Disconnect with time and source, bad
+// shared secrets counted with their source; in memory only (no DB writes, gone after a restart).
+func TestE8_07_LinkStatusPanel(t *testing.T) {
+	f := newP8(t)
+	panel := func() *goquery.Document { return f.c.Get("/admin/router").Doc(t) }
+
+	d := panel()
+	for _, k := range []string{"access-request", "accounting", "disconnect"} {
+		if got := link(t, d, k); got.at != "never" || got.from != "" {
+			t.Errorf("%s before any traffic: %+v", k, got)
+		}
+	}
+	if n := text(d.Find("[data-bad-secret-count]")); n != "0" {
+		t.Errorf("bad secret count %q", n)
+	}
+
+	f.member(f.plan("Basic"), "alice")
+	f.db.SetMaxOpenConns(1) // data_version is per connection
+	version := func() int64 { return scalar[int64](t, f.db, `PRAGMA data_version`) }
+	_ = version() // data_version only reports commits of OTHER connections once it has been read once
+	before := version()
+
+	// packets that change nothing in the database: an unknown user, a bad accounting authenticator, a wrong secret
+	f.fc.Advance(time.Minute) // 12:01:00
+	if r, err := f.nas.Authenticate("nobody", "x"); err != nil || r.Code != radius.CodeAccessReject {
+		t.Fatalf("login: %v %v", r, err)
+	}
+	f.fc.Advance(time.Minute) // 12:02:00
+	badAcct := fakenas.New(f.s.Addrs.RadiusAuth, "wrong-secret")
+	badAcct.AcctAddr, badAcct.Timeout = f.s.Addrs.RadiusAcct, 300*time.Millisecond
+	for range 2 {
+		if _, err := badAcct.Account(fakenas.Acct{Type: rfc2866.AcctStatusType_Value_Start, User: "alice", SessionID: "x"}); err == nil {
+			t.Fatal("bad accounting authenticator answered")
+		}
+	}
+	f.fc.Advance(time.Minute) // 12:03:00
+	badAuth := fakenas.New(f.s.Addrs.RadiusAuth, "wrong-secret")
+	badAuth.Timeout = 300 * time.Millisecond
+	if _, err := badAuth.Authenticate("alice", "pw123456"); err == nil {
+		t.Fatal("a wrong-secret Access-Request was answered")
+	}
+	badAuth.MessageAuth = false // the heuristic path: no Message-Authenticator to check
+	if _, err := badAuth.Authenticate("alice", "pw123456"); err == nil {
+		t.Fatal("a wrong-secret Access-Request without Message-Authenticator was answered")
+	}
+	f.fc.Advance(time.Minute) // 12:04:00
+	if r, err := f.nas.Account(fakenas.Acct{Type: rfc2866.AcctStatusType_Value_InterimUpdate, User: "nobody", SessionID: "u1"}); err != nil || r.Code != radius.CodeAccountingResponse {
+		t.Fatalf("accounting: %v %v", r, err)
+	}
+	if after := version(); after != before {
+		t.Errorf("the database changed (data_version %d -> %d): link status must be in memory only", before, after)
+	}
+
+	d = panel()
+	if got := link(t, d, "access-request"); got.at != "2026-11-01 12:01:00" || got.from != "127.0.0.1" {
+		t.Errorf("last Access-Request: %+v", got)
+	}
+	if got := link(t, d, "accounting"); got.at != "2026-11-01 12:04:00" || got.from != "127.0.0.1" {
+		t.Errorf("last Accounting: %+v", got)
+	}
+	if got := link(t, d, "disconnect"); got.at != "never" {
+		t.Errorf("last Disconnect: %+v", got)
+	}
+	// 2 bad accounting authenticators + 2 wrong-secret Access-Requests (with and without Message-Authenticator), all from this machine
+	if n := text(d.Find("[data-bad-secret-count]")); n != "4" {
+		t.Errorf("bad secret count %q, want 4", n)
+	}
+	src := d.Find("[data-bad-secret-from]")
+	if src.Length() != 1 || src.AttrOr("data-bad-secret-from", "") != "127.0.0.1" || text(src.Find("[data-count]")) != "4" || text(src.Find("[data-at]")) != "2026-11-01 12:03:00" {
+		t.Errorf("bad secret sources: %s", text(d.Find("[data-bad-secret-sources]")))
+	}
+
+	// a Disconnect: ACK
+	f.online("alice", "s1", "192.168.88.10", "AA:BB:CC:DD:EE:01")
+	f.fc.Advance(time.Minute) // 12:05:00
+	if r := f.c.Send("POST", spath(f.sessionDBID("s1")), nil); r.StatusCode != 200 {
+		t.Fatalf("kick: %d", r.StatusCode)
+	}
+	d = panel()
+	got := link(t, d, "disconnect")
+	if got.at != "2026-11-01 12:05:00" || got.from != "127.0.0.1" || !strings.Contains(text(d.Find(`[data-link="disconnect"]`)), "ACK") {
+		t.Errorf("last Disconnect: %+v / %s", got, text(d.Find(`[data-link="disconnect"]`)))
+	}
+}
+
+// E8.07b the panel is empty again after a restart.
+func TestE8_07b_PanelResetsOnRestart(t *testing.T) {
+	fc := clock.NewFake(t0)
+	s := harness.Start(t, harness.Options{Clock: fc})
+	db := harness.DB(t, s.DataDir)
+	secret := scalar[string](t, db, `SELECT radius_shared_secret FROM settings`)
+	nas := fakenas.New(s.Addrs.RadiusAuth, secret)
+	if _, err := nas.Authenticate("x", "y"); err != nil {
+		t.Fatal(err)
+	}
+	c := harness.LoginAsAdmin(t, s)
+	if got := link(t, c.Get("/admin/router").Doc(t), "access-request"); got.from != "127.0.0.1" {
+		t.Fatalf("before restart: %+v", got)
+	}
+	s.Stop()
+	s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey, Clock: fc})
+	c2 := harness.NewAdminClient(t, s2)
+	c2.Login("admin", harness.AdminPassword)
+	if got := link(t, c2.Get("/admin/router").Doc(t), "access-request"); got.at != "never" {
+		t.Errorf("after restart: %+v", got)
+	}
+}
+
+// E8.12 the router page: no-store, the copy behaviour comes from the static script (no inline script).
+func TestE8_12_RouterPageAssets(t *testing.T) {
+	f := newP8(t)
+	r := f.c.Get("/admin/router")
+	if r.Header.Get("Cache-Control") != "no-store" {
+		t.Errorf("Cache-Control %q", r.Header.Get("Cache-Control"))
+	}
+	d := r.Doc(t)
+	clip := ""
+	d.Find("script[src]").Each(func(_ int, s *goquery.Selection) {
+		if src := s.AttrOr("src", ""); strings.HasPrefix(src, "/admin/static/js/clipboard.js?v=") {
+			clip = src
+		}
+	})
+	if clip == "" {
+		t.Error("page does not load /admin/static/js/clipboard.js?v=<hash>")
+	}
+	d.Find("script").Each(func(_ int, s *goquery.Selection) {
+		if _, has := s.Attr("src"); !has {
+			t.Errorf("inline script: %s", s.Text())
+		}
+	})
+	if d.Find("button[data-copy-target]").Length() != 1 || d.Find("button[onclick]").Length() != 0 {
+		t.Error("copy button must be markup-only with data-copy-target")
+	}
+	js := f.c.Get(clip)
+	if js.StatusCode != 200 || !strings.Contains(js.Body, "data-copy-target") {
+		t.Errorf("clipboard.js: %d", js.StatusCode)
 	}
 }
