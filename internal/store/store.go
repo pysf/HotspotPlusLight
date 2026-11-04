@@ -16,8 +16,7 @@ type Store struct{ db *sql.DB }
 // PLAN.md section 6. _txlock=immediate makes every write transaction take the
 // write lock up front (single-writer, no upgrade deadlocks).
 func Open(path string) (*Store, error) {
-	dsn := fmt.Sprintf("file:%s?_txlock=immediate&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)", path)
-	db, err := sql.Open("sqlite", dsn)
+	db, err := sql.Open("sqlite", DSN(path))
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,32 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        if: runner.os == 'Linux'
+        run: test -z "$(gofmt -l .)"
+      - name: vet
+        run: go vet ./...
+      - name: test (race)
+        if: runner.os == 'Linux'
+        run: go test -race -count=1 ./...
+      # The race detector needs cgo on Windows, so it is not used there.
+      - name: test
+        if: runner.os == 'Windows'
+        run: go test -count=1 ./...
+        env:
+          HSP_TEST_WINDOWS_SERVICE: "1" # E11.33: the runner is Administrator

@@ -535,7 +535,7 @@ There is **no** server-rendered member page, cookie, language switch, plan list,
 ### 9.1 Layout
 ```
 HotspotPlusLight/
-  cmd/hotspotpluslight/        main.go (subcommands) — only calls internal/app
+  cmd/hotspotpluslight/        main.go (subcommands), envfile.go (--env-file), service_windows.go / service_other.go (Windows service, Phase 11c) — only calls internal/app
   internal/app/                composition root: builds config, store, services, servers; lifecycle, graceful shutdown. The ONLY place that wires concrete types; no globals, no init()
   internal/config/             env/flags
   internal/clock/              Clock interface + real and fake implementations
@@ -562,6 +562,8 @@ HotspotPlusLight/
 
 ### 9.2 Configuration (environment, all `HSP_` prefixed)
 `DATA_DIR` (db + branding), `HTTP_ADDR` (:8080, page API + `/healthz`), `ADMIN_ADDR` (:8081, admin panel — D23), `RADIUS_AUTH_ADDR` (:1812), `RADIUS_ACCT_ADDR` (:1813), `SECRET_KEY` (base64 32 bytes: AES-GCM key; **required**, losing it makes stored passwords unrecoverable), first-boot seeds: `ADMIN_USERNAME` (default `admin`; the password is `admin` until the first login changes it, O15), `RADIUS_SHARED_SECRET`; `LOG_LEVEL`; `DEV` (`1` = serve the component gallery at `/admin/dev/components`, off by default, Phase 10).
+
+**Command line (Phase 11c, 2026-11-04).** `hotspotpluslight [--env-file <path>] serve | admin set-password [--stdin] | gen-key | service install [--dir <folder>] | uninstall | start | stop | version`. `--env-file` (for `serve` and `admin set-password`) reads `KEY=VALUE` lines (`#` comments, trimmed, optional quotes); a real environment variable wins over the file. `gen-key` prints a new `HSP_SECRET_KEY` (base64 of 32 random bytes), so `openssl` is not needed. The `service` commands work on Windows only: `install` (Administrator) creates the folder (default `C:\ProgramData\HotspotPlusLight`), writes `hsp.env` with a new key and `HSP_DATA_DIR=<folder>\data` if it is missing, and registers the auto-start service `HotspotPlusLight` that runs `serve --env-file <folder>\hsp.env`, with restart on failure. Under the service, logs and the first-start block go to `<folder>\hsp.log`. The SQLite path is turned into a safe `file:` URI by `store.DSN` (drive letters, spaces, `#`, `?`). Build: `make build-windows` (pure Go, no cgo).
 
 ### 9.3 Concurrency and time
 SQLite single writer: all mutating work in short transactions; accounting handlers run synchronously per packet (fast). `Clock` is injected everywhere so tests control time. Background jobs: session pruning (daily), nothing else.

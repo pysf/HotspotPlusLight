@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -205,7 +206,11 @@ func Binary(t *testing.T) string {
 			buildErr = err
 			return
 		}
-		binPath = filepath.Join(dir, "hotspotpluslight")
+		name := "hotspotpluslight"
+		if runtime.GOOS == "windows" {
+			name += ".exe"
+		}
+		binPath = filepath.Join(dir, name)
 		cmd := exec.Command("go", "build", "-o", binPath, "./cmd/hotspotpluslight")
 		cmd.Dir = moduleRoot()
 		if out, err := cmd.CombinedOutput(); err != nil {

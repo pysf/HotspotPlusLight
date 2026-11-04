@@ -534,20 +534,27 @@ func TestE8_08_LogFormatAndSignal(t *testing.T) {
 		for !strings.Contains(se.String(), "listening") && time.Now().Before(deadline) {
 			time.Sleep(20 * time.Millisecond)
 		}
-		cmd.Process.Signal(syscall.SIGTERM)
-		waited := make(chan error, 1)
-		go func() { waited <- cmd.Wait() }()
-		select {
-		case err := <-waited:
-			if err != nil {
-				t.Errorf("format %q: exit after SIGTERM: %v\n%s", format, err, se.String())
-			}
-		case <-time.After(10 * time.Second):
+		if runtime.GOOS == "windows" {
+			// Windows cannot send SIGTERM to a child process. Kill it and skip only the
+			// signal checks; graceful stop on Windows is covered by E11.33 (it asserts "shutdown complete" in hsp.log).
 			cmd.Process.Kill()
-			t.Fatalf("format %q: no exit after SIGTERM", format)
+			cmd.Wait()
+		} else {
+			cmd.Process.Signal(syscall.SIGTERM)
+			waited := make(chan error, 1)
+			go func() { waited <- cmd.Wait() }()
+			select {
+			case err := <-waited:
+				if err != nil {
+					t.Errorf("format %q: exit after SIGTERM: %v\n%s", format, err, se.String())
+				}
+			case <-time.After(10 * time.Second):
+				cmd.Process.Kill()
+				t.Fatalf("format %q: no exit after SIGTERM", format)
+			}
 		}
 		logs := se.String()
-		if !strings.Contains(logs, "shutdown complete") {
+		if runtime.GOOS != "windows" && !strings.Contains(logs, "shutdown complete") {
 			t.Errorf("format %q: no 'shutdown complete' in\n%s", format, logs)
 		}
 		if !strings.Contains(so.String(), "password: admin") || strings.Contains(logs, "password: admin") || strings.Contains(logs, "Env-Seeded-Secret-77") {

@@ -1,10 +1,18 @@
-.PHONY: build run set-password reset-password vet test ci clean generate
+.PHONY: build build-windows build-all run set-password reset-password vet test ci clean generate
 
 # Key used by `make run` when HSP_SECRET_KEY is not set. Created once, kept out of git.
 DEV_KEY_FILE := .dev-secret-key
 
+VERSION ?= dev
+
 build:
-	go build -o bin/hotspotpluslight ./cmd/hotspotpluslight
+	go build -ldflags "-X main.version=$(VERSION)" -o bin/hotspotpluslight ./cmd/hotspotpluslight
+
+# Windows 64-bit build (pure Go, no cgo): bin/hotspotpluslight.exe
+build-windows:
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$(VERSION)" -o bin/hotspotpluslight.exe ./cmd/hotspotpluslight
+
+build-all: build build-windows
 
 # Build and start the whole stack (public :8080, admin :8081, RADIUS :1812/:1813) with data in ./data.
 run: build

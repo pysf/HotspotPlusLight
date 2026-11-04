@@ -18,6 +18,10 @@ export HSP_SECRET_KEY="$(openssl rand -base64 32)"   # keep it: see Backup
 ./bin/hotspotpluslight serve
 ```
 
+`./bin/hotspotpluslight gen-key` prints a new key, so `openssl` is not needed. Instead of environment variables you can put `KEY=VALUE` lines in a file and start with `serve --env-file <file>` (also works for `admin set-password`). A real environment variable wins over the file.
+
+On Windows, build with `make build-windows` (bin/hotspotpluslight.exe, pure Go). To run it as a Windows service, open a terminal as Administrator and run `hotspotpluslight.exe service install` (default folder `C:\ProgramData\HotspotPlusLight`, change it with `--dir`). This creates `hsp.env` with a new secret key, and the service starts with Windows and restarts after a crash. Then run `hotspotpluslight.exe service start`. Logs and the first-start block are in `hsp.log` in that folder. Use `service stop` and `service uninstall` to stop and remove it; your data is kept. Keep a copy of `hsp.env`: the key is needed to read stored passwords. To reset the admin password later, run `hotspotpluslight.exe admin set-password --env-file C:\ProgramData\HotspotPlusLight\hsp.env` (use your own folder if you changed `--dir`). In the env file, a space followed by `#` starts a comment in an unquoted value. Allow ports 8080, 8081 (TCP) and 1812, 1813 (UDP) in the Windows firewall.
+
 `make run` builds and starts everything with data in `./data` (it keeps a development key in the git-ignored `.dev-secret-key`). `make test` runs all tests with the race detector, `make ci` runs `go vet` and the tests.
 
 The admin CSS and JS are plain files in `internal/web/static/` (no build step, no Node). The server bundles and hashes them at startup. Set `HSP_DEV=1` to see every UI component at `/admin/dev/components`. See `docs/ui-notes.md`.

@@ -107,3 +107,5 @@ Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **
 - **Phase 11a (enforcement in two layers) is built (2026-11-04), not committed.** Decisions O3/O4 changed by the owner: exact router limits plus server-side Disconnect on Interim. Notes: `docs/phase11-notes.md`. Hardware items in `PLAN.md` §13.
 
 - **Phase 11b (default admin/admin and the password page) is built (2026-11-04), not committed.** Migration 0003 `admin.must_change_password`; page `GET/PUT /admin/password`; forced-change middleware; new BR-20; `password.js`. Notes: `docs/phase11-notes.md` (Step B).
+
+- **Phase 11c (Windows) is built (2026-11-04), not committed, not run on real Windows.** `store.DSN`, `gen-key`, `--env-file`, `service install|uninstall|start|stop`, `make build-windows`, GitHub Actions CI (Linux + Windows, E11.33 smoke test). Notes: `docs/phase11-notes.md` (Step C).

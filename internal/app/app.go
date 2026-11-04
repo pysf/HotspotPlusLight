@@ -42,7 +42,8 @@ import (
 type Options struct {
 	Getenv     func(string) string // default os.Getenv
 	Stdout     io.Writer           // first-start password block; default os.Stdout
-	Logger     *slog.Logger        // default text logger on stderr at HSP_LOG_LEVEL
+	Logger     *slog.Logger        // default text logger on LogWriter at HSP_LOG_LEVEL
+	LogWriter  io.Writer           // default os.Stderr (the Windows service uses a log file)
 	Clock      clock.Clock         // default real clock
 	Migrations fs.FS               // default embedded migrations (tests inject others)
 	// Disconnector sends RADIUS Disconnect-Requests (BR-18). Default: the real
@@ -51,6 +52,8 @@ type Options struct {
 	// AccountingBeforeCommit runs inside each accounting transaction just before the
 	// commit; an error rolls it back and the packet gets no reply (crash injection, E4.15).
 	AccountingBeforeCommit func() error
+	// Ready, if set, is called by Run once all listeners are bound (the Windows service reports Running then).
+	Ready func()
 }
 
 // Addrs are the bound listener addresses (useful when configured with port 0).
@@ -104,7 +107,11 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	}
 	log := opts.Logger
 	if log == nil {
-		log = newLogger(os.Stderr, cfg)
+		lw := opts.LogWriter
+		if lw == nil {
+			lw = os.Stderr
+		}
+		log = newLogger(lw, cfg)
 	}
 	box, err := secret.NewBox(cfg.SecretKey)
 	if err != nil {
@@ -399,6 +406,9 @@ func Run(ctx context.Context, opts Options) error {
 	if err := a.Start(); err != nil {
 		a.store.Close()
 		return err
+	}
+	if opts.Ready != nil {
+		opts.Ready()
 	}
 	<-ctx.Done()
 	sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

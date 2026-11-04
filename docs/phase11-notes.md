@@ -91,3 +91,32 @@ Harness: `LoginAsAdmin` reads the flag from the DB. If it is set, it logs in wit
 
 ## Known gaps (step B)
 - Until the first password change, anyone who can reach port 8081 can log in with `admin` / `admin`. The README tells the owner to log in right after the first start.
+
+## Step C: Windows (Phase 11c)
+What was built:
+- `store.DSN` builds the SQLite `file:` URI. It works the same on every OS. Drive letters become `file:///C:/...`, backslashes become slashes (only for paths that look like Windows paths), and spaces, `#`, `?`, `%` are escaped. Test E11.30.
+- `gen-key` prints a new `HSP_SECRET_KEY`. Test E11.31.
+- `--env-file <path>` for `serve` and `admin set-password`. Real env wins over the file. Test E11.32.
+- `service install | uninstall | start | stop` (`service_windows.go`). On other systems they print an error (`service_other.go`).
+- `app.Options.LogWriter` lets the service send logs to `hsp.log`.
+- `make build-windows`, `make build-all`.
+- Harness adds `.exe` on Windows. E8.08 kills the child on Windows instead of sending SIGTERM and skips the "shutdown complete" check there.
+- `.github/workflows/ci.yml`: Linux (gofmt, vet, race tests) and Windows (vet, tests, and the service smoke test E11.33 with `HSP_TEST_WINDOWS_SERVICE=1`).
+
+Decisions I made (please check):
+- `install` restricts the folder to SYSTEM and Administrators with `icacls` (by SID, so it works in any Windows language), because `hsp.env` holds the secret key. It does this also when `hsp.env` already exists. If icacls fails, the install stops with an error.
+- Recovery actions: restart after 5 s, 15 s, 60 s; the failure counter resets after one day. They also apply when the service exits with code 1 (not only on a crash).
+- `install` fails if the service already exists. `uninstall` stops the service first and keeps the data. If the stop fails or takes more than 30 s, it returns the error and does not delete the service.
+- If the app ends by itself under the service (for example a bad config), the service exits with code 1, so Windows restarts it.
+- The service reports Running only after the listeners are bound (`app.Options.Ready`). If the app fails before that, it exits with code 1 and never reports Running.
+- `service install` prints how to reset the admin password (`admin set-password --env-file <dir>\hsp.env`). The README says it too.
+- On Windows, `store.DSN` also turns backslashes into slashes in relative paths.
+- In the env file, an unquoted value loses a trailing ` #comment` (space, then `#`). `ab#cd` is kept. Quoted values are kept as they are.
+- Graceful stop on Windows is checked by E11.33 ("shutdown complete" in hsp.log). E8.08 only kills the child there.
+- The `env file` accepts one pair of quotes around a value, and a leading BOM.
+- Backslashes are changed to slashes in the DSN only for Windows-looking paths (drive letter or `\\server`), so a Unix file name with a backslash still works.
+
+Can only be checked on real Windows (CI runs E11.33 there):
+- The whole service life cycle, the recovery actions, `icacls`, stop within 30 s.
+- Windows firewall prompts for ports 8080, 8081, 1812, 1813.
+- SQLite WAL files on Windows paths with spaces (the CI test uses a path with a space).
