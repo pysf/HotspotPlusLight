@@ -26,14 +26,15 @@ build-cross:
 	  os=$${p%/*}; arch=$${p#*/}; ext=""; [ $$os = windows ] && ext=".exe"; \
 	  echo "build $$os/$$arch"; \
 	  GOOS=$$os GOARCH=$$arch GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" \
-	    -o dist/hotspotpluslight-$(VERSION)-$$os-$$arch$$ext ./cmd/hotspotpluslight; \
+	    -o dist/hotspotpluslight-$$os-$$arch$$ext ./cmd/hotspotpluslight; \
 	done
 
 # Release: build all platforms, pack each (.zip for windows, .tar.gz for the rest) and write dist/SHA256SUMS.
+# File names have no version (hotspotpluslight-<os>-<arch>.tar.gz) so releases/latest/download/<name> works. The version is inside the binary.
 # Each archive holds the binary (named hotspotpluslight[.exe]), README.md and LICENSE (if the file exists).
 release: build-cross
 	@set -e; cd dist; \
-	for f in hotspotpluslight-$(VERSION)-*; do \
+	for f in hotspotpluslight-*; do \
 	  case $$f in *.zip|*.tar.gz) continue;; esac; \
 	  base=$${f%.exe}; tmp=$$(mktemp -d); \
 	  case $$f in \

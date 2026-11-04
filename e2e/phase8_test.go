@@ -541,7 +541,8 @@ func TestE8_08_LogFormatAndSignal(t *testing.T) {
 	}
 }
 
-// E8.09 the README covers install, configuration, first start, router setup, listeners, backup and the lab checklist.
+// E8.09 the README is technical (Phase 13a, owner 2026-11-04): ASCII only, diagrams, the legacy link, license,
+// make targets, the perf markers and the site link. The user and install content moved to the site (E13.x in 13b).
 func TestE8_09_Readme(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join(harness.ModuleRoot(), "README.md"))
 	if err != nil {
@@ -549,23 +550,25 @@ func TestE8_09_Readme(t *testing.T) {
 	}
 	r := string(b)
 	for _, want := range []string{
-		"make build", "HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "HSP_LOG_LEVEL", "HSP_LOG_FORMAT",
-		"first start", "make set-password", "admin set-password",
-		"/admin/router", "hotspot folder",
-		"8081", "firewall",
-		"sqlite3 hsp.db", "unrecoverable",
-		"[Unit]", "ExecStart=", "PLAN.md", "VERIFY-ON-HARDWARE",
+		"HotspotPlus Lite", "https://github.com/pysf/hotspotplus", "AGPL-3.0",
+		"https://pysf.github.io/HotspotPlusLight/", "PLAN.md", "CLAUDE.md", "VERIFY-ON-HARDWARE",
+		"make run", "make test", "make ci", "make generate", "make perf", "make perf-quick", "make release", "make build-cross",
+		"<!-- perf:start -->", "<!-- perf:end -->",
+		"flowchart", "sequenceDiagram", "1812", "1813", "3799", "8081",
 	} {
 		if !strings.Contains(r, want) {
 			t.Errorf("README lacks %q", want)
 		}
+	}
+	if n := strings.Count(r, "```mermaid"); n < 5 {
+		t.Errorf("README has %d mermaid blocks, want at least 5 (architecture + 4 sequences)", n)
 	}
 	for _, gone := range []string{"public_base_url", "walled garden", "walled-garden", "8080", "HSP_HTTP_ADDR", "Public base URL"} {
 		if strings.Contains(r, gone) {
 			t.Errorf("README still mentions %q (removed in Phase 12a)", gone)
 		}
 	}
-	if regexp.MustCompile(`[^\x00-\x7F]`).MatchString(strings.ReplaceAll(strings.ReplaceAll(r, "—", "-"), "…", "...")) {
+	if regexp.MustCompile(`[^\x00-\x7F]`).MatchString(r) {
 		t.Error("README contains non-ASCII text (English only)")
 	}
 	for _, name := range []string{"Dockerfile", "docker-compose.yml"} {

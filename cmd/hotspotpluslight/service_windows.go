@@ -209,7 +209,7 @@ func installService(dir string, stdout io.Writer) error {
 		if _, err := rand.Read(key); err != nil {
 			return err
 		}
-		body := fmt.Sprintf("# HotspotPlusLight settings. Keep a copy of HSP_SECRET_KEY with your backups.\nHSP_SECRET_KEY=%s\nHSP_DATA_DIR=%s\n",
+		body := fmt.Sprintf("# HotspotPlus Lite settings. Keep a copy of HSP_SECRET_KEY with your backups.\nHSP_SECRET_KEY=%s\nHSP_DATA_DIR=%s\n",
 			base64.StdEncoding.EncodeToString(key), dataDir)
 		if err := os.WriteFile(envFile, []byte(body), 0o600); err != nil {
 			return err
@@ -217,7 +217,7 @@ func installService(dir string, stdout io.Writer) error {
 		fmt.Fprintln(stdout, "Created", envFile)
 	}
 	s, err := m.CreateService(serviceName, exe, mgr.Config{
-		DisplayName: "HotspotPlusLight",
+		DisplayName: "HotspotPlus Lite",
 		Description: "Hotspot member manager and RADIUS server",
 		StartType:   mgr.StartAutomatic,
 	}, "serve", "--env-file", envFile)

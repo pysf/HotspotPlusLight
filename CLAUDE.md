@@ -76,6 +76,47 @@ The legacy usage data lived in ClickHouse (`Session` = per-packet **delta** rows
 7. **Enforcement in two layers (owner, 2026-11-04; replaces the legacy-faithful gap).** The router gets exact limits at login (`Mikrotik-Xmit/Recv-Limit` + Gigawords, `Session-Timeout` = smallest of time left, `expires_at`, window end). The server also disconnects by itself: on each Start/Interim of an open session, `session.Enforcer` runs `domain.ShouldEnd` and sends a Disconnect (row ends `Server: <CODE>`). Do not add a second implementation of the rule; keep `MONITOR:` comments only for real remaining gaps (up to one interval of overshoot; Disconnect is best effort).
 8. **Do not guess RouterOS/RADIUS vendor details.** The MikroTik attribute ids, the CoA attribute set, and `login-by` behaviour must be verified (`PLAN.md` §13). Mark anything unverified in code comments with `VERIFY-ON-HARDWARE`.
 
+## Go comments (owner, 2026-11-04)
+
+These rules apply to every comment:
+
+- Use `//` line comments. The only exception is a long package comment.
+- Write **complete sentences**. Exception: a short end-of-line comment can be a fragment:
+  ```go
+  limit := cfg.Limit // zero means no limit
+  ```
+- **Keep comments up to date.** When you change logic, update or remove the comments around it.
+- **No comment is better than a useless one.** If the name already says it, write nothing.
+- **Keep it short.** Use one sentence if you can, two at most. Write more only for a rule or a reason that the reader cannot see in the code.
+
+The project tags `MONITOR:` (rule 7) and `VERIFY-ON-HARDWARE` (rule 8) still apply. Keep them short too.
+
+### Doc comments
+
+For comments directly above a declaration (`package`, `func`, `type`, `const`, `var`), exported or not:
+
+- Put the comment directly above the declaration, with no blank line.
+- The first sentence **must start with the name being declared**:
+  ```go
+  // FindByID retrieves a campaign by its unique identifier.
+  func FindByID(ctx context.Context, id int) (*Campaign, error) {
+  ```
+- For functions and methods, say what they return. If they return nothing or only an error, say what they do. Say what happens in special cases, for example nil input or an empty result. List only the errors the caller must handle.
+- Do not explain how the code works inside. Only mention details the caller needs, for example that it is slow.
+- Add the package comment in only one file of the package. Start it with `Package <name>`:
+  ```go
+  // Package abtesting implements A/B testing experiment management.
+  package abtesting
+  ```
+
+### Other comments
+
+For comments inside a function body and at the end of a line:
+
+- **Explain why, not what.** Do not repeat what the code already shows. Explain the business rule, the special case, or the reason for the approach.
+- **Document constraints and workarounds.** If a line looks slow, strange or surprising, say why it is needed.
+- **Refactor before commenting.** If a block needs a comment only to explain what it does, first try a better name or a smaller function.
+
 ## Phase workflow (owner, 2026-11-01)
 Each phase is done by its own agent: tests first (E2E ids from `PLAN.md` §11), implement until green, **do not commit**. Then the orchestrator: (1) re-runs `gofmt -l .`, `go vet ./...`, `go test -race -count=1 ./...`; (2) starts a **separate review agent** (fresh context, not the implementing agent) that runs the `code-review` skill at `medium` on the uncommitted changes and reports findings; real findings are fixed (by a fix agent or by the orchestrator) and the tests re-run; (3) commits with a `Phase N: …` message; (4) only then starts the next phase.
 
@@ -115,3 +156,5 @@ Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **
 - **Phase 12a (drop the page API and :8080) is built (2026-11-04), not committed.** No page API, no public listener, no MAC auto-login, no `public_base_url` / `mac_auto_login` / `after_login_url` (migration 0004), `/healthz` on the admin listener, Reply-Message = code only. The old router pack still builds, with no server calls; Phase 12b replaces it. Notes: `docs/phase12-notes.md`.
 
 - **Phase 12b (new router pages) is built (2026-11-04), not committed.** `internal/routerpack` is now `mikrotik/` + `src/` (7 themes); the admin Router page shows 8 cards with previews and downloads (`/admin/router/pages/{key}.zip`, `/preview`). The 38-theme pack and its tests are gone. Notes: `docs/phase12-notes.md`. Needs hardware: the `$(if error == ...)` match and the status page variables (`PLAN.md` section 13, items 9 to 14).
+
+- **Phase 13a (license, public name, technical README, release names) is built (2026-11-04), not committed.** Public name "HotspotPlus Lite" (binary, module, repo, service keep `hotspotpluslight`), AGPL-3.0 `LICENSE`, README is technical only (install and user docs move to the site, 13b), release files have stable names without the version, `.github/workflows/release.yml`. Notes: `docs/phase13-notes.md`.

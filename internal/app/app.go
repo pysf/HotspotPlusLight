@@ -244,7 +244,7 @@ func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
 	if !seeded {
 		return nil
 	}
-	fmt.Fprintf(opts.Stdout, "=== HotspotPlusLight first start ===\nLog in with username: %s  password: admin\nYou will be asked to set a new password right after you log in.\nForgot it later? Run: hotspotpluslight admin set-password\n====================================\n",
+	fmt.Fprintf(opts.Stdout, "=== HotspotPlus Lite first start ===\nLog in with username: %s  password: admin\nYou will be asked to set a new password right after you log in.\nForgot it later? Run: hotspotpluslight admin set-password\n====================================\n",
 		a.cfg.AdminUsername)
 	a.log.Info("admin account created with the default password; it must be changed at first login")
 	return nil

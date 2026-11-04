@@ -164,7 +164,7 @@ func Layout(d LayoutData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " - HotspotPlusLight</title><link rel=\"stylesheet\" href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " - HotspotPlus Lite</title><link rel=\"stylesheet\" href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -263,7 +263,7 @@ func Layout(d LayoutData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"l-shell\"><aside id=\"sidebar\" class=\"l-sidebar\"><a class=\"l-brand\" href=\"/admin/members\"><span class=\"l-brand__mark\" aria-hidden=\"true\"></span> HotspotPlusLight</a><nav aria-label=\"Main\" class=\"l-nav\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"l-shell\"><aside id=\"sidebar\" class=\"l-sidebar\"><a class=\"l-brand\" href=\"/admin/members\"><span class=\"l-brand__mark\" aria-hidden=\"true\"></span> HotspotPlus Lite</a><nav aria-label=\"Main\" class=\"l-nav\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

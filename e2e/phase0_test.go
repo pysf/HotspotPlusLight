@@ -37,7 +37,7 @@ func TestE0_01_FirstBootCreatesDBAdminSettings(t *testing.T) {
 		t.Fatalf("admin username %q", u)
 	}
 	out := s.Stdout.String()
-	for _, want := range []string{"=== HotspotPlusLight first start ===", "username: admin", "password: admin", "set a new password", "hotspotpluslight admin set-password"} {
+	for _, want := range []string{"=== HotspotPlus Lite first start ===", "username: admin", "password: admin", "set a new password", "hotspotpluslight admin set-password"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("stdout lacks %q:\n%s", want, out)
 		}
@@ -156,17 +156,15 @@ func TestE0_06_WrongKeyRefusesToStart(t *testing.T) {
 	harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey})
 }
 
-// E0.07 README documents the backup procedure and keeping SECRET_KEY with it.
-func TestE0_07_ReadmeBackupNote(t *testing.T) {
+// E0.07 (changed 2026-11-04, Phase 13a) the backup text and the systemd example moved from the README to the
+// user docs site; their check moves to the site test in 13b. Here: no Dockerfile, and the README points to the site.
+func TestE0_07_ReadmeLinksToSiteNoDockerfile(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join(harness.ModuleRoot(), "README.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := string(b)
-	for _, want := range []string{`sqlite3 hsp.db ".backup`, "HSP_SECRET_KEY", "systemd"} {
-		if !strings.Contains(r, want) {
-			t.Errorf("README lacks %q", want)
-		}
+	if !strings.Contains(string(b), "https://pysf.github.io/HotspotPlusLight/") {
+		t.Error("README does not link to the user docs site")
 	}
 	if _, err := os.Stat(filepath.Join(harness.ModuleRoot(), "Dockerfile")); err == nil {
 		t.Error("Dockerfile must not exist")

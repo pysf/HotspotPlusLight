@@ -38,7 +38,7 @@ func SetupScript(c ScriptConfig) string {
 	}
 	var b strings.Builder
 	line := func(format string, a ...any) { fmt.Fprintf(&b, format+"\n", a...) }
-	line("# HotspotPlusLight router setup (RouterOS). Paste into a RouterOS terminal, or save as setup.rsc and /import it.")
+	line("# HotspotPlus Lite router setup (RouterOS). Paste into a RouterOS terminal, or save as setup.rsc and /import it.")
 	line("# Every command below is VERIFY-ON-HARDWARE: it follows the plan and has not been run on a real router yet.")
 	line("")
 	line("# 1. RADIUS server (PAP login and accounting).")
