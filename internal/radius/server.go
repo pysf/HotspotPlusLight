@@ -12,6 +12,8 @@ import (
 	"log/slog"
 	"net"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -58,6 +60,13 @@ type LinkRecorder interface {
 }
 
 // Server owns the auth and accounting packet servers.
+//
+// Shutdown does NOT use radius.PacketServer.Shutdown. That method has a race in
+// layeh.com/radius@v0.0.0-20231213012653 (server-packet.go): Serve registers its
+// listener and only later calls activeAdd(). A Shutdown in that gap drives the
+// active count to -1 twice and closes lastActive twice ("close of closed
+// channel"). We stop the read loops ourselves (stoppableConn) and count the
+// handlers in flight with our own WaitGroup.
 type Server struct {
 	log     *slog.Logger
 	secrets SecretProvider
@@ -66,42 +75,79 @@ type Server struct {
 	link    LinkRecorder
 	auth    *radius.PacketServer
 	acct    *radius.PacketServer
-	conns   []net.PacketConn
+
+	mu       sync.Mutex
+	stopping bool
+	inflight sync.WaitGroup // handlers in flight
+	loops    sync.WaitGroup // Serve loops
+	conns    []net.PacketConn
+	stoppers []*lateCloseConn
 }
 
 func New(secrets SecretProvider, login Authenticator, acctg Accountant, link LinkRecorder, log *slog.Logger) *Server {
 	src := secretSource{secrets}
 	s := &Server{log: log, secrets: secrets, login: login, acctg: acctg, link: link}
-	s.auth = &radius.PacketServer{SecretSource: src, Handler: radius.HandlerFunc(s.handleAuth)}
-	s.acct = &radius.PacketServer{SecretSource: src, Handler: radius.HandlerFunc(s.handleAcct)}
+	s.auth = &radius.PacketServer{SecretSource: src, Handler: s.track(s.handleAuth)}
+	s.acct = &radius.PacketServer{SecretSource: src, Handler: s.track(s.handleAcct)}
 	return s
+}
+
+// track counts a handler as in flight. After Shutdown began, new packets are dropped
+// (the router retransmits).
+func (s *Server) track(h radius.HandlerFunc) radius.Handler {
+	return radius.HandlerFunc(func(w radius.ResponseWriter, r *radius.Request) {
+		s.mu.Lock()
+		if s.stopping {
+			s.mu.Unlock()
+			return
+		}
+		s.inflight.Add(1)
+		s.mu.Unlock()
+		defer s.inflight.Done()
+		h(w, r)
+	})
 }
 
 // Serve runs both listeners on the given connections until Shutdown.
 func (s *Server) Serve(authConn, acctConn net.PacketConn) {
+	a := &lateCloseConn{PacketConn: authConn}
+	b := &lateCloseConn{PacketConn: acctConn, onRead: s.sniffAcct}
+	s.mu.Lock()
 	s.conns = []net.PacketConn{authConn, acctConn}
-	go s.run("auth", s.auth, &lateCloseConn{PacketConn: authConn})
-	go s.run("acct", s.acct, &lateCloseConn{PacketConn: acctConn, onRead: s.sniffAcct})
+	s.stoppers = []*lateCloseConn{a, b}
+	s.loops.Add(2)
+	s.mu.Unlock()
+	go s.run("auth", s.auth, a)
+	go s.run("acct", s.acct, b)
 }
 
-// lateCloseConn lets requests in flight at shutdown still be answered. The
-// library closes its listeners the moment Shutdown starts and only then waits
-// for the running handlers, so their replies would fail. Close here only stops
-// the reading (an immediate read deadline); the socket is really closed by
-// Server.Shutdown once every handler has finished. The library calls Close only
-// from its own Shutdown, after it set its shutdown flag, so a deadline error is
-// always read as "shutting down" and never retried as a temporary error; and
-// Server.Shutdown closes the real sockets even if a Serve loop ended early. onRead, if set, sees every
-// datagram before the library does.
+// lateCloseConn lets requests in flight at shutdown still be answered. stop only
+// ends the reading (an immediate read deadline, and ReadFrom then returns
+// net.ErrClosed, which the library treats as fatal and not as a temporary error);
+// the socket is really closed by Server.Shutdown once every handler has finished.
+// Close is a no-op for the same reason. onRead, if set, sees every datagram before
+// the library does.
 type lateCloseConn struct {
 	net.PacketConn
-	onRead func(pkt []byte, from net.Addr)
+	onRead  func(pkt []byte, from net.Addr)
+	stopped atomic.Bool
 }
 
-func (c *lateCloseConn) Close() error { return c.PacketConn.SetReadDeadline(time.Unix(1, 0)) }
+func (c *lateCloseConn) Close() error { return nil }
+
+func (c *lateCloseConn) stop() {
+	c.stopped.Store(true)
+	c.PacketConn.SetReadDeadline(time.Unix(1, 0))
+}
 
 func (c *lateCloseConn) ReadFrom(b []byte) (int, net.Addr, error) {
+	if c.stopped.Load() {
+		return 0, nil, net.ErrClosed
+	}
 	n, addr, err := c.PacketConn.ReadFrom(b)
+	if c.stopped.Load() {
+		return 0, nil, net.ErrClosed
+	}
 	if err == nil && c.onRead != nil {
 		c.onRead(b[:n], addr)
 	}
@@ -132,16 +178,36 @@ func (s *Server) checkAcctSecret(pkt []byte, from net.Addr) {
 	s.log.Warn("Accounting-Request dropped: its authenticator does not verify, probably a wrong shared secret", "from", from.String())
 }
 
-func (s *Server) run(name string, ps *radius.PacketServer, c net.PacketConn) {
-	if err := ps.Serve(c); err != nil && err != radius.ErrServerShutdown {
+func (s *Server) run(name string, ps *radius.PacketServer, c *lateCloseConn) {
+	defer s.loops.Done()
+	if err := ps.Serve(c); err != nil && !c.stopped.Load() {
 		s.log.Error("radius listener stopped", "listener", name, "err", err)
 	}
 }
 
+// Shutdown stops reading, waits (bounded by ctx) for the handlers in flight, whose
+// replies still go out, and then releases the sockets.
 func (s *Server) Shutdown(ctx context.Context) error {
-	// Waits for the handlers in flight; their replies still go out (lateCloseConn). Then the sockets are released.
-	err := errors.Join(s.auth.Shutdown(ctx), s.acct.Shutdown(ctx))
-	for _, c := range s.conns {
+	s.mu.Lock()
+	s.stopping = true
+	stoppers, conns := s.stoppers, s.conns
+	s.mu.Unlock()
+	for _, c := range stoppers {
+		c.stop()
+	}
+	done := make(chan struct{})
+	go func() {
+		s.loops.Wait()
+		s.inflight.Wait()
+		close(done)
+	}()
+	var err error
+	select {
+	case <-done:
+	case <-ctx.Done():
+		err = ctx.Err()
+	}
+	for _, c := range conns {
 		c.Close()
 	}
 	return err

@@ -268,3 +268,64 @@ func TestWrongSecretPasswordNeverPasses(t *testing.T) {
 		}
 	}
 }
+
+func TestStartThenImmediateShutdownNeverPanics(t *testing.T) {
+	for i := 0; i < 500; i++ {
+		ap, _ := net.ListenPacket("udp", "127.0.0.1:0")
+		cp, _ := net.ListenPacket("udp", "127.0.0.1:0")
+		s := New(staticSecret("s3cret"), &fakeAuth{}, &fakeAcct{}, &fakeLink{}, slog.Default())
+		s.Serve(ap, cp)
+		if err := s.Shutdown(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// slowAcct blocks Account until release is closed.
+type slowAcct struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (a slowAcct) Account(context.Context, domain.AcctRecord) error {
+	close(a.entered)
+	<-a.release
+	return nil
+}
+
+func TestShutdownWaitsForHandlerInFlight(t *testing.T) {
+	ap, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	cp, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	acc := slowAcct{entered: make(chan struct{}), release: make(chan struct{})}
+	s := New(staticSecret("s3cret"), &fakeAuth{}, acc, &fakeLink{}, slog.Default())
+	s.Serve(ap, cp)
+
+	type result struct {
+		resp *radius.Packet
+		err  error
+	}
+	got := make(chan result, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		resp, err := radius.Exchange(ctx, acctPkt(rfc2866.AcctStatusType_Value_Start, "sid1"), cp.LocalAddr().String())
+		got <- result{resp, err}
+	}()
+	<-acc.entered
+
+	down := make(chan error, 1)
+	go func() { down <- s.Shutdown(context.Background()) }()
+	select {
+	case <-down:
+		t.Fatal("Shutdown returned while a handler was still running")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(acc.release)
+	if err := <-down; err != nil {
+		t.Fatal(err)
+	}
+	r := <-got
+	if r.err != nil || r.resp.Code != radius.CodeAccountingResponse {
+		t.Fatalf("reply = %v, %v", r.resp, r.err)
+	}
+}
