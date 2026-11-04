@@ -1,4 +1,4 @@
-.PHONY: release build-cross perf perf-quick perf-windows build build-windows build-all run set-password reset-password vet test ci clean generate
+.PHONY: reset-db release build-cross perf perf-quick perf-windows build build-windows build-all run set-password reset-password vet test ci clean generate
 
 # Key used by `make run` when HSP_SECRET_KEY is not set. Created once, kept out of git.
 DEV_KEY_FILE := .dev-secret-key
@@ -57,8 +57,23 @@ run: build
 	@test -f $(DEV_KEY_FILE) || openssl rand -base64 32 > $(DEV_KEY_FILE)
 	HSP_SECRET_KEY="$${HSP_SECRET_KEY:-$$(cat $(DEV_KEY_FILE))}" ./bin/hotspotpluslight serve
 
+# Delete the dev database (hsp.db, -wal, -shm in $(DATA_DIR)) so the next `make run` starts fresh (admin/admin).
+# Asks you to type "yes"; `make reset-db FORCE=1` skips the question. Stop `make run` first.
+# The dev key file .dev-secret-key is kept on purpose: a fresh database works with the same key.
+DATA_DIR ?= data
+reset-db:
+	@echo "Will delete: $(DATA_DIR)/hsp.db $(DATA_DIR)/hsp.db-wal $(DATA_DIR)/hsp.db-shm"
+	@echo "Stop 'make run' first. The key file $(DEV_KEY_FILE) is kept."
+	@set -e; \
+	if [ -z "$(FORCE)" ]; then \
+	  printf 'Type "yes" to continue: '; read ans </dev/tty; \
+	  [ "$$ans" = yes ] || { echo "Cancelled. Nothing deleted."; exit 1; }; \
+	fi; \
+	rm -f "$(DATA_DIR)/hsp.db" "$(DATA_DIR)/hsp.db-wal" "$(DATA_DIR)/hsp.db-shm"; \
+	echo "Database deleted. Next 'make run' starts fresh."
+
 # Set (or reset) the admin password for the ./data database; prompts twice without echo.
-# Rules (BR-20): min 16 chars with upper, lower, digit and symbol. Logs out every open admin session.
+# Rules (BR-20): at least 10 characters, not the username, "admin" or a common password. Logs out every open admin session.
 set-password reset-password: build
 	@test -f $(DEV_KEY_FILE) || openssl rand -base64 32 > $(DEV_KEY_FILE)
 	HSP_SECRET_KEY="$${HSP_SECRET_KEY:-$$(cat $(DEV_KEY_FILE))}" ./bin/hotspotpluslight admin set-password

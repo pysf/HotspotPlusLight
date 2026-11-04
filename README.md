@@ -147,6 +147,7 @@ Requires Go 1.26 (see `go.mod`). No CGO, no external services, no Node.
 | Command | What it does |
 |---|---|
 | `make run` | build and start with data in `./data` (dev key in the git-ignored `.dev-secret-key`) |
+| `make reset-db` | delete the dev database in `./data` (asks first; `FORCE=1` skips; keeps the dev key) |
 | `make test` | all tests with the race detector |
 | `make ci` | `go vet` and the tests |
 | `make generate` | regenerate the templ components (the generated files are committed) |
