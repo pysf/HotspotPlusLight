@@ -44,7 +44,7 @@ func scanPlan(r rowScanner) (domain.Plan, error) {
 }
 
 func (s *Store) ListPlans(ctx context.Context) ([]domain.Plan, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+planCols+` FROM plan ORDER BY name COLLATE NOCASE, id`)
+	rows, err := s.r.QueryContext(ctx, `SELECT `+planCols+` FROM plan ORDER BY name COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (s *Store) ListPlans(ctx context.Context) ([]domain.Plan, error) {
 }
 
 func (s *Store) GetPlan(ctx context.Context, id int64) (domain.Plan, error) {
-	p, err := scanPlan(s.db.QueryRowContext(ctx, `SELECT `+planCols+` FROM plan WHERE id=?`, id))
+	p, err := scanPlan(s.r.QueryRowContext(ctx, `SELECT `+planCols+` FROM plan WHERE id=?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, domain.ErrNotFound
 	}
@@ -102,16 +102,22 @@ func (s *Store) UpdatePlan(ctx context.Context, p domain.Plan, now time.Time) er
 // DeletePlan deletes the plan unless it is the settings default (checked in the
 // same statement, so a concurrent settings save cannot be undone silently). A
 // member row that appeared meanwhile is caught by the RESTRICT foreign key.
+// The follow-up reads (default? how many members and batches?) run in the same
+// write transaction, so they agree with the failed delete.
 func (s *Store) DeletePlan(ctx context.Context, id int64) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM plan WHERE id=?1
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `DELETE FROM plan WHERE id=?1
 		AND NOT EXISTS (SELECT 1 FROM settings WHERE id=1 AND default_plan_id=?1)`, id)
 	if isConstraint(err) {
-		if def, derr := s.IsDefaultPlan(ctx, id); derr == nil && def {
+		if txIsDefault(ctx, tx, id) {
 			return domain.ErrDefault
 		}
-		// One statement, so both counts come from the same snapshot.
 		var n, b int
-		if err := s.db.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM member WHERE plan_id=?1), (SELECT count(*) FROM batch WHERE plan_id=?1)`, id).Scan(&n, &b); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM member WHERE plan_id=?1), (SELECT count(*) FROM batch WHERE plan_id=?1)`, id).Scan(&n, &b); err != nil {
 			return err
 		}
 		return &domain.InUseError{Members: n, Batches: b}
@@ -120,28 +126,34 @@ func (s *Store) DeletePlan(ctx context.Context, id int64) error {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		if def, derr := s.IsDefaultPlan(ctx, id); derr == nil && def {
+		if txIsDefault(ctx, tx, id) {
 			return domain.ErrDefault
 		}
 		return domain.ErrNotFound
 	}
-	return nil
+	return tx.Commit()
+}
+
+func txIsDefault(ctx context.Context, tx *sql.Tx, id int64) bool {
+	var n int
+	err := tx.QueryRowContext(ctx, `SELECT count(*) FROM settings WHERE id=1 AND default_plan_id=?`, id).Scan(&n)
+	return err == nil && n > 0
 }
 
 func (s *Store) CountMembersOnPlan(ctx context.Context, id int64) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM member WHERE plan_id=?`, id).Scan(&n)
+	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM member WHERE plan_id=?`, id).Scan(&n)
 	return n, err
 }
 
 func (s *Store) IsDefaultPlan(ctx context.Context, id int64) (bool, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM settings WHERE id=1 AND default_plan_id=?`, id).Scan(&n)
+	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM settings WHERE id=1 AND default_plan_id=?`, id).Scan(&n)
 	return n > 0, err
 }
 
 func (s *Store) PlanExists(ctx context.Context, id int64) (bool, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM plan WHERE id=?`, id).Scan(&n)
+	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM plan WHERE id=?`, id).Scan(&n)
 	return n > 0, err
 }

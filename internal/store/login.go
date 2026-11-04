@@ -14,7 +14,7 @@ import (
 // domain.ErrNotFound when there is no such member.
 func (s *Store) GetMemberForLogin(ctx context.Context, username string) (domain.Member, []byte, error) {
 	var enc []byte
-	m, err := scanMember(s.db.QueryRowContext(ctx, `SELECT `+memberCols+`, m.password_enc FROM member m WHERE m.username = ?`, username), nil, &enc)
+	m, err := scanMember(s.r.QueryRowContext(ctx, `SELECT `+memberCols+`, m.password_enc FROM member m WHERE m.username = ?`, username), nil, &enc)
 	if errors.Is(err, sql.ErrNoRows) {
 		return m, nil, domain.ErrNotFound
 	}
@@ -25,7 +25,7 @@ func (s *Store) GetMemberForLogin(ctx context.Context, username string) (domain.
 // newest first (highest id), each with its encrypted password. Several members
 // may share a MAC.
 func (s *Store) ListActiveMembersByMAC(ctx context.Context, mac string) ([]domain.Member, [][]byte, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+memberCols+`, m.password_enc FROM member m WHERE m.mac = ? AND m.mac <> '' AND m.active = 1 ORDER BY m.id DESC`, mac)
+	rows, err := s.r.QueryContext(ctx, `SELECT `+memberCols+`, m.password_enc FROM member m WHERE m.mac = ? AND m.mac <> '' AND m.active = 1 ORDER BY m.id DESC`, mac)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -46,7 +46,7 @@ func (s *Store) ListActiveMembersByMAC(ctx context.Context, mac string) ([]domai
 // CountActiveSessions counts the member's unended sessions updated at or after since (BR-9).
 func (s *Store) CountActiveSessions(ctx context.Context, memberID int64, since time.Time) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM session s WHERE s.member_id = ? AND `+onlineSession,
+	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM session s WHERE s.member_id = ? AND `+onlineSession,
 		memberID, since.Unix()).Scan(&n)
 	return n, err
 }

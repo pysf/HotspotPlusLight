@@ -12,15 +12,34 @@ func (s *Store) InsertAdminSession(ctx context.Context, tokenHash, csrf string, 
 	return err
 }
 
-// TouchAdminSession slides expiry of a live session in one statement and returns its CSRF token.
+// touchEvery is how old the stored expiry must be before it is slid again.
+const touchEvery = 60 // seconds
+
+// TouchAdminSession finds a live session and returns its CSRF token. It reads on
+// the read pool and writes the slid expiry only when the stored one is at least
+// touchEvery seconds behind newExpiresAt, so most requests do not write.
 func (s *Store) TouchAdminSession(ctx context.Context, tokenHash string, now, newExpiresAt int64) (string, bool, error) {
 	var csrf string
-	err := s.db.QueryRowContext(ctx, `UPDATE admin_session SET expires_at=? WHERE token_hash=? AND expires_at>? RETURNING csrf_token`,
-		newExpiresAt, tokenHash, now).Scan(&csrf)
+	var exp int64
+	err := s.r.QueryRowContext(ctx, `SELECT csrf_token, expires_at FROM admin_session WHERE token_hash=? AND expires_at>?`,
+		tokenHash, now).Scan(&csrf, &exp)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
 	}
-	return csrf, err == nil, err
+	if err != nil {
+		return "", false, err
+	}
+	if newExpiresAt-exp < touchEvery {
+		return csrf, true, nil
+	}
+	res, err := s.db.ExecContext(ctx, `UPDATE admin_session SET expires_at=? WHERE token_hash=? AND expires_at>?`, newExpiresAt, tokenHash, now)
+	if err != nil {
+		return "", false, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 { // deleted or expired in between
+		return "", false, nil
+	}
+	return csrf, true, nil
 }
 
 func (s *Store) DeleteAdminSession(ctx context.Context, tokenHash string) error {

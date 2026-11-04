@@ -72,7 +72,7 @@ func scanBatch(r rowScanner, extra ...any) (domain.Batch, error) {
 
 // GetBatch returns one batch (domain.ErrNotFound if unknown).
 func (s *Store) GetBatch(ctx context.Context, id int64) (domain.Batch, error) {
-	b, err := scanBatch(s.db.QueryRowContext(ctx, `SELECT `+batchCols+` FROM batch b WHERE b.id=?`, id))
+	b, err := scanBatch(s.r.QueryRowContext(ctx, `SELECT `+batchCols+` FROM batch b WHERE b.id=?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, domain.ErrNotFound
 	}
@@ -82,7 +82,7 @@ func (s *Store) GetBatch(ctx context.Context, id int64) (domain.Batch, error) {
 // CountBatches is the number of batch rows.
 func (s *Store) CountBatches(ctx context.Context) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM batch`).Scan(&n)
+	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM batch`).Scan(&n)
 	return n, err
 }
 
@@ -93,7 +93,7 @@ const unusedMember = `m.used_download_bytes = 0 AND m.used_upload_bytes = 0 AND 
 // ListBatches returns one page of batches, newest first, with live counts. The
 // online definition is the shared one (onlineExists, BR-17).
 func (s *Store) ListBatches(ctx context.Context, limit, offset int, onlineSince time.Time) ([]domain.BatchRow, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+batchCols+`, p.name,
+	rows, err := s.r.QueryContext(ctx, `SELECT `+batchCols+`, p.name,
 		(SELECT count(*) FROM member m WHERE m.batch_id = b.id),
 		(SELECT count(*) FROM member m WHERE m.batch_id = b.id AND `+unusedMember+`),
 		(SELECT count(*) FROM member m WHERE m.batch_id = b.id AND `+onlineExists+`)
@@ -124,7 +124,7 @@ func (s *Store) RenameBatch(ctx context.Context, id int64, label string) error {
 
 // ListBatchCredentials lists the members now in the batch, oldest first.
 func (s *Store) ListBatchCredentials(ctx context.Context, batchID int64) ([]domain.BatchCredential, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT username, password_enc FROM member WHERE batch_id=? ORDER BY id`, batchID)
+	rows, err := s.r.QueryContext(ctx, `SELECT username, password_enc FROM member WHERE batch_id=? ORDER BY id`, batchID)
 	if err != nil {
 		return nil, err
 	}

@@ -8,6 +8,10 @@ import (
 
 const dsnParams = "_txlock=immediate&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 
+// readDSN is DSN for the read pool. query_only makes every write fail on those
+// connections. (Not mode=ro: WAL readers must still write the -shm file.)
+func readDSN(path string) string { return DSN(path) + "&_pragma=query_only(1)" }
+
 // DSN builds the SQLite "file:" URI for a database path. Windows paths
 // (drive letter or UNC) are handled on every OS; on Windows relative paths too.
 // Backslashes are turned into slashes only when the path looks like a Windows

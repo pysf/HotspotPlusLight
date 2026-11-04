@@ -120,3 +120,69 @@ Can only be checked on real Windows (CI runs E11.33 there):
 - The whole service life cycle, the recovery actions, `icacls`, stop within 30 s.
 - Windows firewall prompts for ports 8080, 8081, 1812, 1813.
 - SQLite WAL files on Windows paths with spaces (the CI test uses a path with a space).
+
+## Step D: capacity test (Phase 11d)
+What was built:
+- `perf/` (build tag `perf`, files `capacity_test.go` and `report.go`). Normal `go test ./...` does not build it.
+- `make perf` (full), `make perf-quick` (500 and 1000 users, 30 s steps), `make perf-windows` (builds `bin/perf.test.exe` and `bin/hotspotpluslight.exe`; keep them in one folder).
+- The server runs as a real child process, so CPU and memory are the server's own. The binary comes from `HSP_PERF_BIN`, or a file next to the test program, or a fresh `go build`.
+- Load model, pass rules and notes are written into `docs/perf-results.md` by the test. The README section between `<!-- perf:start -->` and `<!-- perf:end -->` is rewritten too.
+- Env: `HSP_PERF_STEPS` (comma list), `HSP_PERF_STEP_SECONDS` (default 120), `HSP_PERF_BIN`.
+
+Decisions I made (please check):
+- Members are made by SQL with one shared encrypted password (made with `internal/secret`). The admin password is also set by SQL.
+- The load generator has 128 workers. Each has its own two UDP sockets and one request in flight, so identifiers never run out. Latency is measured from the planned send time (open loop), so a slow load generator or a slow server both show up. The test also fails a step if the load generator itself falls behind (see below).
+- CPU % is the CPU time of the child over the step, as a share of one core (100 = one full core). I did not use `ps %cpu` because on macOS it is a decayed average. Linux reads `/proc`, macOS uses `ps -o time=,rss=`, Windows uses PowerShell (best effort, "n/a" if it fails).
+- The login burst uses extra members (10% of N) who are not online, so the max-sessions rule does not reject them.
+- The warm-up (Starts) is a quarter of the step time, at least 3 s.
+
+### Review fixes (2026-11-04)
+- Only the default full run (default steps and default step seconds) writes `README.md` and `docs/perf-results.md`. Other runs print only. The "what the test does" text is built from the steps and seconds really used. Files are written through a temp file and renamed; README first, then the docs file; the README markers must each appear exactly once.
+- Open loop: every packet has a planned send time. Latency = reply time minus planned time. A step fails if the dispatch lag (real send minus planned send) is over 1 s, or if the steady packets/s is under 95% of the planned.
+- Reply codes are checked: Access-Accept for logins, Accounting-Response for accounting.
+- End-of-step checks in the database: session rows with `terminate_cause LIKE 'Server:%'` must equal the number of over-quota members; open sessions about N minus those; sum of used download bytes matches what was sent and answered (0.5%). Half of the over-quota members are over before their Start; the other half cross the limit on their first Interim, so the Interim kick path is exercised.
+- The Start burst (warm-up) and the steady part are reported apart. Pass rules use the steady part. The warm-up is a quarter of the step time (at least 3 s) and long enough for at most 500 Starts per second (my decision, see below).
+- `HSP_PERF_MIN_USERS=n`: the test fails if the max online users is below n. Without it the test never fails (it is a measurement tool).
+- Sockets are opened before the workers start; an error stops the test with a clear message. If you see "too many open files", run `ulimit -n 4096` first (Linux, macOS).
+- The server log of a failed step is copied to `bin/perf-last-fail.log` (git-ignored).
+- "Online page" is now named "Online sessions page (/admin/sessions/)".
+
+### The SQLite write contention (found by the test)
+What the test showed at 20000 users: lost replies, `database is locked` in the log, accounting p99 over 600 ms, while the server CPU was low.
+
+Cause: one `sql.DB` with no limit on connections. Hundreds of goroutines each opened a connection and ran `BEGIN IMMEDIATE`. They all fought for the one SQLite write lock inside SQLite's busy handler. That handler sleeps and polls, with growing sleeps, and a new arrival can take the lock before an old waiter wakes up. Some writers were starved until `busy_timeout` (5 s) and failed.
+
+Measured before the fix (temporary instrumentation in `InAcctTx`, 20000 users, 60 s step, 38000 accounting transactions): waiting for `BeginTx` p50 1.0 ms, p95 449 ms, p99 3.1 s, max 5.0 s, and 158 `BeginTx` failures. The work inside the transaction (run + commit) was small: p50 0.67 ms, p99 2.6 ms, max 24 ms. So the time was lost waiting for the lock, not working.
+
+Fix (`internal/store/store.go`): the same file is opened as two pools.
+- Write pool: exactly one connection (`SetMaxOpenConns(1)`, `_txlock=immediate` stays). All transactions and all writes use it. Writers now wait in Go in a fair queue, not in the SQLite busy handler.
+- Read pool: 8 connections, for read-only queries. WAL lets readers run while the writer works. The write pool is opened (and its WAL pragma runs) before the read pool opens.
+- Reads that must agree with a write stay inside the write transaction (for example the reads in `InAcctTx` and `DeleteMembers`).
+- Migrations, first boot and tests (`Store.DB()`) use the write pool. `Close` closes both.
+- Rule for callers: never call a `Store` method that writes from inside a transaction callback. With one connection it would wait for itself forever. No current code does this (all tests pass).
+- `synchronous` is NOT changed (still the default FULL). That is a durability trade-off for the owner. Each commit does an fsync, and the writer can do roughly 1000 transactions per second on this Mac, which is why a Start burst above that makes a queue.
+
+### Review fixes for the two pools (2026-11-04)
+- Deadlock audit. Checked every user of the write connection: `InAcctTx` (only caller: `session.Service.Accounting`, its callback uses only `tx`; the Enforcer is called after the commit), `DeleteMembers`, `CreateBatch`, `FirstBoot`, `DeletePlan`, `SetAdminPassword`, `ChangeAdminPassword`, `apply` (migrations), `Store.DB()` (only migrate tests), the e2e harness (own connection to the file, not the store) and `perf` (own connection). No transaction callback calls another Store method. `appliedChecksums` and `openSessions` close their rows before they return. The rule is now written as a comment on `InAcctTx`.
+- The read pool has `_pragma=query_only(1)`, so a write on it fails (not `mode=ro`: WAL readers need to write the -shm file). Grep showed no write on the read handle. A unit test (`TestReadPoolIsQueryOnly`) checks it.
+- Paired reads: the member list page (count and rows) and the status chips, and the delete confirmation (`SelectionStats`), are display only: they use the read pool, and a tiny mismatch is fine. `OpenSessions` (bulk kick, rename check) now uses the write connection, so a kick never misses a session that was already committed. `DeleteMembers` still reads its open sessions inside its own transaction.
+- Admin session check no longer writes on every request. It reads on the read pool and slides the expiry (still 1 hour) only when the stored expiry is at least 60 seconds behind.
+- `DeletePlan` reads the default flag and the member/batch counts in the same write transaction as the failed delete.
+- If the second pool fails to open, the first is closed. `Close` closes the read pool, then the write pool.
+- Perf test: `make perf` time is "about 25-30 minutes" in the Makefile and README. A full run with no passing step does not overwrite README or docs. The sampler goroutine and the sockets are cleaned up if `newWorkers` fails. `ps` time with days (`D-HH:MM:SS`) is parsed. The expected download bytes are summed by username (`u0`..`u{N-1}`), not by member id.
+
+Before and after (this Mac: Apple M5, 10 cores; before = the earlier README, 120 s steps, with the old test; after = the full run now, new stricter test):
+
+| Online users | Before | After |
+|---|---|---|
+| 10000 | pass (acct p99 2.3 ms) | pass (acct p99 3.6 ms) |
+| 20000 | FAIL: 617 lost, acct p99 330 ms, database is locked | pass: 0 lost, acct p99 4.7 ms |
+| 30000 | not reached | pass: 0 lost, acct p99 5.3 ms |
+| 40000 | not reached | FAIL: 144 lost, the Start/steady load is more than the one writer and the load generator can do |
+| Max online users | 10000 | 30000 |
+
+Decisions I made (please check):
+- Warm-up at most 500 Starts per second. At 1000 per second the single writer was at its limit and the burst alone made one reply later than 1 s. A real router rarely sends 500 logins per second. If you want the stampede case, change `maxStartRate` in `perf/capacity_test.go`.
+- Dispatch lag rule uses the worst packet (max), as asked.
+- The over-quota count is max(2, N/100) so both kinds (over at Start, over at first Interim) exist at small N.
+- Read pool size 8. Not tuned.

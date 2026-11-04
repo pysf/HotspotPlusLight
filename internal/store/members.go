@@ -76,7 +76,7 @@ func (s *Store) CreateMember(ctx context.Context, in domain.MemberInput, passwor
 }
 
 func (s *Store) GetMember(ctx context.Context, id int64) (domain.Member, error) {
-	m, err := scanMember(s.db.QueryRowContext(ctx, `SELECT `+memberCols+` FROM member m WHERE m.id=?`, id), nil)
+	m, err := scanMember(s.r.QueryRowContext(ctx, `SELECT `+memberCols+` FROM member m WHERE m.id=?`, id), nil)
 	if errors.Is(err, sql.ErrNoRows) {
 		return m, domain.ErrNotFound
 	}
@@ -116,7 +116,7 @@ func affected(res sql.Result) error {
 
 func (s *Store) GetMemberPassword(ctx context.Context, id int64) ([]byte, error) {
 	var enc []byte
-	err := s.db.QueryRowContext(ctx, `SELECT password_enc FROM member WHERE id=?`, id).Scan(&enc)
+	err := s.r.QueryRowContext(ctx, `SELECT password_enc FROM member WHERE id=?`, id).Scan(&enc)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrNotFound
 	}
@@ -227,7 +227,7 @@ const onlineExists = `EXISTS (SELECT 1 FROM session s WHERE s.member_id = m.id A
 func (s *Store) CountFiltered(ctx context.Context, f domain.MemberFilter, now time.Time) (int, error) {
 	where, args := filterClause(f, now)
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM member m WHERE `+where, args...).Scan(&n)
+	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM member m WHERE `+where, args...).Scan(&n)
 	return n, err
 }
 
@@ -244,7 +244,7 @@ func (s *Store) CountStatuses(ctx context.Context, f domain.MemberFilter, now ti
 		args = append(args, a...)
 	}
 	var c domain.StatusCounts
-	err := s.db.QueryRowContext(ctx, `SELECT count(*), `+strings.Join(cols, `, `)+` FROM member m WHERE `+where,
+	err := s.r.QueryRowContext(ctx, `SELECT count(*), `+strings.Join(cols, `, `)+` FROM member m WHERE `+where,
 		append(args, wargs...)...).Scan(&c.All, &c.Active, &c.Expiring, &c.Expired, &c.Inactive)
 	return c, err
 }
@@ -256,7 +256,7 @@ func (s *Store) ListMembers(ctx context.Context, f domain.MemberFilter, limit, o
 		WHERE ` + where + ` ORDER BY m.id DESC LIMIT ? OFFSET ?`
 	qargs := append([]any{onlineSince.Unix()}, args...)
 	// The online column comes last in the select list but its parameter is the first "?" in the text.
-	rows, err := s.db.QueryContext(ctx, q, append(qargs, limit, offset)...)
+	rows, err := s.r.QueryContext(ctx, q, append(qargs, limit, offset)...)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func (s *Store) ListMembers(ctx context.Context, f domain.MemberFilter, limit, o
 func (s *Store) GetMemberRow(ctx context.Context, id int64, onlineSince time.Time) (domain.MemberRow, error) {
 	var r domain.MemberRow
 	var online int
-	row := s.db.QueryRowContext(ctx, `SELECT `+memberCols+`, `+planColsJoined+`, `+onlineExists+` FROM member m JOIN plan p ON p.id = m.plan_id WHERE m.id = ?`,
+	row := s.r.QueryRowContext(ctx, `SELECT `+memberCols+`, `+planColsJoined+`, `+onlineExists+` FROM member m JOIN plan p ON p.id = m.plan_id WHERE m.id = ?`,
 		onlineSince.Unix(), id)
 	m, err := scanMember(row, &r.Plan, &online)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -291,12 +291,15 @@ func (s *Store) GetMemberRow(ctx context.Context, id int64, onlineSince time.Tim
 // SelectionStats counts the members of a selection and how many of them are online.
 func (s *Store) SelectionStats(ctx context.Context, sel domain.MemberSelection, now, onlineSince time.Time) (members, online int, err error) {
 	where, args := selectionClause(sel, now)
-	err = s.db.QueryRowContext(ctx, `SELECT count(*), coalesce(sum(`+onlineExists+`), 0) FROM member m WHERE `+where,
+	err = s.r.QueryRowContext(ctx, `SELECT count(*), coalesce(sum(`+onlineExists+`), 0) FROM member m WHERE `+where,
 		append([]any{onlineSince.Unix()}, args...)...).Scan(&members, &online)
 	return
 }
 
 // OpenSessions lists the open sessions (ended_at IS NULL) of the selected members.
+// A kick must not miss a session, so this read goes through the write connection:
+// it sees every commit made before it. (SelectionStats and the list counts are
+// display only and use the read pool; a tiny mismatch there is fine.)
 func (s *Store) OpenSessions(ctx context.Context, sel domain.MemberSelection, now time.Time) ([]domain.SessionTarget, error) {
 	where, args := selectionClause(sel, now)
 	return openSessions(ctx, s.db, where, args)

@@ -22,7 +22,7 @@ type SeedInput struct {
 // IsFirstBoot reports whether the settings row does not exist yet.
 func (s *Store) IsFirstBoot(ctx context.Context) (bool, error) {
 	var n int
-	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM settings`).Scan(&n); err != nil {
+	if err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM settings`).Scan(&n); err != nil {
 		return false, err
 	}
 	return n == 0, nil
@@ -65,7 +65,7 @@ func boolInt(b bool) int {
 
 // KeyCheck returns settings.key_check; found is false when there is no row or it is empty.
 func (s *Store) KeyCheck(ctx context.Context) (value string, found bool, err error) {
-	err = s.db.QueryRowContext(ctx, `SELECT key_check FROM settings WHERE id=1`).Scan(&value)
+	err = s.r.QueryRowContext(ctx, `SELECT key_check FROM settings WHERE id=1`).Scan(&value)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
 	}
@@ -75,13 +75,13 @@ func (s *Store) KeyCheck(ctx context.Context) (value string, found bool, err err
 // RadiusSecret is read per packet so settings changes apply without restart (PLAN 7.1).
 func (s *Store) RadiusSecret(ctx context.Context) (string, error) {
 	var v string
-	err := s.db.QueryRowContext(ctx, `SELECT radius_shared_secret FROM settings WHERE id=1`).Scan(&v)
+	err := s.r.QueryRowContext(ctx, `SELECT radius_shared_secret FROM settings WHERE id=1`).Scan(&v)
 	return v, err
 }
 
 func (s *Store) GetAdmin(ctx context.Context) (domain.Admin, error) {
 	var a domain.Admin
-	err := s.db.QueryRowContext(ctx, `SELECT username, password_hash, must_change_password FROM admin WHERE id=1`).Scan(&a.Username, &a.PasswordHash, &a.MustChangePassword)
+	err := s.r.QueryRowContext(ctx, `SELECT username, password_hash, must_change_password FROM admin WHERE id=1`).Scan(&a.Username, &a.PasswordHash, &a.MustChangePassword)
 	if errors.Is(err, sql.ErrNoRows) {
 		return a, domain.ErrNotFound
 	}
@@ -90,12 +90,12 @@ func (s *Store) GetAdmin(ctx context.Context) (domain.Admin, error) {
 
 func (s *Store) CountMembers(ctx context.Context) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM member`).Scan(&n)
+	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM member`).Scan(&n)
 	return n, err
 }
 
 func (s *Store) CountOpenSessions(ctx context.Context) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM session WHERE ended_at IS NULL`).Scan(&n)
+	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM session WHERE ended_at IS NULL`).Scan(&n)
 	return n, err
 }

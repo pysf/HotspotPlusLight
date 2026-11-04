@@ -26,3 +26,17 @@ func TestE11_30_DSN(t *testing.T) {
 		t.Errorf("windows relative: got %s want %s", got, want)
 	}
 }
+
+// The read pool refuses writes; the write pool accepts them.
+func TestReadPoolIsQueryOnly(t *testing.T) {
+	s := migrated(t)
+	if _, err := s.r.Exec(`CREATE TABLE ro_probe(x)`); err == nil {
+		t.Fatal("write on the read pool must fail")
+	}
+	if _, err := s.db.Exec(`CREATE TABLE ro_probe(x)`); err != nil {
+		t.Fatalf("write pool: %v", err)
+	}
+	if _, err := s.r.Exec(`INSERT INTO ro_probe(x) VALUES (1)`); err == nil {
+		t.Fatal("insert on the read pool must fail")
+	}
+}

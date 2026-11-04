@@ -12,7 +12,7 @@ func (s *Store) GetSettings(ctx context.Context) (domain.Settings, error) {
 	var st domain.Settings
 	var def sql.NullInt64
 	var mac int
-	err := s.db.QueryRowContext(ctx, `SELECT site_title, timezone, radius_shared_secret, coa_port, accounting_interval_seconds,
+	err := s.r.QueryRowContext(ctx, `SELECT site_title, timezone, radius_shared_secret, coa_port, accounting_interval_seconds,
 		default_plan_id, mac_auto_login, after_login_url, batch_username_prefix, batch_counter, batch_max_count,
 		voucher_password_length, voucher_help, public_base_url, session_retention_days FROM settings WHERE id=1`).
 		Scan(&st.SiteTitle, &st.Timezone, &st.RadiusSharedSecret, &st.CoaPort, &st.AccountingIntervalSeconds, &def, &mac,

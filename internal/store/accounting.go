@@ -16,6 +16,12 @@ type AcctTx struct{ tx *sql.Tx }
 // InAcctTx runs fn in ONE write transaction and commits when it returns nil;
 // any error rolls everything back. The caller answers the router only after
 // this returns (PLAN 7.3, E4.15).
+//
+// RULE (one write connection): while fn runs it holds the only write
+// connection. fn must use only tx. It must never call another Store method
+// (they need that connection or wait behind it), never use *sql.Rows from the
+// write pool after returning, and never wait for another request. The same rule
+// holds for every other transaction in this package (BeginTx on s.db).
 func (s *Store) InAcctTx(ctx context.Context, fn func(tx *AcctTx) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -113,7 +119,7 @@ func (t *AcctTx) AddDailyUsage(ctx context.Context, memberID int64, day string, 
 // SessionRetentionDays is read at each pruning run, so the setting applies without restart (O18).
 func (s *Store) SessionRetentionDays(ctx context.Context) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT session_retention_days FROM settings WHERE id=1`).Scan(&n)
+	err := s.r.QueryRowContext(ctx, `SELECT session_retention_days FROM settings WHERE id=1`).Scan(&n)
 	return n, err
 }
 

@@ -1,4 +1,4 @@
-.PHONY: build build-windows build-all run set-password reset-password vet test ci clean generate
+.PHONY: perf perf-quick perf-windows build build-windows build-all run set-password reset-password vet test ci clean generate
 
 # Key used by `make run` when HSP_SECRET_KEY is not set. Created once, kept out of git.
 DEV_KEY_FILE := .dev-secret-key
@@ -40,3 +40,17 @@ clean:
 # Regenerate the templ components (the generated *_templ.go files are committed).
 generate:
 	go run github.com/a-h/templ/cmd/templ@v0.3.1100 generate
+
+# Capacity test (Phase 11d): raises the number of online users step by step. Takes about 25-30 minutes.
+# Full run: writes docs/perf-results.md and the Performance section of README.md.
+# Set HSP_PERF_MIN_USERS=n to fail when the max online users is below n (otherwise it never fails).
+perf:
+	go test -tags perf -run TestCapacity -v -timeout 60m ./perf
+
+# Short check of the capacity test (two small steps of 30 s). Prints only; writes no file.
+perf-quick:
+	HSP_PERF_STEPS=500,1000 HSP_PERF_STEP_SECONDS=30 go test -tags perf -run TestCapacity -v -timeout 20m ./perf
+
+# Windows files for the capacity test: bin/perf.test.exe and bin/hotspotpluslight.exe (keep them in one folder).
+perf-windows: build-windows
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go test -c -tags perf -o bin/perf.test.exe ./perf
