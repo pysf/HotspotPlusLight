@@ -5,6 +5,9 @@ package fakenas
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/md5"
+	"errors"
 	"net"
 	"time"
 
@@ -19,10 +22,57 @@ type NAS struct {
 	AcctAddr string // set it to use the accounting methods
 	Secret   string
 	Timeout  time.Duration
+	// MessageAuth makes the NAS act like RouterOS 7.15+ (BlastRADIUS): it sends
+	// Message-Authenticator in Access-Requests and drops a reply that lacks a
+	// correct one. New turns it on, so every e2e run exercises it.
+	MessageAuth bool
 }
 
 func New(authAddr, secret string) *NAS {
-	return &NAS{AuthAddr: authAddr, Secret: secret, Timeout: 3 * time.Second}
+	return &NAS{AuthAddr: authAddr, Secret: secret, Timeout: 3 * time.Second, MessageAuth: true}
+}
+
+// ComputeMA is the Message-Authenticator of wire (RFC 3579 3.2), written out
+// independently of the server: HMAC-MD5 over the packet with the Authenticator
+// field replaced by auth and the first Message-Authenticator value set to zeros.
+// It returns the offset of the 16 value bytes, or -1 when there is no such attribute.
+func ComputeMA(wire, auth []byte, secret string) (sum []byte, off int) {
+	b := append([]byte(nil), wire...)
+	copy(b[4:20], auth)
+	off = -1
+	for i := 20; i+2 <= len(b) && b[i+1] >= 2; i += int(b[i+1]) {
+		if b[i] == 80 && b[i+1] == 18 && i+18 <= len(b) {
+			off = i + 2
+			clear(b[off : off+16])
+			break
+		}
+	}
+	h := hmac.New(md5.New, []byte(secret))
+	h.Write(b)
+	return h.Sum(nil), off
+}
+
+// MAStatus reports whether wire has a Message-Authenticator and whether it is
+// correct for the given Authenticator (see ComputeMA).
+func MAStatus(wire, auth []byte, secret string) (present, ok bool) {
+	sum, off := ComputeMA(wire, auth, secret)
+	if off < 0 {
+		return false, false
+	}
+	return true, hmac.Equal(sum, wire[off:off+16])
+}
+
+// withMA appends a Message-Authenticator to an Access-Request. Call it after
+// every other attribute is set.
+func (n *NAS) withMA(p *radius.Packet) *radius.Packet {
+	if !n.MessageAuth {
+		return p
+	}
+	p.Add(80, make(radius.Attribute, 16))
+	wire, _ := p.MarshalBinary()
+	sum, _ := ComputeMA(wire, p.Authenticator[:], n.Secret)
+	copy(p.Attributes[len(p.Attributes)-1].Attribute, sum)
+	return p
 }
 
 // PAPPacket builds a PAP Access-Request the way the router sends it.
@@ -31,15 +81,30 @@ func (n *NAS) PAPPacket(username, password string) *radius.Packet {
 	rfc2865.UserName_SetString(p, username)
 	rfc2865.UserPassword_SetString(p, password)
 	rfc2865.NASIdentifier_SetString(p, "fakenas")
-	return p
+	return n.withMA(p)
 }
 
-// Exchange sends p and returns the reply (an error when none arrives or its
-// authenticator does not verify with the NAS secret).
+// Exchange sends p and returns the reply (an error when none arrives, its
+// authenticator does not verify with the NAS secret, or, with MessageAuth, it has
+// no correct Message-Authenticator as its first attribute).
 func (n *NAS) Exchange(p *radius.Packet) (*radius.Packet, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), n.Timeout)
 	defer cancel()
-	return radius.Exchange(ctx, p, n.AuthAddr)
+	reply, err := radius.Exchange(ctx, p, n.AuthAddr)
+	if err != nil || !n.MessageAuth {
+		return reply, err
+	}
+	// The library gives the parsed reply; encode it again to get the bytes. The
+	// Authenticator field of reply holds the Response Authenticator, and the
+	// Message-Authenticator is computed with the request's one in its place.
+	wire, err := reply.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	if present, ok := MAStatus(wire, p.Authenticator[:], n.Secret); !present || !ok || wire[20] != 80 {
+		return nil, errors.New("fakenas: reply has no correct Message-Authenticator as its first attribute (RouterOS would drop it)")
+	}
+	return reply, nil
 }
 
 // Authenticate sends a PAP Access-Request and returns the reply packet.

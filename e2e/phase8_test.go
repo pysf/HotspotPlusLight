@@ -318,6 +318,7 @@ func TestE8_07_LinkStatusPanel(t *testing.T) {
 	f.fc.Advance(time.Minute) // 12:03:00
 	badAuth := fakenas.New(f.s.Addrs.RadiusAuth, "wrong-secret")
 	badAuth.Timeout = 300 * time.Millisecond
+	badAuth.MessageAuth = false // a bad Message-Authenticator is not counted as a wrong secret (spoofable)
 	if _, err := badAuth.Authenticate("alice", "pw123456"); err == nil {
 		t.Fatal("a wrong-secret Access-Request was answered")
 	}

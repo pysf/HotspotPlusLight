@@ -105,8 +105,41 @@ func (s *Server) track(h radius.HandlerFunc) radius.Handler {
 		s.inflight.Add(1)
 		s.mu.Unlock()
 		defer s.inflight.Done()
-		h(w, r)
+		if s.log.Enabled(r.Context(), slog.LevelDebug) {
+			s.log.Debug("radius request", "from", r.RemoteAddr.String(), "to", r.LocalAddr.String(), "code", r.Code.String(), "id", r.Identifier)
+		}
+		h(&loggedWriter{ResponseWriter: w, log: s.log, to: r.RemoteAddr}, r)
 	})
+}
+
+// loggedWriter logs each reply at debug level, and a failed write as an error.
+// Without it a reply that never leaves the host leaves no trace.
+type loggedWriter struct {
+	radius.ResponseWriter
+	log *slog.Logger
+	to  net.Addr
+}
+
+func (w *loggedWriter) Write(p *radius.Packet) error {
+	switch p.Code {
+	case radius.CodeAccessAccept, radius.CodeAccessReject, radius.CodeAccessChallenge:
+		// This relies on p.Authenticator still being the request's authenticator, which
+		// holds for packets made by request.Response(). Encode then adds the Response
+		// Authenticator over the finished packet, the Message-Authenticator included.
+		if err := sealMA(p, p.Authenticator); err != nil {
+			w.log.Error("radius reply not sent", "to", w.to.String(), "code", p.Code.String(), "err", err)
+			return err
+		}
+	}
+	err := w.ResponseWriter.Write(p)
+	if err != nil {
+		w.log.Error("radius reply not sent", "to", w.to.String(), "code", p.Code.String(), "err", err)
+		return err
+	}
+	if w.log.Enabled(context.Background(), slog.LevelDebug) {
+		w.log.Debug("radius reply sent", "to", w.to.String(), "code", p.Code.String(), "id", p.Identifier)
+	}
+	return nil
 }
 
 // Serve starts the auth and accounting listeners on the given connections. It
@@ -223,6 +256,13 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 	}
 	from := r.RemoteAddr.String()
 	ctx := context.WithoutCancel(r.Context()) // a shutdown lets requests in flight finish
+	// A router that sends Message-Authenticator must send a correct one. Without one
+	// the request is accepted (see messageauth.go).
+	if present, ok := checkMA(r.Packet, r.Packet.Authenticator); present && !ok {
+		// No BadSecret here: anyone can forge this packet, and it would show a false alarm on the Router page.
+		s.log.Warn("Access-Request dropped: its Message-Authenticator does not verify, probably a wrong shared secret", "from", from)
+		return
+	}
 	if isCHAP(r.Packet) {
 		s.link.AccessRequest(from)
 		// The warning is how the admin notices a router that is not on PAP (D4, PLAN 13.1).
@@ -288,9 +328,7 @@ func (s *Server) reply(w radius.ResponseWriter, r *radius.Request, v auth.Verdic
 		s.log.Info("access-reject", "username", name, "code", string(v.Reason), "message", v.Reason.Message())
 		rfc2865.ReplyMessage_SetString(resp, v.Reason.ReplyMessage())
 	}
-	if err := w.Write(resp); err != nil {
-		s.log.Error("write reply", "err", err)
-	}
+	_ = w.Write(resp) // loggedWriter logs a failure
 }
 
 // microsoftVendorID is the vendor id of the MS-CHAP attributes.
@@ -385,9 +423,7 @@ func (s *Server) handleAcct(w radius.ResponseWriter, r *radius.Request) {
 	}
 	// Accounting-On/Off and every other status type are acknowledged and change nothing.
 	// MONITOR: see session.Service.Account.
-	if err := w.Write(r.Response(radius.CodeAccountingResponse)); err != nil {
-		s.log.Error("write reply", "err", err)
-	}
+	_ = w.Write(r.Response(radius.CodeAccountingResponse)) // loggedWriter logs a failure
 }
 
 // record reads the attributes of PLAN 7.3 into rec. An absent attribute is

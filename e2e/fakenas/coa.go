@@ -17,13 +17,17 @@ const (
 	NAK                       // Disconnect-NAK
 	Silent                    // no answer at all
 	NAKNoSession              // Disconnect-NAK with Error-Cause 503 (Session-Context-Not-Found)
+	ACKBadMA                  // Disconnect-ACK whose Message-Authenticator is wrong
 )
 
 // Disconnect is one Disconnect-Request the fake router received.
 type Disconnect struct {
 	Packet    *radius.Packet
 	Authentic bool // the Request Authenticator verifies with the shared secret
-	From      string
+	// MAPresent and MAValid: the request has a Message-Authenticator, and it
+	// verifies (HMAC-MD5 with a zero Authenticator field, RFC 5176 / RFC 3579 3.2).
+	MAPresent, MAValid bool
+	From               string
 }
 
 // CoA is the router's incoming-RADIUS listener (UDP, normally port 3799): it
@@ -84,6 +88,7 @@ func (c *CoA) serve() {
 			continue
 		}
 		d := Disconnect{Packet: p, Authentic: radius.IsAuthenticRequest(wire, c.secret), From: from.String()}
+		d.MAPresent, d.MAValid = MAStatus(wire, make([]byte, 16), string(c.secret))
 		c.mu.Lock()
 		c.got = append(c.got, d)
 		n2, fn := len(c.got), c.behavior
@@ -103,6 +108,15 @@ func (c *CoA) serve() {
 		if reply == NAKNoSession {
 			rfc3576.ErrorCause_Set(resp, rfc3576.ErrorCause_Value_SessionContextNotFound)
 		}
+		// Like a router that follows BlastRADIUS: the reply carries a
+		// Message-Authenticator, computed with the request's authenticator.
+		resp.Add(80, make(radius.Attribute, 16))
+		raw, _ := resp.MarshalBinary()
+		sum, _ := ComputeMA(raw, p.Authenticator[:], string(c.secret))
+		if reply == ACKBadMA {
+			sum[0] ^= 0xff
+		}
+		copy(resp.Attributes[len(resp.Attributes)-1].Attribute, sum)
 		out, err := resp.Encode()
 		if err == nil {
 			c.conn.WriteTo(out, from)

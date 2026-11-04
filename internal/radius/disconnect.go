@@ -72,6 +72,20 @@ func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) e
 	if t.MAC != "" {
 		rfc2865.CallingStationID_SetString(p, t.MAC)
 	}
+	// RFC 5176 allows Message-Authenticator and RouterOS 7.15+ may require it
+	// (BlastRADIUS). It is computed with a zero Authenticator field, because the
+	// Request Authenticator that Encode computes afterwards covers it (RFC 3579 3.2).
+	// VERIFY-ON-HARDWARE: RouterOS accepts it on incoming RADIUS (port 3799).
+	p.Authenticator = [16]byte{}
+	if err := sealMA(p, p.Authenticator); err != nil {
+		return err
+	}
+	wire, err := p.Encode() // the same bytes Exchange sends; wire[4:20] is the Request Authenticator
+	if err != nil {
+		return err
+	}
+	var reqAuth [16]byte
+	copy(reqAuth[:], wire[4:20])
 	addr := net.JoinHostPort(t.NASIP, strconv.Itoa(st.CoaPort))
 	client := radius.Client{} // no library retry: the loop below resends the same packet
 	var last error
@@ -83,6 +97,15 @@ func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) e
 		actx, cancel := context.WithTimeout(ctx, attemptTimeout)
 		reply, err := client.Exchange(actx, p, addr)
 		cancel()
+		if err == nil {
+			// A reply with a Message-Authenticator must carry a correct one (RFC 3579 3.2:
+			// the Authenticator field holds the request's authenticator).
+			if present, ok := checkMA(reply, reqAuth); present && !ok {
+				d.log.Warn("Disconnect reply ignored: its Message-Authenticator does not verify", "addr", addr)
+				last = domain.ErrKickTimeout // like a bad Response Authenticator: not believed, so try again
+				continue
+			}
+		}
 		switch {
 		case err == nil && reply.Code == radius.CodeDisconnectACK:
 			outcome = "ACK"

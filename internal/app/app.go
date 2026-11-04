@@ -264,11 +264,11 @@ func (a *App) Start() (err error) {
 		return fmt.Errorf("listen HSP_ADMIN_ADDR: %w", err)
 	}
 	closers = append(closers, a.adminLn)
-	if a.authConn, err = net.ListenPacket("udp", a.cfg.RadiusAuthAddr); err != nil {
+	if a.authConn, err = radius.Listen(a.cfg.RadiusAuthAddr, a.log); err != nil {
 		return fmt.Errorf("listen HSP_RADIUS_AUTH_ADDR: %w", err)
 	}
 	closers = append(closers, a.authConn)
-	if a.acctConn, err = net.ListenPacket("udp", a.cfg.RadiusAcctAddr); err != nil {
+	if a.acctConn, err = radius.Listen(a.cfg.RadiusAcctAddr, a.log); err != nil {
 		return fmt.Errorf("listen HSP_RADIUS_ACCT_ADDR: %w", err)
 	}
 	a.addrMu.Lock()

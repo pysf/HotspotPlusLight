@@ -400,7 +400,7 @@ Rows are never pruned (about 1 row per active member per day), never touched by 
 ## 7. RADIUS specification
 
 ### 7.1 Listeners
-UDP `:1812` (auth) and `:1813` (acct), addresses configurable. **Secret is read from `settings` per packet** (changes apply without restart). Any source IP is accepted if the packet verifies; Accounting-Request authenticators must be verified and bad packets dropped silently. *(Phase 3, 2026-11-01: an Access-Request carries no verifiable authenticator, so a wrong secret is detected heuristically — a PAP `User-Password` that does not decrypt to valid UTF-8 text without control characters is dropped silently with a WARN log; see `docs/phase3-notes.md`.)* Unknown/other codes are dropped.
+UDP `:1812` (auth) and `:1813` (acct), addresses configurable. **Secret is read from `settings` per packet** (changes apply without restart). Any source IP is accepted if the packet verifies; Accounting-Request authenticators must be verified and bad packets dropped silently. *(Phase 3, 2026-11-01: an Access-Request carries no verifiable authenticator, so a wrong secret is detected heuristically — a PAP `User-Password` that does not decrypt to valid UTF-8 text without control characters is dropped silently with a WARN log; see `docs/phase3-notes.md`.)* Unknown/other codes are dropped. *(2026-11-04: a wildcard address `:1812` or `0.0.0.0:1812` opens an IPv4-only socket so each reply leaves from the address the request was sent to; `[::]:1812` gives dual stack without that fix. A request with a wrong Message-Authenticator is only dropped and logged, it does not count as a wrong secret.)*
 
 ### 7.2 Access-Request (PAP)
 Inputs: `User-Name`, `User-Password` (PAP, decrypted with the secret), optional `Calling-Station-Id`, `NAS-IP-Address`, `NAS-Identifier`.
@@ -680,6 +680,7 @@ All E2E tests green on a clean checkout with no external services; hardware chec
 12. (Phase 12b) `alogin.html` with `popup=false` lands on the status page; `$(link-status)` works in the captive-portal mini browser of iOS and Android.
 13. (Phase 12b) `api.json` is served and valid JSON for a logged-in and a logged-out client (RFC 8908), and `errors.txt` messages appear for router-side errors.
 14. (Phase 12b) The new pages look right and work in the phone captive-portal mini browsers (no external requests; `backdrop-filter`, `color-mix`, `100dvh` on old iOS).
+15. (Phase 15) RouterOS accepts replies that carry Message-Authenticator as the first attribute (Access-Accept, Access-Reject, and Disconnect requests on port 3799), and `require-message-auth=yes` on the router works with this server.
 10. (informational) `Acct-Session-Id` reuse after reboot is an accepted risk.
 
 ---
