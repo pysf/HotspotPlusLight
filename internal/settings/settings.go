@@ -11,24 +11,27 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// Repo is what the service needs from storage (implemented by store).
+// Repo is what the service needs from storage (store.Store).
 type Repo interface {
 	GetSettings(ctx context.Context) (domain.Settings, error)
 	UpdateSettings(ctx context.Context, s domain.Settings, now time.Time) error
 	PlanExists(ctx context.Context, id int64) (bool, error)
 }
 
+// Service implements the settings use cases.
 type Service struct {
 	repo  Repo
 	clock clock.Clock
 }
 
+// New returns a Service.
 func New(repo Repo, c clock.Clock) *Service { return &Service{repo: repo, clock: c} }
 
+// Get returns the settings row.
 func (s *Service) Get(ctx context.Context) (domain.Settings, error) { return s.repo.GetSettings(ctx) }
 
 // Update validates and stores the form. A non-empty FieldErrors means nothing was stored.
-// The RADIUS shared secret is read per packet, so it applies without restart (PLAN 7.1).
+// The RADIUS shared secret is read per packet, so it applies without a restart (PLAN 7.1).
 func (s *Service) Update(ctx context.Context, f domain.SettingsForm) (domain.FieldErrors, error) {
 	st, errs := domain.ParseSettings(f)
 	if _, bad := errs["timezone"]; !bad {

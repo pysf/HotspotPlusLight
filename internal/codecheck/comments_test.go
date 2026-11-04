@@ -23,6 +23,12 @@ var enforced = []string{
 	"internal/auth",
 	"internal/session",
 	"internal/radius",
+	"internal/store",
+	"internal/member",
+	"internal/plan",
+	"internal/voucher",
+	"internal/settings",
+	"internal/usage",
 }
 
 // TestCommentRules checks, for every enforced package (test files and generated

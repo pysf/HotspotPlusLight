@@ -23,11 +23,13 @@ type Repo interface {
 	TopMembers(ctx context.Context, fromDay, toDay string, limit int) ([]domain.MemberUsage, error)
 }
 
+// Service builds the usage report.
 type Service struct {
 	repo  Repo
 	clock clock.Clock
 }
 
+// New returns a Service.
 func New(repo Repo, clk clock.Clock) *Service { return &Service{repo: repo, clock: clk} }
 
 // View is the data of the usage page.
@@ -38,8 +40,9 @@ type View struct {
 	Range    int // days covered by Top
 }
 
-// Report builds the page: the chart always covers the last ChartDays days, Top the last rangeDays
-// (unknown values fall back to the default). Days are calendar days in settings.timezone, today included.
+// Report returns the usage page data. The chart covers the last ChartDays days and Top
+// the last rangeDays; an unknown rangeDays falls back to the default. Days are calendar
+// days in settings.timezone, today included.
 func (s *Service) Report(ctx context.Context, rangeDays int) (View, error) {
 	st, err := s.repo.GetSettings(ctx)
 	if err != nil {

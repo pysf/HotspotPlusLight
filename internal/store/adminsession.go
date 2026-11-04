@@ -6,6 +6,7 @@ import (
 	"errors"
 )
 
+// InsertAdminSession stores a new admin session by the hash of its token.
 func (s *Store) InsertAdminSession(ctx context.Context, tokenHash, csrf string, createdAt, expiresAt int64) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO admin_session(token_hash, csrf_token, created_at, expires_at) VALUES (?,?,?,?)`,
 		tokenHash, csrf, createdAt, expiresAt)
@@ -15,9 +16,9 @@ func (s *Store) InsertAdminSession(ctx context.Context, tokenHash, csrf string, 
 // touchEvery is how old the stored expiry must be before it is slid again.
 const touchEvery = 60 // seconds
 
-// TouchAdminSession finds a live session and returns its CSRF token. It reads on
-// the read pool and writes the slid expiry only when the stored one is at least
-// touchEvery seconds behind newExpiresAt, so most requests do not write.
+// TouchAdminSession returns the CSRF token of a live session and whether it was found.
+// It slides the expiry to newExpiresAt only when the stored one is at least touchEvery
+// seconds behind, so most requests do not write.
 func (s *Store) TouchAdminSession(ctx context.Context, tokenHash string, now, newExpiresAt int64) (string, bool, error) {
 	var csrf string
 	var exp int64
@@ -42,17 +43,19 @@ func (s *Store) TouchAdminSession(ctx context.Context, tokenHash string, now, ne
 	return csrf, true, nil
 }
 
+// DeleteAdminSession removes the session with this token hash.
 func (s *Store) DeleteAdminSession(ctx context.Context, tokenHash string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM admin_session WHERE token_hash=?`, tokenHash)
 	return err
 }
 
+// PurgeExpiredAdminSessions deletes the sessions that expired at or before now.
 func (s *Store) PurgeExpiredAdminSessions(ctx context.Context, now int64) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM admin_session WHERE expires_at<=?`, now)
 	return err
 }
 
-// SetAdminPassword updates the hash, clears the must-change flag and deletes every admin session in one transaction.
+// SetAdminPassword stores the new hash, clears must_change_password and deletes every admin session.
 func (s *Store) SetAdminPassword(ctx context.Context, hash string, now int64) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -68,8 +71,8 @@ func (s *Store) SetAdminPassword(ctx context.Context, hash string, now int64) er
 	return tx.Commit()
 }
 
-// ChangeAdminPassword is SetAdminPassword for the web page: it keeps the session
-// keepTokenHash and deletes all the others.
+// ChangeAdminPassword is SetAdminPassword for the web page. It keeps the session
+// keepTokenHash and deletes the others.
 func (s *Store) ChangeAdminPassword(ctx context.Context, hash string, now int64, keepTokenHash string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

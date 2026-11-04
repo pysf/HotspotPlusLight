@@ -9,9 +9,8 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// GetMemberForLogin finds a member by username (case-insensitive: the column
-// is COLLATE NOCASE) and returns the encrypted password with it.
-// domain.ErrNotFound when there is no such member.
+// GetMemberForLogin returns the member with this username (case-insensitive) and the
+// encrypted password. It returns domain.ErrNotFound when there is no such member.
 func (s *Store) GetMemberForLogin(ctx context.Context, username string) (domain.Member, []byte, error) {
 	var enc []byte
 	m, err := scanMember(s.r.QueryRowContext(ctx, `SELECT `+memberCols+`, m.password_enc FROM member m WHERE m.username = ?`, username), nil, &enc)
@@ -21,7 +20,7 @@ func (s *Store) GetMemberForLogin(ctx context.Context, username string) (domain.
 	return m, enc, err
 }
 
-// CountActiveSessions counts the member's unended sessions updated at or after since (BR-9).
+// CountActiveSessions returns how many of the member's sessions are open and were updated at or after since (BR-9).
 func (s *Store) CountActiveSessions(ctx context.Context, memberID int64, since time.Time) (int, error) {
 	var n int
 	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM session s WHERE s.member_id = ? AND `+onlineSession,
@@ -30,8 +29,7 @@ func (s *Store) CountActiveSessions(ctx context.Context, memberID int64, since t
 }
 
 // RenewMemberIfUnchanged is RenewMember (BR-13b) guarded by the window start the
-// caller evaluated, so two simultaneous logins renew only once. It reports
-// whether this call renewed the member.
+// caller saw, so two simultaneous logins renew once. It reports whether this call renewed.
 func (s *Store) RenewMemberIfUnchanged(ctx context.Context, id int64, subscription time.Time, kind string, now time.Time) (bool, error) {
 	res, err := s.db.ExecContext(ctx, `UPDATE member SET subscription_date=?1, extra_bulk_bytes=0, used_download_bytes=0, used_upload_bytes=0,
 		used_seconds=0, last_renewed_at=?1, renewal_count=renewal_count+1, last_renewal_kind=?2, updated_at=?1

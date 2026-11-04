@@ -1,4 +1,5 @@
-// Package plan is the plan service: CRUD with validation and in-use checks.
+// Package plan is the plan service: create, edit, list and delete plans, with
+// validation and the in-use checks.
 package plan
 
 import (
@@ -10,9 +11,9 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// Repo is what the service needs from storage (implemented by store).
-// Create/Update return domain.ErrNameTaken on a case-insensitive duplicate and
-// Get/Update/Delete return domain.ErrNotFound for an unknown id.
+// Repo is what the service needs from storage (store.Store). Create and Update return
+// domain.ErrNameTaken on a case-insensitive duplicate. Get, Update and Delete return
+// domain.ErrNotFound for an unknown id.
 type Repo interface {
 	ListPlans(ctx context.Context) ([]domain.Plan, error)
 	GetPlan(ctx context.Context, id int64) (domain.Plan, error)
@@ -23,11 +24,13 @@ type Repo interface {
 	IsDefaultPlan(ctx context.Context, id int64) (bool, error)
 }
 
+// Service implements the plan use cases.
 type Service struct {
 	repo  Repo
 	clock clock.Clock
 }
 
+// New returns a Service.
 func New(repo Repo, c clock.Clock) *Service { return &Service{repo: repo, clock: c} }
 
 // Detail is a plan with the number of members using it.
@@ -36,9 +39,10 @@ type Detail struct {
 	Members int
 }
 
+// List returns all plans.
 func (s *Service) List(ctx context.Context) ([]domain.Plan, error) { return s.repo.ListPlans(ctx) }
 
-// Get returns the plan and its member count (domain.ErrNotFound if unknown).
+// Get returns the plan and its member count, or domain.ErrNotFound.
 func (s *Service) Get(ctx context.Context, id int64) (Detail, error) {
 	p, err := s.repo.GetPlan(ctx, id)
 	if err != nil {
@@ -48,7 +52,7 @@ func (s *Service) Get(ctx context.Context, id int64) (Detail, error) {
 	return Detail{Plan: p, Members: n}, err
 }
 
-// Create validates and stores a plan. A non-empty FieldErrors means nothing was stored.
+// Create validates and stores a plan and returns its id. A non-empty FieldErrors means nothing was stored.
 func (s *Service) Create(ctx context.Context, f domain.PlanForm) (int64, domain.FieldErrors, error) {
 	p, errs := domain.ParsePlan(f)
 	if len(errs) > 0 {
@@ -61,11 +65,12 @@ func (s *Service) Create(ctx context.Context, f domain.PlanForm) (int64, domain.
 	return id, nil, err
 }
 
-// Update validates and stores changes to plan id (BR-5b: applies to all its members live).
+// Update validates and stores changes to plan id. They apply to all its members at once (BR-5b).
+// A non-empty FieldErrors means nothing was stored.
 func (s *Service) Update(ctx context.Context, id int64, f domain.PlanForm) (domain.FieldErrors, error) {
 	p, errs := domain.ParsePlan(f)
 	if len(errs) > 0 {
-		// Unknown ids are 404 regardless of what was typed.
+		// An unknown id is not found, whatever was typed.
 		if _, err := s.repo.GetPlan(ctx, id); err != nil {
 			return nil, err
 		}
@@ -79,8 +84,8 @@ func (s *Service) Update(ctx context.Context, id int64, f domain.PlanForm) (doma
 	return nil, err
 }
 
-// Delete removes a plan that no member uses and that is not the default (O12).
-// Errors: domain.ErrNotFound, *domain.InUseError, domain.ErrDefault.
+// Delete removes a plan that no member or batch uses and that is not the default (O12).
+// It returns domain.ErrNotFound, *domain.InUseError or domain.ErrDefault.
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if _, err := s.repo.GetPlan(ctx, id); err != nil {
 		return err
@@ -95,5 +100,5 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	} else if n > 0 {
 		return &domain.InUseError{Members: n}
 	}
-	return s.repo.DeletePlan(ctx, id) // the FK (RESTRICT) still guards a concurrent member insert
+	return s.repo.DeletePlan(ctx, id) // the RESTRICT foreign key still guards a member added meanwhile
 }

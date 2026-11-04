@@ -9,19 +9,17 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// AcctTx is one accounting transaction; it satisfies session.AcctTx (the
-// composition root adapts InAcctTx to session.Repo).
+// AcctTx is one accounting transaction. It satisfies session.AcctTx; internal/app
+// adapts InAcctTx to session.Repo.
 type AcctTx struct{ tx *sql.Tx }
 
-// InAcctTx runs fn in ONE write transaction and commits when it returns nil;
-// any error rolls everything back. The caller answers the router only after
-// this returns (PLAN 7.3, E4.15).
+// InAcctTx runs fn in one write transaction. It commits when fn returns nil and
+// rolls back on any error. The caller answers the router only after it returns
+// (PLAN 7.3, E4.15).
 //
-// RULE (one write connection): while fn runs it holds the only write
-// connection. fn must use only tx. It must never call another Store method
-// (they need that connection or wait behind it), never use *sql.Rows from the
-// write pool after returning, and never wait for another request. The same rule
-// holds for every other transaction in this package (BeginTx on s.db).
+// While fn runs it holds the only write connection. So fn must use only tx, must
+// not call another Store method (it would wait for itself), and must not wait for
+// another request. The same holds for every transaction on s.db in this package.
 func (s *Store) InAcctTx(ctx context.Context, fn func(tx *AcctTx) error) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -34,6 +32,7 @@ func (s *Store) InAcctTx(ctx context.Context, fn func(tx *AcctTx) error) error {
 	return tx.Commit()
 }
 
+// MemberByUsername returns the member, or domain.ErrNotFound.
 func (t *AcctTx) MemberByUsername(ctx context.Context, username string) (domain.Member, error) {
 	m, err := scanMember(t.tx.QueryRowContext(ctx, `SELECT `+memberCols+` FROM member m WHERE m.username = ?`, username), nil)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -42,6 +41,7 @@ func (t *AcctTx) MemberByUsername(ctx context.Context, username string) (domain.
 	return m, err
 }
 
+// SetMemberMACIfEmpty stores mac on the member only if it has none yet.
 func (t *AcctTx) SetMemberMACIfEmpty(ctx context.Context, id int64, mac string, now time.Time) error {
 	_, err := t.tx.ExecContext(ctx, `UPDATE member SET mac=?, updated_at=? WHERE id=? AND mac=''`, mac, now.Unix(), id)
 	return err
@@ -50,11 +50,10 @@ func (t *AcctTx) SetMemberMACIfEmpty(ctx context.Context, id int64, mac string, 
 const sessionCols = `id, member_id, username, acct_session_id, nas_ip, nas_identifier, framed_ip, mac, status, started_at,
 	last_update_at, ended_at, terminate_cause, download_bytes, upload_bytes, session_seconds`
 
-// LatestSession returns the latest open row of the identity key, else the
-// latest finished one; nil when there is none. The first query uses the partial
-// index session_open_key. MONITOR: the second query has no usable index (the
-// only one is partial; a new one needs a migration and E0.09 counts them): a full
-// scan, only when there is no open row. Add an index migration if it ever matters.
+// LatestSession returns the latest open row of the identity key (username, session
+// id, NAS IP), else the latest finished one. It returns nil when there is none.
+// MONITOR: the finished-row query has no usable index (session_open_key is partial)
+// and scans the table, only when no row is open. Add an index migration if it matters.
 func (t *AcctTx) LatestSession(ctx context.Context, username, sessionID, nasIP string) (*domain.Session, error) {
 	for _, open := range []string{" AND ended_at IS NULL", " AND ended_at IS NOT NULL"} {
 		sess, err := scanSession(t.tx.QueryRowContext(ctx, `SELECT `+sessionCols+` FROM session WHERE username=? AND acct_session_id=? AND nas_ip=?`+open+
@@ -83,6 +82,7 @@ func scanSession(row rowScanner) (domain.Session, error) {
 	return s, err
 }
 
+// InsertSession adds a session row.
 func (t *AcctTx) InsertSession(ctx context.Context, s domain.Session) error {
 	_, err := t.tx.ExecContext(ctx, `INSERT INTO session(member_id, username, acct_session_id, nas_ip, nas_identifier, framed_ip, mac, status,
 		started_at, last_update_at, ended_at, terminate_cause, download_bytes, upload_bytes, session_seconds)
@@ -92,6 +92,7 @@ func (t *AcctTx) InsertSession(ctx context.Context, s domain.Session) error {
 	return err
 }
 
+// UpdateSession writes the changeable fields of the session with s.ID.
 func (t *AcctTx) UpdateSession(ctx context.Context, s domain.Session) error {
 	_, err := t.tx.ExecContext(ctx, `UPDATE session SET nas_identifier=?, framed_ip=?, mac=?, status=?, last_update_at=?, ended_at=?,
 		terminate_cause=?, download_bytes=?, upload_bytes=?, session_seconds=? WHERE id=?`,
@@ -100,7 +101,7 @@ func (t *AcctTx) UpdateSession(ctx context.Context, s domain.Session) error {
 	return err
 }
 
-// AddUsage adds to the member's counters in SQL, so it is relative to whatever the
+// AddUsage adds d to the member's counters in SQL, so it is relative to what the
 // row holds inside this transaction (BR-11, BR-13b).
 func (t *AcctTx) AddUsage(ctx context.Context, memberID int64, d domain.Counters, now time.Time) error {
 	_, err := t.tx.ExecContext(ctx, `UPDATE member SET used_download_bytes=used_download_bytes+?, used_upload_bytes=used_upload_bytes+?,
@@ -108,7 +109,7 @@ func (t *AcctTx) AddUsage(ctx context.Context, memberID int64, d domain.Counters
 	return err
 }
 
-// AddDailyUsage upserts the delta into the member's day row, in the packet's transaction (D12).
+// AddDailyUsage adds d to the member's usage_daily row for day, creating it if needed (D12).
 func (t *AcctTx) AddDailyUsage(ctx context.Context, memberID int64, day string, d domain.Counters) error {
 	_, err := t.tx.ExecContext(ctx, `INSERT INTO usage_daily(member_id, day, down, up, seconds) VALUES (?,?,?,?,?)
 		ON CONFLICT(member_id, day) DO UPDATE SET down=down+excluded.down, up=up+excluded.up, seconds=seconds+excluded.seconds`,
@@ -116,7 +117,7 @@ func (t *AcctTx) AddDailyUsage(ctx context.Context, memberID int64, day string, 
 	return err
 }
 
-// SessionRetentionDays is read at each pruning run, so the setting applies without restart (O18).
+// SessionRetentionDays returns the session retention setting (O18). It is read at each pruning run, so a change applies without restart.
 func (s *Store) SessionRetentionDays(ctx context.Context) (int, error) {
 	var n int
 	err := s.r.QueryRowContext(ctx, `SELECT session_retention_days FROM settings WHERE id=1`).Scan(&n)

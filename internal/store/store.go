@@ -14,7 +14,7 @@ import (
 // readConns is the size of the read pool.
 const readConns = 8
 
-// Store opens the same file as two pools:
+// Store is the database handle. It opens the same file as two pools:
 //   - db is the write pool: exactly ONE connection. Every transaction and every
 //     write goes through it, so writers wait in Go (fair queue) and not in the
 //     SQLite busy handler (which polls and lets new writers barge in).
@@ -28,10 +28,10 @@ const readConns = 8
 // it waits for itself forever.
 type Store struct{ db, r *sql.DB }
 
-// Open opens (creating if needed) the SQLite file with the pragmas of
-// PLAN.md section 6. _txlock=immediate makes every write transaction take the
-// write lock up front (single-writer, no upgrade deadlocks).
-// The write pool is opened first, so WAL mode is set before the read pool opens.
+// Open opens the SQLite file at path, creating it if needed, with the pragmas of
+// PLAN.md section 6. Write transactions take the write lock up front
+// (_txlock=immediate), so they never fail on a lock upgrade. The write pool is
+// opened first so that WAL mode is set before the read pool opens.
 func Open(path string) (*Store, error) {
 	w, err := sql.Open("sqlite", DSN(path))
 	if err != nil {
@@ -62,5 +62,5 @@ func Open(path string) (*Store, error) {
 // Close closes both pools.
 func (s *Store) Close() error { return errors.Join(s.r.Close(), s.db.Close()) }
 
-// DB exposes the write pool for tests and the migration runner only.
+// DB returns the write pool. Use it only in tests and the migration runner.
 func (s *Store) DB() *sql.DB { return s.db }

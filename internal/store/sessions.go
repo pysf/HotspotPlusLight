@@ -9,14 +9,14 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// CountOnlineSessions counts the online sessions (see onlineSession).
+// CountOnlineSessions returns the number of online sessions updated at or after since (see onlineSession).
 func (s *Store) CountOnlineSessions(ctx context.Context, since time.Time) (int, error) {
 	var n int
 	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM session s WHERE `+onlineSession, since.Unix()).Scan(&n)
 	return n, err
 }
 
-// ListOnlineSessions returns one page of online sessions, newest first.
+// ListOnlineSessions returns one page of online sessions (see onlineSession), newest first.
 func (s *Store) ListOnlineSessions(ctx context.Context, since time.Time, limit, offset int) ([]domain.Session, error) {
 	rows, err := s.r.QueryContext(ctx, `SELECT `+sessionCols+` FROM session s WHERE `+onlineSession+` ORDER BY s.started_at DESC, s.id DESC LIMIT ? OFFSET ?`,
 		since.Unix(), limit, offset)
@@ -35,8 +35,8 @@ func (s *Store) ListOnlineSessions(ctx context.Context, since time.Time, limit, 
 	return out, rows.Err()
 }
 
-// SessionTargetByID returns what a Disconnect needs for one session row, and
-// whether the row is still open. domain.ErrNotFound if there is no such row.
+// SessionTargetByID returns what a Disconnect needs for one session row, and whether
+// the row is still open. It returns domain.ErrNotFound if there is no such row.
 func (s *Store) SessionTargetByID(ctx context.Context, id int64) (domain.SessionTarget, bool, error) {
 	var t domain.SessionTarget
 	var ended sql.NullInt64
@@ -48,16 +48,16 @@ func (s *Store) SessionTargetByID(ctx context.Context, id int64) (domain.Session
 	return t, !ended.Valid, err
 }
 
-// EndSession marks an open session ended (an ACKed kick, BR-18). Counters are
-// untouched: the router's final Stop still completes the row (domain.ApplyAccounting).
+// EndSession marks an open session ended with cause, after an accepted Disconnect (BR-18).
+// It does nothing for a session that is already ended. Counters stay: the router's final
+// Stop still completes the row (domain.ApplyAccounting).
 func (s *Store) EndSession(ctx context.Context, id int64, now time.Time, cause string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE session SET ended_at = ?, terminate_cause = ? WHERE id = ? AND ended_at IS NULL`, now.Unix(), cause, id)
 	return err
 }
 
-// OpenSessionTarget finds the open session of an accounting key (username,
-// Acct-Session-Id, router address) for a Disconnect. The bool is false when no
-// open row exists.
+// OpenSessionTarget returns the open session of an accounting key (username,
+// Acct-Session-Id, router address) for a Disconnect. The bool is false when no row is open.
 func (s *Store) OpenSessionTarget(ctx context.Context, username, acctSessionID, nasIP string) (domain.SessionTarget, bool, error) {
 	var t domain.SessionTarget
 	err := s.r.QueryRowContext(ctx, `SELECT id, nas_ip, username, acct_session_id, framed_ip, mac FROM session

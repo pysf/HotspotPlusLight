@@ -9,11 +9,11 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// CreateBatch reserves the next counter..counter+count-1, inserts the batch row
-// and its members and advances settings.batch_counter, all in ONE transaction
-// (BR-15). The transaction takes the write lock up front (_txlock=immediate),
-// so concurrent creations cannot read the same counter. A username that
-// already exists fails the whole batch with *domain.UsernameConflictError.
+// CreateBatch inserts the batch row and its members and advances settings.batch_counter
+// in one transaction (BR-15), then returns the batch and the new usernames. The write
+// lock is taken up front, so two creations never read the same counter. It fails the
+// whole batch with *domain.UsernameConflictError when a username exists, and with
+// domain.ErrPlanGone when the plan was deleted.
 func (s *Store) CreateBatch(ctx context.Context, nb domain.NewBatch, now time.Time) (domain.Batch, []string, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -60,8 +60,10 @@ func (s *Store) CreateBatch(ctx context.Context, nb domain.NewBatch, now time.Ti
 		DurationDays: nb.DurationDays, ExpiresAt: nb.ExpiresAt.UTC(), CreatedAt: now.UTC()}, usernames, nil
 }
 
+// batchCols are the batch columns that scanBatch reads.
 const batchCols = `b.id, b.label, b.plan_id, b.count, b.duration_days, b.expires_at, b.created_at`
 
+// scanBatch reads batchCols, then extra.
 func scanBatch(r rowScanner, extra ...any) (domain.Batch, error) {
 	var b domain.Batch
 	var exp, created int64
@@ -70,7 +72,7 @@ func scanBatch(r rowScanner, extra ...any) (domain.Batch, error) {
 	return b, err
 }
 
-// GetBatch returns one batch (domain.ErrNotFound if unknown).
+// GetBatch returns one batch, or domain.ErrNotFound.
 func (s *Store) GetBatch(ctx context.Context, id int64) (domain.Batch, error) {
 	b, err := scanBatch(s.r.QueryRowContext(ctx, `SELECT `+batchCols+` FROM batch b WHERE b.id=?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -79,19 +81,19 @@ func (s *Store) GetBatch(ctx context.Context, id int64) (domain.Batch, error) {
 	return b, err
 }
 
-// CountBatches is the number of batch rows.
+// CountBatches returns the number of batches.
 func (s *Store) CountBatches(ctx context.Context) (int, error) {
 	var n int
 	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM batch`).Scan(&n)
 	return n, err
 }
 
-// unusedMember: all usage counters 0 and no session row (PLAN 8.2).
+// unusedMember is the SQL test for a member who never used the plan: all counters 0 and no session row (PLAN 8.2).
 const unusedMember = `m.used_download_bytes = 0 AND m.used_upload_bytes = 0 AND m.used_seconds = 0
 	AND NOT EXISTS (SELECT 1 FROM session x WHERE x.member_id = m.id)`
 
-// ListBatches returns one page of batches, newest first, with live counts. The
-// online definition is the shared one (onlineExists, BR-17).
+// ListBatches returns one page of batches, newest first, with member, unused and
+// online counts (onlineExists, BR-17).
 func (s *Store) ListBatches(ctx context.Context, limit, offset int, onlineSince time.Time) ([]domain.BatchRow, error) {
 	rows, err := s.r.QueryContext(ctx, `SELECT `+batchCols+`, p.name,
 		(SELECT count(*) FROM member m WHERE m.batch_id = b.id),
@@ -113,7 +115,7 @@ func (s *Store) ListBatches(ctx context.Context, limit, offset int, onlineSince 
 	return out, rows.Err()
 }
 
-// RenameBatch changes the label only (BR-23a).
+// RenameBatch changes the label only (BR-23a). It returns domain.ErrNotFound for an unknown batch.
 func (s *Store) RenameBatch(ctx context.Context, id int64, label string) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE batch SET label=? WHERE id=?`, label, id)
 	if err != nil {
@@ -122,7 +124,7 @@ func (s *Store) RenameBatch(ctx context.Context, id int64, label string) error {
 	return affected(res)
 }
 
-// ListBatchCredentials lists the members now in the batch, oldest first.
+// ListBatchCredentials returns username and encrypted password of the members now in the batch, oldest first.
 func (s *Store) ListBatchCredentials(ctx context.Context, batchID int64) ([]domain.BatchCredential, error) {
 	rows, err := s.r.QueryContext(ctx, `SELECT username, password_enc FROM member WHERE batch_id=? ORDER BY id`, batchID)
 	if err != nil {

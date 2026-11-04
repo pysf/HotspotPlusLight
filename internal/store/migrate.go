@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+// embedded holds the migration files compiled into the binary.
+//
 //go:embed migrations/*.sql
 var embedded embed.FS
 
@@ -25,8 +27,10 @@ func EmbeddedMigrations() fs.FS {
 	return sub
 }
 
+// migrationName is the file name pattern NNNN_name.sql.
 var migrationName = regexp.MustCompile(`^(\d{4})_[a-z0-9_]+\.sql$`)
 
+// migration is one embedded SQL file with its SHA-256 checksum.
 type migration struct {
 	version  int
 	name     string
@@ -34,6 +38,7 @@ type migration struct {
 	checksum string
 }
 
+// loadMigrations reads and orders the migration files. It fails on a bad name or a gap in the versions.
 func loadMigrations(fsys fs.FS) ([]migration, error) {
 	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {
@@ -62,11 +67,11 @@ func loadMigrations(fsys fs.FS) ([]migration, error) {
 	return ms, nil
 }
 
-// Migrate applies, in order, every migration in fsys not yet recorded in
-// schema_migrations. Each runs in its own transaction together with its
-// schema_migrations row, so a failure leaves the DB at the previous version.
-// Already-applied files are verified by checksum. It returns how many were
-// applied. Forward-only: there are no down migrations.
+// Migrate applies, in order, every migration in fsys that schema_migrations does not
+// list, and returns how many it applied. Each one runs in its own transaction, so a
+// failure leaves the database at the previous version. It refuses to run when an
+// applied file was changed (checksum) or the database is newer than the binary.
+// There are no down migrations.
 func (s *Store) Migrate(ctx context.Context, fsys fs.FS, now func() time.Time) (int, error) {
 	ms, err := loadMigrations(fsys)
 	if err != nil {
@@ -97,6 +102,7 @@ func (s *Store) Migrate(ctx context.Context, fsys fs.FS, now func() time.Time) (
 	return n, nil
 }
 
+// appliedChecksums returns version to checksum for the applied migrations; empty on a fresh database.
 func (s *Store) appliedChecksums(ctx context.Context) (map[int]string, error) {
 	out := map[int]string{}
 	var name string
@@ -120,6 +126,7 @@ func (s *Store) appliedChecksums(ctx context.Context) (map[int]string, error) {
 	return out, rows.Err()
 }
 
+// apply runs one migration and records it in one transaction.
 func (s *Store) apply(ctx context.Context, m migration, now time.Time) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

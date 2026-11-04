@@ -8,6 +8,7 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
+// GetSettings returns the single settings row.
 func (s *Store) GetSettings(ctx context.Context) (domain.Settings, error) {
 	var st domain.Settings
 	var def sql.NullInt64
@@ -24,8 +25,9 @@ func (s *Store) GetSettings(ctx context.Context) (domain.Settings, error) {
 	return st, err
 }
 
+// UpdateSettings saves every editable setting. A nil DefaultPlanID clears the default plan.
 func (s *Store) UpdateSettings(ctx context.Context, st domain.Settings, now time.Time) error {
-	var def any // NULL when no default plan
+	var def any
 	if st.DefaultPlanID != nil {
 		def = *st.DefaultPlanID
 	}

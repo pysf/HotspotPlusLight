@@ -13,8 +13,8 @@ import (
 	"hotspotpluslight/internal/secret"
 )
 
-// Repo is what the service needs from storage (implemented by store).
-// Get* return domain.ErrNotFound for an unknown id.
+// Repo is what the service needs from storage (store.Store). The Get methods return
+// domain.ErrNotFound for an unknown id.
 type Repo interface {
 	GetSettings(ctx context.Context) (domain.Settings, error)
 	GetPlan(ctx context.Context, id int64) (domain.Plan, error)
@@ -29,18 +29,19 @@ type Repo interface {
 	GetMemberPassword(ctx context.Context, id int64) ([]byte, error)
 }
 
-// Cipher encrypts and decrypts member passwords (implemented by secret.Box).
+// Cipher encrypts and decrypts member passwords (secret.Box).
 type Cipher interface {
 	Encrypt(plain []byte) ([]byte, error)
 	Decrypt(data []byte) ([]byte, error)
 }
 
-// Members deletes members the same way the member list does: kick open
-// sessions first, then remove (implemented by member.Service).
+// Members deletes members the same way the member list does: it kicks open
+// sessions first, then removes them (member.Service).
 type Members interface {
 	Delete(ctx context.Context, sel domain.MemberSelection) (member.DeleteResult, error)
 }
 
+// Service implements the batch and voucher use cases.
 type Service struct {
 	repo    Repo
 	cipher  Cipher
@@ -48,21 +49,23 @@ type Service struct {
 	clock   clock.Clock
 }
 
+// New returns a Service.
 func New(repo Repo, cipher Cipher, members Members, clk clock.Clock) *Service {
 	return &Service{repo: repo, cipher: cipher, members: members, clock: clk}
 }
 
-// NewForm is the new-batch form: the default plan is preselected (O10).
+// NewForm returns the empty new-batch form. The default plan is only preselected (O10).
 func (s *Service) NewForm(ctx context.Context) (domain.BatchForm, error) {
 	st, err := s.repo.GetSettings(ctx)
 	return domain.NewBatchForm(st.DefaultPlanID), err
 }
 
+// planChoiceMsg is the field error for a missing or unknown plan.
 const planChoiceMsg = "Choose a plan from the list."
 
-// Create validates the form and stores the batch (BR-15). A non-empty
-// FieldErrors means nothing was stored. A generated username that already
-// exists returns *domain.UsernameConflictError and stores nothing.
+// Create validates the form and stores the batch (BR-15). A non-empty FieldErrors means
+// nothing was stored. It returns *domain.UsernameConflictError, and stores nothing, when
+// a generated username already exists.
 func (s *Service) Create(ctx context.Context, f domain.BatchForm) (domain.Batch, domain.FieldErrors, error) {
 	st, err := s.repo.GetSettings(ctx)
 	if err != nil {
@@ -86,7 +89,7 @@ func (s *Service) Create(ctx context.Context, f domain.BatchForm) (domain.Batch,
 		return domain.Batch{}, errs, nil
 	}
 	days := in.DurationDays
-	if days == 0 {
+	if days == 0 { // zero means the plan's duration
 		days = plan.DurationDays
 	}
 	now := s.clock.Now()
@@ -114,7 +117,7 @@ type ListResult struct {
 	Loc                     *time.Location
 }
 
-// List returns one page of batches with their counts.
+// List returns one page of batches with their member, unused and online counts.
 func (s *Service) List(ctx context.Context, page, per int) (ListResult, error) {
 	st, err := s.repo.GetSettings(ctx)
 	if err != nil {
@@ -133,7 +136,7 @@ func (s *Service) List(ctx context.Context, page, per int) (ListResult, error) {
 	return ListResult{Rows: rows, Total: total, Page: page, Pages: pages, Per: per, Loc: loc}, err
 }
 
-// Rename changes the label only (BR-23a). domain.ErrNotFound if unknown.
+// Rename changes the label only (BR-23a). It returns domain.ErrNotFound if the batch is unknown.
 func (s *Service) Rename(ctx context.Context, id int64, label string) (domain.FieldErrors, error) {
 	label, errs := domain.ParseBatchLabel(label)
 	if len(errs) > 0 {
@@ -145,9 +148,8 @@ func (s *Service) Rename(ctx context.Context, id int64, label string) (domain.Fi
 	return nil, s.repo.RenameBatch(ctx, id, label)
 }
 
-// Delete removes the batch with its members and their sessions (BR-23b). The
-// members service kicks the open sessions first (a failure is counted, not
-// fatal) and deletes members, sessions and the batch row in one transaction.
+// Delete removes the batch with its members and their sessions (BR-23b), or returns
+// domain.ErrNotFound. Open sessions are kicked first; a failed kick is counted, not fatal.
 func (s *Service) Delete(ctx context.Context, id int64) (member.DeleteResult, error) {
 	if _, err := s.repo.GetBatch(ctx, id); err != nil {
 		return member.DeleteResult{}, err
@@ -165,6 +167,7 @@ type Print struct {
 	Total        int
 }
 
+// print builds the Print of vouchers vs with the current settings.
 func (s *Service) print(ctx context.Context, title string, vs []domain.Voucher) (Print, error) {
 	st, err := s.repo.GetSettings(ctx)
 	if err != nil {
@@ -173,7 +176,7 @@ func (s *Service) print(ctx context.Context, title string, vs []domain.Voucher) 
 	return Print{Title: title, BusinessName: st.BusinessName, Help: domain.VoucherHelp(st.VoucherHelp), Pages: domain.VoucherPages(vs), Total: len(vs)}, nil
 }
 
-// PrintBatch returns the batch's vouchers with the current passwords.
+// PrintBatch returns the vouchers of a batch with the current passwords, or domain.ErrNotFound.
 func (s *Service) PrintBatch(ctx context.Context, id int64) (Print, error) {
 	b, err := s.repo.GetBatch(ctx, id)
 	if err != nil {
@@ -198,7 +201,7 @@ func (s *Service) PrintBatch(ctx context.Context, id int64) (Print, error) {
 	return s.print(ctx, title, vs)
 }
 
-// PrintMember returns the voucher of one member, batch or not.
+// PrintMember returns the voucher of one member, in a batch or not, or domain.ErrNotFound.
 func (s *Service) PrintMember(ctx context.Context, id int64) (Print, error) {
 	m, err := s.repo.GetMember(ctx, id)
 	if err != nil {

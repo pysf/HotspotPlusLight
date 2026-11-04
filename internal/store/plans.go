@@ -12,16 +12,18 @@ import (
 )
 
 // SQLite result codes (sqlite3.h). The driver reports RESTRICT violations with
-// several extended codes (787 and 1811 seen), so foreign-key failures are
-// recognised by the primary code SQLITE_CONSTRAINT (19).
+// several extended codes (787 and 1811 seen), so isConstraint tests the primary
+// code SQLITE_CONSTRAINT (19).
 const (
 	sqliteConstraint       = 19
 	sqliteConstraintUnique = 2067
 	sqliteConstraintFK     = 787
 )
 
+// isConstraint reports whether err is any SQLite constraint violation.
 func isConstraint(err error) bool { return sqliteCode(err)&0xff == sqliteConstraint }
 
+// sqliteCode returns the SQLite result code of err, or 0 if err is not a SQLite error.
 func sqliteCode(err error) int {
 	var se *sqlite.Error
 	if errors.As(err, &se) {
@@ -30,10 +32,13 @@ func sqliteCode(err error) int {
 	return 0
 }
 
+// planCols are the plan columns that scanPlan reads.
 const planCols = `id, name, duration_days, speed_value, speed_unit, bulk_value, bulk_unit, time_limit_minutes, max_sessions, auto_resubscribe`
 
+// rowScanner is what the scan helpers need from *sql.Row and *sql.Rows.
 type rowScanner interface{ Scan(...any) error }
 
+// scanPlan reads one row selected with planCols.
 func scanPlan(r rowScanner) (domain.Plan, error) {
 	var p domain.Plan
 	var auto int
@@ -43,6 +48,7 @@ func scanPlan(r rowScanner) (domain.Plan, error) {
 	return p, err
 }
 
+// ListPlans returns all plans ordered by name.
 func (s *Store) ListPlans(ctx context.Context) ([]domain.Plan, error) {
 	rows, err := s.r.QueryContext(ctx, `SELECT `+planCols+` FROM plan ORDER BY name COLLATE NOCASE, id`)
 	if err != nil {
@@ -60,6 +66,7 @@ func (s *Store) ListPlans(ctx context.Context) ([]domain.Plan, error) {
 	return out, rows.Err()
 }
 
+// GetPlan returns the plan, or domain.ErrNotFound.
 func (s *Store) GetPlan(ctx context.Context, id int64) (domain.Plan, error) {
 	p, err := scanPlan(s.r.QueryRowContext(ctx, `SELECT `+planCols+` FROM plan WHERE id=?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -68,6 +75,7 @@ func (s *Store) GetPlan(ctx context.Context, id int64) (domain.Plan, error) {
 	return p, err
 }
 
+// CreatePlan inserts a plan and returns its id, or domain.ErrNameTaken.
 func (s *Store) CreatePlan(ctx context.Context, p domain.Plan, now time.Time) (int64, error) {
 	res, err := s.db.ExecContext(ctx, `INSERT INTO plan(name, duration_days, speed_value, speed_unit, bulk_value, bulk_unit,
 		time_limit_minutes, max_sessions, auto_resubscribe, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
@@ -82,6 +90,7 @@ func (s *Store) CreatePlan(ctx context.Context, p domain.Plan, now time.Time) (i
 	return res.LastInsertId()
 }
 
+// UpdatePlan saves the plan with p.ID. It returns domain.ErrNotFound or domain.ErrNameTaken.
 func (s *Store) UpdatePlan(ctx context.Context, p domain.Plan, now time.Time) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE plan SET name=?, duration_days=?, speed_value=?, speed_unit=?, bulk_value=?, bulk_unit=?,
 		time_limit_minutes=?, max_sessions=?, auto_resubscribe=?, updated_at=? WHERE id=?`,
@@ -99,11 +108,11 @@ func (s *Store) UpdatePlan(ctx context.Context, p domain.Plan, now time.Time) er
 	return nil
 }
 
-// DeletePlan deletes the plan unless it is the settings default (checked in the
-// same statement, so a concurrent settings save cannot be undone silently). A
-// member row that appeared meanwhile is caught by the RESTRICT foreign key.
-// The follow-up reads (default? how many members and batches?) run in the same
-// write transaction, so they agree with the failed delete.
+// DeletePlan deletes the plan. It returns domain.ErrNotFound for an unknown plan,
+// domain.ErrDefault for the default plan, and *domain.InUseError (member and batch
+// counts) when members or batches use it (O12). The default check is in the same
+// statement, so a concurrent settings save cannot be undone; the RESTRICT foreign key
+// catches a member that appears meanwhile.
 func (s *Store) DeletePlan(ctx context.Context, id int64) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -134,24 +143,28 @@ func (s *Store) DeletePlan(ctx context.Context, id int64) error {
 	return tx.Commit()
 }
 
+// txIsDefault reports whether the plan is the default plan, inside tx.
 func txIsDefault(ctx context.Context, tx *sql.Tx, id int64) bool {
 	var n int
 	err := tx.QueryRowContext(ctx, `SELECT count(*) FROM settings WHERE id=1 AND default_plan_id=?`, id).Scan(&n)
 	return err == nil && n > 0
 }
 
+// CountMembersOnPlan returns how many members use the plan.
 func (s *Store) CountMembersOnPlan(ctx context.Context, id int64) (int, error) {
 	var n int
 	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM member WHERE plan_id=?`, id).Scan(&n)
 	return n, err
 }
 
+// IsDefaultPlan reports whether the plan is the default plan.
 func (s *Store) IsDefaultPlan(ctx context.Context, id int64) (bool, error) {
 	var n int
 	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM settings WHERE id=1 AND default_plan_id=?`, id).Scan(&n)
 	return n > 0, err
 }
 
+// PlanExists reports whether a plan with this id exists.
 func (s *Store) PlanExists(ctx context.Context, id int64) (bool, error) {
 	var n int
 	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM plan WHERE id=?`, id).Scan(&n)

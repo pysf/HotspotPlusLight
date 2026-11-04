@@ -1,5 +1,6 @@
 // Package member is the member service: create, edit, renew, extra bulk,
-// passwords, list and delete (kicking open sessions first).
+// passwords, list and delete. Deleting or deactivating a member kicks its open
+// sessions first.
 package member
 
 import (
@@ -14,9 +15,9 @@ import (
 	"hotspotpluslight/internal/secret"
 )
 
-// Repo is what the service needs from storage (implemented by store).
-// Create/Update return domain.ErrUsernameTaken on a case-insensitive duplicate;
-// Get*/Update/Set*/Renew return domain.ErrNotFound for an unknown id.
+// Repo is what the service needs from storage (store.Store). Create and Update return
+// domain.ErrUsernameTaken on a case-insensitive duplicate. Get, Update, Set and Renew
+// return domain.ErrNotFound for an unknown id.
 type Repo interface {
 	CreateMember(ctx context.Context, in domain.MemberInput, passwordEnc []byte, now time.Time) (int64, error)
 	GetMember(ctx context.Context, id int64) (domain.Member, error)
@@ -40,17 +41,18 @@ type Repo interface {
 	GetSettings(ctx context.Context) (domain.Settings, error)
 }
 
-// Cipher encrypts member passwords at rest (implemented by secret.Box).
+// Cipher encrypts member passwords at rest (secret.Box).
 type Cipher interface {
 	Encrypt(plain []byte) ([]byte, error)
 	Decrypt(data []byte) ([]byte, error)
 }
 
-// Disconnector ends a router session (BR-18); implemented by session.Service (RADIUS Disconnect + mark ended on ACK).
+// Disconnector ends a router session (BR-18). session.Service sends the RADIUS Disconnect and marks the row ended on ACK.
 type Disconnector interface {
 	Disconnect(ctx context.Context, t domain.SessionTarget) error
 }
 
+// Service implements the member use cases.
 type Service struct {
 	repo   Repo
 	cipher Cipher
@@ -58,6 +60,7 @@ type Service struct {
 	clock  clock.Clock
 }
 
+// New returns a Service.
 func New(repo Repo, cipher Cipher, disc Disconnector, clk clock.Clock) *Service {
 	return &Service{repo: repo, cipher: cipher, disc: disc, clock: clk}
 }
@@ -70,6 +73,7 @@ type env struct {
 	onlineSince time.Time // sessions updated since then count as online (BR-17)
 }
 
+// env loads the settings and the clock for one request.
 func (s *Service) env(ctx context.Context) (env, error) {
 	st, err := s.repo.GetSettings(ctx)
 	if err != nil {
@@ -91,23 +95,24 @@ type View struct {
 	Now     time.Time
 }
 
+// newView builds the View of a member row.
 func newView(r domain.MemberRow, e env) View {
 	return View{Row: r, Summary: domain.Summarize(r.Member, r.Plan, e.now), Loc: e.loc, Now: e.now}
 }
 
-// NewForm is the form for a new member: the default plan is preselected, never assigned (O10, Q19).
+// NewForm returns the form for a new member, active by default. The default plan is only preselected, never assigned (O10, Q19).
 func (s *Service) NewForm(ctx context.Context) (domain.MemberForm, error) {
 	st, err := s.repo.GetSettings(ctx)
 	return domain.NewMemberForm(st.DefaultPlanID), err
 }
 
-// Location is the display zone (settings.timezone).
+// Location returns the display zone (settings.timezone).
 func (s *Service) Location(ctx context.Context) (*time.Location, error) {
 	e, err := s.env(ctx)
 	return e.loc, err
 }
 
-// planError returns a field message when the chosen plan does not exist.
+// planError returns a field error when the chosen plan does not exist, else nil.
 func (s *Service) planError(ctx context.Context, planID int64) (domain.FieldErrors, error) {
 	if _, err := s.repo.GetPlan(ctx, planID); errors.Is(err, domain.ErrNotFound) {
 		return domain.FieldErrors{"plan_id": "Choose a plan from the list."}, nil
@@ -117,7 +122,8 @@ func (s *Service) planError(ctx context.Context, planID int64) (domain.FieldErro
 	return nil, nil
 }
 
-// Create validates and stores a member (BR-14). A non-empty FieldErrors means nothing was stored.
+// Create validates and stores a member (BR-14) and returns its id. It makes a random
+// 6-digit password when none is given. A non-empty FieldErrors means nothing was stored.
 func (s *Service) Create(ctx context.Context, f domain.MemberForm) (int64, domain.FieldErrors, error) {
 	e, err := s.env(ctx)
 	if err != nil {
@@ -126,7 +132,7 @@ func (s *Service) Create(ctx context.Context, f domain.MemberForm) (int64, domai
 	in, errs := domain.ParseMember(f, e.loc, true)
 	password := f.Password
 	if strings.TrimSpace(password) == "" {
-		if password, err = secret.RandomDigits(6); err != nil { // BR-14: random 6-digit number
+		if password, err = secret.RandomDigits(6); err != nil {
 			return 0, nil, err
 		}
 	} else if msg := domain.ValidateMemberPassword(password); msg != "" {
@@ -152,7 +158,7 @@ func (s *Service) Create(ctx context.Context, f domain.MemberForm) (int64, domai
 	return id, nil, err
 }
 
-// Get returns one member with its summary (domain.ErrNotFound if unknown).
+// Get returns one member with its summary, or domain.ErrNotFound.
 func (s *Service) Get(ctx context.Context, id int64) (View, error) {
 	e, err := s.env(ctx)
 	if err != nil {
@@ -168,9 +174,8 @@ func (s *Service) Get(ctx context.Context, id int64) (View, error) {
 // KickResult counts the Disconnect-Requests sent and how many failed (BR-18).
 type KickResult struct{ Attempted, Failed int }
 
-// kick sends a Disconnect for every open session of the selection. Failures are
-// counted, never fatal: the caller carries on (BR-18, BR-23). It returns the
-// targets it tried.
+// kick sends a Disconnect for every open session of the selection and returns the
+// outcome and the targets. A failed Disconnect is counted, not an error (BR-18, BR-23).
 func (s *Service) kick(ctx context.Context, sel domain.MemberSelection, now time.Time) (KickResult, []domain.SessionTarget, error) {
 	targets, err := s.repo.OpenSessions(ctx, sel, now)
 	if err != nil {
@@ -181,12 +186,12 @@ func (s *Service) kick(ctx context.Context, sel domain.MemberSelection, now time
 	return res, targets, nil
 }
 
-// kickWorkers bounds the concurrent Disconnects of one request: each may wait up
+// kickWorkers is the most Disconnects one request sends at a time. Each may wait up
 // to 3 s for a silent router, so serial sends would stall the HTTP request.
 const kickWorkers = 8
 
-// disconnect sends a Disconnect for each target (at most kickWorkers at a time)
-// and adds the outcome to res. The counts do not depend on the finishing order.
+// disconnect sends a Disconnect for each target, at most kickWorkers at a time, and
+// adds the outcome to res.
 func (s *Service) disconnect(ctx context.Context, targets []domain.SessionTarget, res *KickResult) {
 	failed := make([]bool, len(targets)) // one slot per target: no shared writes
 	sem := make(chan struct{}, kickWorkers)
@@ -209,7 +214,7 @@ func (s *Service) disconnect(ctx context.Context, targets []domain.SessionTarget
 }
 
 // DisconnectMember kicks every open session of one member (BR-18, E5.07).
-// domain.ErrNotFound if the member does not exist.
+// It returns domain.ErrNotFound if the member does not exist.
 func (s *Service) DisconnectMember(ctx context.Context, id int64) (KickResult, error) {
 	if _, err := s.repo.GetMember(ctx, id); err != nil {
 		return KickResult{}, err
@@ -218,9 +223,10 @@ func (s *Service) DisconnectMember(ctx context.Context, id int64) (KickResult, e
 	return res, err
 }
 
-// Update validates and stores the member's editable fields. Changing the plan
-// only changes plan_id (BR-13a). Deactivating kicks the open sessions, and the
-// member is inactive whatever the kick result (BR-18, Q14).
+// Update validates and stores the member's editable fields. Changing the plan only
+// changes plan_id (BR-13a). Deactivating kicks the open sessions, and the member stays
+// inactive whatever the kick result (BR-18, Q14). A non-empty FieldErrors means nothing
+// was stored; renaming an online member is refused.
 func (s *Service) Update(ctx context.Context, id int64, f domain.MemberForm) (domain.FieldErrors, KickResult, error) {
 	e, err := s.env(ctx)
 	if err != nil {
@@ -248,7 +254,7 @@ func (s *Service) Update(ctx context.Context, id int64, f domain.MemberForm) (do
 			return domain.FieldErrors{"username": "This member is online: disconnect the member before renaming."}, KickResult{}, nil
 		}
 	}
-	// An expires_at in the past disconnects the member at their next Interim (Phase 11a, session.Enforcer).
+	// A past expires_at needs no kick here: session.Enforcer disconnects the member at the next Interim.
 	err = s.repo.UpdateMember(ctx, id, in, e.now)
 	if errors.Is(err, domain.ErrUsernameTaken) {
 		return domain.FieldErrors{"username": "This username is already taken."}, KickResult{}, nil
@@ -260,7 +266,7 @@ func (s *Service) Update(ctx context.Context, id int64, f domain.MemberForm) (do
 	return nil, kick, err
 }
 
-// kickIfDeactivated disconnects the open sessions when a member went from active to inactive (BR-18).
+// kickIfDeactivated kicks the open sessions only when the member went from active (was) to inactive (now) (BR-18).
 func (s *Service) kickIfDeactivated(ctx context.Context, id int64, was, now bool, at time.Time) (KickResult, error) {
 	if !was || now {
 		return KickResult{}, nil
@@ -270,7 +276,7 @@ func (s *Service) kickIfDeactivated(ctx context.Context, id int64, was, now bool
 }
 
 // SetActive sets the active flag and nothing else. Deactivating an active member kicks the
-// open sessions like Update does; setting the state it already has changes nothing.
+// open sessions like Update does. Setting the state it already has does nothing.
 func (s *Service) SetActive(ctx context.Context, id int64, active bool) (KickResult, error) {
 	before, err := s.repo.GetMember(ctx, id)
 	if err != nil {
@@ -291,8 +297,8 @@ func (s *Service) Renew(ctx context.Context, id int64) error {
 	return s.repo.RenewMember(ctx, id, "manual", s.clock.Now())
 }
 
-// SetExtraBulk sets (not adds) the member's extra bulk (Q17). Errors: domain.ErrNotFound,
-// domain.ErrUnlimitedData (plan has unlimited data); validation problems come back as FieldErrors.
+// SetExtraBulk sets (not adds) the member's extra bulk (Q17). It returns domain.ErrNotFound,
+// or domain.ErrUnlimitedData when the plan has unlimited data. Bad input comes back as FieldErrors.
 func (s *Service) SetExtraBulk(ctx context.Context, id int64, value, unit string) (domain.FieldErrors, error) {
 	e, err := s.env(ctx)
 	if err != nil {
@@ -312,7 +318,7 @@ func (s *Service) SetExtraBulk(ctx context.Context, id int64, value, unit string
 	return nil, s.repo.SetExtraBulk(ctx, id, bytes, e.now)
 }
 
-// RevealPassword returns the decrypted member password (D8).
+// RevealPassword returns the member's decrypted password (D8), or domain.ErrNotFound.
 func (s *Service) RevealPassword(ctx context.Context, id int64) (string, error) {
 	enc, err := s.repo.GetMemberPassword(ctx, id)
 	if err != nil {
@@ -322,7 +328,7 @@ func (s *Service) RevealPassword(ctx context.Context, id int64) (string, error) 
 	return string(plain), err
 }
 
-// SetPassword replaces the member password. A non-empty message means nothing was stored.
+// SetPassword replaces the member's password. A non-empty message means the password was invalid and nothing was stored.
 func (s *Service) SetPassword(ctx context.Context, id int64, password string) (string, error) {
 	if _, err := s.repo.GetMember(ctx, id); err != nil {
 		return "", err
@@ -337,7 +343,7 @@ func (s *Service) SetPassword(ctx context.Context, id int64, password string) (s
 	return "", s.repo.SetMemberPassword(ctx, id, enc, s.clock.Now())
 }
 
-// ListQuery is the member list request: filter plus paging.
+// ListQuery is a member list request: a filter and the paging.
 type ListQuery struct {
 	Filter    domain.MemberFilter
 	Page, Per int
@@ -347,18 +353,17 @@ type ListQuery struct {
 type ListResult struct {
 	Rows                    []View
 	Total, Page, Pages, Per int
-	Counts                  domain.StatusCounts // under the query and plan of the filter, any status
+	Counts                  domain.StatusCounts // ignores the filter's status
 	Loc                     *time.Location
 }
 
-// List returns one page of members with their summaries (BR-22).
+// List returns one page of members with their summaries (BR-22). The page is clamped to the last page.
 func (s *Service) List(ctx context.Context, q ListQuery) (ListResult, error) {
 	e, err := s.env(ctx)
 	if err != nil {
 		return ListResult{}, err
 	}
-	total, err := s.repo.CountFiltered(ctx, q.Filter, e.now) // the total decides the page clamp
-
+	total, err := s.repo.CountFiltered(ctx, q.Filter, e.now)
 	if err != nil {
 		return ListResult{}, err
 	}
@@ -381,7 +386,8 @@ func (s *Service) List(ctx context.Context, q ListQuery) (ListResult, error) {
 // BulkStats is what the delete confirmation shows.
 type BulkStats struct{ Members, Online int }
 
-// Stats counts the members of a selection and how many are online.
+// Stats returns how many members a selection holds and how many are online.
+// It returns ErrSelectionTooLarge for too many explicit ids.
 func (s *Service) Stats(ctx context.Context, sel domain.MemberSelection) (BulkStats, error) {
 	if len(sel.IDs) > MaxSelectionIDs {
 		return BulkStats{}, ErrSelectionTooLarge
@@ -400,17 +406,17 @@ type DeleteResult struct {
 	Kick    KickResult
 }
 
-// MaxSelectionIDs is the most explicit ids one bulk action accepts (SQLite
-// variable limit; the list pages hold at most 100). Filter selections are unbounded.
+// MaxSelectionIDs is the most explicit ids one bulk action accepts. It keeps the
+// number of SQL variables in the IN list low. Filter selections have no limit.
 const MaxSelectionIDs = 500
 
 // ErrSelectionTooLarge is returned for more than MaxSelectionIDs explicit ids.
 var ErrSelectionTooLarge = errors.New("too many members selected")
 
-// Delete kicks every open session of the selection (best effort), then deletes
-// the members and their session rows in one transaction (E2.10, BR-23 style).
-// A session opened after the kick step is seen inside that transaction and is
-// kicked too, so no deleted member keeps a running session.
+// Delete kicks every open session of the selection (best effort), then deletes the
+// members and their sessions in one transaction (E2.10). A session that opened after the
+// first kick is seen inside that transaction and is kicked too. It returns
+// ErrSelectionTooLarge for too many explicit ids.
 func (s *Service) Delete(ctx context.Context, sel domain.MemberSelection) (DeleteResult, error) {
 	if len(sel.IDs) > MaxSelectionIDs {
 		return DeleteResult{}, ErrSelectionTooLarge
@@ -438,7 +444,7 @@ func (s *Service) Delete(ctx context.Context, sel domain.MemberSelection) (Delet
 	return DeleteResult{Deleted: n, Kick: kick}, nil
 }
 
-// DeleteOne deletes a single member (domain.ErrNotFound if unknown).
+// DeleteOne deletes a single member, or returns domain.ErrNotFound.
 func (s *Service) DeleteOne(ctx context.Context, id int64) (DeleteResult, error) {
 	if _, err := s.repo.GetMember(ctx, id); err != nil {
 		return DeleteResult{}, err

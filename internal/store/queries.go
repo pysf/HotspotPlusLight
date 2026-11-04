@@ -9,7 +9,7 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// SeedInput is everything first-boot seeding writes.
+// SeedInput is what first-boot seeding writes.
 type SeedInput struct {
 	AdminUsername      string
 	AdminPasswordHash  string
@@ -28,9 +28,9 @@ func (s *Store) IsFirstBoot(ctx context.Context) (bool, error) {
 	return n == 0, nil
 }
 
-// FirstBoot seeds the admin and the settings row in ONE transaction, and only
-// if no settings row exists. It returns true when it seeded. It creates no plan:
-// the admin creates plans in the web UI (owner decision, E0.08).
+// FirstBoot seeds the admin and the settings row in one transaction, only if no
+// settings row exists. It reports whether it seeded. It creates no plan: the admin
+// creates plans in the web UI (E0.08).
 func (s *Store) FirstBoot(ctx context.Context, in SeedInput) (bool, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -56,6 +56,7 @@ func (s *Store) FirstBoot(ctx context.Context, in SeedInput) (bool, error) {
 	return true, tx.Commit()
 }
 
+// boolInt returns 1 for true and 0 for false.
 func boolInt(b bool) int {
 	if b {
 		return 1
@@ -63,7 +64,7 @@ func boolInt(b bool) int {
 	return 0
 }
 
-// KeyCheck returns settings.key_check; found is false when there is no row or it is empty.
+// KeyCheck returns settings.key_check. found is false when there is no row or the value is empty.
 func (s *Store) KeyCheck(ctx context.Context) (value string, found bool, err error) {
 	err = s.r.QueryRowContext(ctx, `SELECT key_check FROM settings WHERE id=1`).Scan(&value)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -72,13 +73,14 @@ func (s *Store) KeyCheck(ctx context.Context) (value string, found bool, err err
 	return value, value != "", err
 }
 
-// RadiusSecret is read per packet so settings changes apply without restart (PLAN 7.1).
+// RadiusSecret returns the RADIUS shared secret. It is read per packet, so a change applies without restart (PLAN 7.1).
 func (s *Store) RadiusSecret(ctx context.Context) (string, error) {
 	var v string
 	err := s.r.QueryRowContext(ctx, `SELECT radius_shared_secret FROM settings WHERE id=1`).Scan(&v)
 	return v, err
 }
 
+// GetAdmin returns the admin account, or domain.ErrNotFound.
 func (s *Store) GetAdmin(ctx context.Context) (domain.Admin, error) {
 	var a domain.Admin
 	err := s.r.QueryRowContext(ctx, `SELECT username, password_hash, must_change_password FROM admin WHERE id=1`).Scan(&a.Username, &a.PasswordHash, &a.MustChangePassword)
@@ -88,12 +90,14 @@ func (s *Store) GetAdmin(ctx context.Context) (domain.Admin, error) {
 	return a, err
 }
 
+// CountMembers returns the number of members.
 func (s *Store) CountMembers(ctx context.Context) (int, error) {
 	var n int
 	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM member`).Scan(&n)
 	return n, err
 }
 
+// CountOpenSessions returns the number of sessions with no end time.
 func (s *Store) CountOpenSessions(ctx context.Context) (int, error) {
 	var n int
 	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM session WHERE ended_at IS NULL`).Scan(&n)
