@@ -1,8 +1,0 @@
-{
-  "id": "market-veggies",
-  "category": "Market",
-  "style": "veggies",
-  "title": "Veggies",
-  "primary": "rgb(91, 149, 199)",
-  "overlay": "rgba(0, 0, 0, 0.4)"
-}

@@ -1,8 +1,0 @@
-{
-  "id": "cafe-lantern",
-  "category": "Cafe",
-  "style": "lantern",
-  "title": "Lantern",
-  "primary": "rgb(233, 149, 82)",
-  "overlay": "rgba(0, 0, 0, 0.5)"
-}

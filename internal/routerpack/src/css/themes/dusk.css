@@ -1,0 +1,13 @@
+/* DUSK: violet-black, glow rising from below, glass card */
+body[data-theme="dusk"]{
+  color-scheme:dark;
+  --bg:#0c0a16;
+  --bg-img:radial-gradient(760px 440px at 50% 118%,rgba(139,92,246,.46),transparent 70%),
+           radial-gradient(520px 300px at 50% -70px,rgba(99,102,241,.20),transparent 70%);
+  --blur:blur(16px);
+  --card:rgba(255,255,255,.04);--card-bd:rgba(255,255,255,.09);--card-shadow:0 30px 80px rgba(0,0,0,.45);
+  --text:#f3f0ff;--muted:#9a93b8;--accent:#a78bfa;--bad:#ff7a8a;--ring:rgba(167,139,250,.25);
+  --logo-bg:rgba(167,139,250,.14);--logo-fg:#c4b5fd;--logo-bd:rgba(167,139,250,.32);
+  --in-bg:rgba(255,255,255,.05);--in-bd:rgba(255,255,255,.10);
+  --btn-bg:linear-gradient(180deg,#c0a9ff,#9d7ffa);--btn-fg:#140d2e;--btn-shadow:0 8px 24px rgba(139,92,246,.35);
+}

@@ -1,8 +1,0 @@
-{
-  "id": "university-library",
-  "category": "University",
-  "style": "library",
-  "title": "Library",
-  "primary": "rgb(15, 103, 200)",
-  "overlay": "rgba(13, 14, 16, 0.45)"
-}

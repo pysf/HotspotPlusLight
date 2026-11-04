@@ -1,0 +1,12 @@
+/* RIPPLE: sage paper, signal rings radiating from the card, deep green */
+body[data-theme="ripple"]{
+  --bg:#eef2ee;
+  --card:#fff;--card-bd:rgba(20,35,28,.08);--card-shadow:0 18px 50px rgba(20,60,45,.10);
+  --text:#14231c;--muted:#5a6d63;--accent:#1f6f54;--bad:#c2331f;--ring:rgba(31,111,84,.16);
+  --logo-bg:rgba(31,111,84,.09);--logo-fg:#1f6f54;--logo-bd:rgba(31,111,84,.16);
+  --in-bg:#f4f7f4;--in-bd:rgba(20,35,28,.10);--in-bg-f:#fff;--btn-bg:#1f6f54;--btn-fg:#fff;
+}
+body[data-theme="ripple"]::before{content:"";position:fixed;inset:0;pointer-events:none;
+  background:repeating-radial-gradient(circle at 50% 46%,transparent 0 63px,rgba(31,111,84,.20) 63px 64px);
+  -webkit-mask-image:radial-gradient(circle at 50% 46%,#000 0,transparent 72%);
+          mask-image:radial-gradient(circle at 50% 46%,#000 0,transparent 72%)}

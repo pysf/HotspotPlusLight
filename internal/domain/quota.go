@@ -22,16 +22,13 @@ const (
 	ReasonOutOfTime          Reason = "OUT_OF_TIME"
 	ReasonNoMoreSession      Reason = "NO_MORE_SESSION"
 	ReasonUnsupportedAuth    Reason = "UNSUPPORTED_AUTH_METHOD"
-	ReasonGeneralError       Reason = "GENERAL_ERROR"
-	// ReasonTooManyAttempts is only used by the page API throttle (PLAN 8.1), never by a login check.
-	ReasonTooManyAttempts Reason = "TOO_MANY_ATTEMPTS"
 )
 
 // AllReasons lists every code of the message catalog, in catalog order. The
 // starter login page's translation dictionary is generated from it (PLAN 9.4).
 func AllReasons() []Reason {
 	return []Reason{ReasonInvalidCredentials, ReasonInactive, ReasonNoPlan, ReasonPlanRemoved, ReasonExpired, ReasonNoSubscription,
-		ReasonOutOfBulk, ReasonOutOfTime, ReasonNoMoreSession, ReasonUnsupportedAuth, ReasonGeneralError, ReasonTooManyAttempts}
+		ReasonOutOfBulk, ReasonOutOfTime, ReasonNoMoreSession, ReasonUnsupportedAuth}
 }
 
 // reasonMessages is the English message catalog (PLAN 7.6, O11, O20).
@@ -46,8 +43,6 @@ var reasonMessages = map[Reason]string{
 	ReasonOutOfTime:          "Your time allowance is used up.",
 	ReasonNoMoreSession:      "Someone else is using this account. Try again in a few minutes.",
 	ReasonUnsupportedAuth:    "This network only supports PAP login.",
-	ReasonGeneralError:       "Unexpected server error. Contact support or try again.",
-	ReasonTooManyAttempts:    "Too many attempts. Try again in a minute.",
 }
 
 // Message is the English text of a rejection code; the empty Reason has none.

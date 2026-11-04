@@ -62,7 +62,7 @@ func SetupScript(c ScriptConfig) string {
 	line("# VERIFY-ON-HARDWARE: login-by=http-pap (PAP, not CHAP, must reach RADIUS) and radius-interim-update.")
 	line("/ip hotspot profile set [find name=%s] use-radius=yes login-by=http-pap radius-accounting=yes%s", profile, interim)
 	line("")
-	line("# 4. Login page: download files.zip from the Router page of this admin panel and unzip it.")
+	line("# 4. Login page: download a page design from the Router page of this admin panel and unzip it.")
 	line("# Upload the extracted hotspot folder to the router (Files menu in WinBox, or FTP) and replace the default hotspot folder.")
 	line("# On routers that keep files on flash storage, the folder is flash/hotspot.")
 	return b.String()

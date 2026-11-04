@@ -1,8 +1,0 @@
-{
-  "id": "hotel-reception",
-  "category": "Hotel",
-  "style": "reception",
-  "title": "Reception",
-  "primary": "rgb(220, 20, 26)",
-  "overlay": "rgba(0, 0, 0, 0.38)"
-}

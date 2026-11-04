@@ -1,8 +1,0 @@
-{
-  "id": "hotel-vacation",
-  "category": "Hotel",
-  "style": "vacation",
-  "title": "Vacation",
-  "primary": "rgb(70, 109, 121)",
-  "overlay": "rgba(0, 0, 0, 0.58)"
-}

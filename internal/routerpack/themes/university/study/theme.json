@@ -1,8 +1,0 @@
-{
-  "id": "university-study",
-  "category": "University",
-  "style": "study",
-  "title": "Study",
-  "primary": "rgb(0, 175, 181)",
-  "overlay": "rgba(0, 0, 0, 0.38)"
-}

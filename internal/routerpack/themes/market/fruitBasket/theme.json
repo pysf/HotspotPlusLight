@@ -1,8 +1,0 @@
-{
-  "id": "market-fruitBasket",
-  "category": "Market",
-  "style": "fruitBasket",
-  "title": "Fruit Basket",
-  "primary": "rgb(207, 54, 14)",
-  "overlay": "rgba(0, 0, 0, 0.4)"
-}

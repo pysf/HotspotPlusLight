@@ -22,16 +22,12 @@ func adminPages(t *testing.T, c *harness.AdminClient) []string {
 	if r.StatusCode != http.StatusCreated {
 		t.Fatalf("create batch: %d", r.StatusCode)
 	}
-	themes := c.Get("/admin/router/themes").Doc(t).Find("a[data-detail]").First().AttrOr("href", "")
-	if themes == "" {
-		t.Fatal("no theme link")
-	}
 	m := "/admin/members/" + strconv.FormatInt(member, 10)
 	return []string{
 		"/admin/members", "/admin/members/new", m, m + "/voucher",
 		"/admin/plans", "/admin/plans/new", "/admin/plans/" + strconv.FormatInt(plan, 10),
 		"/admin/batches", "/admin/batches/new", r.Header.Get("Location"),
-		"/admin/sessions", "/admin/usage", "/admin/router", "/admin/router/themes", themes, "/admin/settings",
+		"/admin/sessions", "/admin/usage", "/admin/router", "/admin/settings",
 	}
 }
 

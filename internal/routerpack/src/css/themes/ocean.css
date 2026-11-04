@@ -1,0 +1,11 @@
+/* OCEAN: deep teal color-block, white card */
+body[data-theme="ocean"]{
+  --bg:#0e6577;
+  --bg-img:radial-gradient(620px 440px at 14% 0%,rgba(94,234,212,.34),transparent 70%),
+           radial-gradient(720px 540px at 92% 100%,rgba(8,47,73,.55),transparent 70%),
+           linear-gradient(160deg,#0e7490 0%,#0f5366 58%,#0b3a4a 100%);
+  --card:#fff;--card-bd:transparent;--card-shadow:0 28px 70px rgba(4,40,52,.38);
+  --text:#0b2a33;--muted:#55737b;--accent:#0e7490;--bad:#c2331f;--ring:rgba(14,116,144,.18);
+  --logo-bg:rgba(14,116,144,.10);--logo-fg:#0e7490;
+  --in-bg:#f1f7f8;--in-bd:rgba(11,42,51,.08);--in-bg-f:#fff;--btn-bg:#0e7490;--btn-fg:#fff;
+}

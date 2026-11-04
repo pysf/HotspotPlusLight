@@ -1,8 +1,0 @@
-{
-  "id": "market-size",
-  "category": "Market",
-  "style": "size",
-  "title": "Size",
-  "primary": "rgb(3, 142, 95)",
-  "overlay": "rgba(0, 0, 0, 0.4)"
-}

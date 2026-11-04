@@ -1,8 +1,0 @@
-{
-  "id": "restaurant-traditional",
-  "category": "Restaurant",
-  "style": "traditional",
-  "title": "Traditional",
-  "primary": "rgb(48, 105, 84)",
-  "overlay": "rgba(20, 36, 30, 0.5)"
-}

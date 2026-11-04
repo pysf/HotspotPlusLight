@@ -1,0 +1,15 @@
+/* MIDNIGHT: graphite, blue glow and a fading grid */
+body[data-theme="midnight"]{
+  color-scheme:dark;
+  --bg:#0b0b0c;--bg-img:radial-gradient(700px 380px at 50% -90px,rgba(76,141,255,.22),transparent 70%);
+  --card:#121214;--card-bd:rgba(255,255,255,.09);--card-shadow:0 30px 80px rgba(0,0,0,.5);
+  --text:#f2f2f3;--muted:#8b8b93;--accent:#4c8dff;--bad:#ff6b6b;--ring:rgba(76,141,255,.25);
+  --logo-bg:rgba(76,141,255,.14);--logo-fg:#7fb0ff;--logo-bd:rgba(76,141,255,.30);
+  --in-bg:#19191c;--in-bd:rgba(255,255,255,.10);
+  --btn-bg:#2f6fe0;--btn-fg:#fff; /* was #4c8dff: white text on it was 3.2:1, now 4.7:1 */
+}
+body[data-theme="midnight"]::before{content:"";position:fixed;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+  background-size:44px 44px;
+  -webkit-mask-image:radial-gradient(560px 420px at 50% 22%,#000,transparent 75%);
+          mask-image:radial-gradient(560px 420px at 50% 22%,#000,transparent 75%)}

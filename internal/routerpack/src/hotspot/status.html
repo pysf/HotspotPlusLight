@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+$(if refresh-timeout)
+<meta http-equiv="refresh" content="$(refresh-timeout-secs)">
+$(endif)
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="expires" content="-1">
+<title>Wi-Fi - Status</title>
+<link rel="stylesheet" href="css/hotspot.css">
+</head>
+<body data-theme="@THEME@">
+
+<main class="page">
+  <div class="card">
+    <header class="hero">
+      <h1>Hi, $(username)</h1>
+      <p class="sub">You are online.</p>
+    </header>
+
+    <dl class="stats">
+      <div><dt>Time online</dt><dd>$(uptime)</dd></div>
+$(if session-time-left)
+      <div><dt>Time left</dt><dd>$(session-time-left)</dd></div>
+$(endif)
+$(if remain-bytes-total)
+      <!-- VERIFY-ON-HARDWARE: the router gives this number in bytes, and only when the RADIUS server sets a total limit. -->
+      <div><dt>Data left (bytes)</dt><dd>$(remain-bytes-total)</dd></div>
+$(endif)
+    </dl>
+
+$(if link-orig)
+    <!-- VERIFY-ON-HARDWARE: not every RouterOS version fills the address of the first site on this page. -->
+    <a class="btn" href="$(link-orig)">Continue</a>
+$(endif)
+    <form action="$(link-logout)">
+      <button class="btn btn-quiet" type="submit">Log out</button>
+    </form>
+  </div>
+</main>
+
+</body>
+</html>

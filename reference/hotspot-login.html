@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wi-Fi sign in</title>
+<style>
+/* =====================================================================
+   Hotspot login. ONE layout (the "Air" layout), SEVEN color themes.
+   Layout, sizes, shapes, form and logo are identical in every theme.
+   A theme (body[data-design="a".."g"]) only sets color tokens and an
+   optional background decoration. No images are used.
+   The page works without JavaScript (plain POST form). The preview bar
+   and the demo submit script at the bottom are prototype-only.
+   ===================================================================== */
+*{box-sizing:border-box;margin:0}
+html{-webkit-text-size-adjust:100%}
+:root{--blur:none;--btn-shadow:none;--bg-img:none}
+body{
+  font:15px/1.5 Inter,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  color:var(--text);min-height:100dvh;-webkit-font-smoothing:antialiased;
+  background-color:var(--bg);background-image:var(--bg-img);background-repeat:no-repeat;
+}
+button,input{font:inherit;color:inherit}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- layout (same for every theme) ---------- */
+.page{position:relative;min-height:100dvh;display:grid;place-items:center;
+  padding:max(24px,env(safe-area-inset-top)) 16px 92px}
+.card{width:100%;max-width:400px;padding:40px 32px 32px;border-radius:24px;
+  background:var(--card);border:1px solid var(--card-bd);box-shadow:var(--card-shadow);
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur)}
+@media (max-width:480px){.card{padding:32px 22px 24px;border-radius:22px}}
+.hero{text-align:center}
+
+/* the logo: fixed mark, same size and shape everywhere; only its colors change */
+.logo{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;margin:0 auto 20px;
+  background:var(--logo-bg);color:var(--logo-fg);border:1px solid var(--logo-bd,transparent)}
+.logo svg{width:52%;height:52%;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round}
+.logo svg circle{fill:currentColor;stroke:none}
+.logo img{width:100%;height:100%;object-fit:contain}
+
+h1{font-weight:600;font-size:28px;line-height:1.15;letter-spacing:-.03em;text-wrap:balance}
+.sub{color:var(--muted);margin:8px 0 28px;text-wrap:pretty}
+.field{display:block;margin-bottom:14px}
+.field>span{display:block;font-size:13px;font-weight:500;color:var(--muted);margin-bottom:6px}
+.field input{width:100%;height:48px;padding:0 14px;outline:0;font-size:16px;transition:.15s; /* 16px stops iOS zoom-on-focus */
+  border-radius:14px;background:var(--in-bg);border:1px solid var(--in-bd)}
+.field input:focus{background:var(--in-bg-f,var(--in-bg));border-color:var(--accent);box-shadow:0 0 0 4px var(--ring)}
+.field input:-webkit-autofill{-webkit-text-fill-color:var(--text);transition:background-color 9999s}
+.btn{position:relative;width:100%;height:50px;border:0;border-radius:99px;cursor:pointer;font-weight:600;margin-top:6px;transition:.15s;
+  background:var(--btn-bg);color:var(--btn-fg);box-shadow:var(--btn-shadow)}
+.btn:hover{filter:brightness(1.08)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.btn[aria-busy="true"]{color:transparent;pointer-events:none}
+.btn[aria-busy="true"]::after{content:"";position:absolute;inset:0;margin:auto;width:18px;height:18px;border-radius:50%;
+  border:2px solid var(--btn-fg);border-top-color:transparent;animation:spin .7s linear infinite}
+.err{color:var(--bad);font-size:13px;margin:0 0 10px}
+.err[hidden]{display:none}
+
+/* =====================================================================
+   THEMES: tokens only
+   ===================================================================== */
+
+/* A · AIR: Apple blue on light grey */
+body[data-design="a"]{
+  --bg:#f5f5f7;--bg-img:radial-gradient(900px 420px at 50% -140px,rgba(0,113,227,.10),transparent 70%);
+  --card:#fff;--card-bd:transparent;--card-shadow:0 1px 2px rgba(0,0,0,.04),0 20px 50px rgba(0,0,0,.07);
+  --text:#1d1d1f;--muted:#6e6e73;--accent:#0071e3;--bad:#d70015;--ring:rgba(0,113,227,.15);
+  --logo-bg:rgba(0,113,227,.10);--logo-fg:#0071e3;
+  --in-bg:#f5f5f7;--in-bd:transparent;--in-bg-f:#fff;--btn-bg:#0071e3;--btn-fg:#fff;
+}
+
+/* B · MIDNIGHT: graphite, blue glow and a fading grid */
+body[data-design="b"]{
+  color-scheme:dark;
+  --bg:#0b0b0c;--bg-img:radial-gradient(700px 380px at 50% -90px,rgba(76,141,255,.22),transparent 70%);
+  --card:#121214;--card-bd:rgba(255,255,255,.09);--card-shadow:0 30px 80px rgba(0,0,0,.5);
+  --text:#f2f2f3;--muted:#8b8b93;--accent:#4c8dff;--bad:#ff6b6b;--ring:rgba(76,141,255,.25);
+  --logo-bg:rgba(76,141,255,.14);--logo-fg:#7fb0ff;--logo-bd:rgba(76,141,255,.30);
+  --in-bg:#19191c;--in-bd:rgba(255,255,255,.10);--btn-bg:#4c8dff;--btn-fg:#fff;
+}
+body[data-design="b"]::before{content:"";position:fixed;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+  background-size:44px 44px;
+  -webkit-mask-image:radial-gradient(560px 420px at 50% 22%,#000,transparent 75%);
+          mask-image:radial-gradient(560px 420px at 50% 22%,#000,transparent 75%)}
+
+/* C · AURORA: pastel mesh gradient, frosted glass card, indigo */
+body[data-design="c"]{
+  --bg:#f6f6fb;
+  --bg-img:radial-gradient(520px 420px at 16% 10%,rgba(120,140,255,.50),transparent 70%),
+           radial-gradient(560px 460px at 88% 18%,rgba(214,150,255,.42),transparent 70%),
+           radial-gradient(640px 540px at 62% 98%,rgba(110,222,232,.40),transparent 70%);
+  --blur:blur(26px) saturate(160%);
+  --card:rgba(255,255,255,.58);--card-bd:rgba(255,255,255,.85);--card-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 24px 60px rgba(70,70,150,.16);
+  --text:#16162a;--muted:#62627d;--accent:#5b5bf0;--bad:#d92d20;--ring:rgba(91,91,240,.18);
+  --logo-bg:rgba(255,255,255,.75);--logo-fg:#4f46e5;--logo-bd:rgba(255,255,255,.95);
+  --in-bg:rgba(255,255,255,.7);--in-bd:rgba(30,30,90,.08);--in-bg-f:#fff;
+  --btn-bg:linear-gradient(180deg,#6d6df6,#5252e8);--btn-fg:#fff;--btn-shadow:0 8px 20px rgba(91,91,240,.32);
+}
+
+/* D · DUSK: violet-black, glow rising from below, glass card */
+body[data-design="d"]{
+  color-scheme:dark;
+  --bg:#0c0a16;
+  --bg-img:radial-gradient(760px 440px at 50% 118%,rgba(139,92,246,.46),transparent 70%),
+           radial-gradient(520px 300px at 50% -70px,rgba(99,102,241,.20),transparent 70%);
+  --blur:blur(16px);
+  --card:rgba(255,255,255,.04);--card-bd:rgba(255,255,255,.09);--card-shadow:0 30px 80px rgba(0,0,0,.45);
+  --text:#f3f0ff;--muted:#9a93b8;--accent:#a78bfa;--bad:#ff7a8a;--ring:rgba(167,139,250,.25);
+  --logo-bg:rgba(167,139,250,.14);--logo-fg:#c4b5fd;--logo-bd:rgba(167,139,250,.32);
+  --in-bg:rgba(255,255,255,.05);--in-bd:rgba(255,255,255,.10);
+  --btn-bg:linear-gradient(180deg,#c0a9ff,#9d7ffa);--btn-fg:#140d2e;--btn-shadow:0 8px 24px rgba(139,92,246,.35);
+}
+
+/* E · RIPPLE: sage paper, signal rings radiating from the card, deep green */
+body[data-design="e"]{
+  --bg:#eef2ee;
+  --card:#fff;--card-bd:rgba(20,35,28,.08);--card-shadow:0 18px 50px rgba(20,60,45,.10);
+  --text:#14231c;--muted:#5a6d63;--accent:#1f6f54;--bad:#c2331f;--ring:rgba(31,111,84,.16);
+  --logo-bg:rgba(31,111,84,.09);--logo-fg:#1f6f54;--logo-bd:rgba(31,111,84,.16);
+  --in-bg:#f4f7f4;--in-bd:rgba(20,35,28,.10);--in-bg-f:#fff;--btn-bg:#1f6f54;--btn-fg:#fff;
+}
+body[data-design="e"]::before{content:"";position:fixed;inset:0;pointer-events:none;
+  background:repeating-radial-gradient(circle at 50% 46%,transparent 0 63px,rgba(31,111,84,.20) 63px 64px);
+  -webkit-mask-image:radial-gradient(circle at 50% 46%,#000 0,transparent 72%);
+          mask-image:radial-gradient(circle at 50% 46%,#000 0,transparent 72%)}
+
+/* F · SUNRISE: warm cream, a low sun glowing at the horizon, coral + espresso */
+body[data-design="f"]{
+  --bg:#fff6ef;
+  --bg-img:radial-gradient(560px 560px at 50% 112%,rgba(255,128,80,.60),rgba(255,170,130,.28) 46%,transparent 70%),
+           linear-gradient(180deg,#fffbf7 0%,#ffeadc 100%);
+  --card:#fff;--card-bd:transparent;--card-shadow:0 1px 2px rgba(120,60,30,.05),0 22px 54px rgba(160,70,30,.14);
+  --text:#2a1a12;--muted:#8a6c5c;--accent:#f0592b;--bad:#c2331f;--ring:rgba(240,89,43,.16);
+  --logo-bg:rgba(240,89,43,.10);--logo-fg:#f0592b;--logo-bd:rgba(240,89,43,.20);
+  --in-bg:#fff7f2;--in-bd:rgba(120,60,30,.12);--in-bg-f:#fff;--btn-bg:#2a1a12;--btn-fg:#fff;
+}
+
+/* G · OCEAN: deep teal color-block, white card */
+body[data-design="g"]{
+  --bg:#0e6577;
+  --bg-img:radial-gradient(620px 440px at 14% 0%,rgba(94,234,212,.34),transparent 70%),
+           radial-gradient(720px 540px at 92% 100%,rgba(8,47,73,.55),transparent 70%),
+           linear-gradient(160deg,#0e7490 0%,#0f5366 58%,#0b3a4a 100%);
+  --card:#fff;--card-bd:transparent;--card-shadow:0 28px 70px rgba(4,40,52,.38);
+  --text:#0b2a33;--muted:#55737b;--accent:#0e7490;--bad:#c2331f;--ring:rgba(14,116,144,.18);
+  --logo-bg:rgba(14,116,144,.10);--logo-fg:#0e7490;
+  --in-bg:#f1f7f8;--in-bd:rgba(11,42,51,.08);--in-bg-f:#fff;--btn-bg:#0e7490;--btn-fg:#fff;
+}
+
+/* ---------- prototype-only preview bar (delete in production) ---------- */
+.proto{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:10;
+  display:flex;align-items:center;gap:2px;padding:4px;border-radius:99px;background:rgba(28,28,30,.9);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);font-size:13px;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.28)}
+.proto button{width:36px;height:34px;border:0;border-radius:99px;background:transparent;color:#d1d1d6;cursor:pointer;font-size:18px;line-height:1}
+.proto button:hover{background:rgba(255,255,255,.14);color:#fff}
+.proto span{min-width:132px;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation-duration:.01ms!important}}
+</style>
+</head>
+<body data-design="a">
+
+<main class="page">
+  <div class="card">
+    <header class="hero">
+      <!-- Logo: fixed wifi mark. A customer's own logo replaces the svg: <img src="logo.png" alt="">
+           (or delete this whole div for a text-only page). -->
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.3"/></svg>
+      </div>
+      <h1>Welcome to Hotel Aria</h1>
+      <p class="sub">Sign in with the details from reception to get online.</p>
+    </header>
+
+    <!-- In production: a normal POST to the hotspot login endpoint (add your hidden fields here). -->
+    <form action="/login" method="post" autocomplete="on">
+      <label class="field"><span>Username</span>
+        <input name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+      </label>
+      <label class="field"><span>Password</span>
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="err" id="err" role="alert" hidden>Incorrect username or password.</p>
+      <button class="btn" type="submit">Log in</button>
+    </form>
+  </div>
+</main>
+
+<!-- PROTOTYPE ONLY: theme switcher (also: arrow keys, or open the file with #a ... #g) -->
+<div class="proto" role="group" aria-label="Preview themes">
+  <button type="button" id="prev" aria-label="Previous theme">&lsaquo;</button>
+  <span id="pname" aria-live="polite"></span>
+  <button type="button" id="next" aria-label="Next theme">&rsaquo;</button>
+</div>
+
+<script>
+/* Preview helpers only; the real login page needs no JavaScript. */
+const body=document.body,$=s=>document.querySelector(s);
+const D=[['a','Air'],['b','Midnight'],['c','Aurora'],['d','Dusk'],['e','Ripple'],['f','Sunrise'],['g','Ocean']];
+let i=Math.max(0,D.findIndex(x=>x[0]===location.hash.slice(1)));
+function show(n){i=(n+D.length)%D.length;body.dataset.design=D[i][0];
+  $('#pname').textContent=`${i+1} / ${D.length} · ${D[i][1]}`;history.replaceState(null,'','#'+D[i][0])}
+$('#prev').onclick=()=>show(i-1);$('#next').onclick=()=>show(i+1);
+addEventListener('keydown',e=>{if(/INPUT/.test(document.activeElement.tagName))return;
+  if(e.key==='ArrowLeft')show(i-1);if(e.key==='ArrowRight')show(i+1)});
+show(i);
+/* demo submit: spinner, then the error state */
+$('form').addEventListener('submit',e=>{e.preventDefault();const b=$('.btn');$('#err').hidden=true;b.setAttribute('aria-busy','true');
+  setTimeout(()=>{b.removeAttribute('aria-busy');$('#err').hidden=false},900)});
+</script>
+</body>
+</html>

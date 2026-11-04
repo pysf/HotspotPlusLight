@@ -1,8 +1,0 @@
-{
-  "id": "university-notes",
-  "category": "University",
-  "style": "notes",
-  "title": "Notes",
-  "primary": "rgb(175, 65, 65)",
-  "overlay": "rgba(0, 0, 0, 0.38)"
-}

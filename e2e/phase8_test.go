@@ -9,13 +9,11 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -96,7 +94,7 @@ func TestE8_03_SetupScript(t *testing.T) {
 		"radius-accounting=yes",
 		"radius-interim-update=120s",
 		"VERIFY-ON-HARDWARE",
-		"files.zip",
+		"extracted hotspot folder",
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("script lacks %q\n%s", want, script)
@@ -154,15 +152,12 @@ func TestE8_03c_RouterPageNeedsLogin(t *testing.T) {
 	}
 }
 
-// E8.04 files.zip: the customizable login.html, no server template tokens, the router
-// pages, and no plain-passwd anywhere.
+// E8.04 every download (all 8): a zip under hotspot/, no server template tokens, no plain-passwd anywhere,
+// no password in a URL. (Rewritten in Phase 12b for the 8 designs; the file lists are E12.01.)
 func TestE8_04_PackContents(t *testing.T) {
 	f := newP8(t)
-	for _, theme := range []string{"", "alpha-fall", "alpha-space"} {
-		path := "/admin/router/files.zip"
-		if theme != "" {
-			path += "?theme=" + url.QueryEscape(theme)
-		}
+	for _, key := range []string{"mikrotik", "air", "midnight", "aurora", "dusk", "ripple", "sunrise", "ocean"} {
+		path := "/admin/router/pages/" + key + ".zip"
 		r := f.c.Get(path)
 		if r.StatusCode != 200 || r.Header.Get("Content-Type") != "application/zip" {
 			t.Fatalf("%s: %d %s", path, r.StatusCode, r.Header.Get("Content-Type"))
@@ -171,9 +166,10 @@ func TestE8_04_PackContents(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var names []string
 		for _, zf := range zr.File {
-			names = append(names, zf.Name)
+			if !strings.HasPrefix(zf.Name, "hotspot/") {
+				t.Errorf("%s: %s is outside hotspot/", path, zf.Name)
+			}
 			rc, err := zf.Open()
 			if err != nil {
 				t.Fatal(err)
@@ -185,20 +181,15 @@ func TestE8_04_PackContents(t *testing.T) {
 			}
 			if strings.HasSuffix(zf.Name, ".html") {
 				body := string(b)
-				for _, tok := range []string{"{{", "}}", "{%", "%}", "<no value>", "%!"} {
+				for _, tok := range []string{"{{", "}}", "{%", "%}", "<no value>", "%!", "@THEME@", "@MESSAGES@"} {
 					if strings.Contains(body, tok) {
-						t.Errorf("%s: %s contains the server template token %q", path, zf.Name, tok)
+						t.Errorf("%s: %s contains the template token %q", path, zf.Name, tok)
 					}
 				}
 				if regexp.MustCompile(`(?i)[?&;](pap|password|passwd)=`).MatchString(body) {
 					t.Errorf("%s: %s puts a password into a URL", path, zf.Name)
 				}
 			}
-		}
-		sort.Strings(names)
-		want := []string{"hotspot/alogin.html", "hotspot/background.jpg", "hotspot/error.html", "hotspot/login.html", "hotspot/logo.png", "hotspot/logout.html", "hotspot/redirect.html", "hotspot/rlogin.html", "hotspot/status.html"}
-		if strings.Join(names, ",") != strings.Join(want, ",") {
-			t.Errorf("%s: files %v, want %v", path, names, want)
 		}
 	}
 }
@@ -254,7 +245,7 @@ func TestE8_05_SecretOnlyMasked(t *testing.T) {
 	wrong.Authenticate("alice", "secret1")
 
 	// every other admin page is free of it; /admin/router only inside the script
-	for _, p := range []string{"/admin/members", "/admin/members/" + strconv.FormatInt(f.memberIDByName("alice"), 10), "/admin/plans", "/admin/sessions", "/admin/batches", "/admin/router/themes", "/admin/members/new", "/admin/plans/new"} {
+	for _, p := range []string{"/admin/members", "/admin/members/" + strconv.FormatInt(f.memberIDByName("alice"), 10), "/admin/plans", "/admin/sessions", "/admin/batches", "/admin/members/new", "/admin/plans/new"} {
 		if body := f.c.Get(p).Body; has(body) {
 			t.Errorf("%s contains the secret", p)
 		}
@@ -560,7 +551,7 @@ func TestE8_09_Readme(t *testing.T) {
 	for _, want := range []string{
 		"make build", "HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "HSP_LOG_LEVEL", "HSP_LOG_FORMAT",
 		"first start", "make set-password", "admin set-password",
-		"/admin/router", "files.zip",
+		"/admin/router", "hotspot folder",
 		"8081", "firewall",
 		"sqlite3 hsp.db", "unrecoverable",
 		"[Unit]", "ExecStart=", "PLAN.md", "VERIFY-ON-HARDWARE",

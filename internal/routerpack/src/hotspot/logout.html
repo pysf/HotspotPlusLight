@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="expires" content="-1">
+<title>Wi-Fi - Logged out</title>
+<link rel="stylesheet" href="css/hotspot.css">
+</head>
+<body data-theme="@THEME@">
+
+<main class="page">
+  <div class="card">
+    <header class="hero">
+      <h1>You are logged out</h1>
+      <p class="sub">Thank you for using our Wi-Fi.</p>
+    </header>
+
+    <dl class="stats">
+      <div><dt>Username</dt><dd>$(username)</dd></div>
+      <div><dt>Time online</dt><dd>$(uptime)</dd></div>
+    </dl>
+
+    <a class="btn" href="$(link-login)">Log in again</a>
+  </div>
+</main>
+
+</body>
+</html>

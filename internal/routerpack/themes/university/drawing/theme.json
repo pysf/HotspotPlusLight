@@ -1,8 +1,0 @@
-{
-  "id": "university-drawing",
-  "category": "University",
-  "style": "drawing",
-  "title": "Drawing",
-  "primary": "rgb(80, 127, 98)",
-  "overlay": "rgba(0, 0, 0, 0.38)"
-}

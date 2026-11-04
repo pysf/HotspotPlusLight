@@ -2,52 +2,30 @@ package admin
 
 import (
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
-	"hotspotpluslight/internal/domain"
 	"hotspotpluslight/internal/linkstatus"
 	"hotspotpluslight/internal/routerpack"
 )
 
-// RouterPack is the starter hotspot folder generator (implemented by internal/routerpack).
+// RouterPack builds the hotspot folders (implemented by internal/routerpack).
 type RouterPack interface {
-	Themes() []routerpack.Theme
-	Theme(id string) (routerpack.Theme, bool)
-	Background(t routerpack.Theme) ([]byte, error)
-	Logo() ([]byte, error)
-	LoginHTML(t routerpack.Theme, c routerpack.Config) ([]byte, error)
-	Zip(t routerpack.Theme, c routerpack.Config) ([]byte, error)
+	Designs() []routerpack.Design
+	Design(key string) (routerpack.Design, bool)
+	Zip(key string) ([]byte, error)
+	Preview(key, page, errCode string) ([]byte, error)
+	PreviewAsset(key, name string) ([]byte, string, bool)
 }
 
 const routerHome = "/admin/router"
 
-func packConfig(st domain.Settings) routerpack.Config {
-	return routerpack.Config{SiteTitle: st.SiteTitle}
-}
+func zipURL(key string) string { return routerHome + "/pages/" + key + ".zip" }
 
-func themeURL(id string) string { return routerHome + "/themes/" + id }
-
-func downloadURL(id string) string { return routerHome + "/files.zip?theme=" + id }
-
-type themeGroup struct {
-	Category string
-	Themes   []routerpack.Theme
-}
-
-// groups splits the (category-sorted) theme list into one group per category.
-func groups(themes []routerpack.Theme) []themeGroup {
-	var out []themeGroup
-	for _, t := range themes {
-		if n := len(out); n == 0 || out[n-1].Category != t.Category {
-			out = append(out, themeGroup{Category: t.Category})
-		}
-		out[len(out)-1].Themes = append(out[len(out)-1].Themes, t)
-	}
-	return out
-}
+func previewURL(key string) string { return routerHome + "/pages/" + key + "/preview" }
 
 func (h handlers) routerPage(w http.ResponseWriter, r *http.Request) {
 	st, err := h.Settings.Get(r.Context())
@@ -68,15 +46,15 @@ func (h handlers) routerPage(w http.ResponseWriter, r *http.Request) {
 		CoaPort: st.CoaPort, InterimSeconds: st.AccountingIntervalSeconds,
 	})
 	h.render(w, r, http.StatusOK, RouterPage(layout(r, "Router", routerHome), RouterProps{
-		DefaultTheme: routerpack.DefaultTheme, Script: script, Link: linkRows(h.Link.Snapshot(), loc),
+		Designs: h.Router.Designs(), Script: script, Link: linkRows(h.Link.Snapshot(), loc),
 	}))
 }
 
 // RouterProps is everything the router page shows.
 type RouterProps struct {
-	DefaultTheme string
-	Script       string
-	Link         linkView
+	Designs []routerpack.Design
+	Script  string
+	Link    linkView
 }
 
 type linkEvent struct{ Key, Label, At, From, Detail string }
@@ -112,98 +90,72 @@ func linkRows(s linkstatus.Snapshot, loc *time.Location) linkView {
 	return v
 }
 
-func (h handlers) themeGallery(w http.ResponseWriter, r *http.Request) {
-	h.render(w, r, http.StatusOK, ThemeGalleryPage(layout(r, "Themes", routerHome), groups(h.Router.Themes())))
-}
-
-// theme loads {id}; an unknown theme is a 404.
-func (h handlers) theme(w http.ResponseWriter, r *http.Request) (routerpack.Theme, bool) {
-	t, ok := h.Router.Theme(chi.URLParam(r, "id"))
+// pack loads {key}; an unknown design is a 404.
+func (h handlers) pack(w http.ResponseWriter, r *http.Request) (routerpack.Design, bool) {
+	d, ok := h.Router.Design(chi.URLParam(r, "key"))
 	if !ok {
-		h.notFound(w, r, "Theme")
+		h.notFound(w, r, "Page design")
 	}
-	return t, ok
+	return d, ok
 }
 
-func (h handlers) themePage(w http.ResponseWriter, r *http.Request) {
-	if t, ok := h.theme(w, r); ok {
-		h.render(w, r, http.StatusOK, ThemePage(layout(r, t.Category+" "+t.Title, routerHome), t))
-	}
-}
-
-// themePreview serves the theme's login page as it would be in the downloaded folder; its
-// relative references (background.jpg, logo.png) resolve to the sibling routes below.
-// The page and its script come from the generator, not from the admin, but they run on the admin
-// origin, so the response sandboxes them (opaque origin, no network, no forms) and the page is built
-// without the API base (no API calls in a preview).
-func (h handlers) themePreview(w http.ResponseWriter, r *http.Request) {
-	t, ok := h.theme(w, r)
+// packDownload is GET /admin/router/pages/{key}.zip: the full hotspot folder of one design.
+func (h handlers) packDownload(w http.ResponseWriter, r *http.Request) {
+	d, ok := h.pack(w, r)
 	if !ok {
 		return
 	}
-	st, err := h.Settings.Get(r.Context())
+	zipped, err := h.Router.Zip(d.Key)
 	if err != nil {
 		h.serverError(w, r, err)
 		return
 	}
-	cfg := packConfig(st)
-	page, err := h.Router.LoginHTML(t, cfg)
+	w.Header().Set("Content-Disposition", `attachment; filename="hotspot-`+d.Key+`.zip"`)
+	h.blob(w, "application/zip", zipped)
+}
+
+// previewCSP: the preview is a page of the generator, shown on the admin origin. It may load only its own
+// stylesheet and images. No script, no form target, no network.
+const previewCSP = "default-src 'none'; style-src 'self'; img-src 'self' data:; form-action 'none'; base-uri 'none'"
+
+// packPreview is GET /admin/router/pages/{key}/preview?page=login|alogin|status|logout|error&error=CODE:
+// the page with sample values in place of the router variables.
+func (h handlers) packPreview(w http.ResponseWriter, r *http.Request) {
+	d, ok := h.pack(w, r)
+	if !ok {
+		return
+	}
+	page := r.URL.Query().Get("page")
+	if page == "" {
+		page = "login"
+	}
+	if !slices.Contains(routerpack.PreviewPages, page) {
+		h.notFound(w, r, "Page")
+		return
+	}
+	b, err := h.Router.Preview(d.Key, page, r.URL.Query().Get("error"))
 	if err != nil {
 		h.serverError(w, r, err)
 		return
 	}
 	w.Header().Set("Content-Security-Policy", previewCSP)
-	h.blob(w, "text/html; charset=utf-8", page)
+	h.blob(w, "text/html; charset=utf-8", b)
 }
 
-// previewCSP: scripts may run (the page's own), nothing may be fetched except the theme's images.
-const previewCSP = "sandbox allow-scripts; default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'"
-
-func (h handlers) themeBackground(w http.ResponseWriter, r *http.Request) {
-	t, ok := h.theme(w, r)
+// packAsset serves the stylesheet and images that the preview page links to (relative to .../preview).
+func (h handlers) packAsset(w http.ResponseWriter, r *http.Request) {
+	d, ok := h.pack(w, r)
 	if !ok {
 		return
 	}
-	b, err := h.Router.Background(t)
-	if err != nil {
-		h.serverError(w, r, err)
-		return
-	}
-	h.blob(w, "image/jpeg", b)
-}
-
-func (h handlers) themeLogo(w http.ResponseWriter, r *http.Request) {
-	b, err := h.Router.Logo()
-	if err != nil {
-		h.serverError(w, r, err)
-		return
-	}
-	h.blob(w, "image/png", b)
-}
-
-// packDownload is GET /admin/router/files.zip?theme=<id>: the full hotspot folder (default alpha-fall).
-func (h handlers) packDownload(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("theme")
-	if id == "" {
-		id = routerpack.DefaultTheme
-	}
-	t, ok := h.Router.Theme(id)
+	b, ct, ok := h.Router.PreviewAsset(d.Key, chi.URLParam(r, "*"))
 	if !ok {
-		h.notFound(w, r, "Theme")
+		h.notFound(w, r, "File")
 		return
 	}
-	st, err := h.Settings.Get(r.Context())
-	if err != nil {
-		h.serverError(w, r, err)
-		return
-	}
-	zipped, err := h.Router.Zip(t, packConfig(st))
-	if err != nil {
-		h.serverError(w, r, err)
-		return
-	}
-	w.Header().Set("Content-Disposition", `attachment; filename="hotspot-`+t.ID+`.zip"`)
-	h.blob(w, "application/zip", zipped)
+	w.Header().Set("Content-Security-Policy", "default-src 'none'")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	h.blob(w, ct, b)
 }
 
 func (h handlers) blob(w http.ResponseWriter, contentType string, b []byte) {

@@ -1,8 +1,0 @@
-{
-  "id": "market-choice",
-  "category": "Market",
-  "style": "choice",
-  "title": "Choice",
-  "primary": "rgb(1, 92, 111)",
-  "overlay": "rgba(0, 0, 0, 0.4)"
-}

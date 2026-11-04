@@ -4,7 +4,7 @@ A small hotspot manager for **one MikroTik router**: Go + HTMX + SQLite, one bin
 The admin defines internet plans, creates members (one by one or as printable voucher batches) and watches who is online.
 The server enforces data, time, validity and concurrent-session limits at login and through accounting, and can kick a session (RADIUS Disconnect).
 
-The member login page is **not** served by this program. It is a static HTML page stored on the router, which asks a small JSON API of this server whether a login is allowed. This program generates that page for you (38 themes) as a downloadable folder.
+The member login pages are **not** served by this program. They are static HTML pages stored on the router. This program gives you 8 ready-made page designs as downloadable folders: the MikroTik default pages and 7 themes of one clean layout.
 
 The full design is in `PLAN.md`; decisions awaiting the owner are in `docs/open-questions.md`.
 
@@ -75,7 +75,9 @@ RADIUS needs UDP 1812 and 1813 open from the router to the server, and UDP 3799 
 
 1. In the admin panel open **Settings**. Set the RADIUS shared secret (or keep the generated one) and the Disconnect port (router default 3799).
 2. Open **Router** (`/admin/router`). It shows a **setup script** for RouterOS: the RADIUS server entry with the shared secret and ports, `/radius incoming` for Disconnect, and the hotspot profile (`use-radius=yes login-by=http-pap radius-accounting=yes radius-interim-update=...`). Replace `<SERVER-IP>` with this server's IP address and edit the profile name if yours is not `hsprof1`, then paste it into a RouterOS terminal.
-3. On the same page download **files.zip** (the default theme, or pick one of the themes in the gallery). Unzip it, edit `hotspot/login.html` (footer, texts, colors), replace `logo.png` and `background.jpg` with your own, and upload the `hotspot` folder to the router (Files menu in WinBox, or FTP). It replaces the default `hotspot` folder. On routers that keep files on flash storage the folder is `flash/hotspot`.
+3. On the same page pick a page design (the MikroTik default, or one of 7 themes) and press **Download**. Unzip it. Drag the unzipped hotspot folder (`hotspot`) into **Files** on the router (WinBox, or FTP) and replace the existing one. On routers that keep files on flash storage the folder is `flash/hotspot`.
+   To change the heading, the subtitle or the logo, open `hotspot/login.html` in a text editor. Comments in the file show where. To use your own logo, put it in `hotspot/img/logo.png` and follow the comment.
+   To translate, change the text in the block called `MESSAGES` in `login.html`, the text in `errors.txt`, and the labels in the other pages. The server sends only a short code (for example `OUT_OF_BULK`) when it rejects a login; `login.html` turns the code into text. The MikroTik default pages show the raw code.
 4. Log in from a phone on the hotspot network with a member you created. The Router page also has a **link status** panel (last Access-Request, Accounting packet and Disconnect with their source addresses, and packets with a wrong shared secret). It lives in memory and starts empty after a restart.
 
 The generated RouterOS commands follow the plan and the legacy setup script but have **not yet been run on a real router**: every command is marked `VERIFY-ON-HARDWARE` in the script. Work through the hardware lab checklist in `PLAN.md` section 13 (PAP reaches RADIUS, the MikroTik attribute semantics, Session-Timeout, interim updates, Disconnect, the reject code reaching the login page) before relying on the setup.

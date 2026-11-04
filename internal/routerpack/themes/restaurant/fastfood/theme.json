@@ -1,8 +1,0 @@
-{
-  "id": "restaurant-fastfood",
-  "category": "Restaurant",
-  "style": "fastfood",
-  "title": "Fastfood",
-  "primary": "rgb(241, 126, 49)",
-  "overlay": "rgba(59, 45, 42, 0.4)"
-}

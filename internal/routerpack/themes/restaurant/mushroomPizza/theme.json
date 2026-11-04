@@ -1,8 +1,0 @@
-{
-  "id": "restaurant-mushroomPizza",
-  "category": "Restaurant",
-  "style": "mushroomPizza",
-  "title": "Mushroom Pizza",
-  "primary": "rgb(221, 48, 18)",
-  "overlay": "rgba(0, 0, 0, 0.67)"
-}

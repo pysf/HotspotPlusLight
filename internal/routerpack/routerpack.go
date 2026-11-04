@@ -1,170 +1,181 @@
-// Package routerpack builds the starter hotspot folder that the admin uploads to
-// the MikroTik router (PLAN 9.4): one shared login page layout, 38 themes (a
-// background photo and two colors each), the small router pages and a logo.
-// Packs are generated on request from the embedded sources; nothing is stored.
+// Package routerpack builds the hotspot folders that the admin uploads to the MikroTik
+// router (PLAN 9.4, D22). There are 8 downloads: the MikroTik default pages exactly as
+// RouterOS ships them, and 7 themes of one new layout. Zips are built on request from
+// the embedded sources; nothing is stored.
 package routerpack
 
 import (
 	"archive/zip"
 	"bytes"
-	"cmp"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"html"
 	"io/fs"
 	"path"
 	"slices"
 	"strings"
-	"text/template"
+	"time"
 
 	"hotspotpluslight/internal/domain"
 )
 
-//go:embed layout pages themes
+// The embedded mikrotik folder is a byte-for-byte copy of reference/hotspot (E12.00).
+// go:embed cannot reach ../../reference, so the copy lives here.
+//
+//go:embed mikrotik src
 var assets embed.FS
-
-// DefaultTheme is the legacy default style, used when the admin picks none.
-const DefaultTheme = "alpha-fall"
 
 // folder is the directory name inside the zip: the admin uploads its content to the router.
 const folder = "hotspot"
 
-// Theme is one downloadable login page style (PLAN 16).
-type Theme struct {
-	ID       string `json:"id"`
-	Category string `json:"category"`
-	Style    string `json:"style"`
-	Title    string `json:"title"`
-	Primary  string `json:"primary"` // CSS color of buttons
-	Overlay  string `json:"overlay"` // CSS color laid over the background photo
+// KeyMikrotik is the key of the unchanged MikroTik default pages.
+const KeyMikrotik = "mikrotik"
+
+// DefaultKey is the theme shown first among the themes.
+const DefaultKey = "air"
+
+// Design is one downloadable hotspot folder.
+type Design struct {
+	Key   string
+	Title string
+	About string
 }
 
-// Config is what the pack is generated from (taken from the settings).
-type Config struct {
-	SiteTitle string
+// Themes are the 7 themes of the new layout, in display order. Adding a theme means adding
+// one token block file src/css/themes/<key>.css and one line here (TestThemeSource checks both agree).
+var Themes = []Design{
+	{"air", "Air", "Light grey with Apple blue."},
+	{"midnight", "Midnight", "Graphite with a blue glow and a faint grid."},
+	{"aurora", "Aurora", "Pastel mesh with a frosted glass card."},
+	{"dusk", "Dusk", "Violet-black with a glow from below."},
+	{"ripple", "Ripple", "Sage paper with signal rings."},
+	{"sunrise", "Sunrise", "Warm cream with a low sun."},
+	{"ocean", "Ocean", "Deep teal with a white card."},
 }
 
-// Pack holds the parsed themes and the login page template.
-type Pack struct {
-	themes []Theme
-	login  *template.Template
-}
+// Pack builds the folders. It has no state; New only checks the embedded sources.
+type Pack struct{}
 
-// New parses the embedded sources. It fails only if the binary was built with a broken asset tree.
+// New checks the embedded sources. It fails only if the binary was built with a broken asset tree.
+// zipTime is a fixed time for every zip entry, so the zip is the same each time.
+var zipTime = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
 func New() (*Pack, error) {
 	p := &Pack{}
-	err := fs.WalkDir(assets, "themes", func(name string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || path.Base(name) != "theme.json" {
-			return err
+	for _, d := range p.Designs() {
+		if _, err := p.Files(d.Key); err != nil {
+			return nil, fmt.Errorf("%s: %w", d.Key, err)
 		}
-		raw, err := assets.ReadFile(name)
-		if err != nil {
-			return err
-		}
-		var t Theme
-		if err := json.Unmarshal(raw, &t); err != nil {
-			return fmt.Errorf("%s: %w", name, err)
-		}
-		if t.ID == "" || t.Category == "" || t.Primary == "" || t.Overlay == "" || path.Dir(name) != path.Join("themes", strings.ToLower(t.Category), t.Style) {
-			return fmt.Errorf("%s: incomplete or misplaced manifest", name)
-		}
-		if b, err := assets.ReadFile(path.Join(path.Dir(name), "background.jpg")); err != nil || len(b) == 0 {
-			return fmt.Errorf("%s: no background image", name)
-		}
-		p.themes = append(p.themes, t)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	slices.SortFunc(p.themes, func(a, b Theme) int {
-		return cmp.Or(cmp.Compare(a.Category, b.Category), cmp.Compare(a.Title, b.Title))
-	})
-	p.login, err = template.New("login.html.tmpl").Funcs(template.FuncMap{"js": jsLiteral, "html": html.EscapeString}).
-		ParseFS(assets, "layout/login.html.tmpl")
-	if err != nil {
-		return nil, err
 	}
 	return p, nil
 }
 
-// jsLiteral renders v as a JavaScript string literal that is also safe inside <script>.
-func jsLiteral(v string) (string, error) {
-	b, err := json.Marshal(v)
-	return string(b), err
+// Designs lists the 8 downloads: MikroTik default first, then the themes.
+func (*Pack) Designs() []Design {
+	return append([]Design{{KeyMikrotik, "MikroTik default", "The pages exactly as RouterOS ships them. Failed logins show the raw code."}}, Themes...)
 }
 
-// Themes lists all themes, grouped by category (sorted by category, then title).
-func (p *Pack) Themes() []Theme { return slices.Clone(p.themes) }
-
-// Theme finds a theme by id.
-func (p *Pack) Theme(id string) (Theme, bool) {
-	for _, t := range p.themes {
-		if t.ID == id {
-			return t, true
+// Design finds a download by key.
+func (p *Pack) Design(key string) (Design, bool) {
+	for _, d := range p.Designs() {
+		if d.Key == key {
+			return d, true
 		}
 	}
-	return Theme{}, false
+	return Design{}, false
 }
 
-func (p *Pack) themeDir(t Theme) string {
-	return path.Join("themes", strings.ToLower(t.Category), t.Style)
-}
-
-// Background is the theme's photo (JPEG).
-func (p *Pack) Background(t Theme) ([]byte, error) {
-	return assets.ReadFile(path.Join(p.themeDir(t), "background.jpg"))
-}
-
-// Logo is the placeholder logo shared by all themes.
-func (p *Pack) Logo() ([]byte, error) { return assets.ReadFile("layout/logo.png") }
-
-// Message is one entry of the page's English dictionary.
-type Message struct{ Code, Text string }
-
-type loginData struct {
-	Theme
-	SiteTitle string
-	Messages  []Message
-}
-
-// LoginHTML renders the customizable member page of a theme. Router variables
-// such as $(link-login-only) are left for the router to substitute.
-func (p *Pack) LoginHTML(t Theme, c Config) ([]byte, error) {
-	d := loginData{Theme: t, SiteTitle: c.SiteTitle}
-	for _, r := range domain.AllReasons() {
-		d.Messages = append(d.Messages, Message{string(r), r.Message()})
+// Files returns the content of the folder for a key, by path inside the folder.
+func (p *Pack) Files(key string) (map[string][]byte, error) {
+	if key == KeyMikrotik {
+		return readTree("mikrotik", nil)
 	}
-	var b bytes.Buffer
-	if err := p.login.Execute(&b, d); err != nil {
-		return nil, err
+	d, ok := p.Design(key)
+	if !ok {
+		return nil, fmt.Errorf("unknown design %q", key)
 	}
-	return b.Bytes(), nil
-}
-
-// Zip is the full hotspot folder of a theme: the login page, its background and
-// logo, and the small router pages, all under "hotspot/".
-func (p *Pack) Zip(t Theme, c Config) ([]byte, error) {
-	files := map[string][]byte{}
-	var err error
-	if files["login.html"], err = p.LoginHTML(t, c); err != nil {
-		return nil, err
-	}
-	if files["background.jpg"], err = p.Background(t); err != nil {
-		return nil, err
-	}
-	if files["logo.png"], err = p.Logo(); err != nil {
-		return nil, err
-	}
-	pages, err := fs.ReadDir(assets, "pages")
+	css, err := p.css(d.Key)
 	if err != nil {
 		return nil, err
 	}
-	for _, e := range pages {
-		if files[e.Name()], err = assets.ReadFile(path.Join("pages", e.Name())); err != nil {
-			return nil, err
+	replace := func(name string, b []byte) []byte {
+		if !strings.HasSuffix(name, ".html") {
+			return b
 		}
+		s := strings.ReplaceAll(string(b), "@THEME@", d.Key)
+		s = strings.ReplaceAll(s, "@MESSAGES@", MessagesBlock())
+		return []byte(s)
+	}
+	files, err := readTree("src/hotspot", replace)
+	if err != nil {
+		return nil, err
+	}
+	files["css/hotspot.css"] = css
+	for n, b := range files {
+		if bytes.Contains(b, []byte("@THEME@")) || bytes.Contains(b, []byte("@MESSAGES@")) {
+			return nil, fmt.Errorf("%s: placeholder left in the page", n)
+		}
+	}
+	return files, nil
+}
+
+// css is the shared layout plus only the token block of one theme.
+func (*Pack) css(key string) ([]byte, error) {
+	layout, err := assets.ReadFile("src/css/layout.css")
+	if err != nil {
+		return nil, err
+	}
+	block, err := assets.ReadFile("src/css/themes/" + key + ".css")
+	if err != nil {
+		return nil, err
+	}
+	var b bytes.Buffer
+	b.Write(layout)
+	b.WriteString("\n/* ===== THEME ===== */\n")
+	b.Write(block)
+	return b.Bytes(), nil
+}
+
+// MessagesBlock is the code-to-text block of login.html (the "MESSAGES - translate here" block).
+// It has one line per rejection code of the domain, then the fallback that shows any other message as it is.
+func MessagesBlock() string {
+	var b strings.Builder
+	for i, r := range domain.AllReasons() {
+		word := "elif"
+		if i == 0 {
+			word = "if"
+		}
+		fmt.Fprintf(&b, "$(%s error == \"%s\")%s\n", word, r, html.EscapeString(r.Message()))
+	}
+	b.WriteString("$(elif error)$(error)$(endif)")
+	return b.String()
+}
+
+func readTree(root string, edit func(name string, b []byte) []byte) (map[string][]byte, error) {
+	files := map[string][]byte{}
+	err := fs.WalkDir(assets, root, func(name string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := assets.ReadFile(name)
+		if err != nil {
+			return err
+		}
+		rel := strings.TrimPrefix(name, root+"/")
+		if edit != nil {
+			b = edit(rel, b)
+		}
+		files[rel] = b
+		return nil
+	})
+	return files, err
+}
+
+// Zip is the full hotspot folder of a design, all under "hotspot/", files sorted, no timestamps.
+func (p *Pack) Zip(key string) ([]byte, error) {
+	files, err := p.Files(key)
+	if err != nil {
+		return nil, err
 	}
 	names := make([]string, 0, len(files))
 	for n := range files {
@@ -174,7 +185,7 @@ func (p *Pack) Zip(t Theme, c Config) ([]byte, error) {
 	var out bytes.Buffer
 	zw := zip.NewWriter(&out)
 	for _, n := range names {
-		w, err := zw.CreateHeader(&zip.FileHeader{Name: folder + "/" + n, Method: zip.Deflate})
+		w, err := zw.CreateHeader(&zip.FileHeader{Name: path.Join(folder, n), Method: zip.Deflate, Modified: zipTime})
 		if err != nil {
 			return nil, err
 		}

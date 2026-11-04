@@ -1,0 +1,24 @@
+# Messages the router shows when a login fails or a page is not allowed.
+# They are plain English. To translate them, change the text after the equals sign.
+# Do not change the names on the left. Words that start with a dollar sign and a bracket
+# are filled in by the router (for example the user name or the IP address).
+#
+# A rejection from our server comes through radius-reply. It is only a short code such as OUT_OF_BULK.
+# login.html turns that code into text (see the MESSAGES block in that file).
+
+internal-error = Internal error ($(error-orig))
+config-error = Configuration error ($(error-orig))
+not-logged-in = You are not logged in (IP address $(ip))
+ippool-empty = No free IP address is left. Try again later.
+shutting-down = The Wi-Fi service is shutting down.
+user-session-limit = No more devices can use the account $(username) at the same time.
+license-session-limit = The router has reached its limit of users ($(error-orig))
+wrong-mac-username = The user name $(username) looks like a MAC address, but it is not the address of this device.
+chap-missing = The login was not sent in the expected way. Try again.
+invalid-username = Wrong username or password.
+invalid-mac = The account $(username) cannot be used from this device.
+uptime-limit = The account $(username) has used all its time.
+traffic-limit = The account $(username) has used all its data.
+radius-timeout = The login server is not answering. Try again later.
+auth-in-progress = A login is already in progress. Try again in a moment.
+radius-reply = $(error-orig)

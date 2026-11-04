@@ -166,14 +166,9 @@ func Handler(d Deps) http.Handler {
 				})
 				r.Route("/router", func(r chi.Router) {
 					r.Get("/", h.routerPage)
-					r.Get("/files.zip", h.packDownload)
-					r.Get("/themes", h.themeGallery)
-					r.Route("/themes/{id}", func(r chi.Router) {
-						r.Get("/", h.themePage)
-						r.Get("/login.html", h.themePreview)
-						r.Get("/background.jpg", h.themeBackground)
-						r.Get("/logo.png", h.themeLogo)
-					})
+					r.Get("/pages/{key}.zip", h.packDownload)
+					r.Get("/pages/{key}/preview", h.packPreview)
+					r.Get("/pages/{key}/*", h.packAsset)
 				})
 				r.Get("/settings", h.settingsPage)
 				r.Put("/settings", h.settingsUpdate)

@@ -63,7 +63,7 @@ Multi-tenancy/Business entity, resellers, operators, roles/ACL/tokens, invoices,
 | D19 | **Everything is English** — admin panel, API/RADIUS messages, voucher help text. The router-hosted page holds its own translation table keyed by message code. |
 | D20 | ~~Page API~~ **Removed 2026-11-04 (Phase 12a):** no `GET /api/v1/*`, no MAC auto-login lookup, no branding config endpoint. The site title is edited by hand in the page. |
 | D21 | The starter pack is the **full hotspot folder** (customizable login page + the small router pages) (P3). |
-| D22 | The legacy portal themes are extracted as **38 independent, downloadable themes** (6 categories × their styles). Each theme = one background photo + a primary color + an overlay color on **one shared layout**; the layout has logo, site title, the login form and a footer text (T1, T2). See §9.4 and §16. |
+| D22 | **Router page designs (rewritten 2026-11-04, Phase 12b).** The 38 legacy themes are gone. There are **8 static downloads**, each a complete `hotspot` folder: **MikroTik default** (the RouterOS pages, byte for byte from `reference/hotspot/`; a failed login shows the raw code) and **7 themes** of one new layout: `air`, `midnight`, `aurora`, `dusk`, `ripple`, `sunrise`, `ocean`. The admin edits heading, subtitle, logo and messages by hand in the files; no settings feed them. See §9.4 and §16. |
 
 ---
 
@@ -94,7 +94,7 @@ Each row has my recommendation. Replying "accept all recommendations" is fine; o
 | O19 | **Which clock stamps accounting records.** | **RESOLVED — server receive time (owner, 2026-11-01).** The router's `Event-Timestamp` is kept only for display/debugging. | Implement as stated. |
 | O20 | **Error message format.** | **RESOLVED (owner, 2026-11-01): code + English text. CHANGED 2026-11-04 (Phase 12a): the RADIUS `Reply-Message` is only the code** (for example `OUT_OF_BULK`). The router page turns the code into text, so the admin can translate it by editing the page. The logs and the admin UI keep code plus English text. | Implement as stated (§7.6). |
 | O21 | **Consequences of English-only.** | **RESOLVED (owner, 2026-11-01):** one `settings.voucher_help` (English default); the voucher print page is **always left-to-right** (no `dir` option); `member.language` is dropped; new `settings.public_base_url` (how clients reach this server, baked into the router page pack); `settings.router_login_url` is removed. | Implement as stated. |
-| P1–P3 | **Router-hosted page decisions.** | **P1 and P2 REMOVED (owner, 2026-11-04, Phase 12a):** the page no longer calls our server; there is no page API. P3 stays: the pack is the **full hotspot folder** (Phase 12b replaces the pages with a new look). | See §9.4. |
+| P1–P3 | **Router-hosted page decisions.** | **P1 and P2 REMOVED (owner, 2026-11-04, Phase 12a):** the page no longer calls our server; there is no page API. P3 stays: each download is the **full hotspot folder** (new look since Phase 12b). | See §9.4. |
 
 ---
 
@@ -135,7 +135,7 @@ Legend: **Keep** = same behaviour · **Change** = kept, behaviour differs (see n
 | Self-signup, SMS/voice verification, `verifyHotSpot`, forgot-password/`recoverHotspotUser`, `sendPassword` | Drop | D7/D11 (forgot password = ask admin, who can view it) |
 | `createHotSpotMember`, `createForeignHotSpotMember`, `signUpCustomer`, `findHotSpotMember`, `enquiry`, `getBusinessId`, `getDailyUsage`, `logOutHotSpot` | Drop | Dead/stub/unimplemented in legacy |
 | `paySubscription`, `buyPlan`, `buyBulk`, payment return routes | Drop | D7 |
-| Themes (alpha, restaurant, cafe, hotel, university, market; 38 styles) | Change | Extracted as **38 independent downloadable themes** sharing one layout (D22, §9.4, §16) |
+| Themes (alpha, restaurant, cafe, hotel, university, market; 38 styles) | Change | Replaced (Phase 12b) by **7 new themes** of one layout plus the MikroTik default pages: 8 downloads (D22, §9.4, §16) |
 | Form-field config, pin code, Telegram/Instagram, logo/background upload | Drop | No signup, no pin code, no social links; the admin replaces `logo.png` / `background.jpg` in the downloaded folder by hand |
 | Multi-language texts (fa/en) | Change | English only (O11); the page keeps its own translation table keyed by message code |
 
@@ -452,7 +452,7 @@ See BR-18. `Calling-Station-Id` is the stored RouterOS-style MAC sent as is (BR-
 *Type ids (Recv-Limit 1, Xmit-Limit 2, Rate-Limit 8, Recv-Gigawords 14, Xmit-Gigawords 15, vendor 14988) match the MikroTik dictionary shipped with `layeh.com/radius`; the semantics on a real router remain VERIFY-ON-HARDWARE (§13). `Mikrotik-Total-Limit` is not used: the MikroTik RADIUS page does not document it.*
 
 ### 7.6 Message catalog (English only — O11)
-*(Phase 6, 2026-11-01: `TOO_MANY_ATTEMPTS` is page-API only (HTTP 429), never a RADIUS reject; it is in the catalog so the starter page's dictionary has it.)* Each reject has a stable **code** and an English **message**. The Page API returns both (`code`, `message`); the RADIUS `Reply-Message` is `"<CODE>: <message>"` (O20). The starter page ships this English table only (the legacy Persian texts were dropped, 2026-11-02); the admin adds a language by hand by copying the `en` block in the page script and setting `HSP_LANG`.
+*(Phase 12, 2026-11-04: `TOO_MANY_ATTEMPTS` and `GENERAL_ERROR` were removed; nothing sent them. The page API is gone and the RADIUS `Reply-Message` is now only the `<CODE>` (O20 updated). The router pages map codes to text in their MESSAGES block.)* Each reject has a stable **code** and an English **message** (kept in the server log and the admin UI).
 
 | Code | English message |
 |---|---|
@@ -466,8 +466,6 @@ See BR-18. `Calling-Station-Id` is the stored RouterOS-style MAC sent as is (BR-
 | OUT_OF_TIME | Your time allowance is used up. |
 | NO_MORE_SESSION | Someone else is using this account. Try again in a few minutes. |
 | UNSUPPORTED_AUTH_METHOD | This network only supports PAP login. |
-| GENERAL_ERROR | Unexpected server error. Contact support or try again. |
-| TOO_MANY_ATTEMPTS | Too many attempts. Try again in a minute. |
 
 
 ---
@@ -504,7 +502,7 @@ There is **no** server-rendered member page, cookie, language switch, plan list,
 | `GET /admin/usage` (`?days=7\|30\|90`, default 30) | Phase 9: 30-day daily traffic chart (all members, download + upload) and top 10 members by traffic for the chosen range (D12). |
 | `GET /admin/sessions`, `GET /admin/sessions/table`, `POST /admin/sessions/{id}/disconnections` | BR-17/18 (Phase 5: `/table` is the polled fragment; a failed kick answers `422` missing identifiers, `502` NAK/no answer, `409` already ended, `404` unknown; success `200` + `HX-Redirect`). Columns: username, IP, MAC, started at, duration, data used in this session (↓/↑), disconnect button. The table refreshes itself every **10 s** (htmx polling) and shows the note "Updated by the router every <accounting_interval> s" (Q30). |
 | `GET /admin/settings`, `PUT /admin/settings` | All `settings` columns (secret masked, reveal button). Validation ranges as in DDL. |
-| `GET /admin/router` ; `GET /admin/router/themes` ; `GET /admin/router/themes/{id}` (+ `/login.html`, `/background.jpg`, `/logo.png`: the live preview and its assets) ; `GET /admin/router/files.zip?theme={id}` | Router setup, theme gallery (38 themes grouped by 6 categories, live previews) and theme download (§9.4). Default theme (no parameter): `alpha-fall`. *(Phase 6 built the entry page with the download and gallery links and (until Phase 12a removed it) a warning when `public_base_url` was empty; Phase 8, 2026-11-02, added the setup script (E8.03) and the link status panel; the secret appears in the script only, see open-questions row 38.)* The page also shows a **router link status** panel (in-memory, resets on restart): time + source IP of the last Access-Request, Accounting packet and Disconnect result, plus counters and source IPs of packets dropped for a bad shared secret (owner 2026-11-01). |
+| `GET /admin/router` ; `GET /admin/router/pages/{key}.zip` ; `GET /admin/router/pages/{key}/preview[?page=login\|alogin\|status\|logout\|error&error=CODE]` ; `GET /admin/router/pages/{key}/{css,img}/*` | Router setup page: the setup script, 8 page design cards (each with a small preview and a Download button), and the link status panel. `{key}` is `mikrotik` or a theme key. The zip is `application/zip`, named `hotspot-{key}.zip`, root folder `hotspot/`. The preview fills the router variables with sample values and resolves the `$(if ...)` blocks; it carries its own strict CSP (own stylesheet and images only, no script, no form target). All need a login. *(Phase 8 added the setup script (E8.03) and the link status panel; the secret appears in the script only, see open-questions row 38. Phase 12b removed `/themes`, `/themes/{id}` and `files.zip`.)* The page also shows a **router link status** panel (in-memory, resets on restart): time + source IP of the last Access-Request, Accounting packet and Disconnect result, plus counters and source IPs of packets dropped for a bad shared secret (owner 2026-11-01). |
 | `GET /admin/static/*`, `GET /static/*` | htmx, css, branding override dir. |
 
 ### 8.3 CLI
@@ -530,7 +528,7 @@ HotspotPlusLight/
   internal/voucher/            Service: batch generation, print data (BR-15/16/23)
   internal/radius/             UDP server, handlers, MikroTik attrs, CoA client, message catalog — calls the services
   internal/web/admin/          handlers + templ components (reusable: layout, table, pagination, filter bar, form field, confirm dialog, flash)
-  internal/routerpack/         starter hotspot folder (Phase 6): theme registry, shared login page layout (`layout/login.html.tmpl`, one `logo.png`), router pages (`pages/`), 38 theme manifests + backgrounds (`themes/<category>/<style>/{theme.json,background.jpg}`), zip packaging; `go:embed`
+  internal/routerpack/         hotspot folders (Phase 12b): `mikrotik/` (byte copy of reference/hotspot), `src/hotspot/` (pages, helpers, xml, js), `src/css/layout.css` + `src/css/themes/<key>.css` (one token block per theme), preview with sample values, zip packaging; `go:embed`; plus `script.go` (router setup script)
   internal/web/static/         htmx, the Inter font (vendored, pinned), our CSS (`css/`) and JS (`js/`); `static.go` bundles and hashes them at startup (D24, 2026-11-03, `docs/ui-notes.md`)
   e2e/                         black-box tests, harness, fake router
   docs/
@@ -552,16 +550,20 @@ HotspotPlusLight/
 ### 9.3 Concurrency and time
 SQLite single writer: all mutating work in short transactions; accounting handlers run synchronously per packet (fast). **One writer connection (2026-11-04, Phase 11d):** `store.Open` opens the file as two pools. The write pool has exactly one connection (`SetMaxOpenConns(1)`, `_txlock=immediate`) and runs every transaction and every write, so writers queue fairly in Go instead of fighting in the SQLite busy handler (which starved some writers until `database is locked`). The read pool has 8 connections and runs read-only queries. A read that must agree with a write stays inside the write transaction. Never call a `Store` method that writes from inside a transaction callback (one connection: it would wait for itself). `synchronous` stays at the default (FULL). `Clock` is injected everywhere so tests control time. Background jobs: session pruning (daily), nothing else.
 
-### 9.4 Router artifacts (generated from settings)
-**Themes (D22, T1, T2).** The 38 legacy styles (§16) are independent themes: each is one background photo + a primary color + an overlay color applied to **one shared layout**. Every download is a complete, self-contained hotspot folder: `login.html` with the theme's two colors as CSS custom properties at the top (`--primary-color`, `--overlay-color`), `background.jpg` and a placeholder `logo.png` in the same folder (the admin replaces them by hand), plus the router pages below. Packs are generated at download time from one layout template and the theme manifest; nothing is stored in the database. Layout elements (T2): optional logo, site title text (static, edited in the HTML; it came from `/api/v1/config` until Phase 12a removed the API), the login form (username, password, button, error-message area) and a footer text (edited in the HTML). Not included: signup, forgot-password, language switch, pin code, social links, balance box (the balance API still exists for admins who add one). Direction left-to-right, system font stack (legacy IRANSans was for the legacy UI). Repo layout (moved in Phase 6, 2026-11-01, to its own package; the six legacy logos are byte-identical, so one shared placeholder): `internal/routerpack/layout/{login.html.tmpl,logo.png}`, `internal/routerpack/themes/<category>/<style>/{theme.json,background.jpg}`, `internal/routerpack/pages/*.html`, embedded with `go:embed`. The admin gallery lists the 38 themes grouped by the six categories with live previews; with no `theme` parameter the download is `alpha-fall` (the legacy default).
+### 9.4 Router artifacts (static, built into the binary)
+Owner decisions 2026-11-04 (Phase 12). The login pages live on the router. No JavaScript calls our server. Everything is edited by hand in the files. Nothing is stored in the database, and no setting feeds the pages.
 
-`GET /admin/router/files.zip?theme=<id>` returns the **full hotspot folder** (P3) for the admin to download, customize and upload to the router:
-- `login.html` — the **customizable member page** (it carries a fixed hint line under the form: "If you were disconnected, your plan's data or time may be used up. Try logging in again to see why." — owner 2026-11-01, Q18; listed in the translation dictionary so it can be translated): static HTML + CSS + JS with no server templating. *(Phase 12a: no more `HSP_API_BASE`.)* It holds an English-keyed **translation dictionary** (English only; to add a language the admin copies the `en` block by hand and sets `HSP_LANG`), and the script below. It uses RouterOS variables (`$(mac)`, `$(link-orig)`, `$(link-login-only)`, `$(error)`, `$(username)`, …), which the router substitutes when serving the file.
-- *(Phase 6, 2026-11-01: the pack is `hotspot/{login,alogin,status,logout,error,redirect,rlogin}.html`, `background.jpg`, `logo.png`; the legacy JSON helpers `rstatus`/`fstatus` served only the old SPA and are not carried over; the OS captive-check nudge runs in `alogin.html`, because `login.html` is left by the native form submit.)* The small router pages for success/status/logout/redirect/error (derived from the legacy `alogin, rlogin, status, rstatus, fstatus, logout, redirect` pages), adjusted to the new flow. *The exact set and content must be finalized against RouterOS documentation and a real router (VERIFY-ON-HARDWARE).* Legacy `rlogin.html` is not carried over as is — it redirected to the external portal and put `pap=$(plain-passwd)` in the URL.
+**8 downloads (D22).** `GET /admin/router/pages/{key}.zip`, root folder `hotspot/`:
+- `mikrotik`: the RouterOS default pages, byte for byte from `reference/hotspot/` (an embedded copy; a test keeps it equal). It has `md5.js` and the CHAP block, and a failed login shows the raw reject code.
+- `air` (default look), `midnight`, `aurora`, `dusk`, `ripple`, `sunrise`, `ocean`: one layout, one color theme each (§16).
 
-**Page script behaviour (changed 2026-11-04, Phase 12a):** the page makes no calls to our server. Until Phase 12b replaces it, the script only shows the router's `$(error)` (now the bare reject code) as translated text. *(The old flow with `/api/v1/*` calls is gone.)*
+**Files of a themed zip:** `login.html`, `alogin.html`, `status.html`, `logout.html`, `error.html` (new look); `css/hotspot.css` (the layout plus **only that theme's token block**); `js/busy.js` (optional spinner and double-submit guard, the pages work without it); plain helpers `redirect.html`, `rlogin.html`, `radvert.html`, `api.json` (RFC 8908 captive portal info), `errors.txt` (clear English, `radius-reply = $(error-orig)`); `xml/*` and `favicon.ico` (copied from the MikroTik folder so smart clients keep working). Not shipped: `md5.js`, the CHAP block (we use PAP only), the old `img/*.svg`. No external requests, no web fonts, no inline `style`, `onclick` or script bodies. Pages are well under 30 KB. `<body data-theme="air">` selects the theme.
 
-**Router prerequisites:** none for the page. It is plain HTML on the router and calls nothing (Phase 12a removed the walled-garden entry and `public_base_url`). The downloaded `hotspot` folder replaces the router's default one (`flash/hotspot` on flash routers).
+**Source in the repo** (`internal/routerpack`): `mikrotik/` (the copy), `src/hotspot/` (pages, helpers, `xml/`, `js/`, with the placeholders `@THEME@` and `@MESSAGES@`), `src/css/layout.css` and `src/css/themes/<key>.css` (one token block each). Adding a theme = one new block file plus one line in `routerpack.Themes`. A function builds the zip or the file map for a key (`Pack.Zip`, `Pack.Files`).
+
+**Page behaviour.** `login.html` posts `username` and `password` to `$(link-login-only)` with hidden `dst=$(link-orig)` and `popup=false`, and pre-fills `value="$(username)"`. Comments mark where to edit the heading ("Welcome"), the subtitle and the logo (default Wi-Fi mark; swap to `<img src="img/logo.png" alt="">`). One block, "MESSAGES - translate here", maps every reject code of `domain.AllReasons()` to English text: `$(if error == "CODE")text$(elif ...)...$(elif error)$(error)$(endif)`. `alogin.html` redirects to `$(link-status)` (no popup). `status.html` shows "Hi, `$(username)`", time online `$(uptime)`, time left `$(session-time-left)` when set, data left `$(remain-bytes-total)` when set, a Continue link to `$(link-orig)` when set, and a Log out button to `$(link-logout)`. To translate: change the MESSAGES block, `errors.txt` and the labels in the pages.
+
+**Router prerequisites:** none for the page. The downloaded `hotspot` folder replaces the router's default one (`flash/hotspot` on flash routers).
 
 **Setup script** (shown on `/admin/router`, copyable): `/radius add service=hotspot address=<server-ip> secret=<secret> authentication-port=1812 accounting-port=1813 timeout=5s`, `/radius incoming set accept=yes port=<coa_port>`, hotspot profile `use-radius=yes login-by=http-pap radius-accounting=yes radius-interim-update=<interval>s`, and a note on uploading the folder (it replaces the default `hotspot` folder; `flash/hotspot` on flash routers). No walled-garden and no `html-directory` line (Phase 12a). *RouterOS syntax must be validated on your router/version (§13).*
 
@@ -621,7 +623,7 @@ E2E first: **E5.01** online list shows only active (not stopped/stale) · **E5.0
 Tasks: CoA client, online page, kick actions (automatic enforcement came in Phase 11a, O3/O4).
 
 ### Phase 6 — Router page pack and page API (the page API was removed in Phase 12a, 2026-11-04)
-*(Removed in Phase 12a, 2026-11-04: the page API, so E6.01-E6.10 and E6.12 no longer exist; `public_base_url` baking is gone too.)* E2E first: **E6.01** `GET /api/v1/account` with valid Basic auth ⇒ 200, `loginAllowed:true`, `reason:null` · **E6.02** each non-credential failure returns 200 with `loginAllowed:false` and its `reason` code + English `message` (inactive / no plan / plan removed / expired / validity window / data / time) · **E6.03** wrong password and unknown user both return `401` with an identical problem+json body and no `WWW-Authenticate` header · **E6.04** invalid username characters (non-ASCII, symbols) ⇒ `401 INVALID_CREDENTIALS` · **E6.05** CORS headers on every route (`Allow-Origin *`, `Allow-Headers: Authorization`) and `OPTIONS` preflight ⇒ 204 · **E6.06** the data/time figures in `account` equal the admin list (BR-7/8, BR-22), unlimited flags, and quota-exhausted members still get 200 · **E6.07** `GET /api/v1/devices/{mac}/credentials`: `403 DISABLED` when the setting is off; on ⇒ `200` credentials only for an active member, `404 DEVICE_NOT_FOUND` otherwise; MAC formats normalized (BR-3) · **E6.08** config reflects settings changes immediately · **E6.09** throttle after repeated `401`s: `429` with `Retry-After` and code `TOO_MANY_ATTEMPTS`, per source IP; resets via fake clock · **E6.10** credentials never appear in logs · **E6.11** every theme's `login.html` lint: no server template tokens left, API base baked from `public_base_url`, every message code has a dictionary entry · **E6.12** starter page script against `routerstub` + the API in a headless browser (optional, Playwright): error mapping, English fallback, native submit to the router login, after-login redirect, MAC auto-login · **E6.14** theme registry: exactly 38 themes in 6 categories, each with a manifest, a non-empty background image and parseable colors that match §16 · **E6.15** each of the 38 downloads is a valid zip whose `login.html` carries that theme's colors and background and the shared layout elements (logo, title, form, footer) · **E6.16** no `theme` parameter ⇒ `alpha-fall`; unknown id ⇒ `404` · **E6.17** gallery page lists all 38 grouped by category and each preview renders · **E6.19** error responses are `application/problem+json` with `type`, `title`, `status`, `detail`, `code`; no response contains an `ok` field; `account` and `credentials` carry `Cache-Control: no-store`; unknown routes ⇒ 404 problem+json · **E6.18** the generated `login.html` of every theme contains the disconnected-hint line (and its translation-dictionary key).
+*(Removed in Phase 12b, 2026-11-04: E6.11, E6.14-E6.18 and E6.20 (the 38 themes; replaced by E12.00-E12.06). Removed in Phase 12a, 2026-11-04: the page API, so E6.01-E6.10 and E6.12 no longer exist; `public_base_url` baking is gone too.)* E2E first: **E6.01** `GET /api/v1/account` with valid Basic auth ⇒ 200, `loginAllowed:true`, `reason:null` · **E6.02** each non-credential failure returns 200 with `loginAllowed:false` and its `reason` code + English `message` (inactive / no plan / plan removed / expired / validity window / data / time) · **E6.03** wrong password and unknown user both return `401` with an identical problem+json body and no `WWW-Authenticate` header · **E6.04** invalid username characters (non-ASCII, symbols) ⇒ `401 INVALID_CREDENTIALS` · **E6.05** CORS headers on every route (`Allow-Origin *`, `Allow-Headers: Authorization`) and `OPTIONS` preflight ⇒ 204 · **E6.06** the data/time figures in `account` equal the admin list (BR-7/8, BR-22), unlimited flags, and quota-exhausted members still get 200 · **E6.07** `GET /api/v1/devices/{mac}/credentials`: `403 DISABLED` when the setting is off; on ⇒ `200` credentials only for an active member, `404 DEVICE_NOT_FOUND` otherwise; MAC formats normalized (BR-3) · **E6.08** config reflects settings changes immediately · **E6.09** throttle after repeated `401`s: `429` with `Retry-After` and code `TOO_MANY_ATTEMPTS`, per source IP; resets via fake clock · **E6.10** credentials never appear in logs · **E6.11** every theme's `login.html` lint: no server template tokens left, API base baked from `public_base_url`, every message code has a dictionary entry · **E6.12** starter page script against `routerstub` + the API in a headless browser (optional, Playwright): error mapping, English fallback, native submit to the router login, after-login redirect, MAC auto-login · **E6.14** theme registry: exactly 38 themes in 6 categories, each with a manifest, a non-empty background image and parseable colors that match §16 · **E6.15** each of the 38 downloads is a valid zip whose `login.html` carries that theme's colors and background and the shared layout elements (logo, title, form, footer) · **E6.16** no `theme` parameter ⇒ `alpha-fall`; unknown id ⇒ `404` · **E6.17** gallery page lists all 38 grouped by category and each preview renders · **E6.19** error responses are `application/problem+json` with `type`, `title`, `status`, `detail`, `code`; no response contains an `ok` field; `account` and `credentials` carry `Cache-Control: no-store`; unknown routes ⇒ 404 problem+json · **E6.18** the generated `login.html` of every theme contains the disconnected-hint line (and its translation-dictionary key).
 *(12a: API, CORS and `public_base_url` removed.)* Tasks: API handlers, CORS, throttling, the page pack sources (`login.html` + router pages), the translation dictionary, `public_base_url` baking, theme registry + layout template + zip packaging, gallery pages.
 
 ### Phase 7 — Batches and vouchers
@@ -653,6 +655,9 @@ Step B (2026-11-03): **expiring soon** (BR-24, status chips All / Active / Expir
 ### Phase 12a — Drop the page API and :8080 (built 2026-11-04, owner decision)
 Removed: `internal/web/pageapi`, the public listener, `HSP_HTTP_ADDR`, MAC auto-login (O8), the settings `public_base_url`, `mac_auto_login`, `after_login_url` (migration `0004_drop_page_api_settings.sql`), `Evaluator.Account`, `Evaluator.CredentialsByMAC` and `ListActiveMembersByMAC`. `/healthz` moved to the admin listener. The RADIUS `Reply-Message` is only the code. The setup script lost the walled-garden and `html-directory` lines. E2E: **E12.07** Reply-Message is exactly the code · **E12.08** one listener, `/healthz` without login, `/api/v1/*` 404 · **E12.09** migration 0004 · **E12.10** setup script. Removed tests are listed in `docs/phase12-notes.md`. Phase 12b (new router pages, zips, Router page cards) follows.
 
+
+### Phase 12b - New router pages (built 2026-11-04, owner decision)
+8 static downloads (D22, §9.4, §16): the MikroTik default pages byte for byte, and 7 themes of one new layout. New admin Router page with 8 cards (preview + Download); routes `GET /admin/router/pages/{key}.zip` and `.../preview` (§8). Removed: the 38-theme pack (`layout/`, `pages/`, `themes/`), `/admin/router/themes*`, `files.zip`, and their tests (listed in `docs/phase12-notes.md`). E2E: **E12.00** the `mikrotik` zip equals `reference/hotspot/` under `hotspot/` · **E12.01** file list per themed zip, no `md5.js`, no outside address, under 30 KB · **E12.02** RouterOS syntax per page, `$(if)`/`$(endif)` balanced in every file · **E12.03** the MESSAGES block covers every domain reject code with the fallback, and the preview shows each text · **E12.04** one theme block per CSS, same layout, no colors outside theme blocks, `body data-theme` matches · **E12.05** no inline style, handler or script body, previews need no script · **E12.06** the Router page lists 8 cards, downloads need a login, content type and file name, previews work.
 ---
 
 ## 12. Definition of done (whole project)
@@ -669,7 +674,11 @@ All E2E tests green on a clean checkout with no external services; hardware chec
 6. Gigawords appear in accounting after 4 GiB (usage counting).
 7. `Disconnect-Request` to port 3799 works with the attribute set in BR-18; confirm which attribute set RouterOS requires. **Phase 11a:** also that a Hotspot user is disconnected by it (the automatic kicks depend on it), and that `/radius incoming` on our port (RouterOS default is 1700) answers.
 8. (dropped) Router reboot handling is out of scope.
-9. `$(error)` in the router page shows the RADIUS `Reply-Message`, which is now only the reject code (Phase 12a). Also check (Phase 12b) that `$(if error == "CODE")` matches it.
+9. `$(error)` in the router page shows the RADIUS `Reply-Message`, which is now only the reject code (Phase 12a). Also check (Phase 12b) that `$(if error == "CODE")` matches it, so the MESSAGES block of `login.html` shows the mapped text (and the fallback `$(elif error)$(error)` shows any other router message).
+11. (Phase 12b) Status page variables: `$(uptime)`, `$(session-time-left)`, `$(remain-bytes-total)` (is it filled, and in which unit: we assume bytes), and whether `$(link-orig)` holds the first site on the status page (the Continue link).
+12. (Phase 12b) `alogin.html` with `popup=false` lands on the status page; `$(link-status)` works in the captive-portal mini browser of iOS and Android.
+13. (Phase 12b) `api.json` is served and valid JSON for a logged-in and a logged-out client (RFC 8908), and `errors.txt` messages appear for router-side errors.
+14. (Phase 12b) The new pages look right and work in the phone captive-portal mini browsers (no external requests; `backdrop-filter`, `color-mix`, `100dvh` on old iOS).
 10. (informational) `Acct-Session-Id` reuse after reboot is an accepted risk.
 
 ---
@@ -699,49 +708,17 @@ All E2E tests green on a clean checkout with no external services; hardware chec
 
 ---
 
-## 16. Appendix — Theme catalog (extracted from legacy)
+## 16. Appendix - The 8 router page designs (Phase 12b, replaces the legacy 38-theme catalog)
 
-Source: `api/server/modules/hotspotTemplates.js` (styles per category), `hotspot/app/themeStyles/<category>/<style>.less` (two colors), `hotspot/app/img/<category>/background/<style>.jpg` (background), `hotspot/app/img/<category>/logo/logo.png` (placeholder logo). Theme id = `<category>-<style>`. All themes share one layout (`alphaCommon.less` in legacy). The legacy `themeStyles/customerClub` folder is a union of the same styles and is ignored.
+Visual source: `reference/hotspot-login.html` (CSS values copied exactly; the preview bar and demo scripts were not). Brief: `docs/HOTSPOT-LOGIN.md`. Same layout in every theme; a theme sets only color tokens and an optional background decoration (CSS only, no images).
 
-| Theme id | Category | Style | Primary color | Overlay color | Background (legacy file, bytes) |
-|---|---|---|---|---|---|
-| `alpha-fall` | Alpha | Fall | `rgb(118, 24, 60)` | `rgba(118, 24, 60, 0.58)` | `img/alpha/background/fall.jpg` (50,298) |
-| `alpha-space` | Alpha | Space | `rgb(89, 61, 255)` | `rgba(29, 22, 58, 0.64)` | `img/alpha/background/space.jpg` (49,615) |
-| `alpha-field` | Alpha | Field | `rgb(255, 119, 56)` | `rgba(120, 60, 30, 0.58)` | `img/alpha/background/field.jpg` (50,730) |
-| `restaurant-pasta` | Restaurant | Pasta | `rgb(52, 119, 13)` | `rgba(51, 55, 56, 0.5)` | `img/restaurant/background/pasta.jpg` (49,488) |
-| `restaurant-pizza` | Restaurant | Pizza | `rgb(166, 57, 35)` | `rgba(116, 75, 66, 0.64)` | `img/restaurant/background/pizza.jpg` (51,394) |
-| `restaurant-mushroomPizza` | Restaurant | Mushroom Pizza | `rgb(221, 48, 18)` | `rgba(0, 0, 0, 0.67)` | `img/restaurant/background/mushroomPizza.jpg` (52,172) |
-| `restaurant-fastfood` | Restaurant | Fastfood | `rgb(241, 126, 49)` | `rgba(59, 45, 42, 0.4)` | `img/restaurant/background/fastfood.jpg` (51,350) |
-| `restaurant-traditional` | Restaurant | Traditional | `rgb(48, 105, 84)` | `rgba(20, 36, 30, 0.5)` | `img/restaurant/background/traditional.jpg` (51,718) |
-| `cafe-breakfast` | Cafe | Breakfast | `rgb(69, 99, 95)` | `rgba(58, 67, 66, 0.58)` | `img/cafe/background/breakfast.jpg` (51,251) |
-| `cafe-walnut` | Cafe | Walnut | `rgb(175, 142, 122)` | `rgba(0, 0, 0, 0.5)` | `img/cafe/background/walnut.jpg` (50,712) |
-| `cafe-sunflower` | Cafe | Sunflower | `rgb(209, 102, 0)` | `rgba(51, 15, 15, 0.5)` | `img/cafe/background/sunflower.jpg` (54,302) |
-| `cafe-supper` | Cafe | Supper | `rgb(100, 71, 173)` | `rgba(57, 41, 41, 0.5)` | `img/cafe/background/supper.jpg` (49,843) |
-| `cafe-lantern` | Cafe | Lantern | `rgb(233, 149, 82)` | `rgba(0, 0, 0, 0.5)` | `img/cafe/background/lantern.jpg` (50,910) |
-| `cafe-croisan` | Cafe | Croisan | `rgb(3, 110, 186)` | `rgba(65, 77, 86, 0.47)` | `img/cafe/background/croisan.jpg` (49,692) |
-| `cafe-caffeine` | Cafe | Caffeine | `rgb(169, 48, 31)` | `rgba(0, 0, 0, 0.5)` | `img/cafe/background/caffeine.jpg` (54,439) |
-| `hotel-room` | Hotel | Room | `rgb(77, 19, 41)` | `rgba(71, 40, 53, 0.74)` | `img/hotel/background/room.jpg` (51,550) |
-| `hotel-beach` | Hotel | Beach | `rgb(91, 149, 199)` | `rgba(0, 0, 0, 0.4)` | `img/hotel/background/beach.jpg` (49,397) |
-| `hotel-bell` | Hotel | Bell | `rgb(176, 121, 25)` | `rgba(0, 0, 0, 0.38)` | `img/hotel/background/bell.jpg` (50,567) |
-| `hotel-calm` | Hotel | Calm | `rgb(127, 74, 123)` | `rgba(0, 0, 0, 0.38)` | `img/hotel/background/calm.jpg` (46,865) |
-| `hotel-lobby` | Hotel | Lobby | `rgb(54, 53, 71)` | `rgba(0, 0, 0, 0.38)` | `img/hotel/background/lobby.jpg` (51,602) |
-| `hotel-luggage` | Hotel | Luggage | `rgb(60, 156, 135)` | `rgba(0, 0, 0, 0.5)` | `img/hotel/background/luggage.jpg` (55,869) |
-| `hotel-mountains` | Hotel | Mountains | `rgb(233, 92, 37)` | `rgba(0, 0, 0, 0.3)` | `img/hotel/background/mountains.jpg` (53,083) |
-| `hotel-reception` | Hotel | Reception | `rgb(220, 20, 26)` | `rgba(0, 0, 0, 0.38)` | `img/hotel/background/reception.jpg` (51,910) |
-| `hotel-vacation` | Hotel | Vacation | `rgb(70, 109, 121)` | `rgba(0, 0, 0, 0.58)` | `img/hotel/background/vacation.jpg` (45,898) |
-| `university-library` | University | Library | `rgb(15, 103, 200)` | `rgba(13, 14, 16, 0.45)` | `img/university/background/library.jpg` (50,373) |
-| `university-drawing` | University | Drawing | `rgb(80, 127, 98)` | `rgba(0, 0, 0, 0.38)` | `img/university/background/drawing.jpg` (53,579) |
-| `university-sketch` | University | Sketch | `rgb(244, 92, 36)` | `rgba(0, 0, 0, 0.38)` | `img/university/background/sketch.jpg` (51,256) |
-| `university-fox` | University | Fox | `rgb(254, 108, 91)` | `rgba(0, 0, 0, 0.38)` | `img/university/background/fox.jpg` (51,415) |
-| `university-notes` | University | Notes | `rgb(175, 65, 65)` | `rgba(0, 0, 0, 0.38)` | `img/university/background/notes.jpg` (51,748) |
-| `university-graduation` | University | Graduation | `rgb(99, 70, 173)` | `rgba(0, 0, 0, 0.38)` | `img/university/background/graduation.jpg` (58,054) |
-| `university-study` | University | Study | `rgb(0, 175, 181)` | `rgba(0, 0, 0, 0.38)` | `img/university/background/study.jpg` (51,871) |
-| `market-alley` | Market | Alley | `rgb(234, 95, 24)` | `rgba(0, 0, 0, 0.4)` | `img/market/background/alley.jpg` (56,933) |
-| `market-choice` | Market | Choice | `rgb(1, 92, 111)` | `rgba(0, 0, 0, 0.4)` | `img/market/background/choice.jpg` (54,917) |
-| `market-autumn` | Market | Autumn | `rgb(195, 94, 1)` | `rgba(0, 0, 0, 0.4)` | `img/market/background/autumn.jpg` (50,880) |
-| `market-fruitBasket` | Market | Fruit Basket | `rgb(207, 54, 14)` | `rgba(0, 0, 0, 0.4)` | `img/market/background/fruitBasket.jpg` (52,671) |
-| `market-size` | Market | Size | `rgb(3, 142, 95)` | `rgba(0, 0, 0, 0.4)` | `img/market/background/size.jpg` (51,316) |
-| `market-strawberries` | Market | Strawberries | `rgb(163, 7, 1)` | `rgba(0, 0, 0, 0.67)` | `img/market/background/strawberries.jpg` (56,173) |
-| `market-veggies` | Market | Veggies | `rgb(91, 149, 199)` | `rgba(0, 0, 0, 0.4)` | `img/market/background/veggies.jpg` (51,152) |
-
-Total: 38 themes, 1,966,993 bytes of background images (embedded in the binary).
+| Key | Title | Look | Contrast change |
+|---|---|---|---|
+| `mikrotik` | MikroTik default | The RouterOS pages, unchanged | none (not ours) |
+| `air` | Air | Light grey, Apple blue `#0071e3` (default) | none |
+| `midnight` | Midnight | Graphite, blue glow, faint fading grid (dark) | button `#4c8dff` to `#2f6fe0` (white label 3.2 to 4.7) |
+| `aurora` | Aurora | Pastel mesh, frosted glass card, indigo | top of the button gradient `#6d6df6` to `#6060ee` (white label 4.1 to 4.8) |
+| `dusk` | Dusk | Violet-black, glow from below, glass card, violet button (dark) | none |
+| `ripple` | Ripple | Sage paper, signal rings behind the card, deep green | none |
+| `sunrise` | Sunrise | Warm cream, low sun glow, coral accent, espresso button | none |
+| `ocean` | Ocean | Deep teal color-block, white card | none |
