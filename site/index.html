@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<title>HotspotPlus Lite - Wi-Fi accounts for your MikroTik hotspot</title>
+<meta name="description" content="Self-hosted Wi-Fi accounts for MikroTik hotspots: members, plans, vouchers and live sessions. One Go binary with SQLite inside. Open source, AGPL-3.0.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#09090b">
+<link rel="canonical" href="https://pysf.github.io/HotspotPlusLight/">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HotspotPlus Lite">
+<meta property="og:title" content="HotspotPlus Lite - Wi-Fi accounts for your MikroTik hotspot">
+<meta property="og:description" content="Self-hosted Wi-Fi accounts for MikroTik hotspots: members, plans, vouchers and live sessions. One Go binary with SQLite inside. Open source, AGPL-3.0.">
+<meta property="og:url" content="https://pysf.github.io/HotspotPlusLight/">
+<meta property="og:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="HotspotPlus Lite: Wi-Fi accounts for your MikroTik hotspot, on your own network.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="HotspotPlus Lite - Wi-Fi accounts for your MikroTik hotspot">
+<meta name="twitter:description" content="Self-hosted Wi-Fi accounts for MikroTik hotspots: members, plans, vouchers and live sessions. One Go binary with SQLite inside. Open source, AGPL-3.0.">
+<meta name="twitter:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/site.css">
+<script type="module" src="assets/js/copy.js"></script>
+<script type="module" src="assets/js/docs-search.js"></script>
+<script type="module" src="assets/js/os-tabs.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="./"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.4"/></svg></span>HotspotPlus Lite</a>
+  <nav class="main" aria-label="Main"><a class="opt" href="./#features">Features</a><a href="docs/">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a></nav>
+  <span class="spacer"></span>
+  <form class="search" role="search" hidden>
+    <input id="q" type="search" placeholder="Search docs" aria-label="Search docs" autocomplete="off" role="combobox" aria-autocomplete="list">
+    <kbd aria-hidden="true">/</kbd>
+    <ul class="results" id="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </form>
+  <a class="btn primary sm" href="docs/installation/">Get started</a>
+</div></header>
+<main id="main">
+<div class="wrap">
+ <div class="hero">
+  <div>
+   <span class="tag">open source &middot; self-hosted &middot; AGPL-3.0</span>
+   <h1>Wi-Fi accounts for your MikroTik hotspot, <em>on your own network.</em></h1>
+   <p class="lead">Members, plans, vouchers and live sessions for hotels, cafes and small ISPs. One Go binary with SQLite inside. No cloud, no database server.</p>
+   <div class="os-tabs" data-os-tabs>
+   <div class="os-panel" id="os-linux" data-os="linux" data-label="Linux">
+    <span class="os-label">Linux, 64-bit x86</span>
+    <div class="install"><code>curl -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-linux-amd64.tar.gz</code><button type="button" data-copy="curl -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-linux-amd64.tar.gz" hidden>Copy</button></div>
+   </div>
+   <div class="os-panel" id="os-windows" data-os="windows" data-label="Windows">
+    <span class="os-label">Windows, 64-bit (PowerShell)</span>
+    <div class="install"><code>curl.exe -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-windows-amd64.zip</code><button type="button" data-copy="curl.exe -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-windows-amd64.zip" hidden>Copy</button></div>
+   </div>
+   <div class="os-panel" id="os-macos" data-os="macos" data-label="macOS">
+    <span class="os-label">macOS, Apple silicon</span>
+    <div class="install"><code>curl -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-darwin-arm64.tar.gz</code><button type="button" data-copy="curl -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-darwin-arm64.tar.gz" hidden>Copy</button></div>
+   </div>
+   </div>
+   <p class="install-note">Intel Macs, 32-bit and ARM builds, checksums and building from source: see the <a href="docs/installation/">installation guide</a>.</p>
+   <div class="cta"><a class="btn primary" href="docs/installation/">Read the docs</a><a class="btn" href="https://github.com/pysf/HotspotPlusLight" rel="noopener">View on GitHub</a></div>
+  </div>
+  <div class="term" role="group" aria-label="The first start in a terminal"><div class="bar" aria-hidden="true"><i></i><i></i><i></i><span>~/hotspotpluslight</span></div>
+<pre><code><span class="c"># make a secret key and keep it safe</span>
+<span class="p">$</span> hotspotpluslight gen-key
+y7P0USSXMOGKk+IPoo6HGxRapuvIL16B6c6itYRW5HQ=
+
+<span class="c"># start the server</span>
+<span class="p">$</span> HSP_SECRET_KEY=y7P0USSXMOGKk+IPoo6HGxRapuvIL16B6c6itYRW5HQ= hotspotpluslight serve
+time=2026-11-04T17:44:47.540+01:00 level=INFO msg="migrations applied" count=4
+<span class="g">=== HotspotPlus Lite first start ===</span>
+Log in with username: admin  password: admin
+You will be asked to set a new password right after you log in.
+Forgot it later? Run: hotspotpluslight admin set-password
+<span class="g">====================================</span>
+time=2026-11-04T17:44:47.593+01:00 level=INFO msg="admin account created with the default password; it must be changed at first login"
+time=2026-11-04T17:44:47.594+01:00 level=INFO msg=listening admin=[::]:8081 radius_auth=[::]:1812 radius_acct=[::]:1813
+<span class="c"># now open http://SERVER-IP:8081/admin in a browser</span></code></pre></div>
+ </div>
+</div>
+
+<section class="blk" id="features"><div class="wrap">
+  <span class="eyebrow">// features</span><h2>Everything for Wi-Fi accounts. Nothing that needs care.</h2>
+  <p class="sec-lead">Hand out accounts, set the limits, see who is online and disconnect anyone. The rest of the hotspot stays on your router.</p>
+  <div class="bento">
+   <div class="cell w"><h3>Members and vouchers</h3><p>Add a member one by one, or print a batch of vouchers on A4 sheets. You can always look up a member's password again.</p>
+     <div class="viz bars" aria-hidden="true"><i><b></b></i><i><b></b></i><i><b></b></i></div></div>
+   <div class="cell w"><h3>Plans</h3><p>Data, time, validity days, speed and number of devices. Define a plan once and give it to as many members as you like.</p>
+     <div class="viz sq" role="img" aria-label="An example plan: 20 GB, 30 days, 10 Mbps, 2 devices"><span>20 GB</span><span>30 days</span><span>10 Mbps</span><span>2 devices</span></div></div>
+   <div class="cell"><h3>Limits that hold</h3><p>The router gets the limits at login. The server also watches the usage and disconnects a member who goes over.</p></div>
+   <div class="cell"><h3>Your login page</h3><p>8 designs to download. Change the text and logo by hand, and translate the messages.</p>
+     <div class="viz dots" role="img" aria-label="Seven theme colors"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+   <div class="cell"><h3>Runs anywhere</h3><p>A Windows service, Linux or macOS. 9 builds, including 32-bit and 64-bit ARM.</p></div>
+  </div>
+  <div class="stats"><div><b>1</b><span>binary to deploy</span></div><div><b>1</b><span>SQLite file is your whole database</span></div><div><b>30,000</b><span>online users tested</span></div></div>
+  <p class="stats-note">The test used a simulated router on one machine. Your router may be the limit, not the server. See the <a href="https://github.com/pysf/HotspotPlusLight#performance" rel="noopener">performance section</a> of the README.</p>
+  <p class="credit">HotspotPlus Lite is a small rewrite of <a href="https://github.com/pysf/hotspotplus" rel="noopener">HotspotPlus</a>. It keeps the member, plan and quota rules and drops the multi-tenant product around them.</p>
+</div></section>
+
+<div class="wrap"><div class="cta-band"><h2>Ready to try it?</h2><p>Install the binary, open the admin panel, then follow the router setup.</p>
+ <div class="cta"><a class="btn primary" href="docs/installation/">Installation guide</a><a class="btn" href="docs/">All docs</a></div></div></div>
+</main>
+<footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>
+<nav aria-label="Footer"><a href="docs/">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a><a href="https://github.com/pysf/HotspotPlusLight/issues" rel="noopener">Issues</a></nav></div></footer>
+</body>
+</html>

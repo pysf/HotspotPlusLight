@@ -174,6 +174,18 @@ Pushing a tag `v*` runs `.github/workflows/release.yml`, which builds these file
 - `docs/`: notes per phase, `DESIGN.md` and `FRONTEND.md` (admin UI rules), `perf-results.md`.
 - Hardware items still to verify on a real router are marked `VERIFY-ON-HARDWARE` in the code and in PLAN.md section 13.
 
+## Site
+
+The user site (landing page and docs) is in `site/`: plain HTML, CSS and small ES modules, no build step, no Node. `.github/workflows/pages.yml` deploys it to GitHub Pages on a push to `main` that changes `site/` (set Pages to the source "GitHub Actions" once in the repo settings).
+
+Where to change the base URL: the base URL `https://pysf.github.io/HotspotPlusLight/` is written out in the `canonical`, `og:url`, `og:image` and `twitter:image` tags of every page, in `sitemap.xml` and `robots.txt`, and in the asset links of `site/404.html` (the 404 page is served at any depth, so it cannot use relative links). Every other link is relative. To use a custom domain, replace the base URL in all of `site/` in one go, for example:
+
+```sh
+grep -rl 'https://pysf.github.io/HotspotPlusLight/' site | xargs sed -i.bak 's|https://pysf.github.io/HotspotPlusLight/|https://example.com/|g'
+```
+
+This also fixes `site/404.html`: its asset links are absolute because the 404 page is served at any depth, and the page CSP only allows `self`, so on a custom domain or a local preview the 404 page loses its styles until the base URL is changed. The `sed` command above makes `.bak` backup files; delete them with `find site -name '*.bak' -delete`. The test E13.17 checks that the base URL is the same everywhere. The image `site/assets/img/og-image.png` was drawn once with headless Chrome from `reference/og-image.html`.
+
 ## Performance
 The capacity test raises the number of online users step by step (500 up to 50000) and stops at the first step that fails. Run `make perf` (the full run, about 25-30 minutes): only this run rewrites this section and `docs/perf-results.md`. `make perf-quick` (short check) and runs with your own `HSP_PERF_STEPS` or `HSP_PERF_STEP_SECONDS` only print to the screen. The test never fails the build, unless you set `HSP_PERF_MIN_USERS`.
 

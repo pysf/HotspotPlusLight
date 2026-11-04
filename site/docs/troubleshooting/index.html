@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Troubleshooting and FAQ - HotspotPlus Lite</title>
+<meta name="description" content="Fixes for the usual problems: nobody can log in, Disconnect does nothing, wrong time zone, forgotten password.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#09090b">
+<link rel="canonical" href="https://pysf.github.io/HotspotPlusLight/docs/troubleshooting/">
+<link rel="icon" href="../../assets/img/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HotspotPlus Lite">
+<meta property="og:title" content="Troubleshooting and FAQ - HotspotPlus Lite">
+<meta property="og:description" content="Fixes for the usual problems: nobody can log in, Disconnect does nothing, wrong time zone, forgotten password.">
+<meta property="og:url" content="https://pysf.github.io/HotspotPlusLight/docs/troubleshooting/">
+<meta property="og:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="HotspotPlus Lite: Wi-Fi accounts for your MikroTik hotspot, on your own network.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Troubleshooting and FAQ - HotspotPlus Lite">
+<meta name="twitter:description" content="Fixes for the usual problems: nobody can log in, Disconnect does nothing, wrong time zone, forgotten password.">
+<meta name="twitter:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<link rel="stylesheet" href="../../assets/css/tokens.css">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/docs.css">
+<script type="module" src="../../assets/js/copy.js"></script>
+<script type="module" src="../../assets/js/docs-search.js"></script>
+<script type="module" src="../../assets/js/docs-nav.js"></script>
+
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="../../"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.4"/></svg></span>HotspotPlus Lite</a>
+  <nav class="main" aria-label="Main"><a class="opt" href="../../#features">Features</a><a href="../" aria-current="page">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a></nav>
+  <span class="spacer"></span>
+  <form class="search" role="search" hidden>
+    <input id="q" type="search" placeholder="Search docs" aria-label="Search docs" autocomplete="off" role="combobox" aria-autocomplete="list">
+    <kbd aria-hidden="true">/</kbd>
+    <ul class="results" id="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </form>
+  <a class="btn primary sm" href="../installation/">Get started</a>
+</div></header>
+<main id="main" class="docs"><div class="wrap">
+<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="./" aria-current="page">Troubleshooting</a><ul class="sub"><li><a href="#login-problems">Logins fail</a></li><li><a href="#router-problems">Router and usage</a></li><li><a href="#admin-problems">Admin panel, server and settings</a></li></ul></li></ul></nav></aside>
+<article class="doc"><span class="kick">Documentation</span><h1>Troubleshooting and FAQ</h1><p class="intro">Fixes for the usual problems: nobody can log in, Disconnect does nothing, wrong time zone, forgotten password.</p>
+<section><h2 id="login-problems"><a href="#login-problems">Logins fail</a></h2><div class="faq"><details><summary>Nobody can log in, and the login page waits or fails</summary>
+<p>Check in this order:</p>
+<ol>
+<li>Open the <strong>Router</strong> page and look at the <strong>link status</strong> panel. If no login request arrived, the router does not reach the server: check <code>&lt;SERVER-IP&gt;</code> in <code>/radius</code> and that UDP 1812 and 1813 are open on the server.</li>
+<li>If the panel counts packets with a bad shared secret, the secret on the router differs from the one on the <strong>Settings</strong> page. The server drops such packets without an answer. Make them equal.</li>
+<li>Check that the profile has <code>use-radius=yes</code> and <code>login-by=http-pap</code>.</li>
+<li>Look at the server log (<code>HSP_LOG_LEVEL=debug</code> gives more).</li>
+</ol></details><details><summary>The page shows a code such as OUT_OF_BULK</summary>
+<p>You use the <strong>MikroTik default</strong> design, which shows the raw code. Use one of the 7 themes, or write your own texts in the MESSAGES block. See <a href="../hotspot-login-pages/#translate">Translate the messages</a>.</p></details><details><summary>A login is rejected with UNSUPPORTED_AUTH_METHOD</summary>
+<p>The router sent CHAP. Set <code>login-by=http-pap</code> on the hotspot profile, as in the <a href="../router-setup/#script">setup script</a>. The server writes a warning to its log when this happens.</p></details><details><summary>A member says the account is used by someone else (NO_MORE_SESSION)</summary>
+<p>The member is at the plan's limit of simultaneous devices. After a router restart, old sessions can stay in the list until the router's accounting stops for them. A session ends after the accounting interval plus 60 seconds without an update, or you can disconnect it on the <strong>Online</strong> page. You can also raise the plan's <em>Simultaneous devices</em>.</p></details><details><summary>A voucher says the plan period has ended (NO_ACTIVE_SUBSCRIPTION)</summary>
+<p>The period starts when the voucher is created, not at the first login. A voucher that waited longer than the plan's validity is already out of date. Make the batch closer to the day of use, or use a plan that renews automatically, or renew the member.</p></details></div></section>
+<section><h2 id="router-problems"><a href="#router-problems">Router and usage</a></h2><div class="faq"><details><summary>Disconnect does nothing, or the admin panel shows an error</summary>
+<ul>
+<li>On the router, run <code>/radius incoming set accept=yes port=3799</code>, with the same port as <strong>Disconnect (CoA) port</strong> on the Settings page.</li>
+<li>Check that the router accepts UDP 3799 from the server in its firewall.</li>
+<li>The Router page link status shows the result of the last Disconnect.</li>
+</ul>
+<p>If the router answers that it has no such session, the server treats it as done and ends the session in its list.</p></details><details><summary>Usage is not counted</summary>
+<p>The router must send accounting. Check <code>radius-accounting=yes</code> on the profile and that the link status panel shows accounting packets. The usage updates arrive every accounting interval.</p></details></div></section>
+<section><h2 id="admin-problems"><a href="#admin-problems">Admin panel, server and settings</a></h2><div class="faq"><details><summary>The times are wrong, or vouchers expire at the wrong hour</summary>
+<p>The default time zone is <code>UTC</code>. Set yours on the Settings page, for example <code>Europe/London</code>. Dates, daily usage and voucher expiry follow it.</p></details><details><summary>I forgot the admin password</summary>
+<p>Run <code>hotspotpluslight admin set-password</code> on the server (add <code>--env-file</code> if you use one). See <a href="../first-login/#forgot">First login</a>.</p></details><details><summary>The server does not start</summary>
+<ul>
+<li><code>HSP_SECRET_KEY is required</code>: set the key, see <a href="../configuration/#env">Configuration</a>.</li>
+<li><code>HSP_SECRET_KEY cannot decrypt settings.key_check</code>: this is not the key that the database was made with. Use the right key, or restore a database that fits it.</li>
+<li>An error about a port: another program uses it. Change <code>HSP_ADMIN_ADDR</code>, <code>HSP_RADIUS_AUTH_ADDR</code> or <code>HSP_RADIUS_ACCT_ADDR</code>.</li>
+<li>On Windows, read <code>hsp.log</code> next to <code>hsp.env</code>.</li>
+</ul></details><details><summary>I cannot open the admin panel</summary>
+<p>Use <code>http://SERVER-IP:8081/admin</code>, with <code>http</code> and not <code>https</code>. Check that TCP 8081 is open in the server firewall, and that <code>HSP_ADMIN_ADDR</code> is not bound to another address. <code>/healthz</code> should answer <code>ok</code>.</p></details><details><summary>Where are the logs?</summary>
+<p>The server writes logs to stderr. With systemd use <code>journalctl -u hotspotpluslight</code>. As a Windows service they are in <code>hsp.log</code>. Set <code>HSP_LOG_FORMAT=json</code> for JSON lines and <code>HSP_LOG_LEVEL=debug</code> for more detail.</p></details><details><summary>Can I put it behind HTTPS or on the internet?</summary>
+<p>No. The admin panel is made for a local network and speaks plain HTTP. Do not expose it to the internet or to the hotspot network.</p></details></div></section>
+<nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../backup-and-upgrade/"><small>Previous</small>Backup and upgrade</a></nav></article>
+</div></main>
+<footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>
+<nav aria-label="Footer"><a href="../">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a><a href="https://github.com/pysf/HotspotPlusLight/issues" rel="noopener">Issues</a></nav></div></footer>
+</body>
+</html>

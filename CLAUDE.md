@@ -158,3 +158,5 @@ Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **
 - **Phase 12b (new router pages) is built (2026-11-04), not committed.** `internal/routerpack` is now `mikrotik/` + `src/` (7 themes); the admin Router page shows 8 cards with previews and downloads (`/admin/router/pages/{key}.zip`, `/preview`). The 38-theme pack and its tests are gone. Notes: `docs/phase12-notes.md`. Needs hardware: the `$(if error == ...)` match and the status page variables (`PLAN.md` section 13, items 9 to 14).
 
 - **Phase 13a (license, public name, technical README, release names) is built (2026-11-04), not committed.** Public name "HotspotPlus Lite" (binary, module, repo, service keep `hotspotpluslight`), AGPL-3.0 `LICENSE`, README is technical only (install and user docs move to the site, 13b), release files have stable names without the version, `.github/workflows/release.yml`. Notes: `docs/phase13-notes.md`.
+
+- **Phase 13b (public site) is built (2026-11-04), not committed.** `site/` (home + 11 docs pages), `.github/workflows/pages.yml`, tests E13.03-E13.17. Notes: `docs/phase13-notes.md`.

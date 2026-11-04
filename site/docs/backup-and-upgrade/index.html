@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Backup and upgrade - HotspotPlus Lite</title>
+<meta name="description" content="Back up the SQLite file and the secret key, restore them, and upgrade by replacing the binary.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#09090b">
+<link rel="canonical" href="https://pysf.github.io/HotspotPlusLight/docs/backup-and-upgrade/">
+<link rel="icon" href="../../assets/img/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HotspotPlus Lite">
+<meta property="og:title" content="Backup and upgrade - HotspotPlus Lite">
+<meta property="og:description" content="Back up the SQLite file and the secret key, restore them, and upgrade by replacing the binary.">
+<meta property="og:url" content="https://pysf.github.io/HotspotPlusLight/docs/backup-and-upgrade/">
+<meta property="og:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="HotspotPlus Lite: Wi-Fi accounts for your MikroTik hotspot, on your own network.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Backup and upgrade - HotspotPlus Lite">
+<meta name="twitter:description" content="Back up the SQLite file and the secret key, restore them, and upgrade by replacing the binary.">
+<meta name="twitter:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<link rel="stylesheet" href="../../assets/css/tokens.css">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/docs.css">
+<script type="module" src="../../assets/js/copy.js"></script>
+<script type="module" src="../../assets/js/docs-search.js"></script>
+<script type="module" src="../../assets/js/docs-nav.js"></script>
+
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="../../"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.4"/></svg></span>HotspotPlus Lite</a>
+  <nav class="main" aria-label="Main"><a class="opt" href="../../#features">Features</a><a href="../" aria-current="page">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a></nav>
+  <span class="spacer"></span>
+  <form class="search" role="search" hidden>
+    <input id="q" type="search" placeholder="Search docs" aria-label="Search docs" autocomplete="off" role="combobox" aria-autocomplete="list">
+    <kbd aria-hidden="true">/</kbd>
+    <ul class="results" id="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </form>
+  <a class="btn primary sm" href="../installation/">Get started</a>
+</div></header>
+<main id="main" class="docs"><div class="wrap">
+<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="./" aria-current="page">Backup and upgrade</a><ul class="sub"><li><a href="#what">What to back up</a></li><li><a href="#backup">Back up the database</a></li><li><a href="#restore">Restore</a></li><li><a href="#upgrade">Upgrade</a></li><li><a href="#retention">What is kept</a></li></ul></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
+<article class="doc"><span class="kick">Documentation</span><h1>Backup and upgrade</h1><p class="intro">Back up the SQLite file and the secret key, restore them, and upgrade by replacing the binary.</p>
+<section><h2 id="what"><a href="#what">What to back up</a></h2>
+<p>The state is two things:</p>
+<ol class="steps">
+<li><b>The database</b>, <code>hsp.db</code> in the data folder.</li>
+<li><b>The secret key</b>, <code>HSP_SECRET_KEY</code> (in your env file, for example <code>hsp.env</code>).</li>
+</ol>
+<div class="note warn"><b>Keep the key</b><p>If the key is lost, the stored member passwords are <strong>unrecoverable</strong>, and the server will not start on that database, because the key does not fit. Keep a copy of the key in a safe place, apart from the machine.</p></div></section>
+<section><h2 id="backup"><a href="#backup">Back up the database</a></h2>
+<p>Use SQLite's own backup command. It makes a consistent copy while the server is running. The <code>sqlite3</code> tool is separate from HotspotPlus Lite, so install it if you do not have it.</p>
+<pre><code>sqlite3 hsp.db ".backup backup-$(date +%F).db"</code></pre>
+<p>Run it in the data folder, or give the full path of <code>hsp.db</code>. On Windows, use <code>sqlite3.exe</code> with a file name of your own. Do not copy <code>hsp.db</code> alone while the server runs: recent changes can still be in <code>hsp.db-wal</code>. To run it every night on Linux, add a line like this with <code>crontab -e</code> (the percent signs must be escaped in cron):</p>
+<pre><code>0 3 * * * sqlite3 /var/lib/hotspotpluslight/hsp.db ".backup /backups/hsp-$(date +\%F).db"</code></pre>
+<p>There is no backup or restore feature inside the program.</p></section>
+<section><h2 id="restore"><a href="#restore">Restore</a></h2>
+<ol class="steps">
+<li>Stop the server.</li>
+<li>Put the backup file in the data folder as <code>hsp.db</code>, and delete old <code>hsp.db-wal</code> and <code>hsp.db-shm</code> files there.</li>
+<li>Start the server with the same <code>HSP_SECRET_KEY</code> that the database was made with.</li>
+</ol>
+<p>To move to a new machine, copy the database (from a backup) and the key, and start the program there.</p></section>
+<section><h2 id="upgrade"><a href="#upgrade">Upgrade</a></h2>
+<p>An upgrade replaces the program and restarts it. The database migrations run by themselves at start and only go forward. Make a backup first: you cannot go back to an older program on a migrated database, but you can restore the backup.</p>
+<h3>Linux (systemd)</h3>
+<pre><code>curl -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-linux-amd64.tar.gz
+tar -xzf hotspotpluslight-linux-amd64.tar.gz
+sudo systemctl stop hotspotpluslight
+sudo install -m 755 hotspotpluslight /usr/local/bin/
+sudo systemctl start hotspotpluslight</code></pre>
+<h3>Windows service</h3>
+<pre><code>.\hotspotpluslight.exe service stop
+# replace hotspotpluslight.exe with the new file, in the same place
+.\hotspotpluslight.exe service start</code></pre>
+<h3>macOS or a plain run</h3>
+<p>Stop the program with Ctrl+C or SIGTERM, replace the file and start it again.</p>
+<p>Check the version with <code>hotspotpluslight version</code>. The log shows <code>migrations applied</code> with a count when the database was upgraded. The version is inside the file, so the download links never change.</p></section>
+<section><h2 id="retention"><a href="#retention">What is kept</a></h2>
+<p>Finished sessions older than 90 days are removed (the setting <em>Keep finished sessions (days)</em>; 0 keeps them forever). The daily usage history and the members are kept.</p></section>
+<nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../architecture/"><small>Previous</small>Architecture</a><a class="next" rel="next" href="../troubleshooting/"><small>Next</small>Troubleshooting</a></nav></article>
+</div></main>
+<footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>
+<nav aria-label="Footer"><a href="../">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a><a href="https://github.com/pysf/HotspotPlusLight/issues" rel="noopener">Issues</a></nav></div></footer>
+</body>
+</html>

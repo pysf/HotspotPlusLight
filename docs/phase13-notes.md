@@ -19,3 +19,27 @@ Scope: license, public name, technical README, release names. The site is 13b.
 ## Flags
 - The README mentions `BR-1...BR-24`; that matches PLAN.md.
 - The Pages and CI action versions are not part of 13a (CI already uses checkout@v5 and setup-go@v6).
+
+# Phase 13b notes (2026-11-04)
+
+## Done
+- `site/`: `index.html`, `docs/index.html` (Introduction) and 10 docs pages (installation, running-as-a-service, configuration, first-login, router-setup, hotspot-login-pages, how-it-works, architecture, backup-and-upgrade, troubleshooting), `404.html`, `robots.txt`, `sitemap.xml`, `.nojekyll`, `assets/{css,js,img}`.
+- Pages were assembled once from content fragments with a throwaway script that is NOT in the repo. The committed files are plain HTML to edit by hand. The sidebar and pager are repeated in each docs page; E13.14 keeps them equal. After changing a docs section, update `assets/js/search-index.js` (E13.15 fails if it is out of step).
+- Real first-start output (home terminal and installation page) was captured by running the built binary in a temp dir. Checked by E13.12 against `internal/app`.
+- `og-image.png` was drawn once with headless Chrome from `reference/og-image.html` (no Node, no Go drawing code).
+- Tests E13.03-E13.17 in `e2e/phase13b_test.go`. E13.11 asserts every moved README check on the page that owns it (hard exit item closed). E13.13 compares the router commands, designs, hotspot files, reason codes and MESSAGES lines with `internal/routerpack` and `internal/domain`.
+- Screenshots (headless Chrome, iframe for 390/360 widths) of home and docs at 390 and 1280 px looked right. Lighthouse was not run.
+
+## Deviations from SITE.md
+- `--subtle` (#80808c) added for readable low-emphasis text; `--faint` is decoration only (E13.05, E13.07).
+- Docs search is a result list under the search box (from `search-index.js`, a JS module, not JSON), not a filter of the sidebar. The sidebar also lists the sections of the current page (scroll-spy).
+- The search box, copy buttons and OS tabs appear only with JS; without it all three downloads are listed.
+- `404.html` uses the base URL for assets, because it is served at any depth. So the base URL is not in one single place; E13.17 checks it is identical everywhere and the README gives one command to change it.
+- Strict CSP meta tag on every page.
+
+## Open questions
+- Pages: the owner must set Pages source to "GitHub Actions" once.
+- Router commands and the launchd example are untested on real hardware; the site says so (router page). Windows firewall, ufw and launchd commands are standard OS commands, not checked against the code.
+- "Site title" setting is stored but shown nowhere; the docs say so.
+- Lighthouse scores not measured.
+

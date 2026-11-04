@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pysf.github.io/HotspotPlusLight/sitemap.xml

@@ -1,0 +1,62 @@
+/* Design tokens. Every color, size and font of the site lives here; no other CSS file has a color literal. */
+:root {
+  color-scheme: dark;
+
+  --bg: #09090b;
+  --panel: #101013;
+  --elev: #17171b;
+  --code-bg: #0c0c0f;
+  --card-end: #0d0d10;
+  --dot: #2a2a31;
+
+  --line: rgb(255 255 255 / 0.08);
+  --line2: rgb(255 255 255 / 0.14);
+
+  --text: #ededf0;
+  --white: #fff;
+  --body: #c3c3cb;
+  --muted: #9a9aa5;
+  /* Readable low-emphasis text (4.6:1 or better on every surface). */
+  --subtle: #80808c;
+  /* Decoration only: contrast is about 3.3:1, so never use it for text that matters. */
+  --faint: #62626c;
+
+  --accent: #2dd4ee;
+  --accent2: #7c5cff;
+  --ok: #3ecf8e;
+  --warn: #f5a524;
+  --bad: #ff6b6b;
+  --note-text: #bfe9f0;
+
+  --accent-wash: rgb(45 212 238 / 0.06);
+  --accent-wash-strong: rgb(45 212 238 / 0.08);
+  --accent-edge: rgb(45 212 238 / 0.3);
+  --accent-ring: rgb(45 212 238 / 0.15);
+  --accent-glow: rgb(45 212 238 / 0.13);
+  --accent-glow-soft: rgb(45 212 238 / 0.07);
+  --accent-glow-faint: rgb(45 212 238 / 0.05);
+  --violet-glow: rgb(124 92 255 / 0.1);
+
+  /* Accent colors of the 7 login-page themes (internal/routerpack/src/css/themes), for the dots on the home page. */
+  --theme-air: #0071e3;
+  --theme-midnight: #4c8dff;
+  --theme-aurora: #5b5bf0;
+  --theme-dusk: #a78bfa;
+  --theme-ripple: #1f6f54;
+  --theme-sunrise: #f0592b;
+  --theme-ocean: #0e7490;
+
+  --bar-bg: rgb(9 9 11 / 0.75);
+  --bar-bg-solid: rgb(9 9 11 / 0.94);
+  --shadow: rgb(0 0 0 / 0.6);
+
+  --font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --content: min(1120px, 100% - 40px);
+  --header-h: 58px;
+  --r-control: 10px;
+  --r-code: 12px;
+  --r-card: 18px;
+  --r-band: 22px;
+}

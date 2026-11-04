@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Configuration - HotspotPlus Lite</title>
+<meta name="description" content="Every HSP_ environment variable, the env file, the command line and the Settings page of HotspotPlus Lite.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#09090b">
+<link rel="canonical" href="https://pysf.github.io/HotspotPlusLight/docs/configuration/">
+<link rel="icon" href="../../assets/img/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HotspotPlus Lite">
+<meta property="og:title" content="Configuration - HotspotPlus Lite">
+<meta property="og:description" content="Every HSP_ environment variable, the env file, the command line and the Settings page of HotspotPlus Lite.">
+<meta property="og:url" content="https://pysf.github.io/HotspotPlusLight/docs/configuration/">
+<meta property="og:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="HotspotPlus Lite: Wi-Fi accounts for your MikroTik hotspot, on your own network.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Configuration - HotspotPlus Lite">
+<meta name="twitter:description" content="Every HSP_ environment variable, the env file, the command line and the Settings page of HotspotPlus Lite.">
+<meta name="twitter:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<link rel="stylesheet" href="../../assets/css/tokens.css">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/docs.css">
+<script type="module" src="../../assets/js/copy.js"></script>
+<script type="module" src="../../assets/js/docs-search.js"></script>
+<script type="module" src="../../assets/js/docs-nav.js"></script>
+
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="../../"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.4"/></svg></span>HotspotPlus Lite</a>
+  <nav class="main" aria-label="Main"><a class="opt" href="../../#features">Features</a><a href="../" aria-current="page">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a></nav>
+  <span class="spacer"></span>
+  <form class="search" role="search" hidden>
+    <input id="q" type="search" placeholder="Search docs" aria-label="Search docs" autocomplete="off" role="combobox" aria-autocomplete="list">
+    <kbd aria-hidden="true">/</kbd>
+    <ul class="results" id="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </form>
+  <a class="btn primary sm" href="../installation/">Get started</a>
+</div></header>
+<main id="main" class="docs"><div class="wrap">
+<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="./" aria-current="page">Configuration</a><ul class="sub"><li><a href="#env">Environment variables</a></li><li><a href="#env-file">The env file</a></li><li><a href="#commands">Commands</a></li><li><a href="#settings-page">The Settings page</a></li></ul></li><li><a href="../first-login/">First login</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
+<article class="doc"><span class="kick">Documentation</span><h1>Configuration</h1><p class="intro">Every environment variable of the server with its default, the env file format, the commands, and the Settings page.</p>
+<section><h2 id="env"><a href="#env">Environment variables</a></h2>
+<p>The server reads these variables when it starts. Everything else is on the <a href="#settings-page">Settings page</a>.</p>
+<div class="tbl" tabindex="0" role="region" aria-label="Environment variables"><table><thead><tr><th scope="col">Variable</th><th scope="col">Default</th><th scope="col">Meaning</th></tr></thead><tbody><tr><td><code>HSP_SECRET_KEY</code></td><td>(required)</td><td>Base64 of 32 random bytes. It is the AES-GCM key for the stored member passwords. The server will not start without it, or with a key that does not fit the database. Make one with <code>hotspotpluslight gen-key</code>.</td></tr><tr><td><code>HSP_DATA_DIR</code></td><td><code>data</code></td><td>The folder that holds <code>hsp.db</code>. It is created if it is missing.</td></tr><tr><td><code>HSP_ADMIN_ADDR</code></td><td><code>:8081</code></td><td>Address and port of the admin panel (TCP) and <code>/healthz</code>.</td></tr><tr><td><code>HSP_RADIUS_AUTH_ADDR</code></td><td><code>:1812</code></td><td>Address and port for RADIUS login requests (UDP).</td></tr><tr><td><code>HSP_RADIUS_ACCT_ADDR</code></td><td><code>:1813</code></td><td>Address and port for RADIUS accounting (UDP).</td></tr><tr><td><code>HSP_ADMIN_USERNAME</code></td><td><code>admin</code></td><td>The admin user name. It is used only at the first start, when the account is created.</td></tr><tr><td><code>HSP_RADIUS_SHARED_SECRET</code></td><td>(generated)</td><td>The RADIUS shared secret. It is used only at the first start. If it is empty, a secret is generated. Later, change it on the Settings page.</td></tr><tr><td><code>HSP_LOG_LEVEL</code></td><td><code>info</code></td><td><code>debug</code>, <code>info</code>, <code>warn</code> or <code>error</code>.</td></tr><tr><td><code>HSP_LOG_FORMAT</code></td><td><code>text</code></td><td><code>text</code> (key=value lines) or <code>json</code>. Logs go to stderr.</td></tr><tr><td><code>HSP_DEV</code></td><td>(empty)</td><td>Set to <code>1</code> to show the component gallery at <code>/admin/dev/components</code>. It is for developers; leave it off.</td></tr></tbody></table></div>
+<p>To listen on one address only, give the address, for example <code>HSP_ADMIN_ADDR=192.168.1.10:8081</code>. Use this to keep the admin panel off the hotspot network.</p>
+<div class="note"><b>A wrong value stops the start</b><p>An invalid <code>HSP_LOG_LEVEL</code>, <code>HSP_LOG_FORMAT</code> or <code>HSP_SECRET_KEY</code> makes the server exit with an error that names the variable.</p></div></section>
+<section><h2 id="env-file"><a href="#env-file">The env file</a></h2>
+<p>Instead of setting variables, put them in a file and start with <code>--env-file</code>. The option works for <code>serve</code> and for <code>admin set-password</code>:</p>
+<pre><code># hsp.env
+HSP_SECRET_KEY=your-key-here
+HSP_DATA_DIR=/var/lib/hotspotpluslight
+HSP_LOG_LEVEL=info   # a space and a hash start a comment</code></pre>
+<pre><code>hotspotpluslight --env-file hsp.env serve</code></pre>
+<ul>
+<li>One <code>KEY=VALUE</code> per line. Empty lines and lines that start with <code>#</code> are skipped.</li>
+<li>Keys and values are trimmed. A value can be in one pair of single or double quotes.</li>
+<li>In an unquoted value, a space followed by <code>#</code> starts a comment. A <code>#</code> with no space before it is kept.</li>
+<li>A real environment variable that is not empty wins over the file.</li>
+</ul></section>
+<section><h2 id="commands"><a href="#commands">Commands</a></h2>
+<div class="tbl" tabindex="0" role="region" aria-label="Commands"><table><thead><tr><th scope="col">Command</th><th scope="col">What it does</th></tr></thead><tbody><tr><td><code>hotspotpluslight serve</code></td><td>Starts the server: the admin panel and both RADIUS listeners.</td></tr><tr><td><code>hotspotpluslight gen-key</code></td><td>Prints a new <code>HSP_SECRET_KEY</code> (base64 of 32 random bytes). It needs no database.</td></tr><tr><td><code>hotspotpluslight admin set-password [--stdin]</code></td><td>Sets a new admin password and ends every open admin session. It asks twice without echo on a terminal. With <code>--stdin</code>, or when input is not a terminal, it reads one line. It uses the same rules as the password page.</td></tr><tr><td><code>hotspotpluslight service install [--dir FOLDER]</code></td><td>Windows only: registers the service. See <a href="../running-as-a-service/#windows">Running as a service</a>.</td></tr><tr><td><code>hotspotpluslight service start | stop | uninstall</code></td><td>Windows only: starts, stops or removes the service.</td></tr><tr><td><code>hotspotpluslight version</code></td><td>Prints the version. A build from source prints <code>dev</code>.</td></tr><tr><td><code>--env-file FILE</code></td><td>Reads the settings from FILE, for <code>serve</code> and <code>admin set-password</code>.</td></tr></tbody></table></div>
+<p>With the source code, <code>make set-password</code> runs <code>admin set-password</code> for the <code>./data</code> database.</p></section>
+<section><h2 id="settings-page"><a href="#settings-page">The Settings page</a></h2>
+<p>These are saved in the database and edited on the <strong>Settings</strong> page of the admin panel. They apply without a restart.</p>
+<div class="tbl" tabindex="0" role="region" aria-label="Settings"><table><thead><tr><th scope="col">Setting</th><th scope="col">Default</th><th scope="col">Meaning</th></tr></thead><tbody><tr><td>Site title</td><td>HotspotPlus</td><td>A name for your site. It is only stored; no page shows it yet.</td></tr><tr><td>Time zone</td><td>UTC</td><td>An IANA name such as <code>Europe/London</code>. Dates are shown in this zone, and daily usage and voucher expiry follow it. Set it first.</td></tr><tr><td>RADIUS shared secret</td><td>(generated)</td><td>It must match the secret on the router. A change applies at once.</td></tr><tr><td>Disconnect (CoA) port</td><td>3799</td><td>The router port that gets Disconnect requests.</td></tr><tr><td>Accounting interval (seconds)</td><td>60</td><td>How often the router sends usage updates. At least 10.</td></tr><tr><td>Default plan</td><td>(none)</td><td>Preselected on the new member form.</td></tr><tr><td>Voucher username prefix</td><td>wifi</td><td>English letters and digits.</td></tr><tr><td>Next voucher number</td><td>1360</td><td>The number of the next voucher user name.</td></tr><tr><td>Maximum vouchers per batch</td><td>30</td><td>The largest batch you can make.</td></tr><tr><td>Voucher password length</td><td>6</td><td>From 4 to 20 digits.</td></tr><tr><td>Voucher help text</td><td>(a default English text)</td><td>Printed on every voucher.</td></tr><tr><td>Keep finished sessions (days)</td><td>90</td><td>Older finished sessions are removed. 0 keeps them forever.</td></tr></tbody></table></div></section>
+<nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../running-as-a-service/"><small>Previous</small>Run as a service</a><a class="next" rel="next" href="../first-login/"><small>Next</small>First login</a></nav></article>
+</div></main>
+<footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>
+<nav aria-label="Footer"><a href="../">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a><a href="https://github.com/pysf/HotspotPlusLight/issues" rel="noopener">Issues</a></nav></div></footer>
+</body>
+</html>

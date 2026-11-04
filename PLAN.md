@@ -732,3 +732,8 @@ Owner decisions are in the Phase 13 plan. This step is only the repo part; the s
 - **Public name:** "HotspotPlus Lite" on the admin page titles, the brand text in the admin sidebar, the voucher print title and the README title. The binary, Go module, repo, Windows service name and release files stay `hotspotpluslight`.
 - **README is technical only:** what it is, an architecture flowchart, four sequence diagrams (member login, accounting with enforcement, admin kick, first admin login), the package map, key decisions, make targets, how the tests are organized, where the docs live, the Performance section (markers kept), and a link to https://pysf.github.io/HotspotPlusLight/ for user docs. The install, configuration, router setup, backup and systemd text moved to the site (13b). E8.09 and E0.07 were changed for this; see `docs/phase13-notes.md`.
 - **Release names:** see 9.1a. Test E13.02.
+
+## Phase 13b: the public site (built 2026-11-04)
+- `site/`: landing page and 11 docs pages (plain HTML, CSS, small ES modules; dark Terminal look; no build step, no third-party requests, no inline code). Deployed by `.github/workflows/pages.yml` (checkout@v5, configure-pages@v6, upload-pages-artifact@v5, deploy-pages@v5; Node 24).
+- Base URL `https://pysf.github.io/HotspotPlusLight/` is in the canonical/OG tags, `sitemap.xml`, `robots.txt` and `404.html`; the README says how to change it. All other links are relative.
+- Tests E13.03 to E13.17 (`e2e/phase13b_test.go`), including the moved README checks (hard exit item of 13a). Notes: `docs/phase13-notes.md`.

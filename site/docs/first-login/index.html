@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<title>First login - HotspotPlus Lite</title>
+<meta name="description" content="Log in as admin, set a new password, then create a plan, a member and a batch of vouchers.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#09090b">
+<link rel="canonical" href="https://pysf.github.io/HotspotPlusLight/docs/first-login/">
+<link rel="icon" href="../../assets/img/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HotspotPlus Lite">
+<meta property="og:title" content="First login - HotspotPlus Lite">
+<meta property="og:description" content="Log in as admin, set a new password, then create a plan, a member and a batch of vouchers.">
+<meta property="og:url" content="https://pysf.github.io/HotspotPlusLight/docs/first-login/">
+<meta property="og:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="HotspotPlus Lite: Wi-Fi accounts for your MikroTik hotspot, on your own network.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="First login - HotspotPlus Lite">
+<meta name="twitter:description" content="Log in as admin, set a new password, then create a plan, a member and a batch of vouchers.">
+<meta name="twitter:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<link rel="stylesheet" href="../../assets/css/tokens.css">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/docs.css">
+<script type="module" src="../../assets/js/copy.js"></script>
+<script type="module" src="../../assets/js/docs-search.js"></script>
+<script type="module" src="../../assets/js/docs-nav.js"></script>
+
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="../../"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.4"/></svg></span>HotspotPlus Lite</a>
+  <nav class="main" aria-label="Main"><a class="opt" href="../../#features">Features</a><a href="../" aria-current="page">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a></nav>
+  <span class="spacer"></span>
+  <form class="search" role="search" hidden>
+    <input id="q" type="search" placeholder="Search docs" aria-label="Search docs" autocomplete="off" role="combobox" aria-autocomplete="list">
+    <kbd aria-hidden="true">/</kbd>
+    <ul class="results" id="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </form>
+  <a class="btn primary sm" href="../installation/">Get started</a>
+</div></header>
+<main id="main" class="docs"><div class="wrap">
+<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="./" aria-current="page">First login</a><ul class="sub"><li><a href="#login">Log in</a></li><li><a href="#password">Set a new password</a></li><li><a href="#forgot">If you forget it</a></li><li><a href="#plan">Create a plan</a></li><li><a href="#member">Create a member</a></li><li><a href="#vouchers">Print vouchers</a></li><li><a href="#online">See who is online</a></li></ul></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
+<article class="doc"><span class="kick">Documentation</span><h1>First login</h1><p class="intro">Log in as admin, set a new password, then create a plan, a member and a batch of vouchers.</p>
+<section><h2 id="login"><a href="#login">Log in</a></h2>
+<p>Open <code>http://SERVER-IP:8081/admin</code>. On the first start the account is <code>admin</code> with the password <code>admin</code> (you can change the user name with <code>HSP_ADMIN_USERNAME</code> before the first start). The first-start block printed by the server says the same.</p>
+<p>Do this at once: until the password is changed, anyone who can reach port 8081 can log in as <code>admin</code>.</p></section>
+<section><h2 id="password"><a href="#password">Set a new password</a></h2>
+<p>After you log in you are sent to the password page. No other page opens until you set a new password. The rules:</p>
+<ul>
+<li>At least 10 characters, and at most 72 bytes.</li>
+<li>Not your user name, not <code>admin</code>, and not a very common password.</li>
+<li>No other rules, so a long phrase is fine. The <strong>Generate</strong> button makes a random one.</li>
+</ul>
+<p>You can change it later on the <strong>Password</strong> page (link in the top bar). Your other admin sessions end and this one stays. An admin session ends after one hour without activity.</p></section>
+<section><h2 id="forgot"><a href="#forgot">If you forget it</a></h2>
+<p>Reset it from the command line of the server. It asks twice without echo, uses the same rules as the page, and ends every open admin session:</p>
+<pre><code>hotspotpluslight admin set-password</code></pre>
+<p>With the source code, <code>make set-password</code> does the same for the <code>./data</code> database. Use <code>--env-file</code> if your settings are in a file, and see <a href="../running-as-a-service/">Running as a service</a> for the service user.</p></section>
+<section><h2 id="plan"><a href="#plan">Create a plan</a></h2>
+<p>No plan exists after the first start, and every member needs a plan. Open <strong>Plans</strong> and choose <strong>New plan</strong>:</p>
+<div class="tbl" tabindex="0" role="region" aria-label="Plan fields"><table><thead><tr><th scope="col">Field</th><th scope="col">Meaning</th></tr></thead><tbody><tr><td>Name</td><td>Shown in lists. Names are unique, ignoring case.</td></tr><tr><td>Validity (days)</td><td>A whole number, at least 1. The member can use the plan this long, counted from when the member is created.</td></tr><tr><td>Speed limit</td><td>0 means no limit. One speed is used for download and upload.</td></tr><tr><td>Data limit</td><td>0 means unlimited data. Counts download and upload together.</td></tr><tr><td>Time limit (minutes)</td><td>0 means unlimited time.</td></tr><tr><td>Simultaneous devices</td><td>How many sessions the member can have at once. At least 1.</td></tr><tr><td>Renew automatically when the validity ends</td><td>At the next login after the validity ends, the usage is reset and a new period starts.</td></tr></tbody></table></div>
+<p>Editing a plan changes it for every member on it, at their next login. A plan that members use cannot be deleted. On <strong>Settings</strong> you can pick a default plan that the new member form preselects.</p></section>
+<section><h2 id="member"><a href="#member">Create a member</a></h2>
+<p>Open <strong>Members</strong> and choose <strong>New member</strong>. Pick a plan. A user name has English letters and digits only (up to 64) and is not case-sensitive; if you leave it empty, the mobile number is used. If you leave the password empty, a random 6-digit number is made. You can open a member later to see the password again, print a voucher, change the plan, give extra data, renew the period, or disable the member.</p>
+<ul>
+<li><strong>Extra data</strong> adds to the plan's data limit for the current period. It is reset by a renewal.</li>
+<li><strong>Renew</strong> starts a new period now: usage and extra data go back to zero.</li>
+<li><strong>Disabling</strong> a member also disconnects the member's open sessions.</li>
+<li><strong>Expires at</strong> is optional. After that moment, logins are refused.</li>
+</ul></section>
+<section><h2 id="vouchers"><a href="#vouchers">Print vouchers</a></h2>
+<p>Open <strong>Batches</strong> and choose a new batch. Choose a plan, how many vouchers (up to the maximum in Settings, 30 by default), and an optional label. Each voucher is a member with a user name made from the prefix and a number (for example <code>wifi1360</code>) and a random password of digits (6 by default).</p>
+<p>The vouchers print 14 per A4 page in two columns, with a help text. Use <strong>Reprint</strong> on the batch list at any time. A batch can also have its own <strong>Valid for (days)</strong>: the vouchers then expire at midnight after that many days plus one, in the Settings time zone.</p>
+<div class="note"><b>The period starts when the voucher is created</b><p>Not at the first login. A voucher printed long before it is used may already be near the end of its plan period.</p></div></section>
+<section><h2 id="online"><a href="#online">See who is online</a></h2>
+<p>The <strong>Online</strong> page lists the open sessions and refreshes every 10 seconds. <strong>Disconnect</strong> sends a RADIUS Disconnect request to the router. The <strong>Usage</strong> page shows traffic per day for 30 days and the top 10 members for 7, 30 or 90 days.</p>
+<p>Next: <a href="../router-setup/">Router setup</a>.</p></section>
+<nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../configuration/"><small>Previous</small>Configuration</a><a class="next" rel="next" href="../router-setup/"><small>Next</small>Router setup</a></nav></article>
+</div></main>
+<footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>
+<nav aria-label="Footer"><a href="../">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a><a href="https://github.com/pysf/HotspotPlusLight/issues" rel="noopener">Issues</a></nav></div></footer>
+</body>
+</html>

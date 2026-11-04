@@ -1,0 +1,107 @@
+/* Docs layout and content elements. Colors come from tokens.css only. */
+.docs .wrap { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 56px; padding: 40px 0 80px; }
+.side { position: sticky; top: 90px; align-self: start; max-height: calc(100vh - 110px); overflow: auto; font-size: 14px; border-left: 1px solid var(--line); }
+.side .side-title { font: 400 11.5px var(--mono); color: var(--subtle); margin: 0 0 10px 14px; letter-spacing: 0.06em; text-transform: uppercase; }
+.side ul { list-style: none; padding: 0; }
+.side a { display: block; padding: 6px 14px; margin-left: -1px; border-left: 1px solid transparent; color: var(--muted); }
+.side a:hover { color: var(--text); }
+.side a[aria-current="page"] { color: var(--accent); border-left-color: var(--accent); }
+.side .sub { margin: 2px 0 8px; }
+.side .sub a { padding: 3px 14px 3px 28px; font-size: 13px; color: var(--subtle); }
+.side .sub a[aria-current="location"] { color: var(--text); }
+
+.doc { max-width: 760px; min-width: 0; }
+.doc > .kick { font: 12.5px var(--mono); color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; }
+.doc h1 { font-size: clamp(30px, 4.4vw, 42px); margin: 8px 0 14px; }
+.doc .intro { color: var(--muted); font-size: 17px; margin-bottom: 8px; }
+.doc section { padding: 8px 0 28px; margin-bottom: 8px; }
+.doc h2 { font-size: 26px; margin: 0 0 12px; letter-spacing: -0.03em; }
+.doc h2 a::before { content: "#"; color: var(--faint); font: 400 20px var(--mono); margin-right: 10px; }
+.doc h2 a:hover::before { color: var(--accent); }
+.doc h3 { font-size: 17px; letter-spacing: -0.02em; margin: 26px 0 6px; }
+.doc p, .doc li { color: var(--body); margin: 10px 0; }
+.doc ol, .doc ul { padding-left: 22px; }
+.doc a:not(.btn) { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--accent-edge); }
+.doc a:not(.btn):hover { text-decoration-color: var(--accent); }
+.doc h2 a:not(.btn) { color: var(--text); text-decoration: none; }
+.doc strong { color: var(--text); font-weight: 600; }
+.doc code { font: 12.8px var(--mono); background: var(--elev); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; color: var(--text); overflow-wrap: anywhere; }
+
+pre {
+  position: relative;
+  background: var(--code-bg);
+  border: 1px solid var(--line2);
+  border-radius: var(--r-code);
+  padding: 16px 74px 16px 18px;
+  font: 13px/1.75 var(--mono);
+  overflow: auto;
+  margin: 14px 0;
+  color: var(--body);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+pre.out { padding-right: 18px; color: var(--muted); }
+.doc pre code { background: none; border: 0; padding: 0; font: inherit; color: inherit; overflow-wrap: normal; }
+pre .copy-btn { position: absolute; top: 9px; right: 9px; height: 26px; padding: 0 10px; border-radius: 7px; color: var(--muted); font: 12px var(--font); }
+pre .copy-btn:hover { color: var(--text); }
+
+.note { border: 1px solid var(--accent-edge); background: var(--accent-wash); border-radius: var(--r-code); padding: 13px 16px; margin: 18px 0; font-size: 14.5px; color: var(--note-text); }
+.note b { display: block; font: 12px var(--mono); color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+.note p { color: inherit; margin: 6px 0 0; }
+.note.warn p { color: var(--body); }
+.note.warn { border-color: var(--warn); background: var(--panel); }
+.note.warn b { color: var(--warn); }
+.doc .note code { color: var(--text); }
+
+.tbl { overflow: auto; border: 1px solid var(--line2); border-radius: var(--r-code); margin: 16px 0; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; font: 500 11.5px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+th, td { padding: 11px 16px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--body); }
+tr:last-child td { border: 0; }
+td code { white-space: nowrap; }
+
+.steps { counter-reset: s; list-style: none; padding: 0 !important; }
+.steps li { counter-increment: s; position: relative; padding: 2px 0 2px 46px; margin: 18px 0; }
+.steps li::before { content: counter(s, decimal-leading-zero); position: absolute; left: 0; top: 1px; font: 13px var(--mono); color: var(--accent); border: 1px solid var(--accent-edge); border-radius: 8px; padding: 1px 7px; }
+
+.faq details { border: 1px solid var(--line); border-radius: var(--r-code); background: var(--panel); margin: 10px 0; padding: 0 16px; }
+.faq summary { cursor: pointer; padding: 12px 0; font-weight: 500; color: var(--text); }
+.faq details[open] { border-color: var(--line2); }
+.faq details > :last-child { margin-bottom: 14px; }
+
+.pager { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--line); }
+.pager a { display: block; border: 1px solid var(--line2); border-radius: var(--r-code); padding: 12px 16px; background: var(--panel); }
+.pager a:hover { border-color: var(--accent); }
+.pager small { display: block; font: 11.5px var(--mono); color: var(--subtle); text-transform: uppercase; letter-spacing: 0.05em; }
+.pager .next { text-align: right; grid-column: 2; }
+.doc .pager a { color: var(--text); text-decoration: none; }
+
+@media (max-width: 900px) {
+  .docs .wrap { grid-template-columns: 1fr; gap: 18px; padding-top: 20px; }
+  .side {
+    position: sticky;
+    top: var(--header-h);
+    z-index: 5;
+    max-height: none;
+    overflow: auto;
+    border: 0;
+    background: var(--bar-bg-solid);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    margin: 0 -20px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .side .side-title { display: none; }
+  .side nav > ul { display: flex; gap: 4px; }
+  .side li { list-style: none; }
+  .side a { white-space: nowrap; border: 1px solid var(--line); border-radius: 99px; padding: 4px 14px; margin: 0; }
+  .side a[aria-current="page"] { border-color: var(--accent); }
+  .side .sub { display: none; }
+}
+@media (max-width: 560px) {
+  .side { top: 0; }
+  .pager { grid-template-columns: 1fr; }
+  .pager .next { grid-column: 1; }
+  .doc h2 { font-size: 23px; }
+}

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Running as a service - HotspotPlus Lite</title>
+<meta name="description" content="Start HotspotPlus Lite at boot with systemd on Linux, as a Windows service, or with launchd on macOS.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#09090b">
+<link rel="canonical" href="https://pysf.github.io/HotspotPlusLight/docs/running-as-a-service/">
+<link rel="icon" href="../../assets/img/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HotspotPlus Lite">
+<meta property="og:title" content="Running as a service - HotspotPlus Lite">
+<meta property="og:description" content="Start HotspotPlus Lite at boot with systemd on Linux, as a Windows service, or with launchd on macOS.">
+<meta property="og:url" content="https://pysf.github.io/HotspotPlusLight/docs/running-as-a-service/">
+<meta property="og:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="HotspotPlus Lite: Wi-Fi accounts for your MikroTik hotspot, on your own network.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Running as a service - HotspotPlus Lite">
+<meta name="twitter:description" content="Start HotspotPlus Lite at boot with systemd on Linux, as a Windows service, or with launchd on macOS.">
+<meta name="twitter:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
+<link rel="stylesheet" href="../../assets/css/tokens.css">
+<link rel="stylesheet" href="../../assets/css/site.css">
+<link rel="stylesheet" href="../../assets/css/docs.css">
+<script type="module" src="../../assets/js/copy.js"></script>
+<script type="module" src="../../assets/js/docs-search.js"></script>
+<script type="module" src="../../assets/js/docs-nav.js"></script>
+
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="../../"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.4"/></svg></span>HotspotPlus Lite</a>
+  <nav class="main" aria-label="Main"><a class="opt" href="../../#features">Features</a><a href="../" aria-current="page">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a></nav>
+  <span class="spacer"></span>
+  <form class="search" role="search" hidden>
+    <input id="q" type="search" placeholder="Search docs" aria-label="Search docs" autocomplete="off" role="combobox" aria-autocomplete="list">
+    <kbd aria-hidden="true">/</kbd>
+    <ul class="results" id="search-results" role="listbox" aria-label="Search results" hidden></ul>
+  </form>
+  <a class="btn primary sm" href="../installation/">Get started</a>
+</div></header>
+<main id="main" class="docs"><div class="wrap">
+<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="./" aria-current="page">Run as a service</a><ul class="sub"><li><a href="#systemd">Linux (systemd)</a></li><li><a href="#windows">Windows service</a></li><li><a href="#macos">macOS (launchd)</a></li><li><a href="#check">Check that it runs</a></li></ul></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
+<article class="doc"><span class="kick">Documentation</span><h1>Running as a service</h1><p class="intro">Run HotspotPlus Lite in the background and start it at boot, on Linux, Windows or macOS.</p>
+<section><h2 id="systemd"><a href="#systemd">Linux (systemd)</a></h2>
+<p>Create a user for the service, and a settings file that only root and that user can read. It holds the secret key.</p>
+<pre><code>sudo useradd --system --no-create-home --shell /usr/sbin/nologin hsp
+printf 'HSP_SECRET_KEY=%s\nHSP_DATA_DIR=/var/lib/hotspotpluslight\n' "$(hotspotpluslight gen-key)" | sudo tee /etc/hotspotpluslight.env &gt;/dev/null
+sudo chown root:hsp /etc/hotspotpluslight.env
+sudo chmod 640 /etc/hotspotpluslight.env</code></pre>
+<p>Create <code>/etc/systemd/system/hotspotpluslight.service</code>:</p>
+<pre><code>[Unit]
+Description=HotspotPlus Lite
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=hsp
+EnvironmentFile=/etc/hotspotpluslight.env
+ExecStart=/usr/local/bin/hotspotpluslight serve
+StateDirectory=hotspotpluslight
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+<p>Start it and make it start at boot:</p>
+<pre><code>sudo systemctl daemon-reload
+sudo systemctl enable --now hotspotpluslight
+systemctl status hotspotpluslight</code></pre>
+<p>The first-start block and the log lines are in the journal:</p>
+<pre><code>journalctl -u hotspotpluslight</code></pre>
+<p>The ports are all above 1024, so the service needs no extra privileges. <code>systemctl stop</code> sends SIGTERM: the server stops taking new requests, lets the accounting requests in flight finish, then closes the database.</p>
+<p>If you forget the admin password, run the reset as the same user, so the database files keep their owner:</p>
+<pre><code>sudo -u hsp hotspotpluslight --env-file /etc/hotspotpluslight.env admin set-password</code></pre></section>
+<section><h2 id="windows"><a href="#windows">Windows service</a></h2>
+<p>The program can install itself as a Windows service. Open PowerShell <strong>as Administrator</strong>, go to the folder with <code>hotspotpluslight.exe</code> and run:</p>
+<pre><code>cd C:\hotspotpluslight
+.\hotspotpluslight.exe service install
+.\hotspotpluslight.exe service start</code></pre>
+<p><code>service install</code> does this:</p>
+<ul>
+<li>It makes the folder <code>C:\ProgramData\HotspotPlusLight</code>. To use another folder, add <code>--dir D:\hsp</code>.</li>
+<li>It limits access to that folder to SYSTEM and Administrators, because it holds the secret key.</li>
+<li>If <code>hsp.env</code> is not there yet, it writes it with a new <code>HSP_SECRET_KEY</code> and <code>HSP_DATA_DIR</code> set to the <code>data</code> subfolder.</li>
+<li>It registers the service <code>HotspotPlusLight</code> (display name "HotspotPlus Lite"). It starts with Windows and runs <code>serve --env-file</code> with that file.</li>
+<li>It sets the service to restart after a failure: after 5, 15 and 60 seconds.</li>
+</ul>
+<p>The logs and the first-start block are in <code>hsp.log</code> in that folder:</p>
+<pre><code>type C:\ProgramData\HotspotPlusLight\hsp.log</code></pre>
+<p>Stop and remove the service. Your data is kept:</p>
+<pre><code>.\hotspotpluslight.exe service stop
+.\hotspotpluslight.exe service uninstall</code></pre>
+<p>Do not move <code>hotspotpluslight.exe</code> after the install, because the service points to it. To reset the admin password:</p>
+<pre><code>.\hotspotpluslight.exe admin set-password --env-file C:\ProgramData\HotspotPlusLight\hsp.env</code></pre>
+<p>Allow the ports in the Windows firewall (Administrator PowerShell):</p>
+<pre><code>netsh advfirewall firewall add rule name="HotspotPlus Lite admin" dir=in action=allow protocol=TCP localport=8081
+netsh advfirewall firewall add rule name="HotspotPlus Lite RADIUS" dir=in action=allow protocol=UDP localport=1812-1813</code></pre>
+<div class="note"><b>Keep a copy of hsp.env</b><p>It holds the secret key. Without it the stored member passwords cannot be read. See <a href="../backup-and-upgrade/">Backup and upgrade</a>.</p></div></section>
+<section><h2 id="macos"><a href="#macos">macOS (launchd)</a></h2>
+<p>The <code>service</code> commands work only on Windows. On macOS, use launchd. Put the settings in <code>/usr/local/etc/hotspotpluslight.env</code> (same format as above, readable only by root) and create <code>/Library/LaunchDaemons/local.hotspotpluslight.plist</code>:</p>
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;plist version="1.0"&gt;
+&lt;dict&gt;
+  &lt;key&gt;Label&lt;/key&gt;&lt;string&gt;local.hotspotpluslight&lt;/string&gt;
+  &lt;key&gt;ProgramArguments&lt;/key&gt;
+  &lt;array&gt;
+    &lt;string&gt;/usr/local/bin/hotspotpluslight&lt;/string&gt;
+    &lt;string&gt;--env-file&lt;/string&gt;
+    &lt;string&gt;/usr/local/etc/hotspotpluslight.env&lt;/string&gt;
+    &lt;string&gt;serve&lt;/string&gt;
+  &lt;/array&gt;
+  &lt;key&gt;RunAtLoad&lt;/key&gt;&lt;true/&gt;
+  &lt;key&gt;KeepAlive&lt;/key&gt;&lt;true/&gt;
+  &lt;key&gt;StandardOutPath&lt;/key&gt;&lt;string&gt;/var/log/hotspotpluslight.log&lt;/string&gt;
+  &lt;key&gt;StandardErrorPath&lt;/key&gt;&lt;string&gt;/var/log/hotspotpluslight.log&lt;/string&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;</code></pre>
+<p>launchd starts the program in <code>/</code>, and the data folder defaults to the relative path <code>data</code>, so the database would go to <code>/data</code>, which is read-only. Set the data folder in the env file, and create it:</p>
+<pre><code>echo 'HSP_DATA_DIR=/usr/local/var/hotspotpluslight' | sudo tee -a /usr/local/etc/hotspotpluslight.env &gt;/dev/null
+sudo mkdir -p /usr/local/var/hotspotpluslight</code></pre>
+<pre><code>sudo launchctl bootstrap system /Library/LaunchDaemons/local.hotspotpluslight.plist
+sudo launchctl bootout system /Library/LaunchDaemons/local.hotspotpluslight.plist</code></pre>
+<p>The first command starts the service, the second stops it. The project does not test launchd, so treat this as a starting point.</p></section>
+<section><h2 id="check"><a href="#check">Check that it runs</a></h2>
+<p>On the server, <code>curl http://127.0.0.1:8081/healthz</code> prints <code>ok</code>. In a browser, <code>http://SERVER-IP:8081/admin</code> shows the login page. Then continue with <a href="../first-login/">First login</a>.</p></section>
+<nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../installation/"><small>Previous</small>Installation</a><a class="next" rel="next" href="../configuration/"><small>Next</small>Configuration</a></nav></article>
+</div></main>
+<footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>
+<nav aria-label="Footer"><a href="../">Docs</a><a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a><a href="https://github.com/pysf/HotspotPlusLight/issues" rel="noopener">Issues</a></nav></div></footer>
+</body>
+</html>
