@@ -504,3 +504,18 @@ func TestE4_17_DowntimeCatchUp(t *testing.T) {
 		t.Fatalf("%d session rows", n)
 	}
 }
+
+// E16.01 (review A5) a bad packet with huge Gigawords in both directions must not make the member look
+// unlimited: the counters stay far from int64 overflow and the next login is rejected OUT_OF_BULK.
+func TestE16_01_HugeGigawordsDoNotOverflow(t *testing.T) {
+	f := newP4(t)
+	id := f.member(f.plan("Tiny", "bulk_value", "1", "bulk_unit", "MB"), "alice", "password", "pw")
+	f.start("alice", "s1")
+	const huge = uint64(1) << 63 // Gigawords = 2^31
+	f.interim("alice", "s1", huge, huge, 60)
+	u := f.usage(id)
+	if u.dl < 0 || u.ul < 0 || u.dl+u.ul < 0 || u.dl > 1<<51 || u.ul > 1<<51 {
+		t.Fatalf("counters not capped: %+v", u)
+	}
+	f.rejected("alice", "pw", "OUT_OF_BULK")
+}

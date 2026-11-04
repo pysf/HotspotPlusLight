@@ -125,15 +125,11 @@ func TestE7_01_CreateBatch(t *testing.T) {
 	if f.rowCount("member") != before || f.counter() != 9 || f.rowCount("batch") != 3 {
 		t.Error("a refused batch changed something")
 	}
-	// A taken username refuses the whole batch and changes nothing (409).
+	// A taken username is skipped, not a dead end (review A2, E16.04; was a 409 that left the counter stuck).
 	f.member(p, "card9")
-	before = f.rowCount("member")
-	r = f.c.Send("POST", "/admin/batches", batchForm(p, 3))
-	if r.StatusCode != 409 || !strings.Contains(r.Body, "card9") {
-		t.Fatalf("taken username: %d %s", r.StatusCode, r.Body)
-	}
-	if f.rowCount("member") != before || f.counter() != 9 || f.rowCount("batch") != 3 {
-		t.Error("a conflicting batch left rows behind or moved the counter")
+	id4 := f.batch(p, 3)
+	if got := f.users(id4); strings.Join(got, ",") != "card10,card11,card12" || f.counter() != 13 {
+		t.Fatalf("taken username: %v counter %d", got, f.counter())
 	}
 	// Form page.
 	d := f.c.Get("/admin/batches/new").Doc(t)
@@ -860,5 +856,36 @@ func TestE7_15_PlanHeldByBatch(t *testing.T) {
 	f.c.Send("DELETE", bpath(id), nil)
 	if r := f.c.Send("DELETE", "/admin/plans/"+strconv.FormatInt(p, 10), nil); r.StatusCode != 200 {
 		t.Fatalf("plan after the batch is gone: %d %s", r.StatusCode, r.Body)
+	}
+}
+
+// E16.03 (review A2) saving the Settings form does not roll the voucher counter back to the value the form
+// showed when a batch was made in the meantime. A higher value typed by the admin still applies.
+func TestE16_03_SettingsKeepsBatchCounter(t *testing.T) {
+	f := newP7(t)
+	p := f.plan("Basic")
+	form := harness.FormValues(t, f.c.Get("/admin/settings").Doc(t), "form#settings-form")
+	f.batch(p, 30) // 1360 -> 1390 after the form was opened
+	if r := f.c.Send("PUT", "/admin/settings", form); r.StatusCode != 200 {
+		t.Fatalf("save: %d", r.StatusCode)
+	}
+	if f.counter() != 1390 {
+		t.Fatalf("counter %d, want 1390", f.counter())
+	}
+	form.Set("batch_counter", "2000")
+	if r := f.c.Send("PUT", "/admin/settings", form); r.StatusCode != 200 || f.counter() != 2000 {
+		t.Fatalf("raise: %d counter %d", r.StatusCode, f.counter())
+	}
+}
+
+// E16.04 (review A2) a batch skips usernames that already exist and moves the counter past the last one used.
+func TestE16_04_BatchSkipsTakenUsernames(t *testing.T) {
+	f := newP7(t)
+	p := f.plan("Basic")
+	f.member(p, "wifi1361")
+	f.member(p, "WIFI1362") // usernames are case-insensitive
+	id := f.batch(p, 3)
+	if got := f.users(id); strings.Join(got, ",") != "wifi1360,wifi1363,wifi1364" || f.counter() != 1365 {
+		t.Fatalf("usernames %v counter %d", got, f.counter())
 	}
 }

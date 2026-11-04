@@ -1,9 +1,6 @@
 package domain
 
-import (
-	"math"
-	"time"
-)
+import "time"
 
 // AcctStatus is the RADIUS Acct-Status-Type (RFC 2866). The values 1, 2 and 3
 // are also what the session.status column stores.
@@ -34,12 +31,17 @@ func CumulativeFromAcct(inOctets, inGiga, outOctets, outGiga, sessionTime uint32
 	return Counters{Upload: withGiga(inOctets, inGiga), Download: withGiga(outOctets, outGiga), Seconds: int64(sessionTime)}
 }
 
-// withGiga joins octets and gigawords, and saturates instead of overflowing int64.
+// MaxUsedBytes caps each stored usage counter, so the sum of download and
+// upload (and the SQL additions) can never overflow int64.
+const MaxUsedBytes = int64(1) << 60
+
+// withGiga joins octets and gigawords. A reading above MaxBulkBytes (1 PiB) is
+// not a real counter, so it is capped there.
 func withGiga(octets, giga uint32) int64 {
-	if giga >= 1<<31 {
-		return math.MaxInt64
+	if giga >= uint32(MaxBulkBytes/gigaword) {
+		return MaxBulkBytes
 	}
-	return int64(giga)*gigaword + int64(octets)
+	return min(int64(giga)*gigaword+int64(octets), MaxBulkBytes)
 }
 
 // fieldDelta returns what one counter adds: cur - prev, or cur after a restart.

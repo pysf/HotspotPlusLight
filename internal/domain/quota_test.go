@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -100,5 +101,13 @@ func TestShouldEnd(t *testing.T) {
 		if got != c.want || end != (c.want != "") {
 			t.Errorf("%s: %q %v, want %q", name, got, end, c.want)
 		}
+	}
+}
+
+func TestQuotaOfSaturatesHugeUsage(t *testing.T) {
+	m := MemberState{UsedDownload: math.MaxInt64, UsedUpload: math.MaxInt64}
+	q := QuotaOf(m, Plan{BulkValue: 1, BulkUnit: "MB", DurationDays: 30})
+	if q.UsedBytes < 0 || q.RemainingBytes != 0 {
+		t.Fatalf("used %d remaining %d", q.UsedBytes, q.RemainingBytes)
 	}
 }

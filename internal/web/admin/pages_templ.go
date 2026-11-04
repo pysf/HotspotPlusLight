@@ -904,7 +904,7 @@ func SettingsFormView(p SettingsProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Field(ui.FieldProps{Label: "Next voucher number", Name: "batch_counter", Value: p.Form.BatchCounter, Error: p.Errors["batch_counter"]}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Field(ui.FieldProps{Label: "Next voucher number", Name: "batch_counter", Value: p.Form.BatchCounter, Error: p.Errors["batch_counter"], Hint: "It can only go up."}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

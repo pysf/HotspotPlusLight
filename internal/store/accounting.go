@@ -104,16 +104,16 @@ func (t *AcctTx) UpdateSession(ctx context.Context, s domain.Session) error {
 // AddUsage adds d to the member's counters in SQL, so it is relative to what the
 // row holds inside this transaction (BR-11, BR-13b).
 func (t *AcctTx) AddUsage(ctx context.Context, memberID int64, d domain.Counters, now time.Time) error {
-	_, err := t.tx.ExecContext(ctx, `UPDATE member SET used_download_bytes=used_download_bytes+?, used_upload_bytes=used_upload_bytes+?,
-		used_seconds=used_seconds+?, updated_at=? WHERE id=?`, d.Download, d.Upload, d.Seconds, now.Unix(), memberID)
+	_, err := t.tx.ExecContext(ctx, `UPDATE member SET used_download_bytes=min(used_download_bytes+?1, ?4), used_upload_bytes=min(used_upload_bytes+?2, ?4),
+		used_seconds=used_seconds+?3, updated_at=?5 WHERE id=?6`, d.Download, d.Upload, d.Seconds, domain.MaxUsedBytes, now.Unix(), memberID)
 	return err
 }
 
 // AddDailyUsage adds d to the member's usage_daily row for day, creating it if needed (D12).
 func (t *AcctTx) AddDailyUsage(ctx context.Context, memberID int64, day string, d domain.Counters) error {
 	_, err := t.tx.ExecContext(ctx, `INSERT INTO usage_daily(member_id, day, down, up, seconds) VALUES (?,?,?,?,?)
-		ON CONFLICT(member_id, day) DO UPDATE SET down=down+excluded.down, up=up+excluded.up, seconds=seconds+excluded.seconds`,
-		memberID, day, d.Download, d.Upload, d.Seconds)
+		ON CONFLICT(member_id, day) DO UPDATE SET down=min(down+excluded.down, ?6), up=min(up+excluded.up, ?6), seconds=seconds+excluded.seconds`,
+		memberID, day, d.Download, d.Upload, d.Seconds, domain.MaxUsedBytes)
 	return err
 }
 

@@ -291,3 +291,18 @@ func TestE1_18_LimitsChangeAffectsNextAccessRequest(t *testing.T) {
 	edit("bulk_value", "2", "bulk_unit", "GB", "duration_days", "5", "time_limit_minutes", "20", "max_sessions", "2")
 	f.accepted("alice", "pw")
 }
+
+// E16.02 (review A6) a positive data value that rounds to 0 bytes is a field error (422), not an "unlimited"
+// plan that rejects every login with 0 bytes allowed.
+func TestE16_02_TinyBulkRejected(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	db := harness.DB(t, s.DataDir)
+	r := c.Send("POST", "/admin/plans", harness.PlanForm("P", "bulk_value", "0.0000000001", "bulk_unit", "KB"))
+	if r.StatusCode != 422 || fieldError(r, t, "bulk_value") == "" {
+		t.Fatalf("status %d, want 422 with a bulk_value message", r.StatusCode)
+	}
+	if n := scalar[int](t, db, `SELECT count(*) FROM plan`); n != 0 {
+		t.Fatalf("tiny plan stored: %d", n)
+	}
+}
