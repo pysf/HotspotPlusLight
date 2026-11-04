@@ -1,4 +1,4 @@
-.PHONY: perf perf-quick perf-windows build build-windows build-all run set-password reset-password vet test ci clean generate
+.PHONY: release build-cross perf perf-quick perf-windows build build-windows build-all run set-password reset-password vet test ci clean generate
 
 # Key used by `make run` when HSP_SECRET_KEY is not set. Created once, kept out of git.
 DEV_KEY_FILE := .dev-secret-key
@@ -13,6 +13,43 @@ build-windows:
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$(VERSION)" -o bin/hotspotpluslight.exe ./cmd/hotspotpluslight
 
 build-all: build build-windows
+
+# The 9 platforms we ship (os/arch). Go has no windows/arm and no darwin/386.
+# linux/arm is built with GOARM=7 (32-bit ARM with hardware float, e.g. Raspberry Pi 2 and newer).
+# An ARMv6 build (Pi Zero, Pi 1) is not made.
+PLATFORMS := linux/amd64 linux/386 linux/arm64 linux/arm windows/amd64 windows/386 windows/arm64 darwin/amd64 darwin/arm64
+
+# Cross-build all platforms into dist/ (no packaging).
+build-cross:
+	@rm -rf dist && mkdir -p dist
+	@set -e; for p in $(PLATFORMS); do \
+	  os=$${p%/*}; arch=$${p#*/}; ext=""; [ $$os = windows ] && ext=".exe"; \
+	  echo "build $$os/$$arch"; \
+	  GOOS=$$os GOARCH=$$arch GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" \
+	    -o dist/hotspotpluslight-$(VERSION)-$$os-$$arch$$ext ./cmd/hotspotpluslight; \
+	done
+
+# Release: build all platforms, pack each (.zip for windows, .tar.gz for the rest) and write dist/SHA256SUMS.
+# Each archive holds the binary (named hotspotpluslight[.exe]), README.md and LICENSE (if the file exists).
+release: build-cross
+	@set -e; cd dist; \
+	for f in hotspotpluslight-$(VERSION)-*; do \
+	  case $$f in *.zip|*.tar.gz) continue;; esac; \
+	  base=$${f%.exe}; tmp=$$(mktemp -d); \
+	  case $$f in \
+	    *.exe) cp $$f $$tmp/hotspotpluslight.exe ;; \
+	    *) cp $$f $$tmp/hotspotpluslight ;; \
+	  esac; \
+	  cp ../README.md $$tmp/; [ -f ../LICENSE ] && cp ../LICENSE $$tmp/ || true; \
+	  case $$f in \
+	    *.exe) (cd $$tmp && zip -q -r "$$OLDPWD/$$base.zip" .) ;; \
+	    *) tar -czf $$base.tar.gz -C $$tmp . ;; \
+	  esac; \
+	  rm -rf $$tmp $$f; \
+	done; \
+	if command -v shasum >/dev/null 2>&1; then SUM="shasum -a 256"; else SUM=sha256sum; fi; \
+	$$SUM *.zip *.tar.gz > SHA256SUMS; \
+	ls -l
 
 # Build and start the whole stack (public :8080, admin :8081, RADIUS :1812/:1813) with data in ./data.
 run: build
@@ -35,7 +72,7 @@ test:
 ci: vet test
 
 clean:
-	rm -rf bin
+	rm -rf bin dist
 
 # Regenerate the templ components (the generated *_templ.go files are committed).
 generate:

@@ -560,6 +560,9 @@ HotspotPlusLight/
 - Handlers stay thin: parse → call a service → render/reply. One implementation per rule (e.g. the login verdict and the admin usage summary both come from `auth`/`domain`).
 - Unit tests cover `domain` and each service with fakes; e2e tests drive the real assembled binary.
 
+### 9.1a Release builds (2026-11-04)
+`make release VERSION=x` cross-builds nine platforms with `CGO_ENABLED=0 -trimpath -ldflags "-s -w -X main.version=x"` into `dist/` (linux amd64/386/arm64/arm, windows amd64/386/arm64, darwin amd64/arm64). linux/arm uses GOARM=7 (no ARMv6 build). Each is packed (`.zip` for windows, `.tar.gz` otherwise, with README.md) and `dist/SHA256SUMS` is written. Go has no windows/arm or darwin/386. CI runs `make build-cross` to catch a broken platform.
+
 ### 9.2 Configuration (environment, all `HSP_` prefixed)
 `DATA_DIR` (db + branding), `HTTP_ADDR` (:8080, page API + `/healthz`), `ADMIN_ADDR` (:8081, admin panel — D23), `RADIUS_AUTH_ADDR` (:1812), `RADIUS_ACCT_ADDR` (:1813), `SECRET_KEY` (base64 32 bytes: AES-GCM key; **required**, losing it makes stored passwords unrecoverable), first-boot seeds: `ADMIN_USERNAME` (default `admin`; the password is `admin` until the first login changes it, O15), `RADIUS_SHARED_SECRET`; `LOG_LEVEL`; `DEV` (`1` = serve the component gallery at `/admin/dev/components`, off by default, Phase 10).
 

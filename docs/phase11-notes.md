@@ -186,3 +186,11 @@ Decisions I made (please check):
 - Dispatch lag rule uses the worst packet (max), as asked.
 - The over-quota count is max(2, N/100) so both kinds (over at Start, over at first Interim) exist at small N.
 - Read pool size 8. Not tuned.
+
+## Step C addendum: release binaries (2026-11-04)
+- `make release VERSION=x` builds 9 platforms into `dist/` and packs them (`.zip` for windows, `.tar.gz` for linux/darwin, with README.md; no LICENSE file exists yet, it is added when there is one). It writes `dist/SHA256SUMS` (`shasum -a 256`, or `sha256sum` if missing). `make build-cross` only builds. `make clean` removes `dist/`. `dist/` is git-ignored.
+- Flags: `CGO_ENABLED=0 -trimpath -ldflags "-s -w -X main.version=$(VERSION)"`. Each archive holds `hotspotpluslight[.exe]`.
+- Decision: linux/arm is ARMv7 only (GOARM=7). No ARMv6 build, to keep the list at 9. Say so if you want one.
+- windows/arm and darwin/386 are not supported by Go.
+- CI has a new job `cross-build` (Linux) that runs `make build-cross`.
+- Checked here: `make release VERSION=test` gave 9 archives of about 7.8 to 8.4 MB each, plus SHA256SUMS.

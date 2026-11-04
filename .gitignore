@@ -2,3 +2,4 @@
 /data/
 /.dev-secret-key
 .DS_Store
+/dist/

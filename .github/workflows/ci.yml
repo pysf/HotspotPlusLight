@@ -30,3 +30,14 @@ jobs:
         run: go test -count=1 ./...
         env:
           HSP_TEST_WINDOWS_SERVICE: "1" # E11.33: the runner is Administrator
+
+  # Catches a platform that no longer builds. Same list as `make release`.
+  cross-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: build all 9 platforms
+        run: make build-cross VERSION=ci
