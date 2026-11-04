@@ -54,3 +54,17 @@ func (s *Store) EndSession(ctx context.Context, id int64, now time.Time, cause s
 	_, err := s.db.ExecContext(ctx, `UPDATE session SET ended_at = ?, terminate_cause = ? WHERE id = ? AND ended_at IS NULL`, now.Unix(), cause, id)
 	return err
 }
+
+// OpenSessionTarget finds the open session of an accounting key (username,
+// Acct-Session-Id, router address) for a Disconnect. The bool is false when no
+// open row exists.
+func (s *Store) OpenSessionTarget(ctx context.Context, username, acctSessionID, nasIP string) (domain.SessionTarget, bool, error) {
+	var t domain.SessionTarget
+	err := s.db.QueryRowContext(ctx, `SELECT id, nas_ip, username, acct_session_id, framed_ip, mac FROM session
+		WHERE username=? AND acct_session_id=? AND nas_ip=? AND ended_at IS NULL ORDER BY id DESC LIMIT 1`, username, acctSessionID, nasIP).
+		Scan(&t.ID, &t.NASIP, &t.Username, &t.AcctSessionID, &t.FramedIP, &t.MAC)
+	if errors.Is(err, sql.ErrNoRows) {
+		return t, false, nil
+	}
+	return t, err == nil, err
+}

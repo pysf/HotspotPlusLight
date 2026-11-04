@@ -84,7 +84,8 @@ func TestE9_02_DayInSettingsTimezone(t *testing.T) {
 // E9.03 the day row uses the same Gigawords-aware delta as the member counters (BR-11).
 func TestE9_03_GigawordsAndCounterRestart(t *testing.T) {
 	f := newP4(t)
-	id := f.member(f.plan("Basic"), "alice")
+	// Unlimited data: the plan must not kick the member in the middle of the test (Phase 11a).
+	id := f.member(f.plan("Basic", "bulk_value", "0"), "alice")
 	f.start("alice", "s1")
 	const gig = uint64(1) << 32
 	f.interim("alice", "s1", 3*gig+5, gig+7, 100)

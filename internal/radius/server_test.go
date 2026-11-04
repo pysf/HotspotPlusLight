@@ -183,7 +183,7 @@ func TestRejectCarriesCodeAndMessage(t *testing.T) {
 }
 
 func TestAcceptAttributes(t *testing.T) {
-	fa := &fakeAuth{verdict: auth.Verdict{Grant: domain.Grant{InterimSeconds: 60, SessionTimeout: 99, XmitLimit: 7, RateLimit: "1k/1k"}}}
+	fa := &fakeAuth{verdict: auth.Verdict{Grant: domain.Grant{InterimSeconds: 60, SessionTimeout: 99, DataLimited: true, DataLow: 7, RateLimit: "1k/1k"}}}
 	reply, err := exchange(t, start(t, fa), pap("alice", "pw"), 2*time.Second)
 	if err != nil || reply.Code != radius.CodeAccessAccept {
 		t.Fatalf("%v %v", reply, err)

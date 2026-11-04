@@ -99,6 +99,31 @@ func xmitLimit(t *testing.T, p *radius.Packet) uint32 {
 	return binary.BigEndian.Uint32(v)
 }
 
+// dataLimits returns the data-limit attributes of an Accept as full byte counts:
+// Recv-Limit (id 1) and Xmit-Limit (id 2), each joined with its Gigawords
+// attribute (ids 14 and 15). present is false when neither limit is there.
+func dataLimits(t *testing.T, p *radius.Packet) (recv, xmit uint64, present bool) {
+	t.Helper()
+	get := func(typ byte) (uint64, bool) {
+		v := vsa(t, p, typ)
+		if v == nil {
+			return 0, false
+		}
+		if len(v) != 4 {
+			t.Fatalf("attribute %d malformed: %v", typ, v)
+		}
+		return uint64(binary.BigEndian.Uint32(v)), true
+	}
+	r, rok := get(1)
+	x, xok := get(2)
+	rg, rgok := get(14)
+	xg, xgok := get(15)
+	if rok != xok || rgok != xgok || (rgok && !rok) {
+		t.Fatalf("limit attributes do not match: recv=%v xmit=%v recv-gw=%v xmit-gw=%v", rok, xok, rgok, xgok)
+	}
+	return r | rg<<32, x | xg<<32, rok
+}
+
 func rateLimit(t *testing.T, p *radius.Packet) (string, bool) {
 	t.Helper()
 	v := vsa(t, p, 8)
@@ -271,13 +296,16 @@ func TestE3_06_OutOfBulkAndExtraBulk(t *testing.T) {
 	f.rejected("alice", "pw", "OUT_OF_BULK")
 }
 
-// E3.07 unlimited bulk -> Mikrotik-Xmit-Limit = 3,900,000,000 (O3, legacy sentinel).
-func TestE3_07_UnlimitedBulkSentinel(t *testing.T) {
+// E3.07 unlimited bulk -> no data-limit attribute at all (O3, changed 2026-11-04; was the 3,900,000,000 sentinel).
+func TestE3_07_UnlimitedBulkNoLimit(t *testing.T) {
 	f := newP3(t)
 	id := f.member(f.plan("Free", "bulk_value", "0"), "alice", "password", "pw")
 	f.exec(`UPDATE member SET used_download_bytes=? WHERE id=?`, 50*gb, id) // usage never limits an unlimited plan
-	if x := xmitLimit(t, f.accepted("alice", "pw")); x != 3_900_000_000 {
-		t.Errorf("Xmit-Limit %d, want 3900000000", x)
+	r := f.accepted("alice", "pw")
+	for _, typ := range []byte{1, 2, 14, 15} {
+		if vsa(t, r, typ) != nil {
+			t.Errorf("MikroTik attribute %d sent for unlimited data", typ)
+		}
 	}
 }
 
@@ -303,19 +331,28 @@ func TestE3_08_TimeQuota(t *testing.T) {
 	f.rejected("alice", "pw", "OUT_OF_TIME")
 }
 
-// E3.09 Session-Timeout = remaining time quota, 172800 without a time limit, never capped by the validity window (O4).
-func TestE3_09_SessionTimeoutLegacy(t *testing.T) {
+// E3.09 Session-Timeout = the smallest of time quota left, time until expires_at and time until the window end;
+// never the old 172800 (O4, changed 2026-11-04). The full matrix is E11.03.
+func TestE3_09_SessionTimeoutSmallest(t *testing.T) {
 	f := newP3(t)
 	limited := f.member(f.plan("Limited", "time_limit_minutes", "90", "duration_days", "1"), "limited", "password", "pw")
 	free := f.member(f.plan("NoLimit", "time_limit_minutes", "0", "duration_days", "1"), "free", "password", "pw")
-	// The one-day window ends in 10 minutes; the timeout is not capped by it.
+	// The one-day window ends in 10 minutes: it caps both.
 	end := t0.Unix() - 24*3600 + 600
 	f.exec(`UPDATE member SET subscription_date=? WHERE id IN (?,?)`, end, limited, free)
+	if st := sessionTimeout(f.accepted("limited", "pw")); st != 600 {
+		t.Errorf("limited: Session-Timeout %d, want 600 (window end)", st)
+	}
+	if st := sessionTimeout(f.accepted("free", "pw")); st != 600 {
+		t.Errorf("no time limit: Session-Timeout %d, want 600 (window end)", st)
+	}
+	// A fresh window: the time quota (90 min) is smaller than the day; no time limit gives the whole day.
+	f.exec(`UPDATE member SET subscription_date=? WHERE id IN (?,?)`, t0.Unix(), limited, free)
 	if st := sessionTimeout(f.accepted("limited", "pw")); st != 5400 {
 		t.Errorf("limited: Session-Timeout %d, want 5400", st)
 	}
-	if st := sessionTimeout(f.accepted("free", "pw")); st != 172800 {
-		t.Errorf("no time limit: Session-Timeout %d, want 172800", st)
+	if st := sessionTimeout(f.accepted("free", "pw")); st != 86400 {
+		t.Errorf("no time limit: Session-Timeout %d, want 86400 (window end)", st)
 	}
 }
 
@@ -350,24 +387,26 @@ func TestE3_10_RateLimitStrings(t *testing.T) {
 	}
 }
 
-// E3.11 data cap = remaining bytes; above 4,294,967,295 it is clamped and logged (O3).
-func TestE3_11_DataCapAndClamp(t *testing.T) {
+// E3.11 data cap = remaining bytes, in Recv-Limit and Xmit-Limit; from 4 GiB up the high 32 bits go into the
+// -Gigawords attributes (O3, changed 2026-11-04; was a clamp at 4294967295).
+func TestE3_11_DataCapAndGigawords(t *testing.T) {
 	f := newP3(t)
 	small := f.member(f.plan("Small", "bulk_value", "1", "bulk_unit", "GB"), "small", "password", "pw")
 	f.exec(`UPDATE member SET used_download_bytes=?, used_upload_bytes=? WHERE id=?`, 100*mb, 24*mb, small)
-	if x := xmitLimit(t, f.accepted("small", "pw")); x != uint32(gb-124*mb) {
+	r := f.accepted("small", "pw")
+	if x := xmitLimit(t, r); x != uint32(gb-124*mb) {
 		t.Errorf("Xmit-Limit %d, want %d", x, gb-124*mb)
 	}
+	if vsa(t, r, 14) != nil || vsa(t, r, 15) != nil {
+		t.Error("Gigawords attribute sent below 4 GiB")
+	}
 	f.member(f.plan("Big", "bulk_value", "10", "bulk_unit", "GB"), "big", "password", "pw")
+	recv, xmit, ok := dataLimits(t, f.accepted("big", "pw"))
+	if !ok || recv != uint64(10*gb) || xmit != uint64(10*gb) {
+		t.Errorf("recv %d xmit %d, want %d", recv, xmit, 10*gb)
+	}
 	if strings.Contains(f.log.String(), "clamp") {
-		t.Fatalf("clamp logged before any clamp happened:\n%s", f.log.String())
-	}
-	if x := xmitLimit(t, f.accepted("big", "pw")); x != 4_294_967_295 {
-		t.Errorf("Xmit-Limit %d, want the clamp 4294967295", x)
-	}
-	logs := f.log.String()
-	if !strings.Contains(logs, "level=WARN") || !strings.Contains(logs, "clamp") {
-		t.Errorf("clamp not logged as a warning:\n%s", logs)
+		t.Errorf("a clamp is logged:\n%s", f.log.String())
 	}
 }
 

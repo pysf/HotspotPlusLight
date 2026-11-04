@@ -76,3 +76,29 @@ func TestQuotaOfSaturatesInsteadOfOverflowing(t *testing.T) {
 		t.Fatalf("window end overflowed: %v", q.WindowEnd)
 	}
 }
+
+func TestShouldEnd(t *testing.T) {
+	const gb = int64(1 << 30)
+	past := now0.Add(-time.Second)
+	later := now0.Add(31 * 24 * time.Hour)
+	for name, c := range map[string]struct {
+		mod  func(*MemberState, *Plan)
+		at   time.Time
+		want Reason
+	}{
+		"fine":                  {func(*MemberState, *Plan) {}, now0, ""},
+		"out of data":           {func(m *MemberState, _ *Plan) { m.UsedUpload = 10 * gb }, now0, ReasonOutOfBulk},
+		"out of time":           {func(m *MemberState, _ *Plan) { m.UsedSeconds = 3600 }, now0, ReasonOutOfTime},
+		"expired":               {func(m *MemberState, _ *Plan) { m.ExpiresAt = &past }, now0, ReasonExpired},
+		"inactive":              {func(m *MemberState, _ *Plan) { m.Active = false }, now0, ReasonInactive},
+		"window ended":          {func(*MemberState, *Plan) {}, later, ReasonNoSubscription},
+		"auto-renew window end": {func(_ *MemberState, p *Plan) { p.AutoResubscribe = true }, later, ReasonNoSubscription},
+	} {
+		m, p := state(), plan10gb()
+		c.mod(&m, &p)
+		got, end := ShouldEnd(m, p, c.at)
+		if got != c.want || end != (c.want != "") {
+			t.Errorf("%s: %q %v, want %q", name, got, end, c.want)
+		}
+	}
+}

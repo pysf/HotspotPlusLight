@@ -30,52 +30,55 @@ func ActiveSince(now time.Time, accountingIntervalSeconds int) time.Time {
 	return now.Add(-time.Duration(accountingIntervalSeconds+60) * time.Second)
 }
 
-// Legacy reply-attribute constants (PLAN BR-10; O2, O3, O4).
+// Reply-attribute constants (PLAN BR-10; O2).
 const (
-	UnlimitedSessionTimeout = 172800        // 2 days, sent when the plan has no time limit (O4)
-	UnlimitedXmitLimit      = 3_900_000_000 // sent when the plan has unlimited data (O3)
-	MaxAttr32               = math.MaxUint32
-	BurstFactor             = 4        // burst rate = 4 x speed (O2)
-	BurstSeconds            = 8        // burst time (O2)
-	MaxBurstKbps            = 12000000 // above this the rate limit is sent without burst
+	MaxAttr32    = math.MaxUint32
+	BurstFactor  = 4        // burst rate = 4 x speed (O2)
+	BurstSeconds = 8        // burst time (O2)
+	MaxBurstKbps = 12000000 // above this the rate limit is sent without burst
 )
 
 // Grant is what an Access-Accept carries (BR-10).
 type Grant struct {
 	InterimSeconds uint32
-	// SessionTimeout is the remaining time quota in seconds.
-	// MONITOR: legacy-faithful (O3/O4): the router ends the session when this
-	// elapses, but the server does not enforce it and it is not capped by the
-	// validity window or expires_at, so an unlimited-time member can outlive
-	// the window by up to 48 h.
+	// SessionTimeout is the smallest of: time quota left, time until expires_at,
+	// time until the window end. At least 1 second (O4, 2026-11-04).
 	SessionTimeout uint32
-	// XmitLimit is the remaining data in bytes (Mikrotik-Xmit-Limit, 32-bit).
-	// MONITOR: legacy-faithful (O3): a download-only cap enforced only if the
-	// router honours it; there is no server-side enforcement on interim updates.
-	XmitLimit uint32
-	// XmitClamped reports that the real value exceeded 32 bits and was clamped.
-	XmitClamped bool
+	// DataLimited is false when the plan has unlimited data: then no data-limit
+	// attribute is sent.
+	DataLimited bool
+	// DataLow and DataGiga are the bytes left, split into the low 32 bits and the
+	// high 32 bits (the -Gigawords attribute). Sent as Mikrotik-Xmit-Limit and
+	// Mikrotik-Recv-Limit, both the same value (O3, 2026-11-04).
+	DataLow, DataGiga uint32
 	// RateLimit is the Mikrotik-Rate-Limit string, empty when the plan has no speed limit.
 	RateLimit string
 }
 
-// GrantFor builds the Accept attributes from the member's quota and plan.
-func GrantFor(q Quota, p Plan, intervalSeconds int) Grant {
+// SplitBytes splits n (negative counts as 0) into the low and the high 32 bits.
+func SplitBytes(n int64) (low, giga uint32) {
+	u := uint64(max(n, 0))
+	return uint32(u), uint32(u >> 32)
+}
+
+// GrantFor builds the Accept attributes from the member's state and plan.
+// Layer 1 of the enforcement (O3/O4): the router gets exact limits. The server
+// adds layer 2 (domain.ShouldEnd) on every Interim.
+func GrantFor(m MemberState, p Plan, intervalSeconds int, now time.Time) Grant {
+	q := QuotaOf(m, p)
 	g := Grant{InterimSeconds: uint32(max(min(int64(intervalSeconds), MaxAttr32), 0)), RateLimit: RateLimit(p)}
-	timeout := int64(UnlimitedSessionTimeout)
-	if !q.TimeUnlimited {
-		timeout = q.RemainingSecs
-	}
-	g.SessionTimeout = uint32(max(min(timeout, MaxAttr32), 0))
-	xmit := int64(UnlimitedXmitLimit)
 	if !q.DataUnlimited {
-		xmit = q.RemainingBytes
+		g.DataLimited = true
+		g.DataLow, g.DataGiga = SplitBytes(q.RemainingBytes)
 	}
-	if xmit > MaxAttr32 {
-		xmit, g.XmitClamped = MaxAttr32, true
+	timeout := int64(q.WindowEnd.Sub(now) / time.Second) // the window always has an end
+	if !q.TimeUnlimited {
+		timeout = min(timeout, q.RemainingSecs)
 	}
-	xmit = max(xmit, 0)
-	g.XmitLimit = uint32(xmit)
+	if m.ExpiresAt != nil {
+		timeout = min(timeout, int64(m.ExpiresAt.Sub(now)/time.Second))
+	}
+	g.SessionTimeout = uint32(max(min(timeout, MaxAttr32), 1))
 	return g
 }
 

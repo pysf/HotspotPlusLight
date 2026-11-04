@@ -187,9 +187,6 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 		s.log.Error("login check failed; no reply", "from", from, "err", err)
 		return
 	}
-	if v.Grant.XmitClamped {
-		s.log.Warn("Mikrotik-Xmit-Limit clamped to the 32-bit maximum (the remaining data exceeds 4294967295 bytes)", "username", username)
-	}
 	s.reply(w, r, v)
 }
 
@@ -201,11 +198,22 @@ func (s *Server) reply(w radius.ResponseWriter, r *radius.Request, v auth.Verdic
 		g := v.Grant
 		rfc2869.AcctInterimInterval_Set(resp, rfc2869.AcctInterimInterval(g.InterimSeconds))
 		rfc2865.SessionTimeout_Set(resp, rfc2865.SessionTimeout(g.SessionTimeout))
-		// VERIFY-ON-HARDWARE (PLAN 13.2): the vendor-14988 type ids (Xmit-Limit 2,
-		// Rate-Limit 8) come from the MikroTik dictionary in layeh.com/radius and
-		// match PLAN 7.5; the semantics (download-only cap, the 4294967295 clamp)
-		// and the accepted Rate-Limit syntax still need a real router.
-		mikrotik.MikrotikXmitLimit_Set(resp, mikrotik.MikrotikXmitLimit(g.XmitLimit))
+		// Layer 1 of the enforcement (O3, 2026-11-04): the router gets the exact bytes
+		// left, in both directions, split into the low 32 bits and -Gigawords.
+		// VERIFY-ON-HARDWARE (PLAN 13.2): the type ids (Recv-Limit 1, Xmit-Limit 2,
+		// Recv-Limit-Gigawords 14, Xmit-Limit-Gigawords 15, Rate-Limit 8) come from the
+		// MikroTik dictionary in layeh.com/radius and match PLAN 7.5. Still to prove on a
+		// router: that Recv/Xmit mean upload/download in the Hotspot (the MikroTik doc does
+		// not define the direction), that the Gigawords limits are honoured, and the
+		// Rate-Limit syntax.
+		if g.DataLimited {
+			mikrotik.MikrotikRecvLimit_Set(resp, mikrotik.MikrotikRecvLimit(g.DataLow))
+			mikrotik.MikrotikXmitLimit_Set(resp, mikrotik.MikrotikXmitLimit(g.DataLow))
+			if g.DataGiga > 0 {
+				mikrotik.MikrotikRecvLimitGigawords_Set(resp, mikrotik.MikrotikRecvLimitGigawords(g.DataGiga))
+				mikrotik.MikrotikXmitLimitGigawords_Set(resp, mikrotik.MikrotikXmitLimitGigawords(g.DataGiga))
+			}
+		}
 		if g.RateLimit != "" {
 			mikrotik.MikrotikRateLimit_SetString(resp, g.RateLimit)
 		}

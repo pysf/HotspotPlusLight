@@ -248,7 +248,7 @@ func (s *Service) Update(ctx context.Context, id int64, f domain.MemberForm) (do
 			return domain.FieldErrors{"username": "This member is online: disconnect the member before renaming."}, KickResult{}, nil
 		}
 	}
-	// MONITOR: an expires_at in the past does not disconnect a member who is online (O3/O7: enforced at login only).
+	// An expires_at in the past disconnects the member at their next Interim (Phase 11a, session.Enforcer).
 	err = s.repo.UpdateMember(ctx, id, in, e.now)
 	if errors.Is(err, domain.ErrUsernameTaken) {
 		return domain.FieldErrors{"username": "This username is already taken."}, KickResult{}, nil

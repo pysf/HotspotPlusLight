@@ -552,22 +552,27 @@ func TestE5_08_DeleteKicksFirst(t *testing.T) {
 	}
 }
 
-// E5.09 no Disconnect on an Interim, even with the quota used up (O3 = legacy); the next login is rejected.
-func TestE5_09_NoAutomaticDisconnect(t *testing.T) {
+// E5.09 no Disconnect while the member is under quota (O3, changed 2026-11-04: over quota the server disconnects, see E11.04);
+// a rejected login sends none either.
+func TestE5_09_NoDisconnectUnderQuota(t *testing.T) {
 	f := newP5(t)
-	p := f.plan("Tiny", "bulk_value", "1", "bulk_unit", "MB")
+	p := f.plan("Tiny", "bulk_value", "1", "bulk_unit", "MB", "max_sessions", "2")
 	f.member(p, "alice", "password", "pw")
 	f.accepted("alice", "pw")
 	f.online("alice", "s1", "192.168.88.10", "AA:BB:CC:DD:EE:01")
-	f.interim("alice", "s1", 5*1024*1024, 0, 60)
-	time.Sleep(300 * time.Millisecond)
+	f.interim("alice", "s1", 512*1024, 0, 60)
+	waitUntil(t, "enforcement idle", f.s.App.EnforcementIdle)
+	time.Sleep(200 * time.Millisecond)
 	if n := len(f.coa.Requests()); n != 0 {
-		t.Fatalf("%d Disconnect-Requests sent on an Interim", n)
+		t.Fatalf("%d Disconnect-Requests sent on an Interim under quota", n)
 	}
 	if got := onlineUsers(f.p2); len(got) != 1 {
 		t.Fatalf("session must stay: %v", got)
 	}
-	f.rejected("alice", "pw", "OUT_OF_BULK")
+	f.interim("alice", "s1", 600*1024, 0, 70) // still under 1 MB
+	waitUntil(t, "enforcement idle", f.s.App.EnforcementIdle)
+	f.exec(`UPDATE member SET active=0`)
+	f.rejected("alice", "pw", "INACTIVE_USER")
 	if n := len(f.coa.Requests()); n != 0 {
 		t.Fatalf("%d Disconnect-Requests sent on a rejected login", n)
 	}

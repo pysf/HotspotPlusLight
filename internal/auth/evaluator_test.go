@@ -88,7 +88,7 @@ func login(f *fakeLogin, user, pw string) (Verdict, error) {
 
 func TestEvaluatorOrder(t *testing.T) {
 	f := newFake()
-	if v, _ := login(f, "alice", "pw"); !v.Accepted() || v.Grant.XmitLimit != 1<<30 {
+	if v, _ := login(f, "alice", "pw"); !v.Accepted() || v.Grant.DataLow != 1<<30 {
 		t.Fatalf("%+v", v)
 	}
 	f.active = 1
@@ -129,7 +129,7 @@ func TestEvaluatorAutoRenew(t *testing.T) {
 	}
 	f.plan.AutoResubscribe = true
 	v, err := login(f, "alice", "pw")
-	if err != nil || !v.Accepted() || f.renewals != 1 || v.Grant.XmitLimit != 1<<30 {
+	if err != nil || !v.Accepted() || f.renewals != 1 || v.Grant.DataLow != 1<<30 {
 		t.Fatalf("%+v %v renewals=%d", v, err, f.renewals)
 	}
 }

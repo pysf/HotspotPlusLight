@@ -154,6 +154,18 @@ func Evaluate(m MemberState, p Plan, now time.Time) Decision {
 	return d
 }
 
+// ShouldEnd is layer 2 of the enforcement (O3/O4, 2026-11-04): it reports
+// whether an online member must be disconnected now, and why. It is the login
+// rule itself: true when Evaluate rejects, or when the window of an auto-renew
+// plan has ended (the member logs in again and the renewal happens, BR-6).
+func ShouldEnd(m MemberState, p Plan, now time.Time) (Reason, bool) {
+	d := Evaluate(m, p, now)
+	if d.Renew {
+		return ReasonNoSubscription, true
+	}
+	return d.Reason, d.Reason != ""
+}
+
 // RenewedState is the member state after a renewal at now (BR-13b).
 func RenewedState(m MemberState, now time.Time) MemberState {
 	m.SubscriptionDate = now

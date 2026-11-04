@@ -120,7 +120,7 @@ func (e *Evaluator) Login(ctx context.Context, username, password string) (Verdi
 	if active >= plan.MaxSessions {
 		return reject(domain.ReasonNoMoreSession), nil
 	}
-	return Verdict{Grant: domain.GrantFor(domain.QuotaOf(m.State(), plan), plan, st.AccountingIntervalSeconds)}, nil
+	return Verdict{Grant: domain.GrantFor(m.State(), plan, st.AccountingIntervalSeconds, now)}, nil
 }
 
 // authenticate is check 1 of PLAN 7.2: the member exists (BR-1, case-insensitive)

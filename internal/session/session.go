@@ -59,6 +59,12 @@ const KickCause = "Admin-Reset"
 // ended. On NAK or timeout the session stays as it was and the error is returned
 // (BR-18). It is the Disconnector the member service uses (deactivate, delete).
 func (s *Service) Disconnect(ctx context.Context, t Target) error {
+	return s.DisconnectWithCause(ctx, t, KickCause)
+}
+
+// DisconnectWithCause is Disconnect with the terminate cause the row gets on
+// ACK. The server's own enforcement uses "Server: <CODE>" (O3/O4).
+func (s *Service) DisconnectWithCause(ctx context.Context, t Target, cause string) error {
 	if err := s.disc.Disconnect(ctx, t); err != nil {
 		return err
 	}
@@ -68,7 +74,7 @@ func (s *Service) Disconnect(ctx context.Context, t Target) error {
 	// The router has disconnected the user. If marking the row fails, that is still
 	// a success for the admin (a retry would send a second Disconnect); the router's
 	// Stop closes the row later.
-	if err := s.repo.EndSession(ctx, t.ID, s.clock.Now(), KickCause); err != nil {
+	if err := s.repo.EndSession(ctx, t.ID, s.clock.Now(), cause); err != nil {
 		s.log.Error("disconnect ACKed but the session row could not be marked ended; the router's Stop will close it", "session_id", t.ID, "err", err)
 	}
 	return nil
@@ -127,7 +133,17 @@ type Service struct {
 	clock        clock.Clock
 	log          *slog.Logger
 	beforeCommit func() error
+	enforcer     Checker
 }
+
+// Checker asks for an enforcement check of one open session (implemented by *Enforcer).
+type Checker interface {
+	Check(memberID int64, username, acctSessionID, nasIP string)
+}
+
+// WithEnforcer makes Account ask c to check every open session after an Start
+// or Interim has been stored (layer 2 of the enforcement, O3/O4).
+func WithEnforcer(c Checker) Option { return func(s *Service) { s.enforcer = c } }
 
 // Option customizes a Service.
 type Option func(*Service)
@@ -155,10 +171,9 @@ func (s *Service) OpenCount(ctx context.Context) (int, error) { return s.repo.Co
 // caller may send the Accounting-Response; on error nothing was stored and no
 // reply must be sent. Other status types and unknown users change nothing.
 //
-// MONITOR: legacy-faithful gap (O3/O4): nothing here ends a session whose quota
-// is used up. The router's Mikrotik-Xmit-Limit and Session-Timeout (set at
-// login) are the only enforcement; the next Access-Request is rejected by the
-// login check. Revisit if routers do not enforce them (PLAN 13.2, 13.4).
+// After the commit, a Start or Interim of an open session asks the Enforcer to
+// check the member (layer 2, O3/O4). That never blocks and never delays the
+// Accounting-Response. A Stop never triggers a check.
 //
 // MONITOR: Accounting-On/Off are acknowledged without effect (owner,
 // 2026-11-01): after a router reboot, ghost sessions can block max_sessions
@@ -189,7 +204,10 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 		loc = time.UTC
 	}
 	day := domain.DayKey(now, loc)
-	return s.repo.InAcctTx(ctx, func(tx AcctTx) error {
+	var check *domain.Session // the open session to check after the commit
+	var checkMember int64
+	err = s.repo.InAcctTx(ctx, func(tx AcctTx) error {
+		check = nil
 		m, err := tx.MemberByUsername(ctx, rec.Username)
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil // unknown user: acknowledged, nothing stored (legacy)
@@ -232,11 +250,19 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 				}
 			}
 		}
+		if !res.Ignore && rec.Status != domain.AcctStop && res.Session.EndedAt == nil {
+			c := res.Session
+			check, checkMember = &c, m.ID
+		}
 		if s.beforeCommit != nil {
 			return s.beforeCommit()
 		}
 		return nil
 	})
+	if err == nil && check != nil && s.enforcer != nil {
+		s.enforcer.Check(checkMember, check.Username, check.AcctSessionID, check.NASIP)
+	}
+	return err
 }
 
 // Prune deletes sessions older than settings.session_retention_days (O18;

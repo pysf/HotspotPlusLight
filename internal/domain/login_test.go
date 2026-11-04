@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -37,15 +38,51 @@ func TestRateLimit(t *testing.T) {
 }
 
 func TestGrantFor(t *testing.T) {
-	plan := Plan{SpeedValue: 1, SpeedUnit: "Mbps", BulkValue: 10, BulkUnit: "GB", TimeLimitMinutes: 60}
-	g := GrantFor(QuotaOf(MemberState{UsedSeconds: 600}, plan), plan, 60)
-	if g.SessionTimeout != 3000 || !g.XmitClamped || g.XmitLimit != MaxAttr32 || g.InterimSeconds != 60 {
+	now := time.Unix(1_700_000_000, 0).UTC()
+	plan := Plan{SpeedValue: 1, SpeedUnit: "Mbps", BulkValue: 10, BulkUnit: "GB", TimeLimitMinutes: 60, DurationDays: 30}
+	g := GrantFor(MemberState{SubscriptionDate: now, UsedSeconds: 600}, plan, 60, now)
+	if g.SessionTimeout != 3000 || !g.DataLimited || g.DataGiga != 2 || g.DataLow != uint32(10<<30-2<<32) || g.InterimSeconds != 60 {
 		t.Errorf("%+v", g)
 	}
-	free := Plan{}
-	g = GrantFor(QuotaOf(MemberState{}, free), free, 30)
-	if g.SessionTimeout != UnlimitedSessionTimeout || g.XmitLimit != UnlimitedXmitLimit || g.XmitClamped || g.RateLimit != "" {
-		t.Errorf("%+v", g)
+	free := Plan{DurationDays: 1}
+	g = GrantFor(MemberState{SubscriptionDate: now}, free, 30, now)
+	if g.DataLimited || g.RateLimit != "" || g.SessionTimeout != 86400 {
+		t.Errorf("unlimited plan: %+v", g)
+	}
+}
+
+func TestGrantForTimeout(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0).UTC()
+	soon := now.Add(100 * time.Second)
+	late := now.Add(5000 * time.Second)
+	plan := Plan{DurationDays: 1, TimeLimitMinutes: 60}
+	for name, c := range map[string]struct {
+		m    MemberState
+		p    Plan
+		want uint32
+	}{
+		"time quota wins":    {MemberState{SubscriptionDate: now, UsedSeconds: 3500}, plan, 100},
+		"expires_at wins":    {MemberState{SubscriptionDate: now, ExpiresAt: &soon}, plan, 100},
+		"window end wins":    {MemberState{SubscriptionDate: now.Add(-86400 * time.Second).Add(100 * time.Second)}, plan, 100},
+		"expires_at later":   {MemberState{SubscriptionDate: now, ExpiresAt: &late}, plan, 3600},
+		"at least one":       {MemberState{SubscriptionDate: now, UsedSeconds: 3600}, plan, 1},
+		"window already out": {MemberState{SubscriptionDate: now.Add(-2 * 86400 * time.Second)}, plan, 1},
+		"capped at 32 bits":  {MemberState{SubscriptionDate: now}, Plan{DurationDays: 90000}, math.MaxUint32},
+	} {
+		if g := GrantFor(c.m, c.p, 60, now); g.SessionTimeout != c.want {
+			t.Errorf("%s: %d, want %d", name, g.SessionTimeout, c.want)
+		}
+	}
+}
+
+func TestSplitBytes(t *testing.T) {
+	for _, c := range []struct {
+		n         int64
+		low, giga uint32
+	}{{-5, 0, 0}, {0, 0, 0}, {1<<32 - 1, 1<<32 - 1, 0}, {1 << 32, 0, 1}, {5<<32 + 7, 7, 5}} {
+		if l, g := SplitBytes(c.n); l != c.low || g != c.giga {
+			t.Errorf("%d: %d/%d", c.n, l, g)
+		}
 	}
 }
 
@@ -64,12 +101,5 @@ func TestReplyMessage(t *testing.T) {
 		if r.Message() == "" {
 			t.Errorf("%s has no message", r)
 		}
-	}
-}
-
-func TestGrantForClampsNegativeValues(t *testing.T) {
-	g := GrantFor(Quota{RemainingSecs: -5, RemainingBytes: -9}, Plan{}, -1)
-	if g.SessionTimeout != 0 || g.XmitLimit != 0 || g.InterimSeconds != 0 {
-		t.Errorf("%+v", g)
 	}
 }

@@ -73,6 +73,8 @@ type App struct {
 	store  *store.Store
 	svc    services
 	radius *radius.Server
+	// enforcer is layer 2 of the quota enforcement (O3/O4): it disconnects online members who must not be online.
+	enforcer *session.Enforcer
 
 	httpSrv, adminSrv  *http.Server
 	authConn, acctConn net.PacketConn
@@ -160,7 +162,10 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if opts.AccountingBeforeCommit != nil {
 		sessOpts = append(sessOpts, session.WithBeforeCommit(opts.AccountingBeforeCommit))
 	}
+	enforcer := session.NewEnforcer(st, opts.Clock, log)
+	sessOpts = append(sessOpts, session.WithEnforcer(enforcer))
 	sess := session.New(sessionRepo{st}, disc, opts.Clock, sessOpts...)
+	a.enforcer = enforcer
 	members := member.New(st, box, sess, opts.Clock) // kicks go through the session service: ACK => session ended
 	a.svc = services{
 		auth:      auth.New(st, opts.Clock),
@@ -274,6 +279,7 @@ func (a *App) Start() (err error) {
 	go a.serveHTTP("public", a.httpSrv, a.httpLn)
 	go a.serveHTTP("admin", a.adminSrv, a.adminLn)
 	a.startPruning()
+	a.enforcer.Start(a.svc.session)
 	a.radius.Serve(a.authConn, a.acctConn)
 	a.log.Info("listening", "http", a.addrs.HTTP, "admin", a.addrs.Admin, "radius_auth", a.addrs.RadiusAuth, "radius_acct", a.addrs.RadiusAcct)
 	return nil
@@ -349,7 +355,9 @@ func (a *App) Shutdown(ctx context.Context) error {
 			a.pruneCancel()
 			<-a.pruneDone
 		}
-		err = errors.Join(a.httpSrv.Shutdown(ctx), a.adminSrv.Shutdown(ctx), a.radius.Shutdown(ctx), a.store.Close())
+		err = errors.Join(a.httpSrv.Shutdown(ctx), a.adminSrv.Shutdown(ctx), a.radius.Shutdown(ctx))
+		a.enforcer.Stop() // after RADIUS: no more checks are queued; waits for the running ones
+		err = errors.Join(err, a.store.Close())
 		a.log.Info("shutdown complete")
 	})
 	return err
@@ -400,3 +408,6 @@ func Run(ctx context.Context, opts Options) error {
 	defer cancel()
 	return a.Shutdown(sctx)
 }
+
+// EnforcementIdle reports that no automatic-disconnect check is queued or running (tests wait for it).
+func (a *App) EnforcementIdle() bool { return a.enforcer.Idle() }

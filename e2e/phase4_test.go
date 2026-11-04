@@ -404,7 +404,8 @@ func TestE4_12_BadAuthenticatorDropped(t *testing.T) {
 	f.wantUsage(id, usage{1000, 100, 60})
 }
 
-// E4.13 quota exhaustion through Interims: the next Access-Request is rejected OUT_OF_BULK (and no Disconnect is sent, O3).
+// E4.13 quota exhaustion through Interims: the next Access-Request is rejected OUT_OF_BULK, and the server
+// sends one Disconnect itself (O3, changed 2026-11-04; was "no Disconnect"). The details are E11.04.
 func TestE4_13_DataExhaustedViaInterims(t *testing.T) {
 	f := newP4(t)
 	f.member(f.plan("Tiny", "bulk_value", "1", "bulk_unit", "MB", "max_sessions", "5"), "alice", "password", "pw")
@@ -414,10 +415,14 @@ func TestE4_13_DataExhaustedViaInterims(t *testing.T) {
 	if x := xmitLimit(t, f.accepted("alice", "pw")); x != uint32(mb/4) {
 		t.Fatalf("remaining %d, want %d", x, mb/4)
 	}
-	f.interim("alice", "s1", uint64(mb/2), uint64(mb/2), 120) // upload counts too
-	f.rejected("alice", "pw", "OUT_OF_BULK")
 	if len(f.disc.Calls()) != 0 {
-		t.Fatalf("server-side Disconnect sent: %v", f.disc.Calls())
+		t.Fatalf("Disconnect sent although the member is under quota: %v", f.disc.Calls())
+	}
+	f.interim("alice", "s1", uint64(mb/2), uint64(mb/2), 120) // upload counts too
+	waitUntil(t, "the server's Disconnect", func() bool { return len(f.disc.Calls()) == 1 })
+	f.rejected("alice", "pw", "OUT_OF_BULK")
+	if c := f.disc.Calls(); len(c) != 1 || c[0].Username != "alice" || c[0].AcctSessionID != "s1" {
+		t.Fatalf("server-side Disconnects: %v", c)
 	}
 }
 
