@@ -40,6 +40,6 @@ Scope: license, public name, technical README, release names. The site is 13b.
 ## Open questions
 - Pages: the owner must set Pages source to "GitHub Actions" once.
 - Router commands and the launchd example are untested on real hardware; the site says so (router page). Windows firewall, ufw and launchd commands are standard OS commands, not checked against the code.
-- "Site title" setting is stored but shown nowhere; the docs say so.
+- "Site title" setting is stored but shown nowhere; the docs say so. (Fixed in Phase 14: now "Business name", see `docs/phase14-notes.md`.)
 - Lighthouse scores not measured.
 

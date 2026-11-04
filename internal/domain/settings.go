@@ -8,7 +8,7 @@ import (
 
 // Settings mirrors the single settings row (PLAN.md section 6) minus key_check.
 type Settings struct {
-	SiteTitle                 string
+	BusinessName              string
 	Timezone                  string
 	RadiusSharedSecret        string
 	CoaPort                   int
@@ -33,10 +33,10 @@ func (s Settings) Location() (*time.Location, error) {
 
 // SettingsForm is the raw text of the settings form.
 type SettingsForm struct {
-	SiteTitle, Timezone, RadiusSharedSecret, CoaPort, AccountingIntervalSeconds string
-	DefaultPlanID                                                               string // "" = none
-	BatchUsernamePrefix, BatchCounter, BatchMaxCount                            string
-	VoucherPasswordLength, VoucherHelp, SessionRetentionDays                    string
+	BusinessName, Timezone, RadiusSharedSecret, CoaPort, AccountingIntervalSeconds string
+	DefaultPlanID                                                                  string // "" = none
+	BatchUsernamePrefix, BatchCounter, BatchMaxCount                               string
+	VoucherPasswordLength, VoucherHelp, SessionRetentionDays                       string
 }
 
 // FormFromSettings renders stored settings back into form text.
@@ -47,7 +47,7 @@ func FormFromSettings(s Settings) SettingsForm {
 	}
 	i := strconv.Itoa
 	return SettingsForm{
-		SiteTitle: s.SiteTitle, Timezone: s.Timezone, RadiusSharedSecret: s.RadiusSharedSecret,
+		BusinessName: s.BusinessName, Timezone: s.Timezone, RadiusSharedSecret: s.RadiusSharedSecret,
 		CoaPort: i(s.CoaPort), AccountingIntervalSeconds: i(s.AccountingIntervalSeconds), DefaultPlanID: def,
 		BatchUsernamePrefix: s.BatchUsernamePrefix,
 		BatchCounter:        i(s.BatchCounter), BatchMaxCount: i(s.BatchMaxCount), VoucherPasswordLength: i(s.VoucherPasswordLength),
@@ -61,7 +61,7 @@ func FormFromSettings(s Settings) SettingsForm {
 func ParseSettings(f SettingsForm) (Settings, FieldErrors) {
 	p := &parser{errs: FieldErrors{}}
 	s := Settings{
-		SiteTitle:                 p.text("site_title", f.SiteTitle, true, 100),
+		BusinessName:              p.line("business_name", f.BusinessName, false, 100),
 		Timezone:                  p.text("timezone", f.Timezone, true, 64),
 		RadiusSharedSecret:        p.secret("radius_shared_secret", f.RadiusSharedSecret, 128),
 		CoaPort:                   p.integer("coa_port", f.CoaPort, 1, 65535),

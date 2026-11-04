@@ -207,7 +207,7 @@ templ SettingsFormView(p SettingsProps) {
 		if p.Saved {
 			@ui.Flash("ok", "Settings saved.")
 		}
-		@ui.Field(ui.FieldProps{Label: "Site title", Name: "site_title", Value: p.Form.SiteTitle, Error: p.Errors["site_title"]})
+		@ui.Field(ui.FieldProps{Label: "Business name", Name: "business_name", Value: p.Form.BusinessName, Error: p.Errors["business_name"], Hint: "Shown on printed vouchers and in the admin header. Leave empty to hide."})
 		@ui.Field(ui.FieldProps{Label: "Time zone", Name: "timezone", Value: p.Form.Timezone, Error: p.Errors["timezone"], Hint: "IANA name, e.g. Europe/London. Dates are shown in this zone."})
 		@ui.FieldPair(ui.PairProps{Label: "RADIUS shared secret", For: "radius_shared_secret", Hint: "Must match the secret configured on the router. Changes apply immediately.", Errors: []ui.NamedError{{Name: "radius_shared_secret", Msg: p.Errors["radius_shared_secret"]}}}) {
 			@ui.InputControl(ui.FieldProps{Name: "radius_shared_secret", Type: "password", Value: p.Form.RadiusSharedSecret, Error: p.Errors["radius_shared_secret"], Attrs: templ.Attributes{"autocomplete": "off"}})

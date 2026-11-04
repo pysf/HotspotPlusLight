@@ -69,12 +69,12 @@ func TestSettingsRoundTripAndDefaultPlan(t *testing.T) {
 	if err != nil || st.CoaPort != 3799 || st.DefaultPlanID != nil {
 		t.Fatalf("%+v %v", st, err)
 	}
-	st.DefaultPlanID, st.SiteTitle = &id, "Cafe"
+	st.DefaultPlanID, st.BusinessName = &id, "Cafe"
 	if err := s.UpdateSettings(ctx, st, fixed()); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := s.GetSettings(ctx)
-	if got.DefaultPlanID == nil || *got.DefaultPlanID != id || got.SiteTitle != "Cafe" {
+	if got.DefaultPlanID == nil || *got.DefaultPlanID != id || got.BusinessName != "Cafe" {
 		t.Fatalf("%+v", got)
 	}
 	if ok, _ := s.IsDefaultPlan(ctx, id); !ok {

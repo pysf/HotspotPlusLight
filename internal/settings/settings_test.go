@@ -24,7 +24,7 @@ func (f *fakeRepo) UpdateSettings(_ context.Context, s domain.Settings, _ time.T
 func (f *fakeRepo) PlanExists(context.Context, int64) (bool, error) { return f.planOK, nil }
 
 func goodForm() domain.SettingsForm {
-	return domain.SettingsForm{SiteTitle: "T", Timezone: "Asia/Tehran", RadiusSharedSecret: "s", CoaPort: "3799", AccountingIntervalSeconds: "60",
+	return domain.SettingsForm{BusinessName: "T", Timezone: "Asia/Tehran", RadiusSharedSecret: "s", CoaPort: "3799", AccountingIntervalSeconds: "60",
 		BatchUsernamePrefix: "wifi", BatchCounter: "1", BatchMaxCount: "30", VoucherPasswordLength: "6", SessionRetentionDays: "90"}
 }
 

@@ -158,9 +158,11 @@ func (s *Service) Delete(ctx context.Context, id int64) (member.DeleteResult, er
 // Print is the data of a voucher print page (BR-16).
 type Print struct {
 	Title string
-	Help  string
-	Pages [][]domain.Voucher
-	Total int
+	// BusinessName is printed on the top line of each voucher. Empty means no line.
+	BusinessName string
+	Help         string
+	Pages        [][]domain.Voucher
+	Total        int
 }
 
 func (s *Service) print(ctx context.Context, title string, vs []domain.Voucher) (Print, error) {
@@ -168,7 +170,7 @@ func (s *Service) print(ctx context.Context, title string, vs []domain.Voucher) 
 	if err != nil {
 		return Print{}, err
 	}
-	return Print{Title: title, Help: domain.VoucherHelp(st.VoucherHelp), Pages: domain.VoucherPages(vs), Total: len(vs)}, nil
+	return Print{Title: title, BusinessName: st.BusinessName, Help: domain.VoucherHelp(st.VoucherHelp), Pages: domain.VoucherPages(vs), Total: len(vs)}, nil
 }
 
 // PrintBatch returns the batch's vouchers with the current passwords.

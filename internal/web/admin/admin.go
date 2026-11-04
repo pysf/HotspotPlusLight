@@ -187,6 +187,12 @@ func (h handlers) pageEnv(next http.Handler) http.Handler {
 			theme = c.Value
 		}
 		env := ui.Env{Theme: ui.ParseTheme(theme), Asset: h.Assets.URL}
+		// A failed read only hides the business name (and is logged); the page still renders.
+		if st, err := h.Settings.Get(r.Context()); err != nil {
+			slog.Warn("admin: read settings for the business name", "err", err)
+		} else {
+			env.BusinessName = st.BusinessName
+		}
 		next.ServeHTTP(w, r.WithContext(ui.WithEnv(r.Context(), env)))
 	})
 }

@@ -22,6 +22,17 @@ func ParseTheme(v string) string {
 type Env struct {
 	Theme string
 	Asset func(name string) string
+	// BusinessName is the setting shown in the header and the tab title. Empty means it is hidden.
+	BusinessName string
+}
+
+// TabTitle returns the browser tab title: the page title, then the business name when set, then the product name.
+func (e Env) TabTitle(page string) string {
+	product := "HotspotPlus Lite"
+	if e.BusinessName != "" {
+		product = e.BusinessName + " \u00b7 " + product
+	}
+	return page + " - " + product
 }
 
 type envKey struct{}

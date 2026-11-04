@@ -102,6 +102,15 @@ func (p *parser) text(field, raw string, required bool, maxLen int) string {
 	return raw
 }
 
+// line is like text, but it also rejects control characters (a newline too).
+func (p *parser) line(field, raw string, required bool, maxLen int) string {
+	raw = p.text(field, raw, required, maxLen)
+	if strings.ContainsFunc(raw, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
+		p.errs.add(field, "Must not contain control characters or line breaks.")
+	}
+	return raw
+}
+
 // secret keeps the value verbatim (spaces can be part of a shared secret) and
 // rejects empty or whitespace-only input and control characters (a newline would
 // end the quoted string in the pasted router setup script).

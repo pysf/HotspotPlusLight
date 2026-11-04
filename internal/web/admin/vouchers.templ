@@ -35,6 +35,9 @@ templ VoucherSheets(p voucher.Print, backURL string) {
 				<section class="sheet" data-page={ strconv.Itoa(i + 1) }>
 					for _, v := range page {
 						<div class="voucher" dir="ltr" data-voucher data-username={ v.Username } data-password={ v.Password }>
+							if p.BusinessName != "" {
+								<p class="title" data-business>{ p.BusinessName } &middot; Wi-Fi</p>
+							}
 							<p class="help" data-help>{ p.Help }</p>
 							<p class="credentials">Username: <b>{ v.Username }</b> | Password: <b>{ v.Password }</b></p>
 						</div>

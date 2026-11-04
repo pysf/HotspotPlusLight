@@ -10,7 +10,7 @@ func settingsForm(r *http.Request) domain.SettingsForm {
 	_ = r.ParseForm()
 	v := r.PostFormValue
 	return domain.SettingsForm{
-		SiteTitle: v("site_title"), Timezone: v("timezone"), RadiusSharedSecret: v("radius_shared_secret"),
+		BusinessName: v("business_name"), Timezone: v("timezone"), RadiusSharedSecret: v("radius_shared_secret"),
 		CoaPort: v("coa_port"), AccountingIntervalSeconds: v("accounting_interval_seconds"), DefaultPlanID: v("default_plan_id"),
 		BatchUsernamePrefix: v("batch_username_prefix"), BatchCounter: v("batch_counter"), BatchMaxCount: v("batch_max_count"),
 		VoucherPasswordLength: v("voucher_password_length"), VoucherHelp: v("voucher_help"),

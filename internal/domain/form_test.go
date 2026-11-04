@@ -36,7 +36,7 @@ func TestParsePlanInvalid(t *testing.T) {
 }
 
 func TestParseSettings(t *testing.T) {
-	good := SettingsForm{SiteTitle: "T", Timezone: "UTC", RadiusSharedSecret: "s", CoaPort: "3799", AccountingIntervalSeconds: "60",
+	good := SettingsForm{BusinessName: "T", Timezone: "UTC", RadiusSharedSecret: "s", CoaPort: "3799", AccountingIntervalSeconds: "60",
 		BatchUsernamePrefix: "wifi", BatchCounter: "1360", BatchMaxCount: "30", VoucherPasswordLength: "6", SessionRetentionDays: "90"}
 	if s, errs := ParseSettings(good); len(errs) != 0 || s.DefaultPlanID != nil {
 		t.Fatalf("%+v %v", s, errs)
@@ -51,6 +51,7 @@ func TestParseSettings(t *testing.T) {
 		"batch_username_prefix":       func(f *SettingsForm) { f.BatchUsernamePrefix = "a-b" },
 		"default_plan_id":             func(f *SettingsForm) { f.DefaultPlanID = "x" },
 		"session_retention_days":      func(f *SettingsForm) { f.SessionRetentionDays = "-1" },
+		"business_name":               func(f *SettingsForm) { f.BusinessName = "Hotel\nAria" },
 	} {
 		f := good
 		mutate(&f)
@@ -61,7 +62,7 @@ func TestParseSettings(t *testing.T) {
 }
 
 func TestSharedSecretKeptVerbatim(t *testing.T) {
-	f := SettingsForm{SiteTitle: "T", Timezone: "UTC", RadiusSharedSecret: "  se cret  ", CoaPort: "3799", AccountingIntervalSeconds: "60",
+	f := SettingsForm{BusinessName: "T", Timezone: "UTC", RadiusSharedSecret: "  se cret  ", CoaPort: "3799", AccountingIntervalSeconds: "60",
 		BatchUsernamePrefix: "wifi", BatchCounter: "1", BatchMaxCount: "30", VoucherPasswordLength: "6", SessionRetentionDays: "90"}
 	s, errs := ParseSettings(f)
 	if len(errs) != 0 || s.RadiusSharedSecret != "  se cret  " {

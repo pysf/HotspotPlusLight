@@ -308,7 +308,7 @@ CREATE TABLE plan (
 CREATE TABLE settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   key_check TEXT NOT NULL DEFAULT '', -- AES-GCM encryption of a fixed test string, written at first boot; verified at every start
-  site_title TEXT NOT NULL DEFAULT 'HotspotPlus',
+  business_name TEXT NOT NULL DEFAULT '',            -- shown on vouchers, admin header, tab title when not empty (Phase 14, 2026-11-04; was site_title)
   timezone TEXT NOT NULL DEFAULT 'UTC',
   radius_shared_secret TEXT NOT NULL,
   coa_port INTEGER NOT NULL DEFAULT 3799,

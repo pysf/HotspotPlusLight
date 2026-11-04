@@ -452,7 +452,7 @@ func TestE1_10_Settings(t *testing.T) {
 	}
 	d := page.Doc(t)
 	form := harness.FormValues(t, d, "form#settings-form")
-	for _, f := range []string{"site_title", "timezone", "radius_shared_secret", "coa_port", "accounting_interval_seconds",
+	for _, f := range []string{"business_name", "timezone", "radius_shared_secret", "coa_port", "accounting_interval_seconds",
 		"default_plan_id", "batch_username_prefix", "batch_counter", "batch_max_count",
 		"voucher_password_length", "voucher_help", "session_retention_days"} {
 		if d.Find(`form#settings-form [name="`+f+`"]`).Length() != 1 {
@@ -476,13 +476,13 @@ func TestE1_10_Settings(t *testing.T) {
 
 	// Invalid values: 422, message next to the field, nothing stored.
 	invalid := []struct{ field, val string }{
-		{"site_title", ""}, {"timezone", "Mars/Base"}, {"radius_shared_secret", ""},
+		{"business_name", strings.Repeat("x", 101)}, {"timezone", "Mars/Base"}, {"radius_shared_secret", ""},
 		{"coa_port", "0"}, {"coa_port", "65536"}, {"coa_port", "abc"},
 		{"accounting_interval_seconds", "9"}, {"accounting_interval_seconds", "x"},
 		{"default_plan_id", "9999"}, {"batch_username_prefix", "wi-fi"}, {"batch_counter", "-1"}, {"batch_max_count", "0"},
 		{"voucher_password_length", "0"}, {"voucher_password_length", "x"}, {"session_retention_days", "-1"},
 	}
-	before := scalar[string](t, db, `SELECT site_title||coa_port||accounting_interval_seconds||radius_shared_secret FROM settings`)
+	before := scalar[string](t, db, `SELECT business_name||coa_port||accounting_interval_seconds||radius_shared_secret FROM settings`)
 	for _, iv := range invalid {
 		f := harness.FormValues(t, d, "form#settings-form")
 		f.Set(iv.field, iv.val)
@@ -491,14 +491,14 @@ func TestE1_10_Settings(t *testing.T) {
 			t.Errorf("%s=%q: status %d err %q", iv.field, iv.val, r.StatusCode, fieldError(r, t, iv.field))
 		}
 	}
-	if after := scalar[string](t, db, `SELECT site_title||coa_port||accounting_interval_seconds||radius_shared_secret FROM settings`); after != before {
+	if after := scalar[string](t, db, `SELECT business_name||coa_port||accounting_interval_seconds||radius_shared_secret FROM settings`); after != before {
 		t.Fatal("invalid settings were stored")
 	}
 
 	// Valid update persists every column.
 	f := harness.FormValues(t, d, "form#settings-form")
 	for k, v := range map[string]string{
-		"site_title": "My Cafe", "timezone": "Asia/Tehran", "radius_shared_secret": "s3cret-value", "coa_port": "3800",
+		"business_name": "My Cafe", "timezone": "Asia/Tehran", "radius_shared_secret": "s3cret-value", "coa_port": "3800",
 		"accounting_interval_seconds": "120", "default_plan_id": fmt.Sprint(plan),
 		"batch_username_prefix": "cafe", "batch_counter": "2000",
 		"batch_max_count": "50", "voucher_password_length": "8", "voucher_help": "Connect to the WiFi and sign in.",
@@ -510,7 +510,7 @@ func TestE1_10_Settings(t *testing.T) {
 	if r.StatusCode != 200 || !strings.Contains(r.Body, "Settings saved") {
 		t.Fatalf("save: %d %s", r.StatusCode, r.Body)
 	}
-	row := db.QueryRow(`SELECT site_title,timezone,radius_shared_secret,coa_port,accounting_interval_seconds,default_plan_id,batch_username_prefix,batch_counter,batch_max_count,voucher_password_length,voucher_help,session_retention_days FROM settings`)
+	row := db.QueryRow(`SELECT business_name,timezone,radius_shared_secret,coa_port,accounting_interval_seconds,default_plan_id,batch_username_prefix,batch_counter,batch_max_count,voucher_password_length,voucher_help,session_retention_days FROM settings`)
 	var (
 		title, tz, sec, prefix, help               string
 		coa, interval, counter, maxc, vlen, retain int
@@ -527,7 +527,7 @@ func TestE1_10_Settings(t *testing.T) {
 	// Reload shows what was saved; "" clears the default plan.
 	d2 := c.Get("/admin/settings").Doc(t)
 	f2 := harness.FormValues(t, d2, "form#settings-form")
-	if f2.Get("site_title") != "My Cafe" || f2.Get("default_plan_id") != fmt.Sprint(plan) {
+	if f2.Get("business_name") != "My Cafe" || f2.Get("default_plan_id") != fmt.Sprint(plan) {
 		t.Fatalf("reloaded form: %v", f2)
 	}
 	f2.Set("default_plan_id", "")

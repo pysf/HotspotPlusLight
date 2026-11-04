@@ -839,7 +839,7 @@ func SettingsFormView(p SettingsProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Field(ui.FieldProps{Label: "Site title", Name: "site_title", Value: p.Form.SiteTitle, Error: p.Errors["site_title"]}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Field(ui.FieldProps{Label: "Business name", Name: "business_name", Value: p.Form.BusinessName, Error: p.Errors["business_name"], Hint: "Shown on printed vouchers and in the admin header. Leave empty to hide."}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

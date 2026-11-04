@@ -30,6 +30,15 @@
     letter-spacing: var(--ls-head);
   }
   .l-brand:hover { text-decoration: none; }
+  .l-brand__name {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
+    font-size: var(--fs-small);
+    font-weight: normal;
+  }
   .l-brand__mark {
     flex: none;
     inline-size: var(--s-6);

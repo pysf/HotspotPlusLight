@@ -160,3 +160,5 @@ Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **
 - **Phase 13a (license, public name, technical README, release names) is built (2026-11-04), not committed.** Public name "HotspotPlus Lite" (binary, module, repo, service keep `hotspotpluslight`), AGPL-3.0 `LICENSE`, README is technical only (install and user docs move to the site, 13b), release files have stable names without the version, `.github/workflows/release.yml`. Notes: `docs/phase13-notes.md`.
 
 - **Phase 13b (public site) is built (2026-11-04), not committed.** `site/` (home + 11 docs pages), `.github/workflows/pages.yml`, tests E13.03-E13.17. Notes: `docs/phase13-notes.md`.
+
+- **Business name (2026-11-04, owner)** replaces "Site title": empty by default, shown on vouchers, in the admin header and in the tab title when set. Migration 0005, tests E14.01-E14.03. Notes: `docs/phase14-notes.md`.

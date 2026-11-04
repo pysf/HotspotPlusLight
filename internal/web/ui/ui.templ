@@ -101,7 +101,7 @@ templ Layout(d LayoutData) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<meta name="htmx-config" content={ htmxConfig }/>
-			<title>{ d.Title } - HotspotPlus Lite</title>
+			<title>{ env.TabTitle(d.Title) }</title>
 			<link rel="stylesheet" href={ env.Asset("app.css") }/>
 			if !d.Bare {
 				<script src={ env.Asset("htmx.min.js") } defer></script>
@@ -124,6 +124,9 @@ templ Layout(d LayoutData) {
 						<a class="l-brand" href="/admin/members">
 							<span class="l-brand__mark" aria-hidden="true"></span>
 							HotspotPlus Lite
+							if env.BusinessName != "" {
+								<span class="l-brand__name">{ env.BusinessName }</span>
+							}
 						</a>
 						<nav aria-label="Main" class="l-nav">
 							for _, g := range navGroups(d.Nav) {

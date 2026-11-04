@@ -193,7 +193,7 @@ func TestE12_09_Migration0004(t *testing.T) {
 			t.Errorf("column %s still exists", g)
 		}
 	}
-	if scalar[string](t, db, `SELECT site_title FROM settings`) != "Kept Cafe" || scalar[string](t, db, `SELECT timezone FROM settings`) != "Asia/Tehran" ||
+	if scalar[string](t, db, `SELECT business_name FROM settings`) != "Kept Cafe" || scalar[string](t, db, `SELECT timezone FROM settings`) != "Asia/Tehran" ||
 		scalar[int](t, db, `SELECT coa_port FROM settings`) != 3800 || scalar[string](t, db, `SELECT voucher_help FROM settings`) != "help text" ||
 		scalar[string](t, db, `SELECT radius_shared_secret FROM settings`) != secret || scalar[int](t, db, `SELECT count(*) FROM admin`) != 1 {
 		t.Error("existing data did not survive the migration")

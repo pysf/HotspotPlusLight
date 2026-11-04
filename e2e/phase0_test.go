@@ -188,8 +188,8 @@ func TestE0_08_NoPlanAtFirstStart(t *testing.T) {
 	}
 }
 
-// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily, 0003_admin_must_change, 0004_drop_page_api_settings).
-const wantMigrations = 4
+// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily, 0003_admin_must_change, 0004_drop_page_api_settings, 0005_business_name).
+const wantMigrations = 5
 
 // E0.09 (startup side) failing migration aborts startup at the previous version;
 // editing an applied migration is refused by checksum.
@@ -213,7 +213,8 @@ func TestE0_09_MigrationsAtStartup(t *testing.T) {
 		"0002_usage_daily.sql":            {Data: mustRead(t, "internal/store/migrations/0002_usage_daily.sql")},
 		"0003_admin_must_change.sql":      {Data: mustRead(t, "internal/store/migrations/0003_admin_must_change.sql")},
 		"0004_drop_page_api_settings.sql": {Data: mustRead(t, "internal/store/migrations/0004_drop_page_api_settings.sql")},
-		"0005_bad.sql":                    {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
+		"0005_business_name.sql":          {Data: mustRead(t, "internal/store/migrations/0005_business_name.sql")},
+		"0006_bad.sql":                    {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
 	}
 	_, err := harness.TryStart(harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey, Migrations: fsys})
 	if err == nil {

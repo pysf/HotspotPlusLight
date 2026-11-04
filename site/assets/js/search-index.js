@@ -124,7 +124,7 @@ export default [
   "page": "Configuration",
   "heading": "The Settings page",
   "url": "docs/configuration/#settings-page",
-  "keywords": "These are saved in the database and edited on the Settings page of the admin panel. They apply without a restart. Setting Default Meaning Site title HotspotPlus A name for your site. It is only stored; no page shows it yet. Time zone UTC An IANA name such as E"
+  "keywords": "These are saved in the database and edited on the Settings page of the admin panel. They apply without a restart. Setting Default Meaning Business name (empty) Your business name. It is printed at the top of every voucher and shown in the admin header and the browser tab. Leave it empty to hide it. Time zone UTC An IANA name such as E"
  },
  {
   "page": "First login",

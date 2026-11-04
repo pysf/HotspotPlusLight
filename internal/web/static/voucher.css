@@ -45,8 +45,23 @@ body {
   overflow: hidden;
 }
 
+.voucher .title {
+  margin: 0;
+  padding: 6px 10px 0;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Long help text is cut so that title, help and credentials always fit one cell (7 rows per A4). */
 .voucher .help {
   margin: 0;
+  max-height: 68px; /* 3 lines plus padding; the fallback where line-clamp is missing */
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   padding: 8px 10px;
   border-bottom: 1px dotted #666;
   white-space: pre-line;
