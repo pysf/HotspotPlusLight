@@ -10,13 +10,15 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
-// UsageService is the usage history report (implemented by internal/usage).
+// UsageService is the usage report part of internal/usage.
 type UsageService interface {
 	Report(ctx context.Context, rangeDays int) (usage.View, error)
 }
 
+// usageHome is the path of the usage page.
 const usageHome = "/admin/usage"
 
+// usageHref returns the link to the usage page for a range of days.
 func usageHref(days int) string { return usageHome + "?days=" + strconv.Itoa(days) }
 
 // usageBars maps the daily totals to chart columns; the data attributes are the test hooks.
@@ -33,6 +35,7 @@ func usageBars(v usage.View) []ui.Bar {
 	return bars
 }
 
+// usagePage shows the usage history.
 func (h handlers) usagePage(w http.ResponseWriter, r *http.Request) {
 	v, err := h.Usage.Report(r.Context(), atoi(r.URL.Query().Get("days")))
 	if err != nil {

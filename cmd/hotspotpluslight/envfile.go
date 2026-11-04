@@ -7,10 +7,9 @@ import (
 	"strings"
 )
 
-// parseEnvFile reads KEY=VALUE lines. Empty lines and lines starting with '#'
-// are skipped. Keys and values are trimmed. A value may be wrapped in one pair
-// of single or double quotes. In an unquoted value, a space followed by '#'
-// starts a comment that is removed (a '#' with no space before it is kept).
+// parseEnvFile returns the KEY=VALUE pairs read from r. It skips empty lines
+// and lines that start with '#', and accepts values in one pair of quotes. In
+// an unquoted value, " #" starts a comment. It fails on a line without a key.
 func parseEnvFile(r *bufio.Scanner) (map[string]string, error) {
 	m := map[string]string{}
 	n := 0
@@ -36,8 +35,8 @@ func parseEnvFile(r *bufio.Scanner) (map[string]string, error) {
 	return m, r.Err()
 }
 
-// envGetter returns a getenv function. Without a file it is os.Getenv. With a
-// file, a real (non-empty) environment variable wins over the file.
+// envGetter returns a getenv function for the env file at path. An empty path
+// returns real. A non-empty environment variable wins over the file.
 func envGetter(path string, real func(string) string) (func(string) string, error) {
 	if path == "" {
 		return real, nil
@@ -59,7 +58,8 @@ func envGetter(path string, real func(string) string) (func(string) string, erro
 	}, nil
 }
 
-// extractEnvFile removes "--env-file <path>" or "--env-file=<path>" from args.
+// extractEnvFile returns args without the --env-file option, and its path (empty
+// if absent). It fails when the option has no path.
 func extractEnvFile(args []string) (rest []string, path string, err error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]

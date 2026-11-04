@@ -14,10 +14,11 @@ import (
 // KeyCheckPlaintext is the fixed string encrypted into settings.key_check.
 const KeyCheckPlaintext = "hotspotpluslight-key-check-v1"
 
-// Box encrypts and decrypts with one key.
+// Box encrypts and decrypts with one AES-256-GCM key.
 type Box struct{ gcm cipher.AEAD }
 
-// ParseKey decodes the base64 32-byte HSP_SECRET_KEY.
+// ParseKey returns the key decoded from HSP_SECRET_KEY. It fails if the value is
+// not base64 or not exactly 32 bytes.
 func ParseKey(b64 string) ([]byte, error) {
 	key, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
@@ -29,6 +30,7 @@ func ParseKey(b64 string) ([]byte, error) {
 	return key, nil
 }
 
+// NewBox returns a Box for key, which must be 32 bytes.
 func NewBox(key []byte) (*Box, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -41,7 +43,7 @@ func NewBox(key []byte) (*Box, error) {
 	return &Box{gcm: gcm}, nil
 }
 
-// Encrypt returns nonce || ciphertext.
+// Encrypt returns plain encrypted with a new random nonce placed in front.
 func (b *Box) Encrypt(plain []byte) ([]byte, error) {
 	nonce := make([]byte, b.gcm.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
@@ -50,6 +52,8 @@ func (b *Box) Encrypt(plain []byte) ([]byte, error) {
 	return b.gcm.Seal(nonce, nonce, plain, nil), nil
 }
 
+// Decrypt returns the plain text of data made by Encrypt. It fails on short or
+// altered data and on a wrong key.
 func (b *Box) Decrypt(data []byte) ([]byte, error) {
 	n := b.gcm.NonceSize()
 	if len(data) < n {
@@ -58,7 +62,7 @@ func (b *Box) Decrypt(data []byte) ([]byte, error) {
 	return b.gcm.Open(nil, data[:n], data[n:], nil)
 }
 
-// KeyCheck produces the value stored in settings.key_check.
+// KeyCheck returns the text stored in settings.key_check.
 func (b *Box) KeyCheck() (string, error) {
 	enc, err := b.Encrypt([]byte(KeyCheckPlaintext))
 	if err != nil {
@@ -67,7 +71,7 @@ func (b *Box) KeyCheck() (string, error) {
 	return base64.StdEncoding.EncodeToString(enc), nil
 }
 
-// VerifyKeyCheck reports whether stored was produced with this box's key.
+// VerifyKeyCheck returns an error if stored was not made with this box's key.
 func (b *Box) VerifyKeyCheck(stored string) error {
 	raw, err := base64.StdEncoding.DecodeString(stored)
 	if err != nil {
@@ -80,9 +84,9 @@ func (b *Box) VerifyKeyCheck(stored string) error {
 	return nil
 }
 
-// RandomDigits returns n random decimal digits (crypto/rand), e.g. a 6-digit
-// member password (BR-14). Bytes >= 250 are discarded (rejection sampling), so
-// every digit is exactly uniform. n must be 1..MaxRandomDigits.
+// RandomDigits returns n random decimal digits, for example a member password
+// (BR-14). It fails if n is outside 1..MaxRandomDigits.
+// Bytes of 250 or more are skipped so that every digit is equally likely.
 func RandomDigits(n int) (string, error) {
 	if n < 1 || n > MaxRandomDigits {
 		return "", fmt.Errorf("secret: digit count %d out of range 1..%d", n, MaxRandomDigits)

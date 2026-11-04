@@ -7,6 +7,7 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
+// LoginPage is the admin login form. errMsg is shown above the form when it is not empty.
 templ LoginPage(username, errMsg string) {
 	@ui.Layout(ui.LayoutData{Title: "Log in", Bare: true}) {
 		<div class="l-stack">
@@ -24,8 +25,10 @@ templ LoginPage(username, errMsg string) {
 	}
 }
 
+// num returns v as text without trailing zeros.
 func num(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
 
+// limit returns a speed or size as text, and "Unlimited" for 0.
 func limit(v float64, unit string) string {
 	if v == 0 {
 		return "Unlimited"
@@ -33,6 +36,7 @@ func limit(v float64, unit string) string {
 	return num(v) + " " + unit
 }
 
+// minutes returns a time limit as text, and "Unlimited" for 0.
 func minutes(m int) string {
 	if m == 0 {
 		return "Unlimited"
@@ -40,6 +44,7 @@ func minutes(m int) string {
 	return strconv.Itoa(m) + " min"
 }
 
+// PlansPage lists the plans.
 templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Plans") {
@@ -57,6 +62,7 @@ templ PlanListFragment(plans []domain.Plan) {
 	@PlanListBody(plans)
 }
 
+// PlanListBody is the inside of the plan list region.
 templ PlanListBody(plans []domain.Plan) {
 	if len(plans) == 0 {
 		@ui.EmptyState("No plans yet. Create the first one.")
@@ -84,6 +90,7 @@ templ PlanListBody(plans []domain.Plan) {
 	@ui.Refresher(plansHome, plansChanged, "#"+planListID)
 }
 
+// PlanNewPage is the new plan form as a page (the no-JavaScript fallback of the sheet).
 templ PlanNewPage(l ui.LayoutData) {
 	@ui.Layout(l) {
 		@ui.PageHeader("New plan")
@@ -91,6 +98,7 @@ templ PlanNewPage(l ui.LayoutData) {
 	}
 }
 
+// PlanEditPage is the edit plan form as a page (the no-JavaScript fallback of the sheet).
 templ PlanEditPage(l ui.LayoutData, p PlanFormProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Edit plan")
@@ -98,6 +106,7 @@ templ PlanEditPage(l ui.LayoutData, p PlanFormProps) {
 	}
 }
 
+// PlanFormProps holds what the plan form shows.
 type PlanFormProps struct {
 	Form    domain.PlanForm
 	Errors  domain.FieldErrors
@@ -107,6 +116,7 @@ type PlanFormProps struct {
 	Sheet   bool // shown in the sheet: targets the sheet body, no card
 }
 
+// membersWarning returns the warning for editing a plan that n members use.
 func membersWarning(n int) string {
 	if n == 1 {
 		return "1 member uses this plan; changes apply to it at their next login"
@@ -114,6 +124,7 @@ func membersWarning(n int) string {
 	return strconv.Itoa(n) + " members use this plan; changes apply to all of them at their next login"
 }
 
+// unitOptions returns the select options for units.
 func unitOptions(units []string) []ui.Option {
 	o := make([]ui.Option, len(units))
 	for i, u := range units {
@@ -122,6 +133,7 @@ func unitOptions(units []string) []ui.Option {
 	return o
 }
 
+// planFormAttrs returns the htmx attributes of the plan form.
 func planFormAttrs(p PlanFormProps) templ.Attributes {
 	a := templ.Attributes{"id": "plan-form", "hx-target": "this", "hx-swap": "outerHTML"}
 	if p.Sheet {
@@ -148,6 +160,7 @@ templ PlanFormView(p PlanFormProps) {
 	}
 }
 
+// planFields are the fields of the plan form.
 templ planFields(p PlanFormProps) {
 	if p.Members > 0 {
 		<div class="c-notice" data-kind="warn" data-plan-warning>{ membersWarning(p.Members) }</div>
@@ -178,6 +191,7 @@ templ planFields(p PlanFormProps) {
 	}
 }
 
+// SettingsProps holds what the settings form shows.
 type SettingsProps struct {
 	Form   domain.SettingsForm
 	Errors domain.FieldErrors
@@ -185,6 +199,7 @@ type SettingsProps struct {
 	Saved  bool
 }
 
+// SettingsPage shows the settings form.
 templ SettingsPage(l ui.LayoutData, p SettingsProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Settings")
@@ -192,6 +207,7 @@ templ SettingsPage(l ui.LayoutData, p SettingsProps) {
 	}
 }
 
+// planOptions returns the select options for the default plan, with a first entry for none.
 func planOptions(plans []domain.Plan) []ui.Option {
 	o := []ui.Option{{Value: "", Label: "(none)"}}
 	for _, p := range plans {
@@ -200,8 +216,7 @@ func planOptions(plans []domain.Plan) []ui.Option {
 	return o
 }
 
-// SettingsFormView is the settings form and the PUT response body (200 with a
-// flash, or 422 with field errors).
+// SettingsFormView is the settings form and the PUT response body: 200 with a flash, or 422 with field errors.
 templ SettingsFormView(p SettingsProps) {
 	@ui.FormCard(templ.Attributes{"id": "settings-form", "hx-put": "/admin/settings", "hx-target": "this", "hx-swap": "outerHTML"}) {
 		if p.Saved {
@@ -228,12 +243,14 @@ templ SettingsFormView(p SettingsProps) {
 	}
 }
 
+// PasswordProps holds what the admin password form shows.
 type PasswordProps struct {
 	Errors    domain.FieldErrors
-	Forced    bool // first start: the default password is still in use
+	Forced    bool // the first-start password admin/admin is still in use
 	Throttled bool
 }
 
+// PasswordPage shows the change-password form. Forced is true until the first-start password is changed.
 templ PasswordPage(l ui.LayoutData, p PasswordProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Admin password")

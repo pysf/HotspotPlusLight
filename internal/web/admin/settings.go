@@ -6,6 +6,7 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
+// settingsForm reads the settings form from the request.
 func settingsForm(r *http.Request) domain.SettingsForm {
 	_ = r.ParseForm()
 	v := r.PostFormValue
@@ -18,6 +19,7 @@ func settingsForm(r *http.Request) domain.SettingsForm {
 	}
 }
 
+// settingsPage shows the settings form.
 func (h handlers) settingsPage(w http.ResponseWriter, r *http.Request) {
 	st, err := h.Settings.Get(r.Context())
 	if err != nil {
@@ -32,6 +34,7 @@ func (h handlers) settingsPage(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, SettingsPage(layout(r, "Settings", "/admin/settings"), SettingsProps{Form: domain.FormFromSettings(st), Plans: plans}))
 }
 
+// settingsUpdate saves the settings, or shows the field errors with 422.
 func (h handlers) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 	f := settingsForm(r)
 	errs, err := h.Settings.Update(r.Context(), f)

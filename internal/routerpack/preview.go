@@ -8,11 +8,7 @@ import (
 	"strings"
 )
 
-// Preview renders one page of a design with sample values, the way the admin sees it. It resolves the
-// RouterOS template tags (variables and the if, elif, else, endif blocks) in a small, forgiving way:
-// an unknown variable is empty. The router does the real work; this is only for the picture.
-
-// PreviewPages are the pages that can be previewed (the visible ones; the helpers have no look).
+// PreviewPages lists the pages that can be previewed (the visible ones).
 var PreviewPages = []string{"login", "alogin", "status", "logout", "error"}
 
 // sampleVars are the router values used in the preview.
@@ -23,9 +19,10 @@ var sampleVars = map[string]string{
 	"ip": "192.168.88.10", "mac": "AA:BB:CC:DD:EE:01", "login-by": "http-pap",
 }
 
-// Preview returns the HTML of page (one of PreviewPages) for design key. errCode is the sample
-// value of $(error), for example OUT_OF_BULK; empty means no error. Relative links in the page
-// (css/, img/) are served by PreviewAsset.
+// Preview returns the HTML of page (one of PreviewPages) of design key, filled with sample
+// values. errCode is the sample value of $(error), for example OUT_OF_BULK; empty means no error.
+// It only approximates RouterOS: an unknown variable is empty. Relative links (css/, img/) are
+// served by PreviewAsset.
 func (p *Pack) Preview(key, page, errCode string) ([]byte, error) {
 	files, err := p.Files(key)
 	if err != nil {
@@ -42,7 +39,8 @@ func (p *Pack) Preview(key, page, errCode string) ([]byte, error) {
 	return []byte(renderTemplate(string(src), vars)), nil
 }
 
-// PreviewAsset returns a stylesheet or image of a design for the preview, with its content type.
+// PreviewAsset returns a stylesheet or image of design key with its content type, and false if
+// there is no such file.
 func (p *Pack) PreviewAsset(key, name string) ([]byte, string, bool) {
 	types := map[string]string{".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png"}
 	if !strings.HasPrefix(name, "css/") && !strings.HasPrefix(name, "img/") {
@@ -59,8 +57,10 @@ func (p *Pack) PreviewAsset(key, name string) ([]byte, string, bool) {
 	return files[name], ct, true
 }
 
+// tagRE matches a RouterOS $(...) tag.
 var tagRE = regexp.MustCompile(`\$\(([^()]*)\)`)
 
+// frame is the state of one open if block in renderTemplate.
 type frame struct{ parent, taken, on bool }
 
 // renderTemplate resolves $(var) and $(if ...)$(elif ...)$(else)$(endif) against vars.
@@ -108,7 +108,7 @@ func renderTemplate(src string, vars map[string]string) string {
 	return out.String()
 }
 
-// condition handles "name", "name == value" and "name != value" (value in quotes or bare).
+// condition reports whether expr is true. It handles "name", "name == value" and "name != value" (value in quotes or bare).
 func condition(expr string, vars map[string]string) bool {
 	expr = strings.TrimSpace(expr)
 	for _, op := range []string{"==", "!="} {

@@ -1,7 +1,3 @@
-// Package ui holds the small reusable templ components shared by every admin
-// page: layout, icon, buttons, fields, table, pager, pill, meter, chip, menu,
-// sheet, modal, toast, credentials, code block, bar chart.
-// Each has a c- CSS class in internal/web/static/css/components (see docs/ui-notes.md).
 package ui
 
 import (
@@ -9,11 +5,11 @@ import (
 	"strings"
 )
 
-// NavItem is one sidebar link. Group is its heading (items of one group are listed together).
+// NavItem is one sidebar link. Group is its heading; items of one group are listed together.
 type NavItem struct{ Label, Href, Group, Icon string }
 
-// LayoutData configures the page shell. Bare is the logged-out shell (login
-// page): a centered column, no nav, no logout, no hx-headers.
+// LayoutData configures the page shell. Bare is the logged-out shell (the login
+// page): a centered column with no nav, no logout and no hx-headers.
 type LayoutData struct {
 	Title     string
 	Bare      bool
@@ -25,14 +21,14 @@ type LayoutData struct {
 	PasswordURL string
 }
 
-// htmxConfig makes htmx swap 422 (validation) and 409 (conflict) responses
-// like successes (502 = the router did not do what was asked); other 4xx/5xx stay errors (PLAN 8.2).
-// includeIndicatorStyles is off: our CSS styles .htmx-request itself.
+// htmxConfig makes htmx swap 422, 409, 429 and 502 responses like successes (PLAN 8.2);
+// other 4xx and 5xx stay errors. htmx indicator styles are off because our CSS styles .htmx-request.
 const htmxConfig = `{"includeIndicatorStyles":false,"responseHandling":[{"code":"422|409|429|502","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
 
 // appScripts are the JS modules every page of the shell loads (after htmx).
 var appScripts = []string{"js/theme.js", "js/dialog.js", "js/clipboard.js", "js/toast.js", "js/shortcuts.js", "js/nav.js", "js/forms.js", "js/menu.js", "js/password.js"}
 
+// bodyAttrs returns the attributes of <body>: the CSRF header that htmx sends. The bare shell has none.
 func bodyAttrs(d LayoutData) templ.Attributes {
 	if d.Bare {
 		return nil
@@ -41,6 +37,7 @@ func bodyAttrs(d LayoutData) templ.Attributes {
 	return templ.Attributes{"hx-headers": h}
 }
 
+// navGroup is a heading with its nav items.
 type navGroup struct {
 	Name  string
 	Items []NavItem
@@ -83,6 +80,7 @@ func crumbs(d LayoutData) []string {
 	return []string{d.Title}
 }
 
+// crumbAttrs marks the last breadcrumb as the current page.
 func crumbAttrs(last bool) templ.Attributes {
 	if last {
 		return templ.Attributes{"aria-current": "page"}
@@ -90,8 +88,10 @@ func crumbAttrs(last bool) templ.Attributes {
 	return nil
 }
 
+// themePressed returns the aria-pressed value of the dark theme toggle.
 func themePressed(theme string) string { return strconv.FormatBool(theme == "air-dark") }
 
+// Layout is the page shell: head, sidebar, top bar, the page content (children), the confirm dialog and the toast area.
 templ Layout(d LayoutData) {
 	{{ crumbList := crumbs(d) }}
 	{{ env := EnvFrom(ctx) }}
@@ -325,6 +325,7 @@ templ OnlineDot(on bool) {
 	<span class="c-dot" { dotAttrs(on)... } title={ onlineTitle(on) } role="img" aria-label={ onlineLabel(on) }></span>
 }
 
+// dotAttrs returns data-on for an online dot.
 func dotAttrs(on bool) templ.Attributes {
 	if on {
 		return templ.Attributes{"data-on": true}
@@ -332,6 +333,7 @@ func dotAttrs(on bool) templ.Attributes {
 	return nil
 }
 
+// onlineLabel returns the accessible label of the online dot.
 func onlineLabel(on bool) string {
 	if on {
 		return "Online"
@@ -339,6 +341,7 @@ func onlineLabel(on bool) string {
 	return "Offline"
 }
 
+// onlineTitle returns the tooltip of the online dot.
 func onlineTitle(on bool) string {
 	if on {
 		return "online"
@@ -404,6 +407,7 @@ templ Flash(kind, msg string) {
 	<div class="c-notice" data-kind={ noticeKind(kind) }>{ msg }</div>
 }
 
+// noticeKind returns kind when it is "ok" or "warn", else "error".
 func noticeKind(kind string) string {
 	switch kind {
 	case "ok", "warn":
@@ -417,17 +421,20 @@ templ ErrorFragment(msg string) {
 	<div class="c-notice" data-kind="error" role="alert">{ msg }</div>
 }
 
+// FieldError is the error message of one field, as a response body.
 templ FieldError(name, msg string) {
 	if msg != "" {
 		<p class="c-field__error" id={ "err-" + name } data-error-for={ name }>{ msg }</p>
 	}
 }
 
+// FieldProps describes a Field.
 type FieldProps struct {
 	Label, Name, Type, Value, Error, Hint string
 	Attrs                                 templ.Attributes
 }
 
+// inputType returns t, or "text" when t is empty.
 func inputType(t string) string {
 	if t == "" {
 		return "text"
@@ -461,6 +468,7 @@ templ InputControl(p FieldProps) {
 // NamedError is the error message of one control inside a composite field.
 type NamedError struct{ Name, Msg string }
 
+// PairProps describes a FieldPair.
 type PairProps struct {
 	Label, For, Hint string
 	Errors           []NamedError
@@ -481,19 +489,23 @@ templ FieldPair(p PairProps) {
 	</div>
 }
 
+// FieldHint is the hint text under a field.
 templ FieldHint(h string) {
 	if h != "" {
 		<p class="c-field__hint">{ h }</p>
 	}
 }
 
+// Option is one entry of a select.
 type Option struct{ Value, Label string }
 
+// SelectProps describes a Select.
 type SelectProps struct {
 	Label, Name, Value, Error, Hint string
 	Options                         []Option
 }
 
+// Select is a labelled select with its error message.
 templ Select(p SelectProps) {
 	<div class="c-field">
 		<label class="c-field__label" for={ p.Name }>{ p.Label }</label>
@@ -512,8 +524,10 @@ templ SelectControl(p SelectProps) {
 	</select>
 }
 
+// TextareaProps describes a Textarea.
 type TextareaProps struct{ Label, Name, Value, Error, Hint string }
 
+// Textarea is a labelled textarea with its hint and error message.
 templ Textarea(p TextareaProps) {
 	<div class="c-field">
 		<label class="c-field__label" for={ p.Name }>{ p.Label }</label>
@@ -523,11 +537,13 @@ templ Textarea(p TextareaProps) {
 	</div>
 }
 
+// CheckboxProps describes a Checkbox.
 type CheckboxProps struct {
 	Label, Name, Hint string
 	Checked           bool
 }
 
+// Checkbox is a labelled checkbox.
 templ Checkbox(p CheckboxProps) {
 	<div class="c-field">
 		<label class="c-check" for={ "f-" + p.Name }>
@@ -562,6 +578,7 @@ type ChipProps struct {
 	Attrs              templ.Attributes
 }
 
+// chipAttrs returns the link attributes of a chip.
 func chipAttrs(p ChipProps) templ.Attributes {
 	out := templ.Attributes{}
 	for k, v := range p.Attrs {
@@ -621,6 +638,7 @@ templ ConfirmAction(label, method, url, confirm string) {
 	@Button("secondary", label, confirmAttrs(method, url, confirm))
 }
 
+// confirmAttrs returns the htmx attributes of a button that asks for confirmation first.
 func confirmAttrs(method, url, confirm string) templ.Attributes {
 	return templ.Attributes{"type": "button", "hx-" + method: url, "hx-confirm": confirm, "hx-target": "#flash", "hx-swap": "innerHTML"}
 }
@@ -668,6 +686,7 @@ templ MenuItem(label string, danger bool, attrs templ.Attributes) {
 	<button class="c-menu__item" role="menuitem" { menuItemAttrs(danger, attrs)... }>{ label }</button>
 }
 
+// menuItemAttrs returns the attributes of a menu item.
 func menuItemAttrs(danger bool, in templ.Attributes) templ.Attributes {
 	out := buttonAttrs(in)
 	if danger {
@@ -676,6 +695,7 @@ func menuItemAttrs(danger bool, in templ.Attributes) templ.Attributes {
 	return out
 }
 
+// MenuSep is a line between groups of menu items.
 templ MenuSep() {
 	<hr class="c-menu__sep"/>
 }
@@ -723,12 +743,14 @@ templ SheetForm(attrs templ.Attributes) {
 	</form>
 }
 
+// SheetBody is the scrolling body of a Sheet.
 templ SheetBody() {
 	<div class="c-sheet__body">
 		{ children... }
 	</div>
 }
 
+// SheetFoot is the button row at the bottom of a Sheet.
 templ SheetFoot() {
 	<div class="c-sheet__foot">
 		{ children... }
@@ -738,6 +760,7 @@ templ SheetFoot() {
 // CredRow is one line of the credentials card. Key is a data-key hook for the value ("" = none).
 type CredRow struct{ Label, Value, Key string }
 
+// credKey returns the data-key attribute of a credentials row.
 func credKey(k string) templ.Attributes {
 	if k == "" {
 		return nil
@@ -791,6 +814,7 @@ func pageNumbers(page, pages int) []int {
 	return out
 }
 
+// pageAttrs returns the attributes of a numbered pager link.
 func pageAttrs(n, page int) templ.Attributes {
 	if n == page {
 		return templ.Attributes{"aria-current": "page"}
@@ -806,6 +830,7 @@ func stepAttrs(target, page, pages int) templ.Attributes {
 	return nil
 }
 
+// stepTarget returns target limited to 1..pages.
 func stepTarget(target, pages int) int { return min(max(target, 1), pages) }
 
 // Pagination renders the pager (Previous, page links, Next); nothing for a single page.
@@ -861,6 +886,7 @@ templ BarChart(bars []Bar, top int64, caption string) {
 	}
 }
 
+// barViewBox returns the SVG view box for n bars.
 func barViewBox(n int) string { return "0 0 " + strconv.Itoa(n*10) + " 100" }
 
 // barHeight scales v to 0..100 against top; a non-zero value gets at least 1 so that it stays visible.

@@ -1,6 +1,6 @@
-// Package admin is the admin listener's handler: login/logout, session and CSRF
-// middleware, and the resource-style pages (PLAN 8.2). Handlers stay thin:
-// parse, call a service, render.
+// Package admin is the handler of the admin listener (PLAN 8.2): login and logout,
+// the forced password change, session and CSRF middleware, and the admin pages.
+// Handlers stay thin: parse, call a service, render.
 package admin
 
 import (
@@ -25,9 +25,10 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
+// cookieName is the name of the admin session cookie.
 const cookieName = "hsp_admin"
 
-// Consumer-side interfaces: implemented by internal/auth, plan and settings.
+// AuthService is the admin login and password part of internal/auth.
 type AuthService interface {
 	Login(ctx context.Context, username, password, clientKey string) (auth.AdminSession, error)
 	Authenticate(ctx context.Context, token string) (csrf string, found bool, err error)
@@ -36,6 +37,7 @@ type AuthService interface {
 	ChangePassword(ctx context.Context, token, clientKey, current, next, confirm string) (domain.FieldErrors, error)
 }
 
+// PlanService is the plan part of internal/plan.
 type PlanService interface {
 	List(ctx context.Context) ([]domain.Plan, error)
 	Get(ctx context.Context, id int64) (plan.Detail, error)
@@ -44,6 +46,7 @@ type PlanService interface {
 	Delete(ctx context.Context, id int64) error
 }
 
+// MemberService is the part of internal/member that the pages use.
 type MemberService interface {
 	NewForm(ctx context.Context) (domain.MemberForm, error)
 	Create(ctx context.Context, f domain.MemberForm) (int64, domain.FieldErrors, error)
@@ -61,6 +64,7 @@ type MemberService interface {
 	DisconnectMember(ctx context.Context, id int64) (member.KickResult, error)
 }
 
+// SettingsService is the part of internal/settings that the pages use.
 type SettingsService interface {
 	Get(ctx context.Context) (domain.Settings, error)
 	Update(ctx context.Context, f domain.SettingsForm) (domain.FieldErrors, error)
@@ -71,6 +75,7 @@ type LinkStatus interface {
 	Snapshot() linkstatus.Snapshot
 }
 
+// Deps holds what the admin handler needs.
 type Deps struct {
 	Auth     AuthService
 	Plans    PlanService
@@ -90,8 +95,10 @@ type Deps struct {
 	Log *slog.Logger
 }
 
+// handlers carries the dependencies of every page handler.
 type handlers struct{ Deps }
 
+// ctxKey is the context key of the session's CSRF token.
 type ctxKey struct{}
 
 // Handler builds the admin listener's router. Everything outside /admin is 404.
@@ -101,7 +108,7 @@ func Handler(d Deps) http.Handler {
 	}
 	h := handlers{d}
 	r := chi.NewRouter()
-	// Health check for service managers and monitors: no login, never cached.
+	// Health check for service managers: no login, never cached.
 	r.With(noStore).Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte("ok\n"))
@@ -179,7 +186,7 @@ func Handler(d Deps) http.Handler {
 	return r
 }
 
-// pageEnv puts the theme (from the cookie) and the asset URLs into the request context for ui.Layout.
+// pageEnv puts the theme, the asset URLs and the business name into the request context for ui.Layout.
 func (h handlers) pageEnv(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		theme := ""
@@ -197,7 +204,7 @@ func (h handlers) pageEnv(next http.Handler) http.Handler {
 	})
 }
 
-// devComponents is the component gallery. It exists only with HSP_DEV=1.
+// devComponents serves the component gallery. It is a 404 unless HSP_DEV=1.
 func (h handlers) devComponents(w http.ResponseWriter, r *http.Request) {
 	if !h.Dev {
 		http.NotFound(w, r)
@@ -206,6 +213,7 @@ func (h handlers) devComponents(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, DevComponentsPage(layout(r, "Components", "")))
 }
 
+// noStore marks responses as not cacheable.
 func noStore(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
@@ -213,10 +221,12 @@ func noStore(next http.Handler) http.Handler {
 	})
 }
 
+// redirect returns a handler that redirects to the path to.
 func redirect(to string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, to, http.StatusSeeOther) }
 }
 
+// nav is the sidebar menu.
 var nav = []ui.NavItem{
 	{Label: "Members", Href: "/admin/members", Group: "Manage", Icon: "users"},
 	{Label: "Batches", Href: batchesHome, Group: "Manage", Icon: "ticket"},
@@ -227,11 +237,13 @@ var nav = []ui.NavItem{
 	{Label: "Settings", Href: "/admin/settings", Group: "Setup", Icon: "settings"},
 }
 
+// layout returns the page frame data for the request.
 func layout(r *http.Request, title, active string) ui.LayoutData {
 	csrf, _ := r.Context().Value(ctxKey{}).(string)
 	return ui.LayoutData{Title: title, CSRF: csrf, Nav: nav, Active: active, LogoutURL: "/admin/logout", PasswordURL: passwordHome}
 }
 
+// render writes c as an HTML page with the given status.
 func (h handlers) render(w http.ResponseWriter, r *http.Request, status int, c templ.Component) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
@@ -240,6 +252,7 @@ func (h handlers) render(w http.ResponseWriter, r *http.Request, status int, c t
 	}
 }
 
+// serverError logs err and answers 500, as a toast for list and sheet requests.
 func (h handlers) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	h.Log.Error("admin request failed", "method", r.Method, "path", r.URL.Path, "err", err)
 	if fromApp(r) {
@@ -261,6 +274,7 @@ const (
 	plansChanged   = "plans-changed"
 )
 
+// hxTarget returns the HX-Target header of the request.
 func hxTarget(r *http.Request) string { return r.Header.Get("HX-Target") }
 
 // inSheet is true for a request that comes from the sheet.
@@ -313,6 +327,7 @@ func (h handlers) appOrFlash(w http.ResponseWriter, r *http.Request, status int,
 	h.render(w, r, status, ui.ErrorFragment(msg))
 }
 
+// isHTMX reports whether the request comes from htmx.
 func isHTMX(r *http.Request) bool { return r.Header.Get("HX-Request") == "true" }
 
 // htmxRedirect answers an htmx request with HX-Redirect and a plain request with 303.
@@ -366,10 +381,12 @@ func (h handlers) requireCSRF(next http.Handler) http.Handler {
 	})
 }
 
+// loginPage shows the login form.
 func (h handlers) loginPage(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, LoginPage("", ""))
 }
 
+// clientKey returns the client IP without the port, for throttling failed logins and password changes.
 func clientKey(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -378,6 +395,8 @@ func clientKey(r *http.Request) string {
 	return host
 }
 
+// loginSubmit checks the login form. A successful login goes to the members page, or to
+// the password page while the password must still be changed.
 func (h handlers) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	username, password := r.PostFormValue("username"), r.PostFormValue("password")
 	sess, err := h.Auth.Login(r.Context(), username, password, clientKey(r))
@@ -391,8 +410,7 @@ func (h handlers) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		h.serverError(w, r, err)
 	default:
-		// Session cookie: no Max-Age, so it lives while the browser does; the
-		// server-side row decides validity. No Secure flag: plain HTTP on the LAN (D9).
+		// No Max-Age: the server-side row decides validity. No Secure flag: plain HTTP on the LAN (D9).
 		http.SetCookie(w, &http.Cookie{Name: cookieName, Value: sess.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
 		to := "/admin/members"
 		if must, err := h.Auth.MustChangePassword(r.Context()); err != nil {
@@ -405,6 +423,7 @@ func (h handlers) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// logout ends the session and clears the cookie.
 func (h handlers) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(cookieName); err == nil {
 		if err := h.Auth.Logout(r.Context(), c.Value); err != nil {

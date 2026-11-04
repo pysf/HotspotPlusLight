@@ -42,16 +42,17 @@ type Snapshot struct {
 	BadSecretSources                      []BadSource // newest first
 }
 
-// Recorder is safe for concurrent use.
+// Recorder remembers the link status. It is safe for concurrent use.
 type Recorder struct {
 	clock clock.Clock
 	mu    sync.Mutex
 	snap  Snapshot
 }
 
+// New returns an empty Recorder that takes times from c.
 func New(c clock.Clock) *Recorder { return &Recorder{clock: c} }
 
-// host strips the port from "ip:port"; a bare address is returned as is.
+// host returns addr without its port; an address with no port is returned as is.
 func host(addr string) string {
 	if h, _, err := net.SplitHostPort(addr); err == nil {
 		return h
@@ -59,6 +60,7 @@ func host(addr string) string {
 	return addr
 }
 
+// event returns an Event for addr at the current time.
 func (r *Recorder) event(from, detail string) Event {
 	return Event{At: r.clock.Now(), From: host(from), Detail: detail}
 }

@@ -8,6 +8,7 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
+// SessionsPage lists the online sessions.
 templ SessionsPage(l ui.LayoutData, v session.OnlineView) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Online sessions")
@@ -32,6 +33,7 @@ templ SessionsTable(v session.OnlineView) {
 	</div>
 }
 
+// SessionRow is one row of the online table, with its Disconnect button.
 templ SessionRow(s domain.Session, v session.OnlineView) {
 	<tr data-session data-id={ strconv.FormatInt(s.ID, 10) } data-username={ s.Username }>
 		<td data-col="username" data-label="Username"><a href={ templ.SafeURL(memberURL(s.MemberID)) }>{ s.Username }</a></td>

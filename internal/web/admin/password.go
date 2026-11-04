@@ -10,6 +10,7 @@ import (
 	"hotspotpluslight/internal/auth"
 )
 
+// passwordHome is the path of the admin password page.
 const passwordHome = "/admin/password"
 
 // requirePasswordChanged sends the admin to the password page while the first-start
@@ -39,6 +40,7 @@ func (h handlers) requirePasswordChanged(next http.Handler) http.Handler {
 	})
 }
 
+// passwordPage shows the change-password form.
 func (h handlers) passwordPage(w http.ResponseWriter, r *http.Request) {
 	must, err := h.Auth.MustChangePassword(r.Context())
 	if err != nil {
@@ -48,6 +50,7 @@ func (h handlers) passwordPage(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, PasswordPage(layout(r, "Password", ""), PasswordProps{Forced: must}))
 }
 
+// passwordChange changes the admin password (BR-20), or shows the errors.
 func (h handlers) passwordChange(w http.ResponseWriter, r *http.Request) {
 	var token string
 	if c, err := r.Cookie(cookieName); err == nil {
@@ -67,7 +70,7 @@ func (h handlers) passwordChange(w http.ResponseWriter, r *http.Request) {
 		must, _ := h.Auth.MustChangePassword(r.Context())
 		h.render(w, r, http.StatusUnprocessableEntity, PasswordFormView(PasswordProps{Errors: errs, Forced: must}))
 	default:
-		// The page changes, so the toast text travels in a short cookie that toast.js shows and clears.
+		// The page changes, so the toast text goes in a short cookie that toast.js shows and clears.
 		http.SetCookie(w, &http.Cookie{Name: "hsp_toast", Value: url.PathEscape("Password changed"), Path: "/admin", MaxAge: 30, SameSite: http.SameSiteStrictMode})
 		htmxRedirect(w, r, http.StatusOK, "/admin/members")
 	}

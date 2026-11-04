@@ -29,11 +29,21 @@ var enforced = []string{
 	"internal/voucher",
 	"internal/settings",
 	"internal/usage",
+	"cmd/hotspotpluslight",
+	"internal/clock",
+	"internal/config",
+	"internal/linkstatus",
+	"internal/routerpack",
+	"internal/secret",
+	"internal/web/admin",
+	"internal/web/static",
+	"internal/web/ui",
 }
 
 // TestCommentRules checks, for every enforced package (test files and generated
 // files excluded), that:
-//   - the package has exactly one "Package <name>" comment;
+//   - the package has exactly one package comment: "Package <name>", or
+//     "Command <dir>" for package main (the Go convention for commands);
 //   - every top-level declaration (exported or not) that has a doc comment starts it with its name.
 func TestCommentRules(t *testing.T) {
 	root := filepath.Join("..", "..")
@@ -69,8 +79,12 @@ func checkDir(t *testing.T, root, dir string) {
 	for _, f := range files {
 		if f.Doc != nil {
 			docs = append(docs, f.Doc.Pos())
-			if w := strings.Fields(f.Doc.Text()); len(w) < 2 || w[0] != "Package" || w[1] != name {
-				t.Errorf("%s: package comment must start with %q", fset.Position(f.Doc.Pos()), "Package "+name)
+			want := "Package " + name
+			if name == "main" {
+				want = "Command " + filepath.Base(dir)
+			}
+			if w := strings.Fields(f.Doc.Text()); len(w) < 2 || w[0]+" "+w[1] != want {
+				t.Errorf("%s: package comment must start with %q", fset.Position(f.Doc.Pos()), want)
 			}
 		}
 		// Only "//" comments are allowed, except a package comment.

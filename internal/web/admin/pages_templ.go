@@ -16,6 +16,7 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
+// LoginPage is the admin login form. errMsg is shown above the form when it is not empty.
 func LoginPage(username, errMsg string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -85,8 +86,10 @@ func LoginPage(username, errMsg string) templ.Component {
 	})
 }
 
+// num returns v as text without trailing zeros.
 func num(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
 
+// limit returns a speed or size as text, and "Unlimited" for 0.
 func limit(v float64, unit string) string {
 	if v == 0 {
 		return "Unlimited"
@@ -94,6 +97,7 @@ func limit(v float64, unit string) string {
 	return num(v) + " " + unit
 }
 
+// minutes returns a time limit as text, and "Unlimited" for 0.
 func minutes(m int) string {
 	if m == 0 {
 		return "Unlimited"
@@ -101,6 +105,7 @@ func minutes(m int) string {
 	return strconv.Itoa(m) + " min"
 }
 
+// PlansPage lists the plans.
 func PlansPage(l ui.LayoutData, plans []domain.Plan) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -204,6 +209,7 @@ func PlanListFragment(plans []domain.Plan) templ.Component {
 	})
 }
 
+// PlanListBody is the inside of the plan list region.
 func PlanListBody(plans []domain.Plan) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -247,7 +253,7 @@ func PlanListBody(plans []domain.Plan) templ.Component {
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(planURL(p.ID))).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 67, Col: 65}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 73, Col: 65}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 					if templ_7745c5c3_Err != nil {
@@ -260,7 +266,7 @@ func PlanListBody(plans []domain.Plan) templ.Component {
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 67, Col: 76}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 73, Col: 76}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -273,7 +279,7 @@ func PlanListBody(plans []domain.Plan) templ.Component {
 					var templ_7745c5c3_Var11 string
 					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(p.DurationDays))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 68, Col: 76}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 74, Col: 76}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 					if templ_7745c5c3_Err != nil {
@@ -286,7 +292,7 @@ func PlanListBody(plans []domain.Plan) templ.Component {
 					var templ_7745c5c3_Var12 string
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(limit(p.SpeedValue, p.SpeedUnit))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 69, Col: 62}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 75, Col: 62}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {
@@ -299,7 +305,7 @@ func PlanListBody(plans []domain.Plan) templ.Component {
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(limit(p.BulkValue, p.BulkUnit))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 70, Col: 59}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 76, Col: 59}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 					if templ_7745c5c3_Err != nil {
@@ -312,7 +318,7 @@ func PlanListBody(plans []domain.Plan) templ.Component {
 					var templ_7745c5c3_Var14 string
 					templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(minutes(p.TimeLimitMinutes))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 71, Col: 56}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 77, Col: 56}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 					if templ_7745c5c3_Err != nil {
@@ -325,7 +331,7 @@ func PlanListBody(plans []domain.Plan) templ.Component {
 					var templ_7745c5c3_Var15 string
 					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(p.MaxSessions))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 72, Col: 59}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 78, Col: 59}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 					if templ_7745c5c3_Err != nil {
@@ -385,6 +391,7 @@ func PlanListBody(plans []domain.Plan) templ.Component {
 	})
 }
 
+// PlanNewPage is the new plan form as a page (the no-JavaScript fallback of the sheet).
 func PlanNewPage(l ui.LayoutData) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -432,6 +439,7 @@ func PlanNewPage(l ui.LayoutData) templ.Component {
 	})
 }
 
+// PlanEditPage is the edit plan form as a page (the no-JavaScript fallback of the sheet).
 func PlanEditPage(l ui.LayoutData, p PlanFormProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -479,6 +487,7 @@ func PlanEditPage(l ui.LayoutData, p PlanFormProps) templ.Component {
 	})
 }
 
+// PlanFormProps holds what the plan form shows.
 type PlanFormProps struct {
 	Form    domain.PlanForm
 	Errors  domain.FieldErrors
@@ -488,6 +497,7 @@ type PlanFormProps struct {
 	Sheet   bool // shown in the sheet: targets the sheet body, no card
 }
 
+// membersWarning returns the warning for editing a plan that n members use.
 func membersWarning(n int) string {
 	if n == 1 {
 		return "1 member uses this plan; changes apply to it at their next login"
@@ -495,6 +505,7 @@ func membersWarning(n int) string {
 	return strconv.Itoa(n) + " members use this plan; changes apply to all of them at their next login"
 }
 
+// unitOptions returns the select options for units.
 func unitOptions(units []string) []ui.Option {
 	o := make([]ui.Option, len(units))
 	for i, u := range units {
@@ -503,6 +514,7 @@ func unitOptions(units []string) []ui.Option {
 	return o
 }
 
+// planFormAttrs returns the htmx attributes of the plan form.
 func planFormAttrs(p PlanFormProps) templ.Attributes {
 	a := templ.Attributes{"id": "plan-form", "hx-target": "this", "hx-swap": "outerHTML"}
 	if p.Sheet {
@@ -585,6 +597,7 @@ func PlanFormView(p PlanFormProps) templ.Component {
 	})
 }
 
+// planFields are the fields of the plan form.
 func planFields(p PlanFormProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -610,7 +623,7 @@ func planFields(p PlanFormProps) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(membersWarning(p.Members))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 153, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/pages.templ`, Line: 166, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
@@ -736,6 +749,7 @@ func planFields(p PlanFormProps) templ.Component {
 	})
 }
 
+// SettingsProps holds what the settings form shows.
 type SettingsProps struct {
 	Form   domain.SettingsForm
 	Errors domain.FieldErrors
@@ -743,6 +757,7 @@ type SettingsProps struct {
 	Saved  bool
 }
 
+// SettingsPage shows the settings form.
 func SettingsPage(l ui.LayoutData, p SettingsProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -790,6 +805,7 @@ func SettingsPage(l ui.LayoutData, p SettingsProps) templ.Component {
 	})
 }
 
+// planOptions returns the select options for the default plan, with a first entry for none.
 func planOptions(plans []domain.Plan) []ui.Option {
 	o := []ui.Option{{Value: "", Label: "(none)"}}
 	for _, p := range plans {
@@ -798,8 +814,7 @@ func planOptions(plans []domain.Plan) []ui.Option {
 	return o
 }
 
-// SettingsFormView is the settings form and the PUT response body (200 with a
-// flash, or 422 with field errors).
+// SettingsFormView is the settings form and the PUT response body: 200 with a flash, or 422 with field errors.
 func SettingsFormView(p SettingsProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -941,12 +956,14 @@ func SettingsFormView(p SettingsProps) templ.Component {
 	})
 }
 
+// PasswordProps holds what the admin password form shows.
 type PasswordProps struct {
 	Errors    domain.FieldErrors
-	Forced    bool // first start: the default password is still in use
+	Forced    bool // the first-start password admin/admin is still in use
 	Throttled bool
 }
 
+// PasswordPage shows the change-password form. Forced is true until the first-start password is changed.
 func PasswordPage(l ui.LayoutData, p PasswordProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

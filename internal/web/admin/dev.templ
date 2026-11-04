@@ -2,6 +2,7 @@ package admin
 
 import "hotspotpluslight/internal/web/ui"
 
+// galleryItem is one titled box of the component gallery.
 templ galleryItem(title string) {
 	<div class="c-gallery-item">
 		<h3>{ title }</h3>
@@ -191,4 +192,5 @@ templ DevComponentsPage(l ui.LayoutData) {
 	}
 }
 
+// galleryHref returns the anchor link to gallery page n.
 func galleryHref(n int) string { return "#page-" + string(rune('0'+n)) }

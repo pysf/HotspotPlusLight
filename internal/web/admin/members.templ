@@ -10,6 +10,7 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
+// MembersProps holds what the members page shows.
 type MembersProps struct {
 	Result member.ListResult
 	Filter domain.MemberFilter
@@ -17,6 +18,7 @@ type MembersProps struct {
 	URL    string // the address of this request, kept by the refresher
 }
 
+// planFilterOptions returns the plan select options for the toolbar. anyLabel is the first entry.
 func planFilterOptions(plans []domain.Plan, anyLabel string) []ui.Option {
 	o := []ui.Option{{Value: "", Label: anyLabel}}
 	for _, p := range plans {
@@ -25,6 +27,7 @@ func planFilterOptions(plans []domain.Plan, anyLabel string) []ui.Option {
 	return o
 }
 
+// planFilterValue returns the select value of a plan id; 0 means any plan.
 func planFilterValue(id int64) string {
 	if id == 0 {
 		return ""
@@ -32,6 +35,7 @@ func planFilterValue(id int64) string {
 	return strconv.FormatInt(id, 10)
 }
 
+// pageSizeOptions returns the select options for the page size.
 func pageSizeOptions() []ui.Option {
 	o := make([]ui.Option, len(domain.PageSizes))
 	for i, n := range domain.PageSizes {
@@ -45,7 +49,7 @@ func sheetOpen(url string) templ.Attributes {
 	return templ.Attributes{"hx-get": url, "hx-target": "#" + sheetBodyID, "hx-swap": "innerHTML"}
 }
 
-// filterAttrs make the toolbar update the list in place: typing is debounced, a newer request
+// filterAttrs makes the toolbar update the list in place: typing is debounced, a newer request
 // replaces a running one, and the address is pushed so the page can be reloaded or shared.
 var filterAttrs = templ.Attributes{
 	"hx-get": membersHome, "hx-target": "#" + listID, "hx-push-url": "true",
@@ -61,6 +65,7 @@ var statusChips = []struct{ Key, Status, Label string }{
 	{"inactive", domain.StatusInactive, "Disabled"},
 }
 
+// chipCountOf returns the count shown on the chip with the given key.
 func chipCountOf(c domain.StatusCounts, key string) int {
 	switch key {
 	case "active":
@@ -75,6 +80,7 @@ func chipCountOf(c domain.StatusCounts, key string) int {
 	return c.All
 }
 
+// chipProps returns the props of one status chip, keeping the current filter.
 func chipProps(p MembersProps, key, status, label string) ui.ChipProps {
 	href := listURL(domain.MemberFilter{Query: p.Filter.Query, PlanID: p.Filter.PlanID, Status: status}, p.Result.Per, 0)
 	return ui.ChipProps{
@@ -94,6 +100,7 @@ templ MemberChips(p MembersProps, oob bool) {
 	</div>
 }
 
+// MembersPage lists the members with the toolbar, the status chips and the sheet.
 templ MembersPage(l ui.LayoutData, p MembersProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Members") {
@@ -155,6 +162,7 @@ templ UsageCells(m memberVM) {
 	<td data-col="verdict" data-label="Verdict">{ m.VerdictText }</td>
 }
 
+// MemberRow is one row of the members list.
 templ MemberRow(m memberVM) {
 	<tr data-member data-id={ strconv.FormatInt(m.ID, 10) } data-username={ m.Username } data-status={ m.Status } data-verdict={ m.VerdictCode } data-online={ strconv.FormatBool(m.Online) }>
 		<td data-slot="select"><input type="checkbox" aria-label="Select" name="id" value={ strconv.FormatInt(m.ID, 10) }/></td>
@@ -204,6 +212,7 @@ func rowAction(method, url, target, confirm string) templ.Attributes {
 	return a
 }
 
+// The confirm texts of the row actions.
 const (
 	confirmRenew      = "Restart this member's validity window? Used data, time and extra data are cleared."
 	confirmDisconnect = "Disconnect all open sessions of this member?"
@@ -223,6 +232,7 @@ func toggleAction(m memberVM, target string) (string, templ.Attributes) {
 	return "Enable", a
 }
 
+// MemberMenu is the row menu of a member.
 templ MemberMenu(m memberVM) {
 	{{ toggleLabel, toggle := toggleAction(m, listID) }}
 	@ui.Menu("member-menu-"+strconv.FormatInt(m.ID, 10), "Actions for "+m.Username) {
@@ -257,6 +267,7 @@ func statusLabel(s string) string {
 	return "Disabled"
 }
 
+// MemberNewPage shows the new member form as a page (the no-JavaScript fallback of the sheet).
 templ MemberNewPage(l ui.LayoutData, p MemberFormProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("New member")
@@ -270,6 +281,7 @@ templ MemberNewPage(l ui.LayoutData, p MemberFormProps) {
 	}
 }
 
+// MemberFormProps holds what the member form shows.
 type MemberFormProps struct {
 	Form    domain.MemberForm
 	Errors  domain.FieldErrors
@@ -280,6 +292,7 @@ type MemberFormProps struct {
 	Sheet   bool   // the form is shown in the sheet (targets the sheet body, no card)
 }
 
+// memberFormAttrs returns the htmx attributes of the member form.
 func memberFormAttrs(p MemberFormProps) templ.Attributes {
 	a := templ.Attributes{"id": "member-form", "hx-target": "this", "hx-swap": "outerHTML"}
 	if p.Sheet {
@@ -310,6 +323,7 @@ templ MemberFormView(p MemberFormProps) {
 	}
 }
 
+// memberFields are the fields of the member form.
 templ memberFields(p MemberFormProps) {
 	if p.Warning != "" {
 		@ui.Flash("warn", p.Warning)
@@ -366,6 +380,7 @@ templ MemberEditSheet(p MemberFormProps, m memberVM) {
 	}
 }
 
+// createdVM is the data of the credentials card.
 type createdVM struct{ Username, Password, Plan, Expires string }
 
 // MemberCreated is the credentials card shown in the sheet after a member was created.
@@ -395,6 +410,7 @@ templ MemberStatus(m memberVM, oob bool) {
 	</p>
 }
 
+// oobAttrs returns the out-of-band swap attribute when oob is true.
 func oobAttrs(oob bool) templ.Attributes {
 	if oob {
 		return templ.Attributes{"hx-swap-oob": "true"}
@@ -402,6 +418,7 @@ func oobAttrs(oob bool) templ.Attributes {
 	return nil
 }
 
+// MemberPage shows one member: status, usage, the form, extra data and the password.
 templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader(m.Username)
@@ -451,6 +468,7 @@ templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 	}
 }
 
+// ExtraBulkProps holds what the extra data form shows.
 type ExtraBulkProps struct {
 	URL, Value, Unit string
 	Errors           domain.FieldErrors
@@ -469,6 +487,7 @@ templ ExtraBulkFormView(p ExtraBulkProps) {
 	</form>
 }
 
+// PasswordShown shows the stored password of a member.
 templ PasswordShown(pw string) {
 	<code data-password>{ pw }</code>
 }

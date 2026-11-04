@@ -13,8 +13,10 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
+// plansHome is the path of the plans page.
 const plansHome = "/admin/plans"
 
+// planForm reads the plan form from the request.
 func planForm(r *http.Request) domain.PlanForm {
 	_ = r.ParseForm()
 	return domain.PlanForm{
@@ -26,16 +28,18 @@ func planForm(r *http.Request) domain.PlanForm {
 	}
 }
 
-// planID parses {id}; anything that is not a positive integer is an unknown plan (404).
+// planID returns the plan id of the path. It returns false for anything that is not a positive integer.
 func planID(r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	return id, err == nil && id > 0
 }
 
+// planURL returns the path of one plan.
 func planURL(id int64) string { return fmt.Sprintf("%s/%d", plansHome, id) }
 
+// notFound answers 404 for a missing what (for example "Member"). In a list or sheet it is a toast.
 func (h handlers) notFound(w http.ResponseWriter, r *http.Request, what string) {
-	// A row in a list or sheet that is gone: refresh the list and say so in a toast.
+	// The row in a list or sheet is gone: refresh the list and say so in a toast.
 	if changed := map[string]string{"Member": membersChanged, "Plan": plansChanged}[what]; changed != "" && fromApp(r) {
 		ev := map[string]any{changed: true, "toast": "This " + strings.ToLower(what) + " no longer exists."}
 		if inSheet(r) {
@@ -49,6 +53,7 @@ func (h handlers) notFound(w http.ResponseWriter, r *http.Request, what string) 
 	h.render(w, r, http.StatusNotFound, ui.ErrorFragment(what+" not found."))
 }
 
+// plansList shows the plans, or only the list region when htmx asks for it.
 func (h handlers) plansList(w http.ResponseWriter, r *http.Request) {
 	plans, err := h.Plans.List(r.Context())
 	if err != nil {
@@ -62,6 +67,7 @@ func (h handlers) plansList(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, PlansPage(layout(r, "Plans", plansHome), plans))
 }
 
+// planNew shows the new plan form, in the sheet or as a page.
 func (h handlers) planNew(w http.ResponseWriter, r *http.Request) {
 	if inSheet(r) {
 		h.render(w, r, http.StatusOK, PlanFormView(PlanFormProps{Form: domain.NewPlanForm(), Action: "post", URL: plansHome, Sheet: true}))
@@ -70,6 +76,7 @@ func (h handlers) planNew(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, PlanNewPage(layout(r, "New plan", plansHome)))
 }
 
+// planCreate creates a plan, or shows the field errors with 422.
 func (h handlers) planCreate(w http.ResponseWriter, r *http.Request) {
 	f := planForm(r)
 	id, errs, err := h.Plans.Create(r.Context(), f)
@@ -88,6 +95,7 @@ func (h handlers) planCreate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// planEdit shows the edit plan form, in the sheet or as a page.
 func (h handlers) planEdit(w http.ResponseWriter, r *http.Request) {
 	id, ok := planID(r)
 	if !ok {
@@ -108,6 +116,7 @@ func (h handlers) planEdit(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// planUpdate saves a plan, or shows the field errors with 422.
 func (h handlers) planUpdate(w http.ResponseWriter, r *http.Request) {
 	id, ok := planID(r)
 	if !ok {
@@ -135,6 +144,7 @@ func (h handlers) planUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// planDelete deletes a plan (O12). A plan in use or the default plan answers 409.
 func (h handlers) planDelete(w http.ResponseWriter, r *http.Request) {
 	id, ok := planID(r)
 	if !ok {

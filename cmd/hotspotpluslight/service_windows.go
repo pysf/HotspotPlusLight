@@ -21,19 +21,22 @@ import (
 	"hotspotpluslight/internal/app"
 )
 
+// serviceName is the Windows service name; defaultDir is the default folder for
+// hsp.env, hsp.log and the data folder.
 const (
 	serviceName = "HotspotPlusLight"
 	defaultDir  = `C:\ProgramData\HotspotPlusLight`
 )
 
+// isWindowsService reports whether the process was started by the Service Control Manager.
 func isWindowsService() bool {
 	ok, err := svc.IsWindowsService()
 	return err == nil && ok
 }
 
-// runAsService runs the serve loop under the Service Control Manager. There is
-// no console, so logs and the first-start block go to hsp.log, which lives next
-// to the env file.
+// runAsService runs the app under the Service Control Manager and returns when
+// it stops. There is no console, so logs and the first-start text go to hsp.log
+// next to the env file. It fails without an env file.
 func runAsService(envFile string, getenv func(string) string) error {
 	if envFile == "" {
 		return errors.New("the service needs --env-file")
@@ -47,8 +50,11 @@ func runAsService(envFile string, getenv func(string) string) error {
 	return svc.Run(serviceName, h)
 }
 
+// handler is the service handler that runs app.Run.
 type handler struct{ opts app.Options }
 
+// Execute implements svc.Handler. It reports Running only after the listeners
+// are bound, and a failure exit code if the app ends with an error.
 func (h *handler) Execute(_ []string, req <-chan svc.ChangeRequest, status chan<- svc.Status) (bool, uint32) {
 	status <- svc.Status{State: svc.StartPending}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -85,13 +91,14 @@ func (h *handler) Execute(_ []string, req <-chan svc.ChangeRequest, status chan<
 			case svc.Stop, svc.Shutdown:
 				status <- svc.Status{State: svc.StopPending, WaitHint: 30000}
 				cancel()
-				<-done // the existing graceful shutdown
+				<-done // wait for the graceful shutdown
 				return false, 0
 			}
 		}
 	}
 }
 
+// serviceCommand runs one of install, uninstall, start and stop.
 func serviceCommand(args []string, stdout io.Writer) error {
 	if len(args) == 0 {
 		return errors.New("usage: service install [--dir <folder>] | uninstall | start | stop")
@@ -135,6 +142,8 @@ func serviceCommand(args []string, stdout io.Writer) error {
 	return fmt.Errorf("unknown service command %q", args[0])
 }
 
+// withService opens the installed service and calls f with it. It fails when
+// not run as Administrator or when the service is not installed.
 func withService(f func(*mgr.Mgr, *mgr.Service) error) error {
 	m, err := mgr.Connect()
 	if err != nil {
@@ -174,6 +183,8 @@ func stopService(s *mgr.Service) error {
 	return nil
 }
 
+// installService installs the service with its data folder under dir, creates
+// hsp.env with a new secret key if it is missing, and sets restart-on-failure.
 func installService(dir string, stdout io.Writer) error {
 	exe, err := os.Executable()
 	if err != nil {

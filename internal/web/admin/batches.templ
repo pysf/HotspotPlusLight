@@ -9,6 +9,7 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
+// plural returns n with noun, in the plural form unless n is 1.
 func plural(n int, noun string) string {
 	if n == 1 {
 		return "1 " + noun
@@ -21,6 +22,7 @@ func deleteBatchConfirm(r domain.BatchRow) string {
 	return fmt.Sprintf("Delete this batch? %s will be deleted (%d online, disconnected first).", plural(r.Members, "member"), r.Online)
 }
 
+// labelText returns the batch label, or a placeholder when it is empty.
 func labelText(l string) string {
 	if l == "" {
 		return "(no label)"
@@ -28,6 +30,7 @@ func labelText(l string) string {
 	return l
 }
 
+// BatchesPage lists the batches.
 templ BatchesPage(l ui.LayoutData, res voucher.ListResult) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Batches") {
@@ -46,6 +49,7 @@ templ BatchesPage(l ui.LayoutData, res voucher.ListResult) {
 	}
 }
 
+// BatchRow is one row of the batch list.
 templ BatchRow(r domain.BatchRow, res voucher.ListResult) {
 	<tr data-batch data-id={ strconv.FormatInt(r.Batch.ID, 10) } data-members={ strconv.Itoa(r.Members) } data-online={ strconv.Itoa(r.Online) }>
 		<td data-col="label" data-label="Label">{ labelText(r.Batch.Label) }</td>
@@ -68,6 +72,7 @@ templ BatchRow(r domain.BatchRow, res voucher.ListResult) {
 	</tr>
 }
 
+// BatchNewPage shows the new batch form.
 templ BatchNewPage(l ui.LayoutData, p BatchFormProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("New batch")
@@ -81,6 +86,7 @@ templ BatchNewPage(l ui.LayoutData, p BatchFormProps) {
 	}
 }
 
+// BatchFormProps holds what the batch form shows.
 type BatchFormProps struct {
 	Form     domain.BatchForm
 	Errors   domain.FieldErrors

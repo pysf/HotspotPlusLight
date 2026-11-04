@@ -1,7 +1,7 @@
 // Package routerpack builds the hotspot folders that the admin uploads to the MikroTik
-// router (PLAN 9.4, D22). There are 8 downloads: the MikroTik default pages exactly as
-// RouterOS ships them, and 7 themes of one new layout. Zips are built on request from
-// the embedded sources; nothing is stored.
+// router (PLAN 9.4, D22), and the RouterOS setup script. There are 8 downloads: the
+// MikroTik default pages as RouterOS ships them, and 7 themes of one layout. Zips are
+// built on request from embedded sources; nothing is stored.
 package routerpack
 
 import (
@@ -19,13 +19,13 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// The embedded mikrotik folder is a byte-for-byte copy of reference/hotspot (E12.00).
-// go:embed cannot reach ../../reference, so the copy lives here.
+// assets holds the page sources. The mikrotik folder is a byte-for-byte copy of
+// reference/hotspot (E12.00); go:embed cannot reach ../../reference.
 //
 //go:embed mikrotik src
 var assets embed.FS
 
-// folder is the directory name inside the zip: the admin uploads its content to the router.
+// folder is the directory name inside the zip. The admin uploads its content to the router.
 const folder = "hotspot"
 
 // KeyMikrotik is the key of the unchanged MikroTik default pages.
@@ -34,15 +34,15 @@ const KeyMikrotik = "mikrotik"
 // DefaultKey is the theme shown first among the themes.
 const DefaultKey = "air"
 
-// Design is one downloadable hotspot folder.
+// Design is one downloadable hotspot folder: the MikroTik default or a theme.
 type Design struct {
 	Key   string
 	Title string
 	About string
 }
 
-// Themes are the 7 themes of the new layout, in display order. Adding a theme means adding
-// one token block file src/css/themes/<key>.css and one line here (TestThemeSource checks both agree).
+// Themes lists the 7 themes in display order. A new theme needs a file
+// src/css/themes/<key>.css and a line here; TestThemeSource checks that they agree.
 var Themes = []Design{
 	{"air", "Air", "Light grey with Apple blue."},
 	{"midnight", "Midnight", "Graphite with a blue glow and a faint grid."},
@@ -53,13 +53,13 @@ var Themes = []Design{
 	{"ocean", "Ocean", "Deep teal with a white card."},
 }
 
-// Pack builds the folders. It has no state; New only checks the embedded sources.
+// Pack builds the folders. It has no state.
 type Pack struct{}
 
-// New checks the embedded sources. It fails only if the binary was built with a broken asset tree.
-// zipTime is a fixed time for every zip entry, so the zip is the same each time.
+// zipTime is the time of every zip entry, so the same design always gives the same zip.
 var zipTime = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
+// New returns a Pack. It fails only if the binary was built with a broken asset tree.
 func New() (*Pack, error) {
 	p := &Pack{}
 	for _, d := range p.Designs() {
@@ -75,7 +75,7 @@ func (*Pack) Designs() []Design {
 	return append([]Design{{KeyMikrotik, "MikroTik default", "The pages exactly as RouterOS ships them. Failed logins show the raw code."}}, Themes...)
 }
 
-// Design finds a download by key.
+// Design returns the download with the given key, and false if there is none.
 func (p *Pack) Design(key string) (Design, bool) {
 	for _, d := range p.Designs() {
 		if d.Key == key {
@@ -85,7 +85,8 @@ func (p *Pack) Design(key string) (Design, bool) {
 	return Design{}, false
 }
 
-// Files returns the content of the folder for a key, by path inside the folder.
+// Files returns the content of the folder of design key, by path inside the folder.
+// It fails for an unknown key.
 func (p *Pack) Files(key string) (map[string][]byte, error) {
 	if key == KeyMikrotik {
 		return readTree("mikrotik", nil)
@@ -119,7 +120,7 @@ func (p *Pack) Files(key string) (map[string][]byte, error) {
 	return files, nil
 }
 
-// css is the shared layout plus only the token block of one theme.
+// css returns the shared layout plus the token block of theme key.
 func (*Pack) css(key string) ([]byte, error) {
 	layout, err := assets.ReadFile("src/css/layout.css")
 	if err != nil {
@@ -136,8 +137,8 @@ func (*Pack) css(key string) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-// MessagesBlock is the code-to-text block of login.html (the "MESSAGES - translate here" block).
-// It has one line per rejection code of the domain, then the fallback that shows any other message as it is.
+// MessagesBlock returns the code-to-text block of login.html (the "MESSAGES" block).
+// It has one branch per reject code, then a fallback that shows any other text as it is.
 func MessagesBlock() string {
 	var b strings.Builder
 	for i, r := range domain.AllReasons() {
@@ -151,6 +152,8 @@ func MessagesBlock() string {
 	return b.String()
 }
 
+// readTree returns the files under root, by path relative to root. If edit is not nil,
+// it changes each file's content.
 func readTree(root string, edit func(name string, b []byte) []byte) (map[string][]byte, error) {
 	files := map[string][]byte{}
 	err := fs.WalkDir(assets, root, func(name string, d fs.DirEntry, err error) error {
@@ -171,7 +174,8 @@ func readTree(root string, edit func(name string, b []byte) []byte) (map[string]
 	return files, err
 }
 
-// Zip is the full hotspot folder of a design, all under "hotspot/", files sorted, no timestamps.
+// Zip returns the zip of the hotspot folder of design key, with every file under "hotspot/".
+// It fails for an unknown key.
 func (p *Pack) Zip(key string) ([]byte, error) {
 	files, err := p.Files(key)
 	if err != nil {

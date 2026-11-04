@@ -11,6 +11,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "hotspotpluslight/internal/web/ui"
 
+// galleryItem is one titled box of the component gallery.
 func galleryItem(title string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -36,7 +37,7 @@ func galleryItem(title string) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/dev.templ`, Line: 7, Col: 13}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/dev.templ`, Line: 8, Col: 13}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -994,6 +995,7 @@ func DevComponentsPage(l ui.LayoutData) templ.Component {
 	})
 }
 
+// galleryHref returns the anchor link to gallery page n.
 func galleryHref(n int) string { return "#page-" + string(rune('0'+n)) }
 
 var _ = templruntime.GeneratedTemplate

@@ -5,17 +5,17 @@ import (
 	"strings"
 )
 
-// ScriptConfig is what the router setup script is generated from: the settings
-// plus the RADIUS ports this process listens on.
+// ScriptConfig holds the values the router setup script is made from.
 type ScriptConfig struct {
 	Secret         string // settings.radius_shared_secret
-	AuthPort       int
-	AcctPort       int
+	AuthPort       int    // RADIUS auth port this server listens on
+	AcctPort       int    // RADIUS accounting port this server listens on
 	CoaPort        int    // settings.coa_port
 	InterimSeconds int    // settings.accounting_interval_seconds
 	HotspotProfile string // profile name; empty = DefaultHotspotProfile
 }
 
+// placeholderIP stands for the server IP, which the admin must fill in.
 const (
 	placeholderIP = "<SERVER-IP>"
 	// DefaultHotspotProfile is the RouterOS default name of the first hotspot profile.
@@ -27,10 +27,9 @@ func routerosString(s string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`, `$`, `\$`, `?`, `\?`, "\n", `\n`, "\r", `\r`).Replace(s) + `"`
 }
 
-// SetupScript is the RouterOS script shown on /admin/router (PLAN 9.4). Every
-// command is preceded by a comment, and every command is marked
-// VERIFY-ON-HARDWARE: the syntax follows the plan and the legacy setup script
-// and has not been run on a real router yet (PLAN 13).
+// SetupScript returns the RouterOS script shown on /admin/router (PLAN 9.4).
+// VERIFY-ON-HARDWARE: the syntax follows the plan and the legacy script and has
+// not been run on a real router yet (PLAN 13).
 func SetupScript(c ScriptConfig) string {
 	profile := c.HotspotProfile
 	if profile == "" {

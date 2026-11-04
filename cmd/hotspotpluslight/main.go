@@ -1,4 +1,5 @@
-// Command hotspotpluslight: `serve | admin set-password | gen-key | service | version`.
+// Command hotspotpluslight runs HotspotPlus Lite. Its commands are serve, admin
+// set-password, gen-key, service (Windows only) and version.
 package main
 
 import (
@@ -19,11 +20,14 @@ import (
 	"hotspotpluslight/internal/app"
 )
 
-// version is overridden at build time: -ldflags "-X main.version=1.2.3".
+// version is set at build time with -ldflags "-X main.version=1.2.3".
 var version = "dev"
 
+// main runs the command line and exits with its status code.
 func main() { os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)) }
 
+// run executes one command line and returns the process exit code: 0 on
+// success, 1 on a failure and 2 on a usage error.
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	args, envFile, err := extractEnvFile(args)
 	if err != nil {
@@ -65,7 +69,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// genKey prints a new HSP_SECRET_KEY: base64 of 32 random bytes.
+// genKey prints a new HSP_SECRET_KEY (base64 of 32 random bytes) to w.
 func genKey(w io.Writer) error {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -75,9 +79,9 @@ func genKey(w io.Writer) error {
 	return err
 }
 
-// setPassword reads the new admin password and applies it. With --stdin (or when
-// stdin is not a terminal) it reads one line; on a terminal it prompts twice
-// without echo. The password is never printed.
+// setPassword sets the admin password (BR-20) and ends all admin sessions. It
+// reads one line from stdin with --stdin or when stdin is not a terminal, and
+// otherwise asks twice without echo. It fails if the passwords differ.
 func setPassword(args []string, stdin io.Reader, stderr io.Writer, getenv func(string) string) error {
 	fromStdin := false
 	for _, a := range args {

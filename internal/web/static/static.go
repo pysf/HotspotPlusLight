@@ -18,12 +18,15 @@ import (
 	"time"
 )
 
+// files holds the embedded asset files.
+//
 //go:embed css js htmx.min.js voucher.css inter-latin-wght-normal.woff2
 var files embed.FS
 
 // Prefix is where the assets are mounted.
 const Prefix = "/admin/static/"
 
+// asset is one served file with its content type and short content hash.
 type asset struct {
 	body  []byte
 	ctype string
@@ -33,12 +36,13 @@ type asset struct {
 // Assets is the set of served files. Build it once with New.
 type Assets struct{ items map[string]asset }
 
+// importRe matches an @import line of css/app.css; fontRe matches a font URL in the CSS.
 var (
 	importRe = regexp.MustCompile(`(?m)^@import "([^"]+)";[ \t]*\n?`)
 	fontRe   = regexp.MustCompile(`url\("` + regexp.QuoteMeta(Prefix) + `([^"]+)"\)`)
 )
 
-// New reads the embedded files and builds the CSS bundle.
+// New returns the Assets built from the embedded files, with the CSS bundle.
 func New() (*Assets, error) {
 	a := &Assets{items: map[string]asset{}}
 	plain := map[string]string{
@@ -72,12 +76,13 @@ func New() (*Assets, error) {
 	return a, nil
 }
 
+// add stores a file under name with a hash of its content.
 func (a *Assets) add(name string, body []byte, ctype string) {
 	sum := sha256.Sum256(body)
 	a.items[name] = asset{body: body, ctype: ctype, hash: hex.EncodeToString(sum[:])[:12]}
 }
 
-// bundleCSS inlines the @import lines of css/app.css in order and gives fonts a hashed URL.
+// bundleCSS returns css/app.css with its @import lines inlined in order and font URLs hashed.
 func (a *Assets) bundleCSS(src fs.FS) ([]byte, error) {
 	root, err := fs.ReadFile(src, "css/app.css")
 	if err != nil {
@@ -108,7 +113,7 @@ func (a *Assets) bundleCSS(src fs.FS) ([]byte, error) {
 	return out, ierr
 }
 
-// URL returns the public URL of an asset, with its hash. An unknown name gets no hash.
+// URL returns the public URL of the asset name, with its hash. An unknown name gets no hash.
 func (a *Assets) URL(name string) string {
 	if it, ok := a.items[name]; ok {
 		return Prefix + name + "?v=" + it.hash
@@ -116,7 +121,7 @@ func (a *Assets) URL(name string) string {
 	return Prefix + name
 }
 
-// Handler serves the assets. Mount it with http.StripPrefix(Prefix, ...).
+// Handler returns the handler that serves the assets; mount it with http.StripPrefix(Prefix, ...).
 // A URL with the current hash is cached for a year; any other URL must revalidate.
 func (a *Assets) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

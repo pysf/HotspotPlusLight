@@ -8,6 +8,7 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
+// UsagePage shows the usage history: a daily chart and the top members.
 templ UsagePage(l ui.LayoutData, v usage.View) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Usage")

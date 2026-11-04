@@ -12,7 +12,7 @@ import (
 	"hotspotpluslight/internal/routerpack"
 )
 
-// RouterPack builds the hotspot folders (implemented by internal/routerpack).
+// RouterPack is the page design part of internal/routerpack.
 type RouterPack interface {
 	Designs() []routerpack.Design
 	Design(key string) (routerpack.Design, bool)
@@ -21,12 +21,16 @@ type RouterPack interface {
 	PreviewAsset(key, name string) ([]byte, string, bool)
 }
 
+// routerHome is the path of the router page.
 const routerHome = "/admin/router"
 
+// zipURL returns the download path of the zip of design key.
 func zipURL(key string) string { return routerHome + "/pages/" + key + ".zip" }
 
+// previewURL returns the preview path of design key.
 func previewURL(key string) string { return routerHome + "/pages/" + key + "/preview" }
 
+// routerPage shows the page designs, the setup script and the link status.
 func (h handlers) routerPage(w http.ResponseWriter, r *http.Request) {
 	st, err := h.Settings.Get(r.Context())
 	if err != nil {
@@ -50,25 +54,30 @@ func (h handlers) routerPage(w http.ResponseWriter, r *http.Request) {
 	}))
 }
 
-// RouterProps is everything the router page shows.
+// RouterProps holds what the router page shows.
 type RouterProps struct {
 	Designs []routerpack.Design
 	Script  string
 	Link    linkView
 }
 
+// linkEvent is one row of the link status table.
 type linkEvent struct{ Key, Label, At, From, Detail string }
 
+// badSource is one row of the bad-secret table.
 type badSource struct{ From, Count, At string }
 
+// linkView is the link status prepared for display.
 type linkView struct {
 	Events     []linkEvent
 	BadTotal   string
 	BadSources []badSource
 }
 
+// linkTimeFormat is the time format of the link status.
 const linkTimeFormat = "2006-01-02 15:04:05"
 
+// linkRows returns the link status in snapshot s with times in loc.
 func linkRows(s linkstatus.Snapshot, loc *time.Location) linkView {
 	ev := func(key, label string, e linkstatus.Event) linkEvent {
 		if e.At.IsZero() {
@@ -90,7 +99,7 @@ func linkRows(s linkstatus.Snapshot, loc *time.Location) linkView {
 	return v
 }
 
-// pack loads {key}; an unknown design is a 404.
+// pack returns the design of {key}. For an unknown design it answers 404 and returns false.
 func (h handlers) pack(w http.ResponseWriter, r *http.Request) (routerpack.Design, bool) {
 	d, ok := h.Router.Design(chi.URLParam(r, "key"))
 	if !ok {
@@ -99,7 +108,7 @@ func (h handlers) pack(w http.ResponseWriter, r *http.Request) (routerpack.Desig
 	return d, ok
 }
 
-// packDownload is GET /admin/router/pages/{key}.zip: the full hotspot folder of one design.
+// packDownload sends the zip with the full hotspot folder of one design.
 func (h handlers) packDownload(w http.ResponseWriter, r *http.Request) {
 	d, ok := h.pack(w, r)
 	if !ok {
@@ -114,12 +123,11 @@ func (h handlers) packDownload(w http.ResponseWriter, r *http.Request) {
 	h.blob(w, "application/zip", zipped)
 }
 
-// previewCSP: the preview is a page of the generator, shown on the admin origin. It may load only its own
-// stylesheet and images. No script, no form target, no network.
+// previewCSP limits the preview, which is shown on the admin origin, to its own stylesheet and images.
 const previewCSP = "default-src 'none'; style-src 'self'; img-src 'self' data:; form-action 'none'; base-uri 'none'"
 
-// packPreview is GET /admin/router/pages/{key}/preview?page=login|alogin|status|logout|error&error=CODE:
-// the page with sample values in place of the router variables.
+// packPreview shows one page of a design with sample values in place of the router variables.
+// The query has page (login, alogin, status, logout or error) and error (a reject code).
 func (h handlers) packPreview(w http.ResponseWriter, r *http.Request) {
 	d, ok := h.pack(w, r)
 	if !ok {
@@ -142,7 +150,7 @@ func (h handlers) packPreview(w http.ResponseWriter, r *http.Request) {
 	h.blob(w, "text/html; charset=utf-8", b)
 }
 
-// packAsset serves the stylesheet and images that the preview page links to (relative to .../preview).
+// packAsset sends a stylesheet or image that the preview page links to.
 func (h handlers) packAsset(w http.ResponseWriter, r *http.Request) {
 	d, ok := h.pack(w, r)
 	if !ok {
@@ -158,6 +166,7 @@ func (h handlers) packAsset(w http.ResponseWriter, r *http.Request) {
 	h.blob(w, ct, b)
 }
 
+// blob writes b as the response body with the given content type.
 func (h handlers) blob(w http.ResponseWriter, contentType string, b []byte) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Length", strconv.Itoa(len(b)))

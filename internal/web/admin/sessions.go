@@ -18,36 +18,40 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
-// SessionService is the online list and kick (implemented by internal/session).
+// SessionService is the online list and kick part of internal/session.
 type SessionService interface {
 	Online(ctx context.Context, page, per int) (session.OnlineView, error)
 	Kick(ctx context.Context, id int64) error
 }
 
+// sessionsHome is the path of the online sessions page.
 const sessionsHome = "/admin/sessions"
 
-// tableURL is the polled fragment URL; it keeps the page and size.
+// tableURL returns the URL of the polled table fragment, with the page and size.
 func tableURL(page, per int) string {
 	return sessionsHome + "/table?" + url.Values{"page": {strconv.Itoa(page)}, "per": {strconv.Itoa(per)}}.Encode()
 }
 
-// kickURL is the row's Disconnect URL; it carries page and size so the redirect returns to the same page.
+// kickURL returns the Disconnect URL of a row. It carries the page and size so the redirect returns to the same page.
 func kickURL(id int64, v session.OnlineView) string {
 	return sessionsHome + "/" + strconv.FormatInt(id, 10) + "/disconnections?" +
 		url.Values{"page": {strconv.Itoa(v.Page)}, "per": {strconv.Itoa(v.Per)}}.Encode()
 }
 
+// sessionsHref returns a function that gives the link to a page of the online list.
 func sessionsHref(per int) func(int) string {
 	return func(page int) string {
 		return sessionsHome + "?" + url.Values{"page": {strconv.Itoa(page)}, "per": {strconv.Itoa(per)}}.Encode()
 	}
 }
 
+// online returns the online list for the page and size in the query.
 func (h handlers) online(r *http.Request) (session.OnlineView, error) {
 	q := r.URL.Query()
 	return h.Sessions.Online(r.Context(), atoi(q.Get("page")), atoi(q.Get("per")))
 }
 
+// sessionsPage shows the online sessions.
 func (h handlers) sessionsPage(w http.ResponseWriter, r *http.Request) {
 	v, err := h.online(r)
 	if err != nil {
@@ -57,7 +61,7 @@ func (h handlers) sessionsPage(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, SessionsPage(layout(r, "Online", sessionsHome), v))
 }
 
-// sessionsTable is the fragment the page polls every 10 s.
+// sessionsTable shows the table fragment that the page polls every 10 seconds.
 func (h handlers) sessionsTable(w http.ResponseWriter, r *http.Request) {
 	v, err := h.online(r)
 	if err != nil {
@@ -67,6 +71,7 @@ func (h handlers) sessionsTable(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, SessionsTable(v))
 }
 
+// sessionKick disconnects one session (BR-18).
 func (h handlers) sessionKick(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
@@ -102,7 +107,7 @@ func (h handlers) kickFailed(w http.ResponseWriter, r *http.Request, err error) 
 	}
 }
 
-// sentence upper-cases the first letter of an error message.
+// sentence returns s with the first letter in upper case.
 func sentence(s string) string {
 	c, n := utf8.DecodeRuneInString(s)
 	return string(unicode.ToUpper(c)) + s[n:]

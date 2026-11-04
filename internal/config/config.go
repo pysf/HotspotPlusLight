@@ -9,6 +9,7 @@ import (
 	"hotspotpluslight/internal/secret"
 )
 
+// Config holds the settings read from the HSP_* environment.
 type Config struct {
 	DataDir            string
 	AdminAddr          string
@@ -16,13 +17,14 @@ type Config struct {
 	RadiusAcctAddr     string
 	SecretKey          []byte // decoded AES-256 key
 	AdminUsername      string
-	RadiusSharedSecret string // first-boot seed only; empty = generate
+	RadiusSharedSecret string // seed for the first start only; empty means generate one
 	LogLevel           slog.Level
 	LogFormat          string // "text" (key=value) or "json"
 	Dev                bool   // HSP_DEV=1: serve the component gallery at /admin/dev/components
 }
 
-// Load builds a Config from getenv (os.Getenv in production).
+// Load returns the Config read through getenv. It fails when HSP_SECRET_KEY is
+// missing or invalid, or when HSP_LOG_LEVEL or HSP_LOG_FORMAT is invalid.
 func Load(getenv func(string) string) (Config, error) {
 	get := func(name, def string) string {
 		if v := getenv("HSP_" + name); v != "" {

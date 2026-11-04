@@ -1,8 +1,12 @@
+// Package ui holds the small reusable templ components shared by every admin
+// page: layout, icon, buttons, fields, table, pager, pill, meter, chip, menu,
+// sheet, modal, toast, credentials, code block and bar chart. Each has a c- CSS
+// class in internal/web/static/css/components (see docs/ui-notes.md).
 package ui
 
 import "context"
 
-// Themes are the allowed values of the "theme" cookie and of data-theme on <html>. The first is the default.
+// Themes lists the allowed values of the "theme" cookie and of data-theme on <html>. The first is the default.
 var Themes = []string{"air", "air-dark"}
 
 // ThemeCookie is the cookie name that stores the theme.
@@ -18,7 +22,7 @@ func ParseTheme(v string) string {
 	return Themes[0]
 }
 
-// Env is what Layout needs from the request: the theme to render and the URL of each asset (with its hash).
+// Env is what Layout needs from the request: the theme and the URL of each asset.
 type Env struct {
 	Theme string
 	Asset func(name string) string
@@ -35,12 +39,13 @@ func (e Env) TabTitle(page string) string {
 	return page + " - " + product
 }
 
+// envKey is the context key of the page environment.
 type envKey struct{}
 
-// WithEnv stores the page environment in ctx. The admin middleware calls it for every request.
+// WithEnv returns a copy of ctx that carries e. The admin middleware calls it for every page request.
 func WithEnv(ctx context.Context, e Env) context.Context { return context.WithValue(ctx, envKey{}, e) }
 
-// EnvFrom reads the page environment. Without one it renders the default theme and plain asset URLs.
+// EnvFrom returns the page environment in ctx. Without one it returns the default theme and plain asset URLs.
 func EnvFrom(ctx context.Context) Env {
 	e, _ := ctx.Value(envKey{}).(Env)
 	e.Theme = ParseTheme(e.Theme)

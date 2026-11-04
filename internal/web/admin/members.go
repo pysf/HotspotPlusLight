@@ -16,16 +16,19 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
+// membersHome is the path of the members page.
 const membersHome = "/admin/members"
 
+// memberURL returns the path of one member.
 func memberURL(id int64) string { return fmt.Sprintf("%s/%d", membersHome, id) }
 
-// pathID parses {id}; the route only matches digits, so this fails only for 0 or overflow (404).
+// pathID returns the {id} of the path. It returns false for 0 or an overflow; the route matches digits only.
 func pathID(r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	return id, err == nil && id > 0
 }
 
+// memberForm reads the member form from the request.
 func memberForm(r *http.Request) domain.MemberForm {
 	_ = r.ParseForm()
 	v := r.PostFormValue
@@ -36,7 +39,7 @@ func memberForm(r *http.Request) domain.MemberForm {
 	}
 }
 
-// filterFrom reads the list filter from a query string or a form.
+// filterFrom returns the list filter read through get, from a query string or a form.
 func filterFrom(get func(string) string) domain.MemberFilter {
 	plan, _ := strconv.ParseInt(get("plan"), 10, 64)
 	f := domain.MemberFilter{Query: get("q"), PlanID: max(plan, 0)}
@@ -47,8 +50,10 @@ func filterFrom(get func(string) string) domain.MemberFilter {
 	return f
 }
 
+// atoi returns the number in s, or 0 if there is none.
 func atoi(s string) int { n, _ := strconv.Atoi(s); return n }
 
+// members shows the members list, or only the list region when htmx asks for it.
 func (h handlers) members(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	filter := filterFrom(q.Get)
@@ -70,12 +75,13 @@ func (h handlers) members(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, MembersPage(layout(r, "Members", membersHome), props))
 }
 
-// formProps builds the props of the member form (new or edit).
+// formProps returns the props of the member form (new or edit).
 func (h handlers) formProps(r *http.Request, f domain.MemberForm, errs domain.FieldErrors) (MemberFormProps, error) {
 	plans, err := h.Plans.List(r.Context())
 	return MemberFormProps{Form: f, Errors: errs, Plans: plans}, err
 }
 
+// memberNew shows the new member form, in the sheet or as a page.
 func (h handlers) memberNew(w http.ResponseWriter, r *http.Request) {
 	f, err := h.Members.NewForm(r.Context())
 	if err != nil {
@@ -96,6 +102,7 @@ func (h handlers) memberNew(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, MemberNewPage(layout(r, "New member", membersHome), p))
 }
 
+// memberCreate creates a member, or shows the field errors with 422.
 func (h handlers) memberCreate(w http.ResponseWriter, r *http.Request) {
 	f := memberForm(r)
 	id, errs, err := h.Members.Create(r.Context(), f)
@@ -119,7 +126,7 @@ func (h handlers) memberCreate(w http.ResponseWriter, r *http.Request) {
 		htmxRedirect(w, r, http.StatusCreated, memberURL(id))
 		return
 	}
-	// From the sheet: the credentials card is the answer; the sheet stays open until "Done".
+	// In the sheet the answer is the credentials card, and the sheet stays open until "Done".
 	card, err := h.createdCard(r, id)
 	if err != nil {
 		h.serverError(w, r, err)
@@ -129,7 +136,7 @@ func (h handlers) memberCreate(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusCreated, MemberCreated(card))
 }
 
-// createdCard gathers what the credentials card shows (the password may be the generated one).
+// createdCard returns what the credentials card shows. The password may be a generated one.
 func (h handlers) createdCard(r *http.Request, id int64) (createdVM, error) {
 	v, err := h.Members.Get(r.Context(), id)
 	if err != nil {
@@ -143,6 +150,7 @@ func (h handlers) createdCard(r *http.Request, id int64) (createdVM, error) {
 	return createdVM{Username: vm.Username, Password: pw, Plan: vm.PlanName, Expires: vm.ExpiresFull}, nil
 }
 
+// memberPage shows one member, in the sheet or as a page.
 func (h handlers) memberPage(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
@@ -172,6 +180,7 @@ func (h handlers) memberPage(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, MemberPage(layout(r, v.Row.Member.Username, membersHome), newVM(v), p))
 }
 
+// memberUpdate saves a member. If some sessions could not be disconnected (BR-18), it says so.
 func (h handlers) memberUpdate(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
@@ -216,7 +225,7 @@ func (h handlers) memberUpdate(w http.ResponseWriter, r *http.Request) {
 	h.renderMemberForm(w, r, status, id, p)
 }
 
-// renderMemberForm answers with the form: in the sheet it is the whole edit sheet (form and actions).
+// renderMemberForm answers with the member form. In the sheet it is the whole edit sheet.
 func (h handlers) renderMemberForm(w http.ResponseWriter, r *http.Request, status int, id int64, p MemberFormProps) {
 	if !p.Sheet {
 		h.render(w, r, status, MemberFormView(p))
@@ -230,9 +239,8 @@ func (h handlers) renderMemberForm(w http.ResponseWriter, r *http.Request, statu
 	h.render(w, r, status, MemberEditSheet(p, newVM(v)))
 }
 
-// memberToggle sets the member to the state in the form value active (1 or 0). The target
-// state is explicit, so a double click does the same thing twice. Disabling goes through
-// SetActive, which disconnects the open sessions exactly as unticking "Active" does.
+// memberToggle sets a member to the state in the form value active (1 or 0). The target is
+// explicit, so a double click does the same twice. Disabling disconnects the open sessions.
 func (h handlers) memberToggle(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
@@ -275,7 +283,7 @@ func (h handlers) memberToggle(w http.ResponseWriter, r *http.Request) {
 	htmxRedirect(w, r, http.StatusOK, memberURL(id))
 }
 
-// firstError returns the message of the first field error in a fixed field order, so the toast is stable.
+// firstError returns the first field error in field name order, or "" if there is none.
 func firstError(errs domain.FieldErrors) string {
 	keys := make([]string, 0, len(errs))
 	for k := range errs {
@@ -288,6 +296,7 @@ func firstError(errs domain.FieldErrors) string {
 	return errs[keys[0]]
 }
 
+// memberDelete deletes one member and disconnects its open sessions (BR-18).
 func (h handlers) memberDelete(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
@@ -313,6 +322,7 @@ func (h handlers) memberDelete(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// memberRenew renews a member by hand (BR-13).
 func (h handlers) memberRenew(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
@@ -331,6 +341,7 @@ func (h handlers) memberRenew(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// memberExtraBulk sets the extra bulk of a member. A plan with unlimited data answers 409.
 func (h handlers) memberExtraBulk(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
@@ -354,6 +365,7 @@ func (h handlers) memberExtraBulk(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// passwordReveal shows the stored password of a member.
 func (h handlers) passwordReveal(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
@@ -371,6 +383,7 @@ func (h handlers) passwordReveal(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// passwordSet sets a new password for a member.
 func (h handlers) passwordSet(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r)
 	if !ok {
@@ -391,7 +404,8 @@ func (h handlers) passwordSet(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// bulkSelection reads the delete selection: every result of the filter, or the ticked ids.
+// bulkSelection returns the delete selection: every result of the filter, or the ticked ids.
+// It returns false when nothing is selected.
 func bulkSelection(r *http.Request) (domain.MemberSelection, bool) {
 	_ = r.ParseForm()
 	if domain.Checked(r.PostFormValue("all_results")) {
@@ -444,7 +458,7 @@ func (h handlers) memberBulkDelete(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// listURL builds the link to the list with the filter and page size; page 0 leaves the page out.
+// listURL returns the link to the list with the filter and page size. Page 0 leaves the page out.
 func listURL(f domain.MemberFilter, per, page int) string {
 	v := url.Values{"per": {strconv.Itoa(per)}}
 	if page > 0 {
@@ -462,13 +476,12 @@ func listURL(f domain.MemberFilter, per, page int) string {
 	return membersHome + "?" + v.Encode()
 }
 
-// listHref builds the link to a page of the list, keeping the filters.
+// listHref returns a function that gives the link to a page of the list, keeping the filter.
 func listHref(f domain.MemberFilter, per int) func(int) string {
 	return func(page int) string { return listURL(f, per, page) }
 }
 
-// memberVM is a member prepared for display: one place that turns the domain
-// summary into text, shared by the list rows and the member page (BR-22).
+// memberVM is a member prepared for display. The list rows and the member page share it (BR-22).
 type memberVM struct {
 	ID                          int64
 	Username, Name, Mobile, MAC string
@@ -492,8 +505,10 @@ type memberVM struct {
 	Member                      domain.Member
 }
 
+// fmtTime returns t in loc as date and time.
 func fmtTime(t time.Time, loc *time.Location) string { return t.In(loc).Format("2006-01-02 15:04") }
 
+// newVM returns the display values of a member view.
 func newVM(v member.View) memberVM {
 	m, p, s := v.Row.Member, v.Row.Plan, v.Summary
 	vm := memberVM{
@@ -535,6 +550,7 @@ func newVM(v member.View) memberVM {
 	return vm
 }
 
+// trimJoin returns a and b joined by a space, leaving out an empty one.
 func trimJoin(a, b string) string {
 	switch {
 	case a == "":
