@@ -329,3 +329,89 @@ func TestShutdownWaitsForHandlerInFlight(t *testing.T) {
 		t.Fatalf("reply = %v, %v", r.resp, r.err)
 	}
 }
+
+// blockingSecret blocks every secret lookup until release is closed.
+type blockingSecret struct{ release chan struct{} }
+
+func (b blockingSecret) RadiusSecret(context.Context) (string, error) {
+	<-b.release
+	return "s3cret", nil
+}
+
+// Review A4: sniffAcct runs in the UDP read loop, so it must return at once even
+// when the secret lookup (a database read) is stuck.
+func TestSniffAcctDoesNotBlockTheReadLoop(t *testing.T) {
+	release := make(chan struct{})
+	s := New(blockingSecret{release}, &fakeAuth{}, &fakeAcct{}, &fakeLink{}, slog.Default())
+	pkt, err := acctPkt(rfc2866.AcctStatusType_Value_InterimUpdate, "s1").MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() {
+		s.sniffAcct(pkt, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1})
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("sniffAcct blocked on the secret lookup")
+	}
+	close(release)
+	s.Shutdown(context.Background())
+}
+
+// Review A4: at most maxSniffs checks run at once, and a full semaphore drops the
+// extra ones without blocking the read loop.
+func TestSniffAcctIsBounded(t *testing.T) {
+	release := make(chan struct{})
+	var mu sync.Mutex
+	started := 0
+	s := New(countingSecret{release: release, mu: &mu, n: &started}, &fakeAuth{}, &fakeAcct{}, &fakeLink{}, slog.Default())
+	pkt, err := acctPkt(rfc2866.AcctStatusType_Value_InterimUpdate, "s1").MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	from := &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1}
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 3*maxSniffs; i++ {
+			s.sniffAcct(pkt, from)
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("sniffAcct blocked when the semaphore was full")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		mu.Lock()
+		n := started
+		mu.Unlock()
+		if n == maxSniffs {
+			break
+		}
+		if n > maxSniffs || time.Now().After(deadline) {
+			t.Fatalf("%d checks running, want exactly %d", n, maxSniffs)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	close(release)
+	s.Shutdown(context.Background())
+}
+
+type countingSecret struct {
+	release chan struct{}
+	mu      *sync.Mutex
+	n       *int
+}
+
+func (c countingSecret) RadiusSecret(context.Context) (string, error) {
+	c.mu.Lock()
+	*c.n++
+	c.mu.Unlock()
+	<-c.release
+	return "s3cret", nil
+}

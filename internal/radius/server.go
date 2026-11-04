@@ -79,6 +79,7 @@ type Server struct {
 	mu       sync.Mutex
 	stopping bool
 	inflight sync.WaitGroup // handlers in flight
+	sniffSem chan struct{}  // bounds the secret checks that run at once
 	loops    sync.WaitGroup // Serve loops
 	conns    []net.PacketConn
 	stoppers []*lateCloseConn
@@ -87,7 +88,7 @@ type Server struct {
 // New returns a Server. Call Serve to start it.
 func New(secrets SecretProvider, login Authenticator, acctg Accountant, link LinkRecorder, log *slog.Logger) *Server {
 	src := secretSource{secrets}
-	s := &Server{log: log, secrets: secrets, login: login, acctg: acctg, link: link}
+	s := &Server{log: log, secrets: secrets, login: login, acctg: acctg, link: link, sniffSem: make(chan struct{}, maxSniffs)}
 	s.auth = &radius.PacketServer{SecretSource: src, Handler: s.track(s.handleAuth)}
 	s.acct = &radius.PacketServer{SecretSource: src, Handler: s.track(s.handleAcct)}
 	return s
@@ -188,17 +189,36 @@ func (c *lateCloseConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	return n, addr, err
 }
 
+// maxSniffs is how many wrong-secret checks may run at once.
+const maxSniffs = 64
+
 // sniffAcct sees accounting datagrams before the library does. The library drops
 // a packet with a bad Request Authenticator without telling us who sent it; this
-// is how the link status panel learns about a wrong shared secret.
-//
-// MONITOR: this runs in the UDP read loop with one SQLite read and one MD5 per
-// accounting packet. Fine for one router on a LAN; if the volume grows, cache the
-// secret and clear it on settings save.
+// is how the link status panel learns about a wrong shared secret. The check runs
+// in its own goroutine, so a busy database never stalls the UDP read loop.
 func (s *Server) sniffAcct(pkt []byte, from net.Addr) {
-	if len(pkt) >= 20 && radius.Code(pkt[0]) == radius.CodeAccountingRequest {
-		s.checkAcctSecret(pkt, from)
+	if len(pkt) < 20 || radius.Code(pkt[0]) != radius.CodeAccountingRequest {
+		return
 	}
+	select {
+	case s.sniffSem <- struct{}{}:
+	default:
+		return // a missed check only means a missed wrong-secret alarm; a flood must not pile up goroutines
+	}
+	s.mu.Lock()
+	if s.stopping {
+		s.mu.Unlock()
+		<-s.sniffSem
+		return
+	}
+	s.inflight.Add(1)
+	s.mu.Unlock()
+	pkt = bytes.Clone(pkt) // the read loop reuses its buffer
+	go func() {
+		defer s.inflight.Done()
+		defer func() { <-s.sniffSem }()
+		s.checkAcctSecret(pkt, from)
+	}()
 }
 
 // checkAcctSecret repeats the library's authenticator check to find a wrong secret.
@@ -258,7 +278,8 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 	ctx := context.WithoutCancel(r.Context()) // a shutdown lets requests in flight finish
 	// A router that sends Message-Authenticator must send a correct one. Without one
 	// the request is accepted (see messageauth.go).
-	if present, ok := checkMA(r.Packet, r.Packet.Authenticator); present && !ok {
+	maPresent, maOK := checkMA(r.Packet, r.Packet.Authenticator)
+	if maPresent && !maOK {
 		// RouterOS 7.15+ always sends Message-Authenticator, so this is how a wrong secret shows up.
 		s.link.BadSecret(from) // MONITOR: spoofable on UDP; the owner accepts a false alarm
 		s.log.Warn("Access-Request dropped: its Message-Authenticator does not verify, probably a wrong shared secret", "from", from)
@@ -282,9 +303,10 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 		s.link.AccessRequest(from)
 		s.log.Warn("Access-Request with a malformed User-Password dropped", "from", from, "err", err)
 		return
-	case !plausiblePassword(raw) || !zeroPadded(r.Packet):
+	case !(maPresent && maOK) && (!plausiblePassword(raw) || !zeroPadded(r.Packet)):
 		// layeh does not authenticate Access-Requests, so a wrong secret shows up only
-		// as a User-Password that decrypts to noise. Never answer it.
+		// as a User-Password that decrypts to noise. A verified Message-Authenticator
+		// already proves the secret, so the heuristics are skipped then. Never answer it.
 		s.link.BadSecret(from) // MONITOR: spoofable on UDP, see internal/linkstatus
 		s.log.Warn("Access-Request dropped: User-Password does not decrypt, probably a wrong shared secret", "from", from)
 		return

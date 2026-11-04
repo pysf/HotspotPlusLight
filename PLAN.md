@@ -380,6 +380,14 @@ CREATE INDEX session_open_key ON session(username, acct_session_id, nas_ip) WHER
 CREATE INDEX session_started ON session(started_at);
 ```
 
+**Migration 0006 (review A7, 2026-11-04): full session indexes**
+```sql
+CREATE INDEX session_member ON session(member_id);
+CREATE INDEX session_key ON session(username, acct_session_id, nas_ip);
+CREATE INDEX session_prune ON session(COALESCE(ended_at, last_update_at));
+```
+They serve the finished-row lookup, member delete, the unused-member check and pruning. `PruneSessions` deletes in chunks of 1000. `session_prune` is rewritten on each Interim; `make perf-quick` (500 and 1000 online users) showed no change in latency with or without it (2026-11-04), so it stays.
+
 **Migration 0002 (Phase 9, 2026-11-02): `usage_daily`**
 ```sql
 CREATE TABLE usage_daily (
