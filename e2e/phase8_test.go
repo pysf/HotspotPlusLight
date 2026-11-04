@@ -318,9 +318,12 @@ func TestE8_07_LinkStatusPanel(t *testing.T) {
 	f.fc.Advance(time.Minute) // 12:03:00
 	badAuth := fakenas.New(f.s.Addrs.RadiusAuth, "wrong-secret")
 	badAuth.Timeout = 300 * time.Millisecond
-	badAuth.MessageAuth = false // a bad Message-Authenticator is not counted as a wrong secret (spoofable)
 	if _, err := badAuth.Authenticate("alice", "pw123456"); err == nil {
 		t.Fatal("a wrong-secret Access-Request was answered")
+	}
+	badAuth.MessageAuth = false // the heuristic path: no Message-Authenticator to check
+	if _, err := badAuth.Authenticate("alice", "pw123456"); err == nil {
+		t.Fatal("a wrong-secret Access-Request without Message-Authenticator was answered")
 	}
 	f.fc.Advance(time.Minute) // 12:04:00
 	if r, err := f.nas.Account(fakenas.Acct{Type: rfc2866.AcctStatusType_Value_InterimUpdate, User: "nobody", SessionID: "u1"}); err != nil || r.Code != radius.CodeAccountingResponse {
@@ -340,12 +343,12 @@ func TestE8_07_LinkStatusPanel(t *testing.T) {
 	if got := link(t, d, "disconnect"); got.at != "never" {
 		t.Errorf("last Disconnect: %+v", got)
 	}
-	// 2 bad accounting authenticators + 1 wrong-secret Access-Request, all from this machine
-	if n := text(d.Find("[data-bad-secret-count]")); n != "3" {
-		t.Errorf("bad secret count %q, want 3", n)
+	// 2 bad accounting authenticators + 2 wrong-secret Access-Requests (with and without Message-Authenticator), all from this machine
+	if n := text(d.Find("[data-bad-secret-count]")); n != "4" {
+		t.Errorf("bad secret count %q, want 4", n)
 	}
 	src := d.Find("[data-bad-secret-from]")
-	if src.Length() != 1 || src.AttrOr("data-bad-secret-from", "") != "127.0.0.1" || text(src.Find("[data-count]")) != "3" || text(src.Find("[data-at]")) != "2026-11-01 12:03:00" {
+	if src.Length() != 1 || src.AttrOr("data-bad-secret-from", "") != "127.0.0.1" || text(src.Find("[data-count]")) != "4" || text(src.Find("[data-at]")) != "2026-11-01 12:03:00" {
 		t.Errorf("bad secret sources: %s", text(d.Find("[data-bad-secret-sources]")))
 	}
 

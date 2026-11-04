@@ -259,7 +259,8 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 	// A router that sends Message-Authenticator must send a correct one. Without one
 	// the request is accepted (see messageauth.go).
 	if present, ok := checkMA(r.Packet, r.Packet.Authenticator); present && !ok {
-		// No BadSecret here: anyone can forge this packet, and it would show a false alarm on the Router page.
+		// RouterOS 7.15+ always sends Message-Authenticator, so this is how a wrong secret shows up.
+		s.link.BadSecret(from) // MONITOR: spoofable on UDP; the owner accepts a false alarm
 		s.log.Warn("Access-Request dropped: its Message-Authenticator does not verify, probably a wrong shared secret", "from", from)
 		return
 	}

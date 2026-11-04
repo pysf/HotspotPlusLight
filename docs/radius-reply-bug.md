@@ -53,8 +53,8 @@ and `bad-replies 0`. We added it anyway as hardening:
   attribute (RouterOS 7.15+ can require it).
 - The Disconnect-Request carries one. A Disconnect reply with a wrong one is dropped
   and the kick retries, like a reply with a bad Response Authenticator.
-- An Access-Request with a wrong one is dropped and logged only. It does not raise
-  the wrong-secret alarm, because anyone can forge it.
+- An Access-Request with a wrong one is dropped, logged, and raises
+  the wrong-secret alarm. Anyone can forge it, and the owner accepts a false alarm.
 
 ## Fix
 - `radius.Listen` (`internal/radius/listen.go`): for a wildcard IPv4 address

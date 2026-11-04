@@ -140,8 +140,8 @@ func TestRequestWithBadMessageAuthenticatorDropped(t *testing.T) {
 	if rawExchange(t, addr, bad, 400*time.Millisecond) != nil {
 		t.Fatal("a request with a bad Message-Authenticator was answered")
 	}
-	if _, _, bs := link.counts(); bs != 0 {
-		t.Fatalf("bad-secret count %d, want 0 (a bad Message-Authenticator is spoofable)", bs)
+	if _, _, bs := link.counts(); bs != 1 {
+		t.Fatalf("bad-secret count %d, want 1", bs)
 	}
 	fa.mu.Lock()
 	asked := fa.gotUser
