@@ -27,10 +27,10 @@ import (
 	"hotspotpluslight/internal/session"
 )
 
-// Options configures one start. Zero value = fresh temp dir, fresh key.
+// Options configures one start. The zero value means a fresh temp dir and a fresh key.
 type Options struct {
 	DataDir    string            // reuse to simulate a restart
-	SecretKey  string            // base64; "" = generate; use NoSecretKey to omit
+	SecretKey  string            // base64; "" = generate; use NoKey to omit
 	NoKey      bool              // do not set HSP_SECRET_KEY at all
 	Env        map[string]string // extra HSP_* variables (without prefix)
 	Clock      clock.Clock

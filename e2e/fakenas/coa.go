@@ -65,7 +65,7 @@ func (c *CoA) SetBehavior(fn func(n int, d Disconnect) Reply) {
 	c.mu.Unlock()
 }
 
-// Always answers every request the same way.
+// Always makes c answer every request with r.
 func (c *CoA) Always(r Reply) { c.SetBehavior(func(int, Disconnect) Reply { return r }) }
 
 // Requests returns the Disconnect-Requests received so far.

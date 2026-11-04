@@ -1,6 +1,6 @@
 // Package fakenas is a fake MikroTik router: a RADIUS client for black-box
-// tests. Phase 0 only needs Authenticate; later phases add accounting and a
-// Disconnect listener here.
+// tests. It sends Access-Requests and accounting packets; coa.go has the fake
+// Disconnect listener.
 package fakenas
 
 import (

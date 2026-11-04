@@ -1,3 +1,6 @@
+// Package e2e holds the black-box tests. They drive the real app only through
+// its interfaces: UDP RADIUS, the admin HTTP listener and the CLI. Test names
+// are E<phase>.<nn>, and each comment lists the BR and O ids it covers.
 package e2e
 
 import (

@@ -1,5 +1,5 @@
-// Package app is the composition root: the ONLY place that wires concrete
-// types together. No globals, no init().
+// Package app is the composition root: the only place that wires concrete
+// types together. It has no globals and no init().
 package app
 
 import (
@@ -37,10 +37,10 @@ import (
 	"hotspotpluslight/internal/web/static"
 )
 
-// Options carries the process-level dependencies; zero values select production defaults.
+// Options carries the process-level dependencies. A zero value selects the production default.
 type Options struct {
 	Getenv     func(string) string // default os.Getenv
-	Stdout     io.Writer           // first-start password block; default os.Stdout
+	Stdout     io.Writer           // first-start block with the admin login; default os.Stdout
 	Logger     *slog.Logger        // default text logger on LogWriter at HSP_LOG_LEVEL
 	LogWriter  io.Writer           // default os.Stderr (the Windows service uses a log file)
 	Clock      clock.Clock         // default real clock
@@ -51,11 +51,11 @@ type Options struct {
 	// AccountingBeforeCommit runs inside each accounting transaction just before the
 	// commit; an error rolls it back and the packet gets no reply (crash injection, E4.15).
 	AccountingBeforeCommit func() error
-	// Ready, if set, is called by Run once all listeners are bound (the Windows service reports Running then).
+	// Ready, if set, is called by Run once all listeners are bound. The Windows service reports Running then.
 	Ready func()
 }
 
-// Addrs are the bound listener addresses (useful when configured with port 0).
+// Addrs are the bound listener addresses. They are useful when the configured port is 0.
 type Addrs struct{ Admin, RadiusAuth, RadiusAcct string }
 
 type services struct {
@@ -69,6 +69,7 @@ type services struct {
 	voucher   *voucher.Service
 }
 
+// App is the assembled application: database, services, admin HTTP server and RADIUS server.
 type App struct {
 	cfg    config.Config
 	log    *slog.Logger
@@ -82,14 +83,15 @@ type App struct {
 	authConn, acctConn net.PacketConn
 	adminLn            net.Listener
 	addrs              Addrs
-	addrMu             sync.RWMutex // guards addrs: written by Start, read by admin handlers
+	addrMu             sync.RWMutex // guards addrs, which Start writes and admin handlers read
 	stopOnce           sync.Once
 	pruneCancel        context.CancelFunc
 	pruneDone          chan struct{}
 }
 
 // New loads config, opens and migrates the database, verifies the key, seeds
-// first-boot data and wires the services. It binds nothing.
+// first-boot data and wires the services. It binds nothing and returns the first
+// error; the database is closed in that case.
 func New(ctx context.Context, opts Options) (*App, error) {
 	if opts.Getenv == nil {
 		opts.Getenv = os.Getenv
@@ -172,7 +174,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	sessOpts = append(sessOpts, session.WithEnforcer(enforcer))
 	sess := session.New(sessionRepo{st}, disc, opts.Clock, sessOpts...)
 	a.enforcer = enforcer
-	members := member.New(st, box, sess, opts.Clock) // kicks go through the session service: ACK => session ended
+	members := member.New(st, box, sess, opts.Clock) // kicks go through the session service, so an ACK ends the session row
 	a.svc = services{
 		auth:      auth.New(st, opts.Clock),
 		evaluator: auth.NewEvaluator(st, box, opts.Clock, log),
@@ -181,7 +183,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		settings:  settings.New(st, opts.Clock),
 		session:   sess,
 		usage:     usage.New(st, opts.Clock),
-		voucher:   voucher.New(st, box, members, opts.Clock), // batch delete reuses the member delete path (kick, then remove)
+		voucher:   voucher.New(st, box, members, opts.Clock), // batch delete reuses the member delete path: kick, then remove
 	}
 	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, link, log)
 	pack, err := routerpack.New()
@@ -196,7 +198,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	return a, nil
 }
 
-// newLogger writes structured lines to w: key=value text by default, JSON with HSP_LOG_FORMAT=json.
+// newLogger returns a logger that writes key=value text to w, or JSON when HSP_LOG_FORMAT is json.
 func newLogger(w io.Writer, cfg config.Config) *slog.Logger {
 	ho := &slog.HandlerOptions{Level: cfg.LogLevel}
 	if cfg.LogFormat == "json" {
@@ -205,16 +207,17 @@ func newLogger(w io.Writer, cfg config.Config) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, ho))
 }
 
-// sessionRepo adapts the store to session.Repo: the store's transaction type is
-// concrete, the service wants its own consumer-side interface.
+// sessionRepo adapts the store to session.Repo. The store's transaction type is
+// concrete, and the service wants its own interface.
 type sessionRepo struct{ *store.Store }
 
+// InAcctTx runs fn in an accounting transaction of the store.
 func (r sessionRepo) InAcctTx(ctx context.Context, fn func(session.AcctTx) error) error {
 	return r.Store.InAcctTx(ctx, func(tx *store.AcctTx) error { return fn(tx) })
 }
 
-// seed performs first-boot seeding (O15, BR-21). The admin starts as admin/admin and
-// must set a new password at first login (BR-20); the stdout block says so.
+// seed creates the first-boot data (O15, BR-21): the admin account with the
+// password "admin" and the must-change flag (BR-20), and the RADIUS shared secret. The stdout block says so.
 func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
 	hash, err := auth.HashPassword("admin")
 	if err != nil {
@@ -250,7 +253,8 @@ func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
 	return nil
 }
 
-// Start binds the three sockets and begins serving.
+// Start binds the admin HTTP socket and the two RADIUS sockets, and begins serving.
+// It closes whatever it opened and returns an error if a bind fails.
 func (a *App) Start() (err error) {
 	var closers []io.Closer
 	defer func() {
@@ -285,9 +289,10 @@ func (a *App) Start() (err error) {
 // pruneEvery is how often old sessions are pruned after the run at start (O18).
 const pruneEvery = 24 * time.Hour
 
-// startPruning prunes once now, in the background so RADIUS serving never waits for it (so a restart applies a changed retention) and
-// then daily until Shutdown. Real timer, not the injected clock: it only
-// schedules; the cut-off itself comes from the Clock.
+// startPruning prunes old sessions once at start, so a restart applies a changed
+// retention, and then daily until Shutdown. It runs in the background so RADIUS
+// never waits for it. The timer is real, not the injected clock: it only
+// schedules, and the cut-off itself comes from the Clock.
 func (a *App) startPruning() {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.pruneCancel, a.pruneDone = cancel, make(chan struct{})
@@ -312,21 +317,22 @@ func (a *App) startPruning() {
 	}()
 }
 
+// serveHTTP serves s on ln until Shutdown and logs any other stop.
 func (a *App) serveHTTP(name string, s *http.Server, ln net.Listener) {
 	if err := s.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		a.log.Error("http listener stopped", "listener", name, "err", err)
 	}
 }
 
+// Addrs returns the bound listener addresses. They are empty before Start.
 func (a *App) Addrs() Addrs {
 	a.addrMu.RLock()
 	defer a.addrMu.RUnlock()
 	return a.addrs
 }
 
-// radiusPorts are the UDP ports the router must be told (read when the setup
-// script is rendered). The bound port wins; before Start, or if it cannot be
-// read, the configured one, then the RADIUS standard ports.
+// radiusPorts returns the UDP ports to put into the router setup script. The bound
+// port wins; before Start, or if it cannot be read, the configured one, then 1812 and 1813.
 func (a *App) radiusPorts() (authPort, acctPort int) {
 	port := func(addrs ...string) int {
 		for _, addr := range addrs {
@@ -344,7 +350,8 @@ func (a *App) radiusPorts() (authPort, acctPort int) {
 	return authPort, acctPort
 }
 
-// Shutdown stops accepting, drains in-flight work, then closes the database.
+// Shutdown stops accepting, drains work in flight, then closes the database.
+// It does this once; later calls return nil.
 func (a *App) Shutdown(ctx context.Context) error {
 	var err error
 	a.stopOnce.Do(func() {
@@ -353,16 +360,17 @@ func (a *App) Shutdown(ctx context.Context) error {
 			<-a.pruneDone
 		}
 		err = errors.Join(a.adminSrv.Shutdown(ctx), a.radius.Shutdown(ctx))
-		a.enforcer.Stop() // after RADIUS: no more checks are queued; waits for the running ones
+		a.enforcer.Stop() // after RADIUS, so no new checks are queued; it waits for the running ones
 		err = errors.Join(err, a.store.Close())
 		a.log.Info("shutdown complete")
 	})
 	return err
 }
 
-// SetAdminPassword is the `admin set-password` subcommand: it opens the existing
-// database (no migration, no seeding), applies BR-20, stores the bcrypt hash and
-// clears the must-change flag and deletes every admin session. The password is never printed or logged.
+// SetAdminPassword is the `admin set-password` subcommand. It opens the existing
+// database without migrating or seeding it, applies BR-20, stores the new hash,
+// clears the must-change flag and deletes every admin session. It returns an error if
+// there is no database or no admin yet. The password is never printed or logged.
 func SetAdminPassword(ctx context.Context, opts Options, password string) error {
 	if opts.Getenv == nil {
 		opts.Getenv = os.Getenv
@@ -390,7 +398,8 @@ func SetAdminPassword(ctx context.Context, opts Options, password string) error 
 	return err
 }
 
-// Run is the `serve` subcommand: start, wait for ctx cancellation, shut down gracefully.
+// Run is the `serve` subcommand. It starts the app, waits until ctx ends, then
+// shuts down gracefully (10 s at most).
 func Run(ctx context.Context, opts Options) error {
 	a, err := New(ctx, opts)
 	if err != nil {
@@ -409,5 +418,5 @@ func Run(ctx context.Context, opts Options) error {
 	return a.Shutdown(sctx)
 }
 
-// EnforcementIdle reports that no automatic-disconnect check is queued or running (tests wait for it).
+// EnforcementIdle reports whether no automatic-disconnect check is queued or running. Tests wait for it.
 func (a *App) EnforcementIdle() bool { return a.enforcer.Idle() }
