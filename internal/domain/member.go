@@ -37,7 +37,7 @@ type Member struct {
 	CreatedAt        time.Time
 }
 
-// State is the part of the member the login rules look at.
+// State returns the part of the member that the login rules look at.
 func (m Member) State() MemberState {
 	return MemberState{
 		Active: m.Active, SubscriptionDate: m.SubscriptionDate, ExtraBulkBytes: m.ExtraBulkBytes, ExpiresAt: m.ExpiresAt,
@@ -222,11 +222,10 @@ const (
 // ExpiringSoon is how long before expires_at a member counts as "expiring soon" (BR-24).
 const ExpiringSoon = 3 * 24 * time.Hour
 
-// MemberStatus is the status shown in the list (BR-24). Precedence: expired,
-// inactive, expiring, active. Expired once now is strictly after expires_at
-// (O7). Expiring: active, expires_at set, not expired, at most ExpiringSoon left
-// (exactly 3 days left still counts). All times are compared in whole seconds,
-// like the SQL in store.statusClause, which must give the same answer.
+// MemberStatus returns the status shown in the list (BR-24), with precedence
+// expired, inactive, expiring, active. Expired means now is strictly after
+// expires_at (O7); exactly ExpiringSoon left still counts as expiring. Times
+// are compared in whole seconds, because store.statusClause must agree.
 func MemberStatus(active bool, expiresAt *time.Time, now time.Time) string {
 	n := now.Unix()
 	switch {
@@ -267,7 +266,6 @@ type MemberRow struct {
 	Online bool
 }
 
-// PageSizes are the allowed page sizes; the first entry after 10 is the default.
 var PageSizes = []int{10, 20, 40, 60, 80, 100}
 
 // DefaultPageSize is used for a missing or invalid per-page value.

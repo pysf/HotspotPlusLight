@@ -15,6 +15,7 @@ import (
 // SessionTTL is the sliding idle lifetime of an admin session (PLAN 9.5).
 const SessionTTL = time.Hour
 
+// ErrInvalidCredentials means the username or password is wrong.
 var ErrInvalidCredentials = errors.New("invalid credentials")
 
 // ThrottledError means too many failed logins; try again after RetryAfter.
@@ -43,10 +44,10 @@ func randomToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-// Login checks the credentials (throttled per clientKey, e.g. the source IP)
-// and opens a server-side session.
+// Login checks the credentials and opens a server-side session. Failures are
+// throttled per clientKey (the source IP); a locked client gets *ThrottledError.
 func (s *Service) Login(ctx context.Context, username, password, clientKey string) (AdminSession, error) {
-	defer s.throttle.Lock(clientKey)() // one attempt at a time per client, or parallel guesses beat the limit
+	defer s.throttle.Lock(clientKey)() // parallel guesses would beat the limit
 	now := s.clock.Now()
 	if wait := s.throttle.RetryAfter(clientKey, now); wait > 0 {
 		return AdminSession{}, &ThrottledError{RetryAfter: wait}
@@ -77,9 +78,9 @@ func (s *Service) Login(ctx context.Context, username, password, clientKey strin
 	return AdminSession{Token: token, CSRF: csrf}, nil
 }
 
-// Authenticate resolves a cookie value to a live session and slides its expiry
-// to now + 1 h. found is false for unknown, expired or logged-out ids.
-// MONITOR: sessions are opaque and server-side; revoking = deleting the row.
+// Authenticate resolves a cookie value to a live session, returns its CSRF
+// token and slides its expiry by SessionTTL. found is false for an unknown,
+// expired or logged-out token.
 func (s *Service) Authenticate(ctx context.Context, token string) (csrf string, found bool, err error) {
 	if token == "" {
 		return "", false, nil
@@ -88,12 +89,12 @@ func (s *Service) Authenticate(ctx context.Context, token string) (csrf string, 
 	return s.repo.TouchAdminSession(ctx, hashToken(token), now.Unix(), now.Add(SessionTTL).Unix())
 }
 
-// Logout deletes the session server-side.
+// Logout deletes the session.
 func (s *Service) Logout(ctx context.Context, token string) error {
 	return s.repo.DeleteAdminSession(ctx, hashToken(token))
 }
 
-// CSRFMatches compares tokens in constant time.
+// CSRFMatches reports whether got equals want. An empty want never matches.
 func CSRFMatches(want, got string) bool {
 	return want != "" && subtle.ConstantTimeCompare([]byte(want), []byte(got)) == 1
 }

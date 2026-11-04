@@ -24,7 +24,7 @@ func NormalizeUsername(raw string) (string, bool) {
 	return u, true
 }
 
-// ActiveSince is the oldest last_update_at at which an unended session still
+// ActiveSince returns the oldest last_update_at at which an unended session still
 // counts as active/online: accounting interval + 60 s (BR-9, BR-17).
 func ActiveSince(now time.Time, accountingIntervalSeconds int) time.Time {
 	return now.Add(-time.Duration(accountingIntervalSeconds+60) * time.Second)
@@ -61,9 +61,9 @@ func SplitBytes(n int64) (low, giga uint32) {
 	return uint32(u), uint32(u >> 32)
 }
 
-// GrantFor builds the Accept attributes from the member's state and plan.
-// Layer 1 of the enforcement (O3/O4): the router gets exact limits. The server
-// adds layer 2 (domain.ShouldEnd) on every Interim.
+// GrantFor returns the Accept attributes for the member's state and plan. This
+// is layer 1 of the enforcement (O3/O4): exact limits for the router. Layer 2
+// is ShouldEnd on every Interim.
 func GrantFor(m MemberState, p Plan, intervalSeconds int, now time.Time) Grant {
 	q := QuotaOf(m, p)
 	g := Grant{InterimSeconds: uint32(max(min(int64(intervalSeconds), MaxAttr32), 0)), RateLimit: RateLimit(p)}

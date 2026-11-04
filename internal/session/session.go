@@ -1,6 +1,5 @@
-// Package session is the accounting / online list / kick / pruning service.
-// Phase 4 adds accounting (BR-11, BR-12) and pruning (O18); Phase 5 the online
-// list and kick.
+// Package session handles accounting (BR-11, BR-12), the online list, kick
+// (BR-18), server-side enforcement and pruning of old sessions (O18).
 package session
 
 import (
@@ -18,16 +17,17 @@ import (
 type AcctTx interface {
 	MemberByUsername(ctx context.Context, username string) (domain.Member, error) // domain.ErrNotFound if unknown
 	SetMemberMACIfEmpty(ctx context.Context, id int64, mac string, now time.Time) error
-	// LatestSession returns the latest open session of the identity key, else the
-	// latest finished one; nil, nil when there is none.
+	// LatestSession returns the latest open session of the key, else the latest
+	// finished one; nil, nil when there is none.
 	LatestSession(ctx context.Context, username, sessionID, nasIP string) (*domain.Session, error)
 	InsertSession(ctx context.Context, s domain.Session) error
 	UpdateSession(ctx context.Context, s domain.Session) error
 	AddUsage(ctx context.Context, memberID int64, d domain.Counters, now time.Time) error
-	// AddDailyUsage adds the same delta to the member's row of the given day (D12, Phase 9).
+	// AddDailyUsage adds the same delta to the member's row of the given day (D12).
 	AddDailyUsage(ctx context.Context, memberID int64, day string, d domain.Counters) error
 }
 
+// Repo is what the Service needs from storage (implemented by store).
 type Repo interface {
 	CountOpenSessions(ctx context.Context) (int, error)
 	// InAcctTx runs fn in one transaction: committed when fn returns nil, rolled back otherwise.
@@ -42,11 +42,11 @@ type Repo interface {
 	EndSession(ctx context.Context, id int64, now time.Time, cause string) error
 }
 
-// Target identifies a session to disconnect (BR-18). The type lives in domain
-// so that the member service can use it without importing this package.
+// Target identifies a session to disconnect (BR-18). It lives in domain so the
+// member service does not import this package.
 type Target = domain.SessionTarget
 
-// Disconnector sends a RADIUS Disconnect-Request and returns nil only on a
+// Disconnector sends a Disconnect-Request and returns nil only on a
 // Disconnect-ACK (implemented by internal/radius). Errors wrap domain.ErrKick*.
 type Disconnector interface {
 	Disconnect(ctx context.Context, t Target) error
@@ -55,15 +55,15 @@ type Disconnector interface {
 // KickCause is the terminate cause of a session ended by an ACKed kick (BR-18).
 const KickCause = "Admin-Reset"
 
-// Disconnect sends a Disconnect-Request for t and, on ACK, marks the session row
-// ended. On NAK or timeout the session stays as it was and the error is returned
-// (BR-18). It is the Disconnector the member service uses (deactivate, delete).
+// Disconnect sends a Disconnect-Request for t and, on ACK, ends the session row.
+// On NAK or timeout the row is unchanged and the error is returned (BR-18).
+// The member service uses it (deactivate, delete).
 func (s *Service) Disconnect(ctx context.Context, t Target) error {
 	return s.DisconnectWithCause(ctx, t, KickCause)
 }
 
 // DisconnectWithCause is Disconnect with the terminate cause the row gets on
-// ACK. The server's own enforcement uses "Server: <CODE>" (O3/O4).
+// ACK. The enforcement uses "Server: <CODE>" (O3/O4).
 func (s *Service) DisconnectWithCause(ctx context.Context, t Target, cause string) error {
 	if err := s.disc.Disconnect(ctx, t); err != nil {
 		return err
@@ -71,17 +71,16 @@ func (s *Service) DisconnectWithCause(ctx context.Context, t Target, cause strin
 	if t.ID == 0 {
 		return nil
 	}
-	// The router has disconnected the user. If marking the row fails, that is still
-	// a success for the admin (a retry would send a second Disconnect); the router's
-	// Stop closes the row later.
+	// The user is gone. If the row cannot be ended, still succeed: a retry would send
+	// a second Disconnect, and the router's Stop closes the row later.
 	if err := s.repo.EndSession(ctx, t.ID, s.clock.Now(), cause); err != nil {
 		s.log.Error("disconnect ACKed but the session row could not be marked ended; the router's Stop will close it", "session_id", t.ID, "err", err)
 	}
 	return nil
 }
 
-// Kick disconnects one session by row id: domain.ErrNotFound if unknown,
-// domain.ErrSessionEnded if it is already finished.
+// Kick disconnects one session by row id. It returns domain.ErrNotFound if the
+// id is unknown and domain.ErrSessionEnded if the session is already finished.
 func (s *Service) Kick(ctx context.Context, id int64) error {
 	t, open, err := s.repo.SessionTargetByID(ctx, id)
 	if err != nil {
@@ -102,8 +101,8 @@ type OnlineView struct {
 	Loc                     *time.Location
 }
 
-// Online returns one page of the online sessions, newest first. "Online" is the
-// same predicate as the member list's dot (store.onlineSession, domain.ActiveSince).
+// Online returns one page of the online sessions, newest first. "Online" is
+// the same rule as the dot in the member list (domain.ActiveSince).
 func (s *Service) Online(ctx context.Context, page, per int) (OnlineView, error) {
 	st, err := s.repo.GetSettings(ctx)
 	if err != nil {
@@ -127,6 +126,7 @@ func (s *Service) Online(ctx context.Context, page, per int) (OnlineView, error)
 	return OnlineView{Rows: rows, Total: total, Page: page, Pages: pages, Per: per, IntervalSeconds: st.AccountingIntervalSeconds, Now: now, Loc: loc}, nil
 }
 
+// Service is the accounting, online list, kick and pruning service.
 type Service struct {
 	repo         Repo
 	disc         Disconnector
@@ -141,21 +141,21 @@ type Checker interface {
 	Check(memberID int64, username, acctSessionID, nasIP string)
 }
 
-// WithEnforcer makes Account ask c to check every open session after an Start
-// or Interim has been stored (layer 2 of the enforcement, O3/O4).
+// WithEnforcer makes Account ask c to check the open session after a Start or
+// Interim is stored (layer 2 of the enforcement, O3/O4).
 func WithEnforcer(c Checker) Option { return func(s *Service) { s.enforcer = c } }
 
 // Option customizes a Service.
 type Option func(*Service)
 
-// WithBeforeCommit installs a hook that runs inside every accounting
-// transaction right before it commits; an error rolls the transaction back
-// (crash injection for E4.15).
+// WithBeforeCommit sets a hook that runs inside every accounting transaction
+// just before the commit. An error rolls it back (crash test E4.15).
 func WithBeforeCommit(fn func() error) Option { return func(s *Service) { s.beforeCommit = fn } }
 
 // WithLogger sets the logger (default: discard).
 func WithLogger(l *slog.Logger) Option { return func(s *Service) { s.log = l } }
 
+// New returns a Service. Without WithLogger, logs are discarded.
 func New(repo Repo, disc Disconnector, clk clock.Clock, opts ...Option) *Service {
 	s := &Service{repo: repo, disc: disc, clock: clk, log: slog.New(slog.DiscardHandler)}
 	for _, o := range opts {
@@ -164,20 +164,20 @@ func New(repo Repo, disc Disconnector, clk clock.Clock, opts ...Option) *Service
 	return s
 }
 
+// OpenCount returns how many sessions are open.
 func (s *Service) OpenCount(ctx context.Context) (int, error) { return s.repo.CountOpenSessions(ctx) }
 
-// Account applies one Start/Interim/Stop record (PLAN 7.3, BR-11, BR-12) in a
-// single transaction. When it returns nil the change is committed and the
-// caller may send the Accounting-Response; on error nothing was stored and no
-// reply must be sent. Other status types and unknown users change nothing.
+// Account applies one Start, Interim or Stop record (PLAN 7.3, BR-11, BR-12) in
+// one transaction. On nil the change is committed and the caller may send the
+// Accounting-Response; on error nothing was stored and no reply must be sent.
+// Other status types and unknown users change nothing.
 //
 // After the commit, a Start or Interim of an open session asks the Enforcer to
-// check the member (layer 2, O3/O4). That never blocks and never delays the
-// Accounting-Response. A Stop never triggers a check.
+// check the member (O3/O4). A Stop never does.
 //
-// MONITOR: Accounting-On/Off are acknowledged without effect (owner,
-// 2026-11-01): after a router reboot, ghost sessions can block max_sessions
-// logins until they go stale (BR-9) or the admin kicks them.
+// MONITOR: Accounting-On/Off do nothing (owner, 2026-11-01). After a router
+// reboot, ghost sessions can block max_sessions until they go stale (BR-9) or
+// the admin kicks them.
 func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 	switch rec.Status {
 	case domain.AcctStart, domain.AcctInterim, domain.AcctStop:
@@ -186,7 +186,7 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 	}
 	now := s.clock.Now()
 	mac, ok := domain.NormalizeMAC(rec.MAC)
-	if !ok && rec.MAC != "" { // stored as empty; the packet is still accounted
+	if !ok && rec.MAC != "" { // keep going: the packet is still accounted, without a MAC
 		raw := rec.MAC
 		if len(raw) > 40 {
 			raw = raw[:40]
@@ -199,12 +199,12 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 		return err
 	}
 	loc, err := st.Location()
-	if err != nil { // history must never block quota accounting
+	if err != nil { // usage history must never block quota accounting
 		s.log.Warn("invalid settings timezone; booking usage history in UTC", "err", err)
 		loc = time.UTC
 	}
 	day := domain.DayKey(now, loc)
-	var check *domain.Session // the open session to check after the commit
+	var check *domain.Session // checked by the Enforcer after the commit
 	var checkMember int64
 	err = s.repo.InAcctTx(ctx, func(tx AcctTx) error {
 		check = nil
@@ -265,9 +265,9 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 	return err
 }
 
-// Prune deletes sessions older than settings.session_retention_days (O18;
-// 0 = keep forever) and returns how many went. Member usage counters are not
-// affected: they live on the member row.
+// Prune deletes sessions older than settings.session_retention_days (O18) and
+// returns how many it deleted. Retention 0 keeps everything. Member usage is on
+// the member row and is not affected.
 func (s *Service) Prune(ctx context.Context) (int, error) {
 	days, err := s.repo.SessionRetentionDays(ctx)
 	if err != nil || days <= 0 {

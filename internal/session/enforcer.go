@@ -10,20 +10,18 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// Layer 2 of the enforcement (O3/O4, 2026-11-04): on every Interim of an open
-// session the server checks the member again. If the member must not be online
-// any more (domain.ShouldEnd), it sends a Disconnect itself.
+// Tuning values of the Enforcer: workers, queue size and retry limits.
 const (
 	enforcerWorkers = 8
 	enforcerQueue   = 1024
-	maxTries        = 3 // failed Disconnects per session, then we give up
-	retryFactor     = 2 // a failed session is not tried again within 2 x accounting interval
-	forgetAfter     = 1 // hours: a failed session's record is dropped after this
+	maxTries        = 3 // failed Disconnects per session, then give up
+	retryFactor     = 2 // wait 2 x the accounting interval before trying a session again
+	forgetAfter     = 1 // hours until a session's record is dropped
 	sweepAbove      = 1000
 )
 
-// EnforcerRepo is what the Enforcer reads: fresh member and plan, so admin
-// changes count.
+// EnforcerRepo is what the Enforcer reads. It reads fresh member and plan, so
+// admin changes count.
 type EnforcerRepo interface {
 	GetMember(ctx context.Context, id int64) (domain.Member, error)
 	GetPlan(ctx context.Context, id int64) (domain.Plan, error)
@@ -32,8 +30,7 @@ type EnforcerRepo interface {
 	OpenSessionTarget(ctx context.Context, username, acctSessionID, nasIP string) (domain.SessionTarget, bool, error)
 }
 
-// Ender disconnects a session and marks its row ended with the given cause
-// (implemented by *Service).
+// Ender disconnects a session and ends its row with the given cause (*Service).
 type Ender interface {
 	DisconnectWithCause(ctx context.Context, t Target, cause string) error
 }
@@ -45,16 +42,17 @@ type job struct {
 	memberID int64
 }
 
-// track is what we remember about one session: queued/running, and failed tries.
+// track is what the Enforcer remembers about one session.
 type track struct {
 	busy    bool
 	tries   int
-	retryAt time.Time // not checked again before this (injected clock); set after a failure and after a success
+	retryAt time.Time // not checked again before this; set after a failure and after a success
 	last    time.Time
 }
 
-// Enforcer disconnects online members who ran out of quota, expired, were
-// disabled, and so on. Check never blocks.
+// Enforcer is layer 2 of the enforcement (O3/O4): on every Start and Interim of an
+// open session it checks the member again (domain.ShouldEnd) and sends a Disconnect
+// if the member must not be online. Check never blocks.
 type Enforcer struct {
 	repo  EnforcerRepo
 	clock clock.Clock
@@ -69,11 +67,12 @@ type Enforcer struct {
 	cancel  context.CancelFunc
 }
 
+// NewEnforcer returns an Enforcer. Call Start before Check.
 func NewEnforcer(repo EnforcerRepo, clk clock.Clock, log *slog.Logger) *Enforcer {
 	return &Enforcer{repo: repo, clock: clk, log: log, jobs: make(chan job, enforcerQueue), tracks: map[sessionKey]*track{}}
 }
 
-// Start launches the workers. They use e to disconnect.
+// Start launches the workers. They disconnect through end.
 func (e *Enforcer) Start(end Ender) {
 	ctx, cancel := context.WithCancel(context.Background())
 	e.cancel = cancel
@@ -101,17 +100,17 @@ func (e *Enforcer) Stop() {
 	e.wg.Wait()
 }
 
-// Idle reports that no check is queued or running (tests wait for it).
+// Idle reports whether no check is queued or running. Tests use it to wait.
 func (e *Enforcer) Idle() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.queued == 0
 }
 
-// Check asks for a check of one open session. It never blocks: the job goes into
-// a buffered channel, and is dropped (with a warning) when the channel is full.
-// One check per session at a time, and a session whose Disconnect failed is not
-// tried again within 2 x the accounting interval, or after 3 failures.
+// Check asks for a check of one open session. It never blocks: when the queue
+// is full the job is dropped with a warning. A session is checked one at a
+// time, and one whose Disconnect failed waits 2 x the accounting interval and
+// is given up after 3 failures.
 func (e *Enforcer) Check(memberID int64, username, acctSessionID, nasIP string) {
 	k := sessionKey{username, acctSessionID, nasIP}
 	now := e.clock.Now()
@@ -135,7 +134,7 @@ func (e *Enforcer) Check(memberID int64, username, acctSessionID, nasIP string) 
 	}
 	t.busy = true
 	e.queued++
-	// The send does not block, so it is safe to do it under the lock. This way Stop cannot close the channel in between.
+	// The send never blocks, so it can be under the lock; then Stop cannot close the channel in between.
 	select {
 	case e.jobs <- job{key: k, memberID: memberID}:
 		e.mu.Unlock()
@@ -146,8 +145,8 @@ func (e *Enforcer) Check(memberID int64, username, acctSessionID, nasIP string) 
 	}
 }
 
-// finish clears the busy flag. A nil update means "nothing to remember": the
-// record goes away unless it holds failed tries or a "recently ended" mark.
+// finish clears the busy flag and applies update. The record is dropped unless
+// it holds failed tries or a "recently ended" mark.
 func (e *Enforcer) finish(k sessionKey, update func(*track)) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -183,7 +182,7 @@ func (e *Enforcer) work(ctx context.Context, end Ender, j job) {
 	err := end.DisconnectWithCause(ctx, target, cause)
 	if err == nil {
 		e.log.Info("member disconnected by the server", "username", j.key.username, "reason", string(reason))
-		// Keep a short "recently ended" mark: a late Interim, before the router's Stop, must not cause a second Disconnect.
+		// Keep a "recently ended" mark: a late Interim before the router's Stop must not cause a second Disconnect.
 		e.finish(j.key, func(t *track) {
 			now := e.clock.Now()
 			t.tries, t.last = 0, now
@@ -209,7 +208,7 @@ func (e *Enforcer) work(ctx context.Context, end Ender, j job) {
 	})
 }
 
-// interval is the accounting interval (60 s when settings cannot be read).
+// interval returns the accounting interval, or 60 s when settings cannot be read.
 func (e *Enforcer) interval(ctx context.Context) time.Duration {
 	st, err := e.repo.GetSettings(ctx)
 	if err != nil || st.AccountingIntervalSeconds <= 0 {
@@ -218,7 +217,7 @@ func (e *Enforcer) interval(ctx context.Context) time.Duration {
 	return time.Duration(st.AccountingIntervalSeconds) * time.Second
 }
 
-// decide loads fresh state and applies the one shared rule. ok is true when the
+// decide loads fresh state and applies domain.ShouldEnd. ok is true when the
 // session must be disconnected.
 func (e *Enforcer) decide(ctx context.Context, j job) (domain.Reason, Target, bool) {
 	fail := func(err error) (domain.Reason, Target, bool) {

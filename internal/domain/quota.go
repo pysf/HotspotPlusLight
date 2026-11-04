@@ -45,11 +45,11 @@ var reasonMessages = map[Reason]string{
 	ReasonUnsupportedAuth:    "This network only supports PAP login.",
 }
 
-// Message is the English text of a rejection code; the empty Reason has none.
+// Message returns the English text of a rejection code, or "" for the empty Reason.
 func (r Reason) Message() string { return reasonMessages[r] }
 
-// ReplyMessage is the RADIUS Reply-Message of a rejection: only the code (O20, changed 2026-11-04).
-// The router page maps the code to text, so it can be translated by hand.
+// ReplyMessage returns the Reply-Message of a rejection: the bare code (O20).
+// The router page maps the code to text.
 func (r Reason) ReplyMessage() string { return string(r) }
 
 // MemberState is what the login rules need to know about a member.
@@ -73,8 +73,8 @@ type Quota struct {
 	AllowedSeconds, UsedSeconds, RemainingSecs int64
 }
 
-// QuotaOf computes the quota of member state m on plan p. It is the single
-// implementation behind the login check and the admin summary (BR-22).
+// QuotaOf returns the quota of member state m on plan p. The login check and
+// the admin summary both use it (BR-22).
 func QuotaOf(m MemberState, p Plan) Quota {
 	q := Quota{
 		WindowStart: m.SubscriptionDate,
@@ -120,10 +120,9 @@ type Decision struct {
 // Allowed reports whether the member may log in (ignoring the concurrent-session check).
 func (d Decision) Allowed() bool { return d.Reason == "" }
 
-// Evaluate applies, in order: active (2), expires_at not passed (5, O7), validity
-// window with auto-resubscribe (6), remaining data (7), remaining time (8).
-// Checks 1 (credentials), 3-4 (plan present) and 9 (sessions) are the caller's.
-// It is pure: the caller supplies now and performs any renewal.
+// Evaluate applies checks 2 and 5-8 of PLAN 7.2 in order: active, expires_at
+// (O7), validity window with auto-resubscribe, data, time. The caller does
+// checks 1, 3-4 and 9, and performs any renewal that Decision.Renew asks for.
 func Evaluate(m MemberState, p Plan, now time.Time) Decision {
 	if !m.Active {
 		return Decision{Reason: ReasonInactive}
@@ -150,10 +149,9 @@ func Evaluate(m MemberState, p Plan, now time.Time) Decision {
 	return d
 }
 
-// ShouldEnd is layer 2 of the enforcement (O3/O4, 2026-11-04): it reports
-// whether an online member must be disconnected now, and why. It is the login
-// rule itself: true when Evaluate rejects, or when the window of an auto-renew
-// plan has ended (the member logs in again and the renewal happens, BR-6).
+// ShouldEnd is layer 2 of the enforcement (O3/O4). It reports whether an online
+// member must be disconnected now, and why: Evaluate rejects, or the window of
+// an auto-renew plan has ended (the next login renews, BR-6).
 func ShouldEnd(m MemberState, p Plan, now time.Time) (Reason, bool) {
 	d := Evaluate(m, p, now)
 	if d.Renew {
@@ -162,7 +160,7 @@ func ShouldEnd(m MemberState, p Plan, now time.Time) (Reason, bool) {
 	return d.Reason, d.Reason != ""
 }
 
-// RenewedState is the member state after a renewal at now (BR-13b).
+// RenewedState returns the member state after a renewal at now (BR-13b).
 func RenewedState(m MemberState, now time.Time) MemberState {
 	m.SubscriptionDate = now
 	m.ExtraBulkBytes = 0
@@ -177,7 +175,7 @@ type Summary struct {
 	Status   string // active | expiring | inactive | expired (MemberStatus)
 }
 
-// Summarize builds the summary from the same functions the login uses.
+// Summarize returns the admin summary, using the same functions as the login.
 func Summarize(m Member, p Plan, now time.Time) Summary {
 	return Summary{Quota: QuotaOf(m.State(), p), Decision: Evaluate(m.State(), p, now), Status: MemberStatus(m.Active, m.ExpiresAt, now)}
 }

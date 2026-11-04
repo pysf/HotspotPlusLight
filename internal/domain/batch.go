@@ -77,14 +77,12 @@ func ParseBatchForm(f BatchForm, maxCount int) (BatchInput, FieldErrors) {
 	return in, p.errs
 }
 
-// BatchExpiry is the batch expiry: local midnight of (today + days + 1), in loc
-// (BR-15, O14). The date is the local calendar date of now, so 21:00 UTC is
-// already tomorrow in Tehran.
+// BatchExpiry returns the batch expiry: local midnight of (today + days + 1) in
+// loc (BR-15, O14). "Today" is the local date of now, not the UTC date.
 func BatchExpiry(now time.Time, loc *time.Location, days int) time.Time {
 	y, m, d := now.In(loc).Date()
 	t := time.Date(y, m, d+days+1, 0, 0, 0, 0, loc)
-	// When a DST jump skips local midnight, time.Date may answer with an instant on
-	// the previous day; step forward to the first valid instant of the target day.
+	// A DST jump can skip local midnight; step forward to the first valid instant of the target day.
 	target := time.Date(y, m, d+days+1, 12, 0, 0, 0, loc) // noon always exists
 	for t.Before(target) && t.In(loc).Day() != target.Day() {
 		t = t.Add(15 * time.Minute)
@@ -92,10 +90,10 @@ func BatchExpiry(now time.Time, loc *time.Location, days int) time.Time {
 	return t
 }
 
-// ErrPlanGone: the batch's plan no longer exists (deleted while the form was submitted).
+// ErrPlanGone means the batch's plan was deleted while the form was submitted.
 var ErrPlanGone = errors.New("plan no longer exists")
 
-// BatchUsername is the username of the n-th voucher.
+// BatchUsername returns the username of the n-th voucher.
 func BatchUsername(prefix string, n int) string { return prefix + strconv.Itoa(n) }
 
 // UsernameConflictError says which generated username already exists; it

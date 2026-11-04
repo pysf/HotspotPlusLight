@@ -1,5 +1,5 @@
-// Package auth holds the login checks: admin login, server-side admin sessions
-// and password helpers (Phase 1); the member Evaluator (PLAN 7.2) arrives in Phase 3.
+// Package auth holds the login checks: the admin login with server-side
+// sessions and password helpers, and the member login Evaluator (PLAN 7.2).
 package auth
 
 import (
@@ -30,17 +30,19 @@ type Repo interface {
 	ChangeAdminPassword(ctx context.Context, hash string, now int64, keepTokenHash string) error
 }
 
+// Service is the admin login, session and password service.
 type Service struct {
 	repo     Repo
 	clock    clock.Clock
 	throttle *Throttle
 }
 
+// New returns a Service that stores its data in repo.
 func New(repo Repo, c clock.Clock) *Service {
 	return &Service{repo: repo, clock: c, throttle: NewThrottle(loginMaxFailures, loginLockout)}
 }
 
-// VerifyAdmin reports whether username/password match the admin account.
+// VerifyAdmin reports whether username and password match the admin account.
 func (s *Service) VerifyAdmin(ctx context.Context, username, password string) (bool, error) {
 	a, err := s.repo.GetAdmin(ctx)
 	if err != nil {
@@ -51,9 +53,9 @@ func (s *Service) VerifyAdmin(ctx context.Context, username, password string) (b
 	return okPW && a.Username == username, nil
 }
 
-// SetAdminPassword enforces BR-20, stores the bcrypt hash and ends every admin
-// session (PLAN 9.5). This is the CLI path (forgotten password); the web page
-// uses ChangePassword.
+// SetAdminPassword checks the password against BR-20, stores its bcrypt hash and
+// ends every admin session (PLAN 9.5). It is the CLI path; the web page uses
+// ChangePassword.
 func (s *Service) SetAdminPassword(ctx context.Context, password string) error {
 	a, err := s.repo.GetAdmin(ctx)
 	if err != nil {
@@ -69,17 +71,17 @@ func (s *Service) SetAdminPassword(ctx context.Context, password string) error {
 	return s.repo.SetAdminPassword(ctx, hash, s.clock.Now().Unix())
 }
 
-// MustChangePassword reports whether the admin still has to set a new password (first start).
+// MustChangePassword reports whether the admin still has to change the first-start password (admin/admin).
 func (s *Service) MustChangePassword(ctx context.Context) (bool, error) {
 	a, err := s.repo.GetAdmin(ctx)
 	return a.MustChangePassword, err
 }
 
-// ChangePassword is the admin password page (BR-20). The current password is checked
-// first; a wrong one counts in the login throttle (same clientKey) and is returned as a
-// field error. The new password is then checked by the rule and the confirmation. On
-// success the hash is stored, the flag is cleared and every session except the one for
-// token is deleted. A non-empty FieldErrors means nothing was changed.
+// ChangePassword changes the admin password from the web page (BR-20) and
+// ends every admin session except the one for token. A wrong current password
+// counts in the login throttle of clientKey. It also clears the must-change
+// flag. Wrong input is returned in FieldErrors; a non-empty FieldErrors means
+// nothing was changed.
 func (s *Service) ChangePassword(ctx context.Context, token, clientKey, current, next, confirm string) (domain.FieldErrors, error) {
 	defer s.throttle.Lock(clientKey)()
 	now := s.clock.Now()
@@ -111,8 +113,7 @@ func (s *Service) ChangePassword(ctx context.Context, token, clientKey, current,
 	if err := s.repo.ChangeAdminPassword(ctx, hash, now.Unix(), hashToken(token)); err != nil {
 		return nil, err
 	}
-	// Only a finished change clears the counter. A right current password with a bad
-	// new one must not reset it.
+	// Only a finished change clears the counter, or guessing the new password would reset it.
 	s.throttle.Success(clientKey)
 	return nil, nil
 }

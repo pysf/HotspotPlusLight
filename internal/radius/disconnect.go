@@ -17,19 +17,19 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// SettingsReader gives the shared secret and the router's incoming-RADIUS port
-// (read at every Disconnect, so a changed setting applies at once).
+// SettingsReader gives the shared secret and the router's incoming-RADIUS port.
+// It is read at every Disconnect, so a change applies at once.
 type SettingsReader interface {
 	GetSettings(ctx context.Context) (domain.Settings, error)
 }
 
-// attemptTimeout and attempts give BR-18's "wait at most 3 s, 1 retry".
+// attemptTimeout and attempts give BR-18: wait at most 3 s, with 1 retry.
 const (
 	attemptTimeout = 1500 * time.Millisecond
 	attempts       = 2
 )
 
-// DisconnectRecorder receives the outcome of each Disconnect (PLAN 8.2; implemented by linkstatus.Recorder).
+// DisconnectRecorder receives the outcome of each Disconnect (PLAN 8.2, linkstatus.Recorder).
 type DisconnectRecorder interface {
 	Disconnect(addr, outcome string)
 }
@@ -41,21 +41,20 @@ type Disconnector struct {
 	log      *slog.Logger
 }
 
+// NewDisconnector returns a Disconnector that reads its settings from s.
 func NewDisconnector(s SettingsReader, link DisconnectRecorder, log *slog.Logger) *Disconnector {
 	return &Disconnector{settings: s, link: link, log: log}
 }
 
-// Disconnect sends a Disconnect-Request for t to t.NASIP:settings.coa_port,
-// signed with the shared secret. It returns nil only for a verified
-// Disconnect-ACK; otherwise an error wrapping domain.ErrKickIdentifiers,
-// ErrKickRefused (NAK, final; except a NAK with Error-Cause 503
-// Session-Context-Not-Found, RFC 5176, which means the router no longer has the
-// session: that counts as success so the ghost row can be closed) or ErrKickTimeout (the same packet is sent twice).
+// Disconnect sends a Disconnect-Request for t to t.NASIP on settings.coa_port.
+// It returns nil for a verified Disconnect-ACK, and also for a NAK with
+// Error-Cause 503 (RFC 5176): the router no longer has the session, so the ghost
+// row can be closed. Other errors wrap domain.ErrKickIdentifiers,
+// domain.ErrKickRefused (NAK) or domain.ErrKickTimeout (no answer after 2 sends, or a network error).
 //
-// VERIFY-ON-HARDWARE: that RouterOS accepts this attribute set (User-Name,
-// Acct-Session-Id, Framed-IP-Address, Calling-Station-Id in the router's own
-// spelling), that MikroTik sends Error-Cause in its NAK (503 is only honoured when
-// present), and needs "incoming" RADIUS enabled on port 3799 (PLAN 13).
+// VERIFY-ON-HARDWARE: RouterOS accepts User-Name, Acct-Session-Id, Framed-IP-Address and
+// Calling-Station-Id (in its own MAC spelling), sends Error-Cause in its NAK (503 needs it), and has
+// "incoming" RADIUS enabled on port 3799 (PLAN 13).
 func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) error {
 	if err := t.Validate(); err != nil {
 		return err
@@ -76,8 +75,8 @@ func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) e
 	addr := net.JoinHostPort(t.NASIP, strconv.Itoa(st.CoaPort))
 	client := radius.Client{} // no library retry: the loop below resends the same packet
 	var last error
-	// MONITOR: the panel's outcome is best effort. A cancelled context is shown as "no answer", and a
-	// failure before the packet is built (bad target, unreadable settings) is not recorded at all.
+	// MONITOR: the panel's outcome is best effort. A cancelled context shows as "no answer",
+	// and a failure before the packet is built is not recorded.
 	outcome := "no answer"
 	defer func() { d.link.Disconnect(addr, outcome) }()
 	for range attempts {

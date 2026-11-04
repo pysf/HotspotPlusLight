@@ -30,7 +30,8 @@ type Cipher interface {
 	Decrypt(data []byte) ([]byte, error)
 }
 
-// Evaluator is THE member login check (PLAN 7.2), used by the RADIUS handler. The rules themselves live in domain.
+// Evaluator is the member login check of PLAN 7.2, used by the RADIUS handler.
+// The rules themselves live in domain.
 type Evaluator struct {
 	repo   LoginRepo
 	cipher Cipher
@@ -38,6 +39,7 @@ type Evaluator struct {
 	log    *slog.Logger
 }
 
+// NewEvaluator returns an Evaluator that reads from repo and decrypts with cipher.
 func NewEvaluator(repo LoginRepo, cipher Cipher, clk clock.Clock, log *slog.Logger) *Evaluator {
 	return &Evaluator{repo: repo, cipher: cipher, clock: clk, log: log}
 }
@@ -49,6 +51,7 @@ type Verdict struct {
 	Grant  domain.Grant
 }
 
+// Accepted reports whether the login is allowed.
 func (v Verdict) Accepted() bool { return v.Reason == "" }
 
 func reject(r domain.Reason) Verdict { return Verdict{Reason: r} }
@@ -57,12 +60,10 @@ func reject(r domain.Reason) Verdict { return Verdict{Reason: r} }
 var dummyPassword = []byte("unknown-user-dummy-password")
 
 // Login runs checks 1-9 of PLAN 7.2 in order. The error is an infrastructure
-// failure (database, key): the caller must not answer the router with it
-// (no false Accept, no false Reject).
-// MONITOR: there is no brute-force protection per username at the RADIUS edge
-// (PLAN 9.5, accepted by the owner).
-// MONITOR: check 9 (concurrent sessions) is not atomic with the Accept: two
-// simultaneous logins at max_sessions=1 can both pass, as in legacy (no locking).
+// failure (database, key): the caller must not answer the router with it.
+// MONITOR: no brute-force protection per username at the RADIUS edge (PLAN 9.5).
+// MONITOR: check 9 is not atomic with the Accept, so two simultaneous logins at
+// max_sessions=1 can both pass, as in legacy.
 func (e *Evaluator) Login(ctx context.Context, username, password string) (Verdict, error) {
 	m, ok, err := e.authenticate(ctx, username, password) // 1. credentials
 	if err != nil {
@@ -87,11 +88,9 @@ func (e *Evaluator) Login(ctx context.Context, username, password string) (Verdi
 	// 2, 5-8: active, expires_at, window (with auto-resubscribe), data, time.
 	d := domain.Evaluate(m.State(), plan, now)
 	if d.Renew {
-		// BR-6: renew, then re-evaluate against the stored result. If another
-		// login renewed first, our guarded renewal does nothing and we simply
-		// reload the member it renewed. Legacy order (checkAuthorization renews
-		// before the session check): a member rejected for NO_MORE_SESSION has
-		// still been renewed.
+		// BR-6: renew, then reload and evaluate again. The renewal is guarded, so if
+		// another login renewed first this does nothing. Like legacy, a member
+		// rejected for NO_MORE_SESSION has still been renewed.
 		if _, err := e.repo.RenewMemberIfUnchanged(ctx, m.ID, m.SubscriptionDate, "auto", now); err != nil {
 			return Verdict{}, err
 		}
@@ -99,7 +98,7 @@ func (e *Evaluator) Login(ctx context.Context, username, password string) (Verdi
 			return Verdict{}, err
 		}
 		if d = domain.Evaluate(m.State(), plan, now); d.Renew {
-			// Concurrent edit moved the window again: a normal reject, not a failure.
+			// A concurrent edit moved the window again: a normal reject, not a failure.
 			e.log.Warn("member still outside its window after renewal; rejecting", "member", m.ID)
 			return reject(domain.ReasonNoSubscription), nil
 		}
@@ -119,9 +118,8 @@ func (e *Evaluator) Login(ctx context.Context, username, password string) (Verdi
 	return Verdict{Grant: domain.GrantFor(m.State(), plan, st.AccountingIntervalSeconds, now)}, nil
 }
 
-// authenticate is check 1 of PLAN 7.2: the member exists (BR-1, case-insensitive)
-// and the password matches. ok=false means "invalid credentials"; the error is an
-// infrastructure failure.
+// authenticate is check 1 of PLAN 7.2: the member exists (BR-1) and the password
+// matches. ok is false for invalid credentials; the error is an infrastructure failure.
 func (e *Evaluator) authenticate(ctx context.Context, username, password string) (domain.Member, bool, error) {
 	name, ok := domain.NormalizeUsername(username)
 	if !ok {
@@ -129,8 +127,7 @@ func (e *Evaluator) authenticate(ctx context.Context, username, password string)
 	}
 	m, enc, err := e.repo.GetMemberForLogin(ctx, name)
 	if errors.Is(err, domain.ErrNotFound) {
-		// Same work as for a known user with a wrong password, so timing does not
-		// reveal which usernames exist.
+		// Do the same work as for a wrong password, so timing does not reveal which usernames exist.
 		subtle.ConstantTimeCompare(dummyPassword, []byte(password))
 		return domain.Member{}, false, nil
 	}
@@ -144,7 +141,7 @@ func (e *Evaluator) authenticate(ctx context.Context, username, password string)
 	return m, subtle.ConstantTimeCompare(stored, []byte(password)) == 1, nil
 }
 
-// planOf is checks 3-4 of PLAN 7.2: the member's plan, or the Reason why there is none.
+// planOf is checks 3-4 of PLAN 7.2. It returns the member's plan, or the Reason why there is none.
 func (e *Evaluator) planOf(ctx context.Context, m domain.Member) (domain.Plan, domain.Reason, error) {
 	if m.PlanID <= 0 { // 3. defensive: plans are mandatory
 		return domain.Plan{}, domain.ReasonNoPlan, nil

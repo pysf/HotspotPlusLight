@@ -26,7 +26,7 @@ type Plan struct {
 type Admin struct {
 	Username     string
 	PasswordHash string // bcrypt
-	// MustChangePassword is set at first start (admin/admin) until the admin sets a new password.
+	// MustChangePassword is true after the first start (account admin/admin) until the admin sets a new password.
 	MustChangePassword bool
 }
 

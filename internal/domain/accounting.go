@@ -23,19 +23,18 @@ type Counters struct {
 	Download, Upload, Seconds int64
 }
 
-// Gigawords is the 2^32 that one Acct-*-Gigawords unit stands for (RFC 2869).
+// gigaword is the 2^32 that one Acct-*-Gigawords unit stands for (RFC 2869).
 const gigaword = int64(1) << 32
 
-// CumulativeFromAcct builds the cumulative counters of an accounting packet
-// (BR-11): upload = Acct-Input-Octets (+ Input-Gigawords << 32), download =
-// Acct-Output-Octets (+ Output-Gigawords << 32), seconds = Acct-Session-Time.
-// VERIFY-ON-HARDWARE (PLAN 13.5/13.6): direction (Input = upload) and when
-// RouterOS starts sending Gigawords.
+// CumulativeFromAcct returns the cumulative counters of an accounting packet
+// (BR-11): upload from the Input octets and gigawords, download from the Output
+// ones, seconds from Acct-Session-Time.
+// VERIFY-ON-HARDWARE (PLAN 13.5/13.6): Input = upload, and when Gigawords appear.
 func CumulativeFromAcct(inOctets, inGiga, outOctets, outGiga, sessionTime uint32) Counters {
 	return Counters{Upload: withGiga(inOctets, inGiga), Download: withGiga(outOctets, outGiga), Seconds: int64(sessionTime)}
 }
 
-// withGiga saturates instead of overflowing int64 (only a bogus 8 EiB+ reading can).
+// withGiga joins octets and gigawords, and saturates instead of overflowing int64.
 func withGiga(octets, giga uint32) int64 {
 	if giga >= 1<<31 {
 		return math.MaxInt64
@@ -43,9 +42,9 @@ func withGiga(octets, giga uint32) int64 {
 	return int64(giga)*gigaword + int64(octets)
 }
 
-// MONITOR: a reordered/delayed Interim (cur < prev) is indistinguishable from a
-// counter restart and is treated as one (E4.04): it over-counts and rewinds the
-// stored counter. LAN UDP reordering is rare; accepted.
+// fieldDelta returns what one counter adds: cur - prev, or cur after a restart.
+// MONITOR: a delayed Interim (cur < prev) looks like a restart (E4.04), so it
+// over-counts. UDP reordering on a LAN is rare; accepted.
 func fieldDelta(prev, cur int64) int64 {
 	if cur < prev {
 		return cur // the router's counter restarted (BR-11)
@@ -53,9 +52,8 @@ func fieldDelta(prev, cur int64) int64 {
 	return cur - prev
 }
 
-// DeltaTo is what a new cumulative reading adds to the member: per field
-// `cur - prev`, or `cur` when the counter went backwards (a restart). A
-// retransmitted packet therefore adds nothing.
+// DeltaTo returns what the new cumulative reading cur adds to the member. A
+// retransmitted packet adds nothing.
 func (prev Counters) DeltaTo(cur Counters) Counters {
 	return Counters{
 		Download: fieldDelta(prev.Download, cur.Download),
@@ -64,7 +62,7 @@ func (prev Counters) DeltaTo(cur Counters) Counters {
 	}
 }
 
-// IsZero reports that nothing would be added.
+// IsZero reports whether all three counters are zero.
 func (c Counters) IsZero() bool { return c == Counters{} }
 
 // Covers reports whether every field of c is at least the one of o.
@@ -103,18 +101,17 @@ type AcctResult struct {
 }
 
 // kickEnded reports whether r is the router's final Stop of a session the admin
-// kicked (BR-18): the stored row is finished (EndedAt set) yet its status is not
-// Stop, and r is a Stop whose figures are all >= the stored ones. Only then does
-// r complete this same row, so the usage is counted once and the row keeps its
-// Admin-Reset cause. Anything else (an Interim, a Stop with a counter reset
-// because the router reused the Acct-Session-Id) follows the normal path.
+// kicked (BR-18): the row is ended but its status is not Stop, and r is a Stop
+// covering the stored figures. Such a Stop completes the same row, so the usage
+// is counted once and the row keeps its Admin-Reset cause. A Stop with smaller
+// figures (the router reused the id) is a new session and takes the normal path.
 func kickEnded(s *Session, r AcctRecord) bool {
 	return s != nil && s.EndedAt != nil && s.Status != AcctStop && r.Status == AcctStop && r.Cum.Covers(s.Cum)
 }
 
-// ApplyAccounting is the pure core of PLAN 7.3 + BR-11. latest is the stored
-// session for the identity key (username, Acct-Session-Id, NAS address), nil if
-// none; now is the server receive time (O19).
+// ApplyAccounting is the pure core of PLAN 7.3 and BR-11. latest is the stored
+// session for the key (username, Acct-Session-Id, NAS address), or nil; now is
+// the server receive time (O19).
 //
 //   - Start: reuse an open row that has not counted any time yet (a
 //     retransmission), else a new row (a reused Acct-Session-Id after a Stop
@@ -133,7 +130,7 @@ func ApplyAccounting(latest *Session, r AcctRecord, now time.Time) AcctResult {
 	case r.Status == AcctStart && open && latest.Cum.Seconds == 0:
 		s = *latest
 	case r.Status == AcctStart:
-		if open { // the router reused the id (reboot): the old row is dead, or it would stay online and count toward max_sessions (BR-9)
+		if open { // a reboot reused the id: close the old row or it stays online and counts toward max_sessions (BR-9)
 			c := *latest
 			end := now
 			c.EndedAt, c.TerminateCause, c.Status, c.LastUpdateAt = &end, "Lost-Service", AcctStop, now
@@ -145,8 +142,8 @@ func ApplyAccounting(latest *Session, r AcctRecord, now time.Time) AcctResult {
 	case latest != nil && latest.Cum.Covers(r.Cum):
 		return AcctResult{Ignore: true}
 	default:
-		// MONITOR: a late Interim/Stop with no open row and figures above the latest finished row
-		// creates a new row and double-bills the overlap. Needed for the server-downtime case (E4.17).
+		// MONITOR: a late Interim/Stop above the latest finished row makes a new row and
+		// double-bills the overlap. It is needed when the server was down (E4.17).
 		s = Session{StartedAt: now.Add(-time.Duration(r.Cum.Seconds) * time.Second)}
 	}
 	res := AcctResult{Insert: s.ID == 0, Delta: s.Cum.DeltaTo(r.Cum), Closed: closed}

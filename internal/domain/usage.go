@@ -2,13 +2,11 @@ package domain
 
 import "time"
 
-// Daily usage history (PLAN D12, Phase 9). Pure helpers: no clock reads, no I/O.
-
 // DayFormat is the layout of a usage day key; keys sort chronologically as text.
 const DayFormat = "2006-01-02"
 
-// DayKey is the calendar day of t in loc, e.g. "2026-11-01". Accounting stores
-// usage under the day (in settings.timezone) on which the packet arrived.
+// DayKey returns the calendar day of t in loc, e.g. "2026-11-01". Usage is
+// stored under the day (in settings.timezone) on which the packet arrived.
 func DayKey(t time.Time, loc *time.Location) string { return t.In(loc).Format(DayFormat) }
 
 // UsageDay is the traffic of all members on one day.
@@ -46,12 +44,12 @@ func NormalizeUsageDays(days int) int {
 	return DefaultUsageDays
 }
 
-// DayWindow lists the n day keys ending with the day of now in loc, oldest first.
+// DayWindow returns the n day keys ending with the day of now in loc, oldest first.
 func DayWindow(now time.Time, loc *time.Location, n int) []string {
 	t := now.In(loc)
 	out := make([]string, n)
 	for i := range n {
-		// Calendar arithmetic at noon: immune to DST shifts at midnight.
+		// Noon, so a DST shift at midnight cannot change the day.
 		d := time.Date(t.Year(), t.Month(), t.Day()-(n-1-i), 12, 0, 0, 0, loc)
 		out[i] = d.Format(DayFormat)
 	}

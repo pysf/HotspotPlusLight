@@ -1,6 +1,6 @@
-// Package radius is the UDP RADIUS server: PAP Access-Requests are answered by
-// the auth.Evaluator (Phase 3); accounting packets are applied by the session
-// service (Phase 4).
+// Package radius is the UDP RADIUS server and the Disconnect client. PAP
+// Access-Requests are answered by an auth.Evaluator, and accounting packets are
+// applied by the session service.
 package radius
 
 import (
@@ -27,12 +27,13 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-// SecretProvider returns the current shared secret. It is called per packet so
-// settings changes apply without restart (PLAN 7.1).
+// SecretProvider returns the current shared secret. It is called per packet, so
+// a settings change applies without a restart (PLAN 7.1).
 type SecretProvider interface {
 	RadiusSecret(ctx context.Context) (string, error)
 }
 
+// secretSource adapts a SecretProvider to the library's SecretSource.
 type secretSource struct{ p SecretProvider }
 
 func (s secretSource) RADIUSSecret(ctx context.Context, _ net.Addr) ([]byte, error) {
@@ -51,22 +52,21 @@ type Accountant interface {
 	Account(ctx context.Context, rec domain.AcctRecord) error
 }
 
-// LinkRecorder receives the router link events (PLAN 8.2; implemented by
-// linkstatus.Recorder). Source addresses are "ip:port".
+// LinkRecorder receives the router link events (PLAN 8.2, linkstatus.Recorder).
+// Addresses are "ip:port".
 type LinkRecorder interface {
 	AccessRequest(addr string)
 	Accounting(addr string)
 	BadSecret(addr string)
 }
 
-// Server owns the auth and accounting packet servers.
+// Server runs the auth and accounting packet servers.
 //
-// Shutdown does NOT use radius.PacketServer.Shutdown. That method has a race in
-// layeh.com/radius@v0.0.0-20231213012653 (server-packet.go): Serve registers its
-// listener and only later calls activeAdd(). A Shutdown in that gap drives the
-// active count to -1 twice and closes lastActive twice ("close of closed
-// channel"). We stop the read loops ourselves (stoppableConn) and count the
-// handlers in flight with our own WaitGroup.
+// Shutdown does not use radius.PacketServer.Shutdown. It has a race in
+// layeh.com/radius@v0.0.0-20231213012653: Serve registers its listener and only
+// later calls activeAdd(), so a Shutdown in that gap closes lastActive twice
+// ("close of closed channel"). Server stops the read loops itself
+// (lateCloseConn) and counts handlers in flight with its own WaitGroup.
 type Server struct {
 	log     *slog.Logger
 	secrets SecretProvider
@@ -84,6 +84,7 @@ type Server struct {
 	stoppers []*lateCloseConn
 }
 
+// New returns a Server. Call Serve to start it.
 func New(secrets SecretProvider, login Authenticator, acctg Accountant, link LinkRecorder, log *slog.Logger) *Server {
 	src := secretSource{secrets}
 	s := &Server{log: log, secrets: secrets, login: login, acctg: acctg, link: link}
@@ -92,8 +93,8 @@ func New(secrets SecretProvider, login Authenticator, acctg Accountant, link Lin
 	return s
 }
 
-// track counts a handler as in flight. After Shutdown began, new packets are dropped
-// (the router retransmits).
+// track counts h as in flight. After Shutdown began, new packets are dropped
+// and the router retransmits.
 func (s *Server) track(h radius.HandlerFunc) radius.Handler {
 	return radius.HandlerFunc(func(w radius.ResponseWriter, r *radius.Request) {
 		s.mu.Lock()
@@ -108,7 +109,8 @@ func (s *Server) track(h radius.HandlerFunc) radius.Handler {
 	})
 }
 
-// Serve runs both listeners on the given connections until Shutdown.
+// Serve starts the auth and accounting listeners on the given connections. It
+// returns at once; Shutdown stops them.
 func (s *Server) Serve(authConn, acctConn net.PacketConn) {
 	a := &lateCloseConn{PacketConn: authConn}
 	b := &lateCloseConn{PacketConn: acctConn, onRead: s.sniffAcct}
@@ -121,11 +123,10 @@ func (s *Server) Serve(authConn, acctConn net.PacketConn) {
 	go s.run("acct", s.acct, b)
 }
 
-// lateCloseConn lets requests in flight at shutdown still be answered. stop only
-// ends the reading (an immediate read deadline, and ReadFrom then returns
-// net.ErrClosed, which the library treats as fatal and not as a temporary error);
-// the socket is really closed by Server.Shutdown once every handler has finished.
-// Close is a no-op for the same reason. onRead, if set, sees every datagram before
+// lateCloseConn lets requests in flight at shutdown still be answered. stop ends
+// the reading only: ReadFrom then returns net.ErrClosed, which the library treats
+// as fatal, not temporary. Server.Shutdown closes the socket once every handler
+// has finished, so Close is a no-op. onRead, if set, sees every datagram before
 // the library does.
 type lateCloseConn struct {
 	net.PacketConn
@@ -154,21 +155,20 @@ func (c *lateCloseConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	return n, addr, err
 }
 
-// sniffAcct looks at accounting datagrams before the library does. The library
-// drops a packet whose Request Authenticator does not verify without telling us
-// who sent it; this is how the link status panel learns about wrong shared
-// secrets (it repeats the library's own check).
+// sniffAcct sees accounting datagrams before the library does. The library drops
+// a packet with a bad Request Authenticator without telling us who sent it; this
+// is how the link status panel learns about a wrong shared secret.
 //
-// MONITOR: this runs in the UDP read loop and does one SQLite read (the current
-// secret, so settings changes apply at once) plus one MD5 per accounting packet.
-// Fine at LAN scale (one router, an interim every 60 s per user); if accounting
-// volume ever grows, cache the secret in memory and invalidate it on settings save.
+// MONITOR: this runs in the UDP read loop with one SQLite read and one MD5 per
+// accounting packet. Fine for one router on a LAN; if the volume grows, cache the
+// secret and clear it on settings save.
 func (s *Server) sniffAcct(pkt []byte, from net.Addr) {
 	if len(pkt) >= 20 && radius.Code(pkt[0]) == radius.CodeAccountingRequest {
 		s.checkAcctSecret(pkt, from)
 	}
 }
 
+// checkAcctSecret repeats the library's authenticator check to find a wrong secret.
 func (s *Server) checkAcctSecret(pkt []byte, from net.Addr) {
 	secret, err := s.secrets.RadiusSecret(context.Background())
 	if err != nil || secret == "" || radius.IsAuthenticRequest(pkt, []byte(secret)) {
@@ -185,8 +185,9 @@ func (s *Server) run(name string, ps *radius.PacketServer, c *lateCloseConn) {
 	}
 }
 
-// Shutdown stops reading, waits (bounded by ctx) for the handlers in flight, whose
-// replies still go out, and then releases the sockets.
+// Shutdown stops reading, waits for the handlers in flight (their replies still
+// go out) until ctx ends, and then closes the sockets. It returns ctx.Err() if
+// the wait timed out.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
 	s.stopping = true
@@ -213,9 +214,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return err
 }
 
-// handleAuth answers Access-Requests (PAP only, PLAN 7.2). It stays silent
-// (no reply) when it cannot give a trustworthy answer: a probably wrong shared
-// secret, a malformed packet, or an infrastructure failure.
+// handleAuth answers Access-Requests (PAP only, PLAN 7.2). It sends no reply
+// when it cannot give a trustworthy answer: a probable wrong shared secret, a
+// malformed packet, or an infrastructure failure.
 func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 	if r.Code != radius.CodeAccessRequest {
 		return // other codes are dropped (PLAN 7.1)
@@ -224,7 +225,7 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 	ctx := context.WithoutCancel(r.Context()) // a shutdown lets requests in flight finish
 	if isCHAP(r.Packet) {
 		s.link.AccessRequest(from)
-		// This is how we notice a router that is not on PAP (D4, PLAN 13.1).
+		// The warning is how the admin notices a router that is not on PAP (D4, PLAN 13.1).
 		s.log.Warn("CHAP/MS-CHAP Access-Request rejected: only PAP is supported", "from", from)
 		s.reply(w, r, auth.Verdict{Reason: domain.ReasonUnsupportedAuth})
 		return
@@ -241,8 +242,8 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 		s.log.Warn("Access-Request with a malformed User-Password dropped", "from", from, "err", err)
 		return
 	case !plausiblePassword(raw) || !zeroPadded(r.Packet):
-		// layeh does not authenticate Access-Requests, so a wrong shared secret
-		// shows up only as a User-Password that decrypts to noise. Never answer it.
+		// layeh does not authenticate Access-Requests, so a wrong secret shows up only
+		// as a User-Password that decrypts to noise. Never answer it.
 		s.link.BadSecret(from) // MONITOR: spoofable on UDP, see internal/linkstatus
 		s.log.Warn("Access-Request dropped: User-Password does not decrypt, probably a wrong shared secret", "from", from)
 		return
@@ -256,7 +257,7 @@ func (s *Server) handleAuth(w radius.ResponseWriter, r *radius.Request) {
 	s.reply(w, r, v)
 }
 
-// reply writes the Access-Accept or Access-Reject for v.
+// reply writes the Access-Accept or Access-Reject for v, and logs a reject.
 func (s *Server) reply(w radius.ResponseWriter, r *radius.Request, v auth.Verdict) {
 	var resp *radius.Packet
 	if v.Accepted() {
@@ -264,14 +265,11 @@ func (s *Server) reply(w radius.ResponseWriter, r *radius.Request, v auth.Verdic
 		g := v.Grant
 		rfc2869.AcctInterimInterval_Set(resp, rfc2869.AcctInterimInterval(g.InterimSeconds))
 		rfc2865.SessionTimeout_Set(resp, rfc2865.SessionTimeout(g.SessionTimeout))
-		// Layer 1 of the enforcement (O3, 2026-11-04): the router gets the exact bytes
-		// left, in both directions, split into the low 32 bits and -Gigawords.
-		// VERIFY-ON-HARDWARE (PLAN 13.2): the type ids (Recv-Limit 1, Xmit-Limit 2,
-		// Recv-Limit-Gigawords 14, Xmit-Limit-Gigawords 15, Rate-Limit 8) come from the
-		// MikroTik dictionary in layeh.com/radius and match PLAN 7.5. Still to prove on a
-		// router: that Recv/Xmit mean upload/download in the Hotspot (the MikroTik doc does
-		// not define the direction), that the Gigawords limits are honoured, and the
-		// Rate-Limit syntax.
+		// Layer 1 of the enforcement (O3): the exact bytes left, in both directions,
+		// as low 32 bits plus -Gigawords.
+		// VERIFY-ON-HARDWARE (PLAN 13.2): the type ids match PLAN 7.5. Still to prove:
+		// what Recv/Xmit mean in the Hotspot, that the Gigawords limits are honoured,
+		// and the Rate-Limit syntax.
 		if g.DataLimited {
 			mikrotik.MikrotikRecvLimit_Set(resp, mikrotik.MikrotikRecvLimit(g.DataLow))
 			mikrotik.MikrotikXmitLimit_Set(resp, mikrotik.MikrotikXmitLimit(g.DataLow))
@@ -285,7 +283,7 @@ func (s *Server) reply(w radius.ResponseWriter, r *radius.Request, v auth.Verdic
 		}
 	} else {
 		resp = r.Response(radius.CodeAccessReject)
-		// The Reply-Message is only the code; the logs keep code and English text (O20).
+		// The Reply-Message is only the code; the log keeps the English text too (O20).
 		name, _ := rfc2865.UserName_LookupString(r.Packet)
 		s.log.Info("access-reject", "username", name, "code", string(v.Reason), "message", v.Reason.Message())
 		rfc2865.ReplyMessage_SetString(resp, v.Reason.ReplyMessage())
@@ -295,9 +293,8 @@ func (s *Server) reply(w radius.ResponseWriter, r *radius.Request, v auth.Verdic
 	}
 }
 
-const (
-	microsoftVendorID = 311 // MS-CHAP attributes are vendor-specific
-)
+// microsoftVendorID is the vendor id of the MS-CHAP attributes.
+const microsoftVendorID = 311
 
 // isCHAP reports a CHAP-Password or any Microsoft vendor attribute (MS-CHAP v1/v2).
 func isCHAP(p *radius.Packet) bool {
@@ -315,11 +312,11 @@ func isCHAP(p *radius.Packet) bool {
 	return false
 }
 
-// zeroPadded checks the padding of the decrypted User-Password. A real router pads
-// with zero bytes only. The library cuts the plaintext at the first zero byte and
-// hides what follows, so a wrong-secret block of random bytes with an early zero
-// byte would look like a short, valid password (about 1 in 150 packets).
-// RFC 2865 §5.2 requires zero padding. VERIFY-ON-HARDWARE: confirm RouterOS pads with zeros.
+// zeroPadded reports whether the decrypted User-Password is padded with zero
+// bytes only (RFC 2865 5.2). The library cuts the plaintext at the first zero
+// byte, so a wrong-secret block with an early zero byte would look like a short
+// valid password (about 1 in 150 packets).
+// VERIFY-ON-HARDWARE: RouterOS pads with zeros.
 func zeroPadded(p *radius.Packet) bool {
 	a, ok := p.Lookup(rfc2865.UserPassword_Type)
 	if !ok || len(a) < 16 || len(a)%16 != 0 || len(p.Secret) == 0 {
@@ -338,9 +335,9 @@ func zeroPadded(p *radius.Packet) bool {
 	return i < 0 || !slices.ContainsFunc(dec[i:], func(b byte) bool { return b != 0 })
 }
 
-// plausiblePassword is true for text a person could have typed: valid UTF-8
-// without control characters. A decryption with the wrong secret yields random
-// bytes, which fail this with overwhelming probability.
+// plausiblePassword reports whether b is text a person could have typed: valid
+// UTF-8 without control characters. A wrong secret gives random bytes, which
+// almost never pass.
 func plausiblePassword(b []byte) bool {
 	if !utf8.Valid(b) {
 		return false
@@ -353,17 +350,16 @@ func plausiblePassword(b []byte) bool {
 	return true
 }
 
-// handleAcct applies an Accounting-Request and answers it only after the
-// transaction has committed (PLAN 7.3). The library has already verified the
-// Request Authenticator with the shared secret (bad packets never get here, E4.12).
-// No reply is sent when the change could not be stored: the router retransmits.
+// handleAcct applies an Accounting-Request and answers it only after the change
+// is committed (PLAN 7.3). Without a reply the router retransmits. The library
+// has already verified the Request Authenticator (E4.12).
 func (s *Server) handleAcct(w radius.ResponseWriter, r *radius.Request) {
 	if r.Code != radius.CodeAccountingRequest {
 		return
 	}
 	from := r.RemoteAddr.String()
 	s.link.Accounting(from)
-	// Shutdown cancels r.Context(); a transaction in flight must still commit and be answered (E8.06).
+	// Shutdown cancels r.Context(), but a transaction in flight must still commit and be answered (E8.06).
 	ctx := context.WithoutCancel(r.Context())
 	status, err := rfc2866.AcctStatusType_Lookup(r.Packet)
 	if err != nil {
@@ -394,8 +390,8 @@ func (s *Server) handleAcct(w radius.ResponseWriter, r *radius.Request) {
 	}
 }
 
-// record reads the attributes of PLAN 7.3. An absent attribute is 0/empty; a
-// present but malformed one is an error (the packet is dropped, not counted as 0).
+// record reads the attributes of PLAN 7.3 into rec. An absent attribute is
+// zero or empty; a malformed one is an error, so the packet is dropped, not counted as 0.
 func (s *Server) record(r *radius.Request, rec domain.AcctRecord, sid string) (domain.AcctRecord, error) {
 	p := r.Packet
 	rec.SessionID = sid
@@ -405,7 +401,7 @@ func (s *Server) record(r *radius.Request, rec domain.AcctRecord, sid string) (d
 	}
 	rec.NASIP = host // the packet's source address is what a Disconnect is sent to (BR-18)
 	var errs []error
-	// opt returns the lookup result, or the zero value when the attribute is absent.
+	// opt reports whether the attribute is present; a missing one is fine, any other error is collected.
 	opt := func(name string, err error) bool {
 		if err == nil {
 			return true

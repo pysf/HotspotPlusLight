@@ -10,8 +10,8 @@ const (
 	loginLockout     = time.Minute
 )
 
-// Throttle locks a client out for `lockout` after `max` failures within one
-// lockout period. In memory only: a restart forgives (single admin, LAN).
+// Throttle locks a client out for the lockout time after max failures within
+// one lockout period. It is in memory only, so a restart forgives.
 type Throttle struct {
 	mu      sync.Mutex
 	max     int
@@ -32,7 +32,7 @@ type entry struct {
 	lockedUntil time.Time
 }
 
-// NewThrottle locks a key out for lockout after max failures.
+// NewThrottle returns a Throttle that locks a key out for lockout after max failures.
 func NewThrottle(max int, lockout time.Duration) *Throttle {
 	return &Throttle{max: max, lockout: lockout, byKey: map[string]*entry{}, locks: map[string]*keyLock{}}
 }
@@ -76,8 +76,8 @@ func (t *Throttle) Success(key string) {
 	t.mu.Unlock()
 }
 
-// lock serializes check, verify and record for one key (other keys are not
-// blocked) and returns the release function.
+// Lock serializes check, verify and record for one key, and returns the release
+// function. Other keys are not blocked.
 func (t *Throttle) Lock(key string) (unlock func()) {
 	t.mu.Lock()
 	l := t.locks[key]
