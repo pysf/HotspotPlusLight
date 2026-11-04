@@ -7,21 +7,33 @@ import (
 	"net"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"layeh.com/radius"
 
 	"hotspotpluslight/internal/domain"
 )
 
-type coaSettings struct{ port int }
+type coaSettings struct {
+	port   int
+	secret string // empty means "s3cret"
+}
 
 func (c coaSettings) GetSettings(context.Context) (domain.Settings, error) {
+	if c.secret == "none" {
+		return domain.Settings{CoaPort: c.port}, nil
+	}
 	return domain.Settings{RadiusSharedSecret: "s3cret", CoaPort: c.port}, nil
 }
 
 type noLink struct{}
 
 func (noLink) Disconnect(string, string) {}
+
+// recLink keeps the last outcome.
+type recLink struct{ outcome string }
+
+func (r *recLink) Disconnect(_, outcome string) { r.outcome = outcome }
 
 // fakeRouter answers each Disconnect-Request with an ACK. badMA(n) says whether
 // the n-th ACK (from 1) carries a wrong Message-Authenticator. It returns the port
@@ -62,7 +74,7 @@ func fakeRouter(t *testing.T, badMA func(n int) bool) (int, *atomic.Int32) {
 
 func kick(t *testing.T, port int) error {
 	t.Helper()
-	d := NewDisconnector(coaSettings{port}, noLink{}, slog.Default())
+	d := NewDisconnector(coaSettings{port: port}, noLink{}, slog.Default())
 	return d.Disconnect(t.Context(), domain.SessionTarget{NASIP: "127.0.0.1", Username: "alice", AcctSessionID: "s1"})
 }
 
@@ -77,13 +89,38 @@ func TestDisconnectBadMAThenGood(t *testing.T) {
 	}
 }
 
-// Wrong every time: the kick ends as "no answer" after the retries.
+// Wrong every time: the kick ends as ErrKickBadReply (not "no answer") after the
+// retries, and the panel outcome says so (review B9).
 func TestDisconnectBadMAEveryTime(t *testing.T) {
 	port, n := fakeRouter(t, func(int) bool { return true })
-	if err := kick(t, port); !errors.Is(err, domain.ErrKickTimeout) {
-		t.Fatalf("want ErrKickTimeout, got %v", err)
+	link := &recLink{}
+	d := NewDisconnector(coaSettings{port: port}, link, slog.Default())
+	err := d.Disconnect(t.Context(), domain.SessionTarget{NASIP: "127.0.0.1", Username: "alice", AcctSessionID: "s1"})
+	if !errors.Is(err, domain.ErrKickBadReply) {
+		t.Fatalf("want ErrKickBadReply, got %v", err)
+	}
+	if link.outcome != "bad reply (check the shared secret)" {
+		t.Fatalf("outcome %q", link.outcome)
 	}
 	if n.Load() != attempts {
 		t.Fatalf("%d requests, want %d", n.Load(), attempts)
+	}
+}
+
+// An empty shared secret is a configuration error at once, with nothing sent (review B9).
+func TestDisconnectEmptySecret(t *testing.T) {
+	port, n := fakeRouter(t, func(int) bool { return false })
+	link := &recLink{}
+	d := NewDisconnector(coaSettings{port: port, secret: "none"}, link, slog.Default())
+	start := time.Now()
+	err := d.Disconnect(t.Context(), domain.SessionTarget{NASIP: "127.0.0.1", Username: "alice", AcctSessionID: "s1"})
+	if !errors.Is(err, domain.ErrKickNoSecret) {
+		t.Fatalf("want ErrKickNoSecret, got %v", err)
+	}
+	if time.Since(start) > attemptTimeout/2 || n.Load() != 0 {
+		t.Fatalf("took %v, %d requests sent", time.Since(start), n.Load())
+	}
+	if link.outcome != "shared secret not set" {
+		t.Fatalf("outcome %q", link.outcome)
 	}
 }

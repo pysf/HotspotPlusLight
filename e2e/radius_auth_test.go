@@ -188,6 +188,25 @@ func TestE3_04_NoPlanAndPlanRemoved(t *testing.T) {
 	}
 }
 
+// E16.07 (review B7) a disabled member whose plan row is missing gets INACTIVE_USER:
+// check 2 (active) runs before checks 3-4 (plan), as in PLAN 7.2.
+func TestE16_07_InactiveBeforePlanChecks(t *testing.T) {
+	f := newP3(t)
+	id := f.member(f.plan("Basic"), "alice", "password", "secret1")
+	conn, err := f.db.Conn(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(context.Background(), `PRAGMA foreign_keys=OFF`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(context.Background(), `UPDATE member SET active=0, plan_id=9999 WHERE id=?`, id); err != nil {
+		t.Fatal(err)
+	}
+	f.rejected("alice", "secret1", "INACTIVE_USER")
+}
+
 // E3.05 window lapsed -> reject; with auto_resubscribe -> accept and renew (BR-5, BR-6, BR-13b, Q21).
 func TestE3_05_WindowLapsedAndAutoResubscribe(t *testing.T) {
 	f := newP3(t)

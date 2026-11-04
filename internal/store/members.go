@@ -65,7 +65,7 @@ func scanMember(r rowScanner, plan *domain.Plan, extra ...any) (domain.Member, e
 	return m, nil
 }
 
-// CreateMember inserts a member and returns its id, or domain.ErrUsernameTaken.
+// CreateMember inserts a member and returns its id, or domain.ErrUsernameTaken or domain.ErrPlanGone.
 func (s *Store) CreateMember(ctx context.Context, in domain.MemberInput, passwordEnc []byte, now time.Time) (int64, error) {
 	res, err := s.db.ExecContext(ctx, `INSERT INTO member(username, password_enc, active, first_name, last_name, mobile, email, national_code,
 		mac, plan_id, subscription_date, expires_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -73,6 +73,9 @@ func (s *Store) CreateMember(ctx context.Context, in domain.MemberInput, passwor
 		in.MAC, in.PlanID, now.Unix(), optUnix(in.ExpiresAt), now.Unix(), now.Unix())
 	if sqliteCode(err) == sqliteConstraintUnique {
 		return 0, domain.ErrUsernameTaken
+	}
+	if sqliteCode(err) == sqliteConstraintFK { // the plan was deleted after the service checked it
+		return 0, domain.ErrPlanGone
 	}
 	if err != nil {
 		return 0, err
@@ -90,7 +93,7 @@ func (s *Store) GetMember(ctx context.Context, id int64) (domain.Member, error) 
 }
 
 // UpdateMember changes the editable fields only; window, counters and extra bulk stay (BR-13a).
-// It returns domain.ErrNotFound or domain.ErrUsernameTaken.
+// It returns domain.ErrNotFound, domain.ErrUsernameTaken or domain.ErrPlanGone.
 func (s *Store) UpdateMember(ctx context.Context, id int64, in domain.MemberInput, now time.Time) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE member SET username=?, active=?, first_name=?, last_name=?, mobile=?, email=?, national_code=?,
 		mac=?, plan_id=?, expires_at=?, updated_at=? WHERE id=?`,
@@ -98,6 +101,9 @@ func (s *Store) UpdateMember(ctx context.Context, id int64, in domain.MemberInpu
 		in.MAC, in.PlanID, optUnix(in.ExpiresAt), now.Unix(), id)
 	if sqliteCode(err) == sqliteConstraintUnique {
 		return domain.ErrUsernameTaken
+	}
+	if sqliteCode(err) == sqliteConstraintFK { // the plan was deleted after the service checked it
+		return domain.ErrPlanGone
 	}
 	if err != nil {
 		return err

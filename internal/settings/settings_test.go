@@ -12,12 +12,16 @@ import (
 type fakeRepo struct {
 	saved  *domain.Settings
 	planOK bool
+	gone   bool // UpdateSettings fails as if the plan was deleted after the check
 }
 
 func (f *fakeRepo) GetSettings(context.Context) (domain.Settings, error) {
 	return domain.Settings{}, nil
 }
 func (f *fakeRepo) UpdateSettings(_ context.Context, s domain.Settings, _ time.Time) error {
+	if f.gone {
+		return domain.ErrPlanGone
+	}
 	f.saved = &s
 	return nil
 }
@@ -60,5 +64,16 @@ func TestTimezoneValidation(t *testing.T) {
 		if err != nil || (errs["timezone"] == "") != ok {
 			t.Errorf("%q: ok=%v errs=%v err=%v", tz, ok, errs, err)
 		}
+	}
+}
+
+// TestUpdatePlanGoneBecomesFormError covers review B4.
+func TestUpdatePlanGoneBecomesFormError(t *testing.T) {
+	r := &fakeRepo{planOK: true, gone: true}
+	f := goodForm()
+	f.DefaultPlanID = "5"
+	errs, err := New(r, clock.NewFake(time.Unix(0, 0))).Update(context.Background(), f)
+	if err != nil || errs["default_plan_id"] == "" {
+		t.Fatalf("%v %v", errs, err)
 	}
 }

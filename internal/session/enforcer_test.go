@@ -154,3 +154,11 @@ func TestEnforcerNoSecondDisconnectAfterSuccess(t *testing.T) {
 		t.Fatalf("disconnects after the mark: %d", end.count())
 	}
 }
+
+// TestEnforcerStopTwice covers review B3: a second Stop must not panic.
+func TestEnforcerStopTwice(t *testing.T) {
+	e := NewEnforcer(&enfRepo{}, clock.NewFake(t0), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	e.Start(&enfEnder{})
+	e.Stop()
+	e.Stop()
+}

@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
@@ -26,6 +27,7 @@ import (
 const (
 	serviceName = "HotspotPlusLight"
 	defaultDir  = `C:\ProgramData\HotspotPlusLight`
+	stopWait    = 25 * time.Second // less than the 30 s WaitHint given to Windows
 )
 
 // isWindowsService reports whether the process was started by the Service Control Manager.
@@ -54,9 +56,12 @@ func runAsService(envFile string, getenv func(string) string) error {
 type handler struct{ opts app.Options }
 
 // Execute implements svc.Handler. It reports Running only after the listeners
-// are bound, and a failure exit code if the app ends with an error.
+// are bound and handles Stop at any time, also during start. It returns a
+// failure exit code (so Windows restarts the service) only if the app fails by itself.
 func (h *handler) Execute(_ []string, req <-chan svc.ChangeRequest, status chan<- svc.Status) (bool, uint32) {
-	status <- svc.Status{State: svc.StartPending}
+	// Accepts must be set here, or Windows never delivers a Stop during a slow start.
+	// The WaitHint covers a slow migration.
+	status <- svc.Status{State: svc.StartPending, Accepts: svc.AcceptStop | svc.AcceptShutdown, WaitHint: 30000}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
@@ -64,21 +69,19 @@ func (h *handler) Execute(_ []string, req <-chan svc.ChangeRequest, status chan<
 	opts := h.opts
 	opts.Ready = func() { close(ready) }
 	go func() { done <- app.Run(ctx, opts) }()
-	// Report Running only when the listeners are bound. If the app fails first, never report Running.
-	select {
-	case <-ready:
-		status <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown}
-	case err := <-done:
-		if err == nil {
-			err = errors.New("the app stopped before it was ready")
-		}
-		fmt.Fprintln(h.opts.Stdout, "error:", err)
-		return true, 1
-	}
+	// Control requests are read from the start, so a Stop during a slow start works.
+	// A nil ready channel never fires; it is set to nil once Running is reported.
+	readyCh := (<-chan struct{})(ready)
 	for {
 		select {
+		case <-readyCh:
+			readyCh = nil
+			status <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown}
 		case err := <-done:
 			// The app ended by itself (for example a bad config): report failure so Windows restarts it.
+			if err == nil && readyCh != nil {
+				err = errors.New("the app stopped before it was ready")
+			}
 			if err != nil {
 				fmt.Fprintln(h.opts.Stdout, "error:", err)
 				return true, 1
@@ -91,8 +94,14 @@ func (h *handler) Execute(_ []string, req <-chan svc.ChangeRequest, status chan<
 			case svc.Stop, svc.Shutdown:
 				status <- svc.Status{State: svc.StopPending, WaitHint: 30000}
 				cancel()
-				<-done // wait for the graceful shutdown
-				return false, 0
+				select {
+				case <-done: // the graceful shutdown ended
+					return false, 0
+				case <-time.After(stopWait):
+					// Exit code 0: an admin Stop must never trigger a recovery restart.
+					fmt.Fprintln(h.opts.Stdout, "error: the app did not stop in time")
+					return false, 0
+				}
 			}
 		}
 	}
@@ -158,7 +167,8 @@ func withService(f func(*mgr.Mgr, *mgr.Service) error) error {
 	return f(m, s)
 }
 
-// stopService asks the service to stop and waits up to 30 seconds. A service that is already stopped is fine.
+// stopService asks the service to stop and waits up to 35 seconds, longer than
+// the 30 s the service manager allows. A service that is already stopped or stopping is fine.
 func stopService(s *mgr.Service) error {
 	st, err := s.Query()
 	if err != nil {
@@ -167,10 +177,15 @@ func stopService(s *mgr.Service) error {
 	if st.State == svc.Stopped {
 		return nil
 	}
-	if st, err = s.Control(svc.Stop); err != nil {
-		return err
+	if st.State != svc.StopPending { // already stopping: only wait
+		if st, err = s.Control(svc.Stop); err != nil {
+			if errors.Is(err, windows.ERROR_SERVICE_NOT_ACTIVE) { // it stopped after the query
+				return nil
+			}
+			return err
+		}
 	}
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(35 * time.Second)
 	for st.State != svc.Stopped {
 		if time.Now().After(deadline) {
 			return errors.New("timeout waiting for the service to stop")

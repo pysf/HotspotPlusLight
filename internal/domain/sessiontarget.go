@@ -15,9 +15,11 @@ type SessionTarget struct {
 
 // Kick failures (BR-18). The wrapped message tells the admin what went wrong.
 var (
-	ErrKickIdentifiers = errors.New("cannot disconnect")                // the session lacks what a Disconnect needs
-	ErrKickRefused     = errors.New("the router refused to disconnect") // Disconnect-NAK
-	ErrKickTimeout     = errors.New("the router did not answer")        // no verifiable reply after the retry
+	ErrKickIdentifiers = errors.New("cannot disconnect")                                                  // the session lacks what a Disconnect needs
+	ErrKickRefused     = errors.New("the router refused to disconnect")                                   // Disconnect-NAK
+	ErrKickTimeout     = errors.New("the router did not answer")                                          // no reply after the retry
+	ErrKickBadReply    = errors.New("the router's answer could not be trusted (check the shared secret)") // reply with a bad Message-Authenticator
+	ErrKickNoSecret    = errors.New("the RADIUS shared secret is not set")                                // nothing can be signed
 	ErrSessionEnded    = errors.New("this session has already ended")
 )
 

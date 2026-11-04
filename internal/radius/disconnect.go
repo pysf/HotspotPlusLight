@@ -50,7 +50,9 @@ func NewDisconnector(s SettingsReader, link DisconnectRecorder, log *slog.Logger
 // It returns nil for a verified Disconnect-ACK, and also for a NAK with
 // Error-Cause 503 (RFC 5176): the router no longer has the session, so the ghost
 // row can be closed. Other errors wrap domain.ErrKickIdentifiers,
-// domain.ErrKickRefused (NAK) or domain.ErrKickTimeout (no answer after 2 sends, or a network error).
+// domain.ErrKickRefused (NAK), domain.ErrKickTimeout (no answer after 2 sends, or a network error),
+// domain.ErrKickBadReply (replies that fail the Message-Authenticator check) or
+// domain.ErrKickNoSecret (no shared secret is set; nothing is sent).
 //
 // VERIFY-ON-HARDWARE: RouterOS accepts User-Name, Acct-Session-Id, Framed-IP-Address and
 // Calling-Station-Id (in its own MAC spelling), sends Error-Cause in its NAK (503 needs it), and has
@@ -62,6 +64,10 @@ func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) e
 	st, err := d.settings.GetSettings(ctx)
 	if err != nil {
 		return err
+	}
+	if st.RadiusSharedSecret == "" { // the router would drop the packet and the admin would wait for a timeout
+		d.link.Disconnect(net.JoinHostPort(t.NASIP, strconv.Itoa(st.CoaPort)), "shared secret not set")
+		return domain.ErrKickNoSecret
 	}
 	p := radius.New(radius.CodeDisconnectRequest, []byte(st.RadiusSharedSecret))
 	rfc2865.UserName_SetString(p, t.Username)
@@ -102,7 +108,7 @@ func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) e
 			// the Authenticator field holds the request's authenticator).
 			if present, ok := checkMA(reply, reqAuth); present && !ok {
 				d.log.Warn("Disconnect reply ignored: its Message-Authenticator does not verify", "addr", addr)
-				last = domain.ErrKickTimeout // like a bad Response Authenticator: not believed, so try again
+				last, outcome = domain.ErrKickBadReply, "bad reply (check the shared secret)" // not believed, so try again
 				continue
 			}
 		}
@@ -123,7 +129,9 @@ func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) e
 		case ctx.Err() != nil:
 			return ctx.Err()
 		case errors.Is(err, context.DeadlineExceeded):
-			last = domain.ErrKickTimeout
+			if last == nil { // a bad reply is more useful to the admin than "no answer"
+				last = domain.ErrKickTimeout
+			}
 		default:
 			return fmt.Errorf("%w: %v", domain.ErrKickTimeout, err) // e.g. ICMP port unreachable: retrying will not help
 		}

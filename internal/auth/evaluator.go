@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
 	"errors"
 	"fmt"
@@ -25,8 +26,9 @@ type LoginRepo interface {
 	RenewMemberIfUnchanged(ctx context.Context, id int64, subscription time.Time, kind string, now time.Time) (bool, error)
 }
 
-// Cipher decrypts the stored member password (implemented by secret.Box).
+// Cipher encrypts and decrypts the stored member password (implemented by secret.Box).
 type Cipher interface {
+	Encrypt(plain []byte) ([]byte, error)
 	Decrypt(data []byte) ([]byte, error)
 }
 
@@ -37,11 +39,18 @@ type Evaluator struct {
 	cipher Cipher
 	clock  clock.Clock
 	log    *slog.Logger
+	// dummyEnc is a valid ciphertext that an unknown username decrypts, so it costs as much as a known one.
+	dummyEnc []byte
 }
 
 // NewEvaluator returns an Evaluator that reads from repo and decrypts with cipher.
-func NewEvaluator(repo LoginRepo, cipher Cipher, clk clock.Clock, log *slog.Logger) *Evaluator {
-	return &Evaluator{repo: repo, cipher: cipher, clock: clk, log: log}
+// It fails when the cipher cannot encrypt, for example with a bad key.
+func NewEvaluator(repo LoginRepo, cipher Cipher, clk clock.Clock, log *slog.Logger) (*Evaluator, error) {
+	dummyEnc, err := cipher.Encrypt(dummyPassword)
+	if err != nil {
+		return nil, fmt.Errorf("auth: prepare the dummy password: %w", err)
+	}
+	return &Evaluator{repo: repo, cipher: cipher, clock: clk, log: log, dummyEnc: dummyEnc}, nil
 }
 
 // Verdict is the outcome of a login check: a rejection Reason, or (Reason "")
@@ -72,6 +81,10 @@ func (e *Evaluator) Login(ctx context.Context, username, password string) (Verdi
 	if !ok {
 		return reject(domain.ReasonInvalidCredentials), nil
 	}
+	// domain.Evaluate repeats this check on purpose (BR-22 and the admin summary).
+	if !m.Active { // 2. before the plan checks, as in PLAN 7.2
+		return reject(domain.ReasonInactive), nil
+	}
 	plan, why, err := e.planOf(ctx, m) // 3-4. plan present
 	if err != nil {
 		return Verdict{}, err
@@ -85,7 +98,7 @@ func (e *Evaluator) Login(ctx context.Context, username, password string) (Verdi
 	}
 	now := e.clock.Now()
 
-	// 2, 5-8: active, expires_at, window (with auto-resubscribe), data, time.
+	// 5-8: expires_at, window (with auto-resubscribe), data, time.
 	d := domain.Evaluate(m.State(), plan, now)
 	if d.Renew {
 		// BR-6: renew, then reload and evaluate again. The renewal is guarded, so if
@@ -128,7 +141,8 @@ func (e *Evaluator) authenticate(ctx context.Context, username, password string)
 	m, enc, err := e.repo.GetMemberForLogin(ctx, name)
 	if errors.Is(err, domain.ErrNotFound) {
 		// Do the same work as for a wrong password, so timing does not reveal which usernames exist.
-		subtle.ConstantTimeCompare(dummyPassword, []byte(password))
+		stored, _ := e.cipher.Decrypt(e.dummyEnc)
+		samePassword(stored, password)
 		return domain.Member{}, false, nil
 	}
 	if err != nil {
@@ -138,7 +152,14 @@ func (e *Evaluator) authenticate(ctx context.Context, username, password string)
 	if err != nil {
 		return domain.Member{}, false, fmt.Errorf("decrypt password of member %d: %w", m.ID, err)
 	}
-	return m, subtle.ConstantTimeCompare(stored, []byte(password)) == 1, nil
+	return m, samePassword(stored, password), nil
+}
+
+// samePassword compares the SHA-256 hashes in constant time. Hashing first gives
+// equal lengths, so the compare never returns early and the stored length stays hidden.
+func samePassword(stored []byte, given string) bool {
+	a, b := sha256.Sum256(stored), sha256.Sum256([]byte(given))
+	return subtle.ConstantTimeCompare(a[:], b[:]) == 1
 }
 
 // planOf is checks 3-4 of PLAN 7.2. It returns the member's plan, or the Reason why there is none.

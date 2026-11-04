@@ -39,5 +39,8 @@ func (s *Store) UpdateSettings(ctx context.Context, st domain.Settings, now time
 		st.BusinessName, st.Timezone, st.RadiusSharedSecret, st.CoaPort, st.AccountingIntervalSeconds, def,
 		st.BatchUsernamePrefix, st.BatchCounter, st.BatchMaxCount,
 		st.VoucherPasswordLength, st.VoucherHelp, st.SessionRetentionDays, now.Unix())
+	if sqliteCode(err) == sqliteConstraintFK { // the default plan was deleted after the service checked it
+		return domain.ErrPlanGone
+	}
 	return err
 }

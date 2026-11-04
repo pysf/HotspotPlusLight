@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"hotspotpluslight/internal/domain"
@@ -17,8 +18,12 @@ const maxBatchSkips = 10000
 // lock is taken up front, so two creations never read the same counter. Usernames that
 // already exist are skipped and the counter moves past them. It fails with
 // *domain.UsernameConflictError when too many names are taken, and with
-// domain.ErrPlanGone when the plan was deleted.
+// domain.ErrPlanGone when the plan was deleted. It fails when the number of
+// passwords is not Count.
 func (s *Store) CreateBatch(ctx context.Context, nb domain.NewBatch, now time.Time) (domain.Batch, []string, error) {
+	if len(nb.PasswordsEnc) != nb.Input.Count {
+		return domain.Batch{}, nil, fmt.Errorf("batch has %d passwords for %d members", len(nb.PasswordsEnc), nb.Input.Count)
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Batch{}, nil, err

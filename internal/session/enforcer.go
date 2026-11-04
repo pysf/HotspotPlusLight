@@ -87,13 +87,17 @@ func (e *Enforcer) Start(end Ender) {
 	}
 }
 
-// Stop ends the workers and waits for them. No Check may follow.
+// Stop ends the workers and waits for them. A second call does nothing.
 func (e *Enforcer) Stop() {
 	if e.cancel == nil {
 		return
 	}
-	e.cancel()
 	e.mu.Lock()
+	if e.stopped {
+		e.mu.Unlock()
+		return
+	}
+	e.cancel()
 	e.stopped = true // a late Check must not send on the closed channel
 	close(e.jobs)
 	e.mu.Unlock()

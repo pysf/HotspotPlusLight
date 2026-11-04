@@ -175,9 +175,13 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	sess := session.New(sessionRepo{st}, disc, opts.Clock, sessOpts...)
 	a.enforcer = enforcer
 	members := member.New(st, box, sess, opts.Clock) // kicks go through the session service, so an ACK ends the session row
+	evaluator, err := auth.NewEvaluator(st, box, opts.Clock, log)
+	if err != nil {
+		return fail(err)
+	}
 	a.svc = services{
 		auth:      auth.New(st, opts.Clock),
-		evaluator: auth.NewEvaluator(st, box, opts.Clock, log),
+		evaluator: evaluator,
 		member:    members,
 		plan:      plan.New(st, opts.Clock),
 		settings:  settings.New(st, opts.Clock),

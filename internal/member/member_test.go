@@ -22,6 +22,7 @@ type fakeRepo struct {
 	settings domain.Settings
 	sessions []domain.SessionTarget
 	next     int64
+	planGone bool // the write fails as if the plan was deleted after the check
 	deleted  []domain.MemberSelection
 	late     []domain.SessionTarget // sessions that appear after the kick step, seen inside the delete transaction
 }
@@ -33,6 +34,9 @@ func newRepo() *fakeRepo {
 }
 
 func (f *fakeRepo) CreateMember(_ context.Context, in domain.MemberInput, enc []byte, now time.Time) (int64, error) {
+	if f.planGone {
+		return 0, domain.ErrPlanGone
+	}
 	for _, m := range f.members {
 		if equalFold(m.Username, in.Username) {
 			return 0, domain.ErrUsernameTaken
@@ -72,6 +76,9 @@ func (f *fakeRepo) GetMemberRow(ctx context.Context, id int64, _ time.Time) (dom
 }
 
 func (f *fakeRepo) UpdateMember(_ context.Context, id int64, in domain.MemberInput, _ time.Time) error {
+	if f.planGone {
+		return domain.ErrPlanGone
+	}
 	m := f.members[id]
 	m.Username, m.Active, m.PlanID = in.Username, in.Active, in.PlanID
 	f.members[id] = m
@@ -373,5 +380,20 @@ func TestKickSendsDisconnectsConcurrently(t *testing.T) {
 	}
 	if len(d.calls) != 24 {
 		t.Fatalf("%d calls", len(d.calls))
+	}
+}
+
+// TestPlanGoneBecomesFormError covers review B4: a plan deleted after the check
+// gives a plan_id form error, not an error.
+func TestPlanGoneBecomesFormError(t *testing.T) {
+	s, r, _ := setup()
+	ctx := context.Background()
+	id, _, _ := s.Create(ctx, domain.MemberForm{Username: "Alice", PlanID: "1", Active: true})
+	r.planGone = true
+	if _, errs, err := s.Create(ctx, domain.MemberForm{Username: "Bob", PlanID: "1"}); err != nil || errs["plan_id"] == "" {
+		t.Errorf("Create: %v %v", errs, err)
+	}
+	if errs, _, err := s.Update(ctx, id, domain.MemberForm{Username: "Alice", PlanID: "1", Active: true}); err != nil || errs["plan_id"] == "" {
+		t.Errorf("Update: %v %v", errs, err)
 	}
 }

@@ -93,3 +93,28 @@ func TestDeletePlanInUseCounts(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+// TestCreateBatchWrongPasswordCount covers review B5: the number of passwords
+// must equal Count, with nothing written and no panic.
+func TestCreateBatchWrongPasswordCount(t *testing.T) {
+	s := seeded(t)
+	ctx := context.Background()
+	p, _ := s.CreatePlan(ctx, samplePlan("P"), fixed())
+	start := counter(t, s)
+	for _, extra := range []int{-1, 1} {
+		nb := newBatch(p, 3)
+		if extra < 0 {
+			nb.PasswordsEnc = nb.PasswordsEnc[:2]
+		} else {
+			nb.PasswordsEnc = append(nb.PasswordsEnc, []byte("x"))
+		}
+		if _, _, err := s.CreateBatch(ctx, nb, fixed()); err == nil {
+			t.Fatalf("extra %d: want an error", extra)
+		}
+	}
+	var members int
+	s.db.QueryRow(`SELECT count(*) FROM member`).Scan(&members)
+	if members != 0 || counter(t, s) != start {
+		t.Fatalf("members %d, counter %d (start %d)", members, counter(t, s), start)
+	}
+}

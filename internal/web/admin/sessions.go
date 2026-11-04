@@ -98,9 +98,9 @@ func (h handlers) kickFailed(w http.ResponseWriter, r *http.Request, err error) 
 		h.notFound(w, r, "Session")
 	case errors.Is(err, domain.ErrSessionEnded):
 		h.render(w, r, http.StatusConflict, ui.ErrorFragment("This session has already ended."))
-	case errors.Is(err, domain.ErrKickIdentifiers):
+	case errors.Is(err, domain.ErrKickIdentifiers), errors.Is(err, domain.ErrKickNoSecret):
 		h.render(w, r, http.StatusUnprocessableEntity, ui.ErrorFragment(sentence(err.Error())+"."))
-	case errors.Is(err, domain.ErrKickRefused), errors.Is(err, domain.ErrKickTimeout):
+	case errors.Is(err, domain.ErrKickRefused), errors.Is(err, domain.ErrKickTimeout), errors.Is(err, domain.ErrKickBadReply):
 		h.render(w, r, http.StatusBadGateway, ui.ErrorFragment(sentence(err.Error())+"; the session was not changed."))
 	default:
 		h.serverError(w, r, err)

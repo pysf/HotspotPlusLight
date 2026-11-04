@@ -191,3 +191,24 @@ func TestStatusClauseMatchesGoRule(t *testing.T) {
 		t.Errorf("query not applied to the counts: %+v", n)
 	}
 }
+
+// TestForeignKeyFailuresBecomePlanGone covers review B4: a plan deleted after
+// the service checked it must give domain.ErrPlanGone, not a raw SQLite error.
+func TestForeignKeyFailuresBecomePlanGone(t *testing.T) {
+	s := seeded(t)
+	ctx := context.Background()
+	p, _ := s.CreatePlan(ctx, samplePlan("P"), fixed())
+	id := addMember(t, s, "Alice", p, nil)
+	if _, err := s.CreateMember(ctx, domain.MemberInput{Username: "Bob", PlanID: 9999}, []byte("x"), fixed()); !errors.Is(err, domain.ErrPlanGone) {
+		t.Errorf("CreateMember: %v", err)
+	}
+	if err := s.UpdateMember(ctx, id, domain.MemberInput{Username: "Alice", PlanID: 9999}, fixed()); !errors.Is(err, domain.ErrPlanGone) {
+		t.Errorf("UpdateMember: %v", err)
+	}
+	st, _ := s.GetSettings(ctx)
+	gone := int64(9999)
+	st.DefaultPlanID = &gone
+	if err := s.UpdateSettings(ctx, st, fixed()); !errors.Is(err, domain.ErrPlanGone) {
+		t.Errorf("UpdateSettings: %v", err)
+	}
+}

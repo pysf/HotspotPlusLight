@@ -112,10 +112,13 @@ func (s *Service) Location(ctx context.Context) (*time.Location, error) {
 	return e.loc, err
 }
 
+// planChoiceMsg is the field error for a missing or unknown plan.
+const planChoiceMsg = "Choose a plan from the list."
+
 // planError returns a field error when the chosen plan does not exist, else nil.
 func (s *Service) planError(ctx context.Context, planID int64) (domain.FieldErrors, error) {
 	if _, err := s.repo.GetPlan(ctx, planID); errors.Is(err, domain.ErrNotFound) {
-		return domain.FieldErrors{"plan_id": "Choose a plan from the list."}, nil
+		return domain.FieldErrors{"plan_id": planChoiceMsg}, nil
 	} else if err != nil {
 		return nil, err
 	}
@@ -154,6 +157,9 @@ func (s *Service) Create(ctx context.Context, f domain.MemberForm) (int64, domai
 	id, err := s.repo.CreateMember(ctx, in, enc, e.now)
 	if errors.Is(err, domain.ErrUsernameTaken) {
 		return 0, domain.FieldErrors{"username": "This username is already taken."}, nil
+	}
+	if errors.Is(err, domain.ErrPlanGone) { // deleted between the check and the insert
+		return 0, domain.FieldErrors{"plan_id": planChoiceMsg}, nil
 	}
 	return id, nil, err
 }
@@ -258,6 +264,9 @@ func (s *Service) Update(ctx context.Context, id int64, f domain.MemberForm) (do
 	err = s.repo.UpdateMember(ctx, id, in, e.now)
 	if errors.Is(err, domain.ErrUsernameTaken) {
 		return domain.FieldErrors{"username": "This username is already taken."}, KickResult{}, nil
+	}
+	if errors.Is(err, domain.ErrPlanGone) { // deleted between the check and the update
+		return domain.FieldErrors{"plan_id": planChoiceMsg}, KickResult{}, nil
 	}
 	if err != nil {
 		return nil, KickResult{}, err

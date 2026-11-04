@@ -69,48 +69,57 @@ Pieces: 1 domain + auth, 2 radius + linkstatus, 3 session + usage + member + pla
 ## Group B: smaller correctness problems
 
 ### B1. Env file: quoted value followed by a comment (confirmed)
+- **Result: Fixed (2026-11-04), test E16.06 (`TestE16_06_EnvFileQuotedWithComment`).** `quotedValue` reads the closing quote and ignores what follows.
 - **Where:** `cmd/hotspotpluslight/envfile.go:28-32` (piece 5).
 - **Bug:** `HSP_ADMIN_ADDR="127.0.0.1:8081" # local` keeps the quotes, because the unquote branch needs the value to end with the opening quote. The bind fails. A quoted `HSP_SECRET_KEY` fails base64 decoding.
 - **Fix:** read a leading quote first, find the closing quote, and ignore what follows.
 
 ### B2. Windows service stop (claim)
+- **Result: Fixed (2026-11-04), not run on Windows (no pure helper possible: the logic uses `svc` types).** `Execute` now reads control requests from the start (Stop works during a slow start), and waits at most 25 s after cancel. `stopService` only waits when the state is StopPending. Checked with `GOOS=windows go vet` and `go build`. Needs a run on real Windows (E11.33 in CI).
 - **Where:** `cmd/hotspotpluslight/service_windows.go` (piece 5), around lines 151 and 78.
 - **Bug 1:** `stopService` sends Stop to a service that is already in StopPending. That returns an error, so `service stop` and `service uninstall` report failure. Fix: wait when the state is StopPending.
 - **Bug 2:** `Execute` does not read control requests until the app is ready. A Stop during a slow start is not handled, and `<-done` after cancel has no timeout. Fix: select on the change-request channel from the start.
 
 ### B3. Stopping the Enforcer twice crashes (confirmed)
+- **Result: Fixed (2026-11-04), test `TestEnforcerStopTwice`.** Stop returns early when already stopped.
 - **Where:** `internal/session/enforcer.go:91-101` (piece 3).
 - **Bug:** `Stop()` is not idempotent. The `stopped` flag is set but never checked. A second call closes a closed channel and panics.
 - **Impact today:** none (called once). A later change could trigger it.
 - **Fix:** return early if `stopped` is set, or use `sync.Once`.
 
 ### B4. Foreign-key errors shown as a server error (claim, store part confirmed as likely)
+- **Result: Fixed (2026-11-04), tests `TestForeignKeyFailuresBecomePlanGone` (store), `TestPlanGoneBecomesFormError` (member), `TestUpdatePlanGoneBecomesFormError` (settings).** The store maps FK 787 to `ErrPlanGone` in `CreateMember`, `UpdateMember`, `UpdateSettings`; the services turn it into a `plan_id` / `default_plan_id` form error (422).
 - **Where:** `internal/store/members.go:69` (piece 4), `internal/member/member.go:154` (piece 3), and `UpdateSettings` with a vanished `default_plan_id`.
 - **Bug:** only the UNIQUE violation is mapped. A foreign-key failure (code 787) comes back raw. Example: a plan is deleted in another tab between the plan check and the write. `CreateBatch` already maps this to `ErrPlanGone`.
 - **Result:** a 500 page, not a form message.
 - **Fix:** map the FK failure to `domain.ErrPlanGone` in the member and settings paths.
 
 ### B5. Batch with the wrong number of passwords (claim)
+- **Result: Fixed (2026-11-04), test `TestCreateBatchWrongPasswordCount`.** `CreateBatch` returns an error at the top when the password count is not `Count`.
 - **Where:** `internal/store/batches.go:41` (piece 4).
 - **Bug:** `CreateBatch` loops over `nb.PasswordsEnc` but sizes usernames and advances the counter by `nb.Input.Count`. Fewer passwords leave empty usernames and skipped numbers. More passwords panic with index out of range inside the transaction.
 - **Fix:** check that the two lengths match at the top.
 
 ### B6. Migration check error read as a fresh database (claim)
+- **Result: Fixed (2026-11-04), test `TestAppliedChecksumsReturnsRealErrors`.** Only `sql.ErrNoRows` means fresh.
 - **Where:** `internal/store/migrate.go:100` (piece 4).
 - **Bug:** `appliedChecksums` treats any error from the `sqlite_master` check as a fresh database. A short lock or I/O error then makes `Migrate` try 0001 again. It fails with a wrong "table already exists" error and skips the checksum and newer-DB checks.
 - **Fix:** only `sql.ErrNoRows` means fresh.
 
 ### B7. Reject order (claim)
+- **Result: Fixed (2026-11-04), tests E16.07 and `TestInactiveBeforePlanChecks`.** PLAN 7.2 puts check 2 (active) before 3-4 (plan), so the code was wrong and PLAN stays. Expired is check 5, after the plan checks, as PLAN says; so an expired member with a missing plan still gets NO_PLAN / PLAN_REMOVED (the finding's claim about EXPIRED was not right). `Login` now rejects an inactive member before the plan lookup.
 - **Where:** `internal/auth/evaluator.go:75` (piece 1).
 - **Bug:** the plan checks (3-4) run before the active and `expires_at` checks (2). A disabled or expired member whose plan row is missing gets NO_PLAN or PLAN_REMOVED, not INACTIVE_USER or EXPIRED. This differs from PLAN §7.2.
 - **Fix:** run rule 2 before the plan lookup, or change the docs to match.
 
 ### B8. Timing leak for unknown usernames (claim)
+- **Result: Fixed (2026-11-04), test `TestUnknownUserDoesTheSameWork`.** An unknown user now decrypts a valid dummy ciphertext (made once in `NewEvaluator`) and both paths compare SHA-256 hashes (equal length). Proved by structure with a counting cipher (one Decrypt each), not by timing, which would be flaky. `auth.Cipher` gained `Encrypt` (`secret.Box` already has it).
 - **Where:** `internal/auth/evaluator.go:131` (piece 1).
 - **Bug:** a known user goes through AES-GCM `Decrypt` and a constant-time compare. An unknown user only compares against a short dummy. `ConstantTimeCompare` returns early when the lengths differ, which leaks the stored password length. Someone on the LAN can tell which usernames exist.
 - **Fix:** on the unknown-user path, decrypt a valid dummy ciphertext and compare equal-length values (for example hash both sides first).
 
 ### B9. Disconnect results are unclear (claim)
+- **Result: Fixed (2026-11-04), tests `TestDisconnectEmptySecret`, `TestDisconnectBadMAEveryTime`.** An empty secret returns `ErrKickNoSecret` at once (nothing sent; panel says "shared secret not set"; admin gets 422). Replies with a bad Message-Authenticator end as `ErrKickBadReply` (panel: "bad reply (check the shared secret)"; admin gets 502). The old test `TestDisconnectBadMAEveryTime` expected `ErrKickTimeout`, which was the bug, so it now expects `ErrKickBadReply`.
 - **Where:** `internal/radius/disconnect.go:66` and `:103` (piece 2).
 - **Bug 1:** the Disconnect is signed and sent even when `RadiusSharedSecret` is empty. The router drops it. The caller gets `ErrKickTimeout` after 2 x 1.5 s and the panel says "no answer". Fix: return a clear configuration error early.
 - **Bug 2:** a reply with a bad Message-Authenticator is reported as "no answer" although a reply arrived. A secret mismatch looks like a dead router. Fix: record a separate outcome.

@@ -3,6 +3,7 @@ package settings
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	_ "time/tzdata" // IANA names must validate on machines without a zoneinfo database
@@ -52,5 +53,9 @@ func (s *Service) Update(ctx context.Context, f domain.SettingsForm) (domain.Fie
 	if len(errs) > 0 {
 		return errs, nil
 	}
-	return nil, s.repo.UpdateSettings(ctx, st, s.clock.Now())
+	err := s.repo.UpdateSettings(ctx, st, s.clock.Now())
+	if errors.Is(err, domain.ErrPlanGone) { // deleted between the check and the write
+		return domain.FieldErrors{"default_plan_id": "Choose a plan from the list."}, nil
+	}
+	return nil, err
 }
