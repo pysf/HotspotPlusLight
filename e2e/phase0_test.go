@@ -15,7 +15,6 @@ import (
 
 	"hotspotpluslight/e2e/fakenas"
 	"hotspotpluslight/e2e/harness"
-	"hotspotpluslight/internal/domain"
 )
 
 func scalar[T any](t *testing.T, db *sql.DB, q string, args ...any) T {
@@ -38,24 +37,18 @@ func TestE0_01_FirstBootCreatesDBAdminSettings(t *testing.T) {
 		t.Fatalf("admin username %q", u)
 	}
 	out := s.Stdout.String()
-	for _, want := range []string{"=== HotspotPlusLight first start ===", "Admin username: admin", "Change it with: hotspotpluslight admin set-password"} {
+	for _, want := range []string{"=== HotspotPlusLight first start ===", "username: admin", "password: admin", "set a new password", "hotspotpluslight admin set-password"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("stdout lacks %q:\n%s", want, out)
 		}
 	}
-	pw, ok := harness.AdminPasswordFromStdout(out)
-	if !ok || len(pw) != 20 {
-		t.Fatalf("printed password %q", pw)
-	}
-	if err := domain.ValidateAdminPassword(pw, "admin"); err != nil {
-		t.Fatalf("generated password violates BR-20: %v", err)
-	}
+	// O15/BR-20 (Phase 11b): the account starts as admin/admin and must change it at first login.
 	hash := scalar[string](t, db, `SELECT password_hash FROM admin WHERE id=1`)
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) != nil {
-		t.Fatal("printed password does not match stored bcrypt hash")
+	if bcrypt.CompareHashAndPassword([]byte(hash), []byte("admin")) != nil {
+		t.Fatal("stored hash is not bcrypt(admin)")
 	}
-	if strings.Contains(hash, pw) {
-		t.Fatal("clear password stored")
+	if scalar[int](t, db, `SELECT must_change_password FROM admin WHERE id=1`) != 1 {
+		t.Fatal("must_change_password not set at first start")
 	}
 	if scalar[string](t, db, `SELECT key_check FROM settings WHERE id=1`) == "" {
 		t.Fatal("key_check empty")
@@ -74,8 +67,8 @@ func TestE0_02_SecondBootKeepsData(t *testing.T) {
 	s.Stop()
 
 	s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey})
-	if strings.Contains(s2.Stdout.String(), "Admin password") {
-		t.Fatalf("password printed again:\n%s", s2.Stdout.String())
+	if strings.Contains(s2.Stdout.String(), "first start") {
+		t.Fatalf("first-start block printed again:\n%s", s2.Stdout.String())
 	}
 	if hash1 != scalar[string](t, db, `SELECT password_hash FROM admin`) ||
 		sec1 != scalar[string](t, db, `SELECT radius_shared_secret FROM settings`) {
@@ -203,8 +196,8 @@ func TestE0_08_NoPlanAtFirstStart(t *testing.T) {
 	}
 }
 
-// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily).
-const wantMigrations = 2
+// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily, 0003_admin_must_change).
+const wantMigrations = 3
 
 // E0.09 (startup side) failing migration aborts startup at the previous version;
 // editing an applied migration is refused by checksum.
@@ -224,9 +217,10 @@ func TestE0_09_MigrationsAtStartup(t *testing.T) {
 
 	// deliberately failing migration after the shipped ones
 	fsys := fstest.MapFS{
-		"0001_init.sql":        {Data: mustRead(t, "internal/store/migrations/0001_init.sql")},
-		"0002_usage_daily.sql": {Data: mustRead(t, "internal/store/migrations/0002_usage_daily.sql")},
-		"0003_bad.sql":         {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
+		"0001_init.sql":              {Data: mustRead(t, "internal/store/migrations/0001_init.sql")},
+		"0002_usage_daily.sql":       {Data: mustRead(t, "internal/store/migrations/0002_usage_daily.sql")},
+		"0003_admin_must_change.sql": {Data: mustRead(t, "internal/store/migrations/0003_admin_must_change.sql")},
+		"0004_bad.sql":               {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
 	}
 	_, err := harness.TryStart(harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey, Migrations: fsys})
 	if err == nil {

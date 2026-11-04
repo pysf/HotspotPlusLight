@@ -11,11 +11,12 @@ import (
 
 // SeedInput is everything first-boot seeding writes.
 type SeedInput struct {
-	AdminUsername     string
-	AdminPasswordHash string
-	KeyCheck          string
-	RadiusSecret      string
-	Now               time.Time
+	AdminUsername      string
+	AdminPasswordHash  string
+	MustChangePassword bool // first start: admin/admin, set a new password at first login
+	KeyCheck           string
+	RadiusSecret       string
+	Now                time.Time
 }
 
 // IsFirstBoot reports whether the settings row does not exist yet.
@@ -44,8 +45,8 @@ func (s *Store) FirstBoot(ctx context.Context, in SeedInput) (bool, error) {
 		return false, nil
 	}
 	now := in.Now.Unix()
-	if _, err := tx.ExecContext(ctx, `INSERT INTO admin(id, username, password_hash, updated_at) VALUES (1, ?, ?, ?)`,
-		in.AdminUsername, in.AdminPasswordHash, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO admin(id, username, password_hash, must_change_password, updated_at) VALUES (1, ?, ?, ?, ?)`,
+		in.AdminUsername, in.AdminPasswordHash, boolInt(in.MustChangePassword), now); err != nil {
 		return false, err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO settings(id, key_check, radius_shared_secret, updated_at)
@@ -80,7 +81,7 @@ func (s *Store) RadiusSecret(ctx context.Context) (string, error) {
 
 func (s *Store) GetAdmin(ctx context.Context) (domain.Admin, error) {
 	var a domain.Admin
-	err := s.db.QueryRowContext(ctx, `SELECT username, password_hash FROM admin WHERE id=1`).Scan(&a.Username, &a.PasswordHash)
+	err := s.db.QueryRowContext(ctx, `SELECT username, password_hash, must_change_password FROM admin WHERE id=1`).Scan(&a.Username, &a.PasswordHash, &a.MustChangePassword)
 	if errors.Is(err, sql.ErrNoRows) {
 		return a, domain.ErrNotFound
 	}

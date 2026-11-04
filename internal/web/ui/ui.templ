@@ -21,15 +21,17 @@ type LayoutData struct {
 	Nav       []NavItem
 	Active    string // Href of the current nav item
 	LogoutURL string
+	// PasswordURL, when set, adds a "Password" link to the top bar.
+	PasswordURL string
 }
 
 // htmxConfig makes htmx swap 422 (validation) and 409 (conflict) responses
 // like successes (502 = the router did not do what was asked); other 4xx/5xx stay errors (PLAN 8.2).
 // includeIndicatorStyles is off: our CSS styles .htmx-request itself.
-const htmxConfig = `{"includeIndicatorStyles":false,"responseHandling":[{"code":"422|409|502","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
+const htmxConfig = `{"includeIndicatorStyles":false,"responseHandling":[{"code":"422|409|429|502","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
 
 // appScripts are the JS modules every page of the shell loads (after htmx).
-var appScripts = []string{"js/theme.js", "js/dialog.js", "js/clipboard.js", "js/toast.js", "js/shortcuts.js", "js/nav.js", "js/forms.js", "js/menu.js"}
+var appScripts = []string{"js/theme.js", "js/dialog.js", "js/clipboard.js", "js/toast.js", "js/shortcuts.js", "js/nav.js", "js/forms.js", "js/menu.js", "js/password.js"}
 
 func bodyAttrs(d LayoutData) templ.Attributes {
 	if d.Bare {
@@ -161,6 +163,12 @@ templ Layout(d LayoutData) {
 									@Icon("sun")
 									Theme
 								</button>
+								if d.PasswordURL != "" {
+									<a class="c-btn" data-variant="ghost" href={ templ.SafeURL(d.PasswordURL) }>
+										@Icon("key")
+										Password
+									</a>
+								}
 								if d.LogoutURL != "" {
 									<button type="button" class="c-btn" hx-post={ d.LogoutURL }>
 										@Icon("logout")
@@ -209,6 +217,9 @@ templ Icon(name string) {
 				<circle cx="17" cy="18" r="2"></circle>
 			case "logout":
 				<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path>
+			case "key":
+				<path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"></path>
+				<circle cx="7.5" cy="15.5" r="5.5"></circle>
 			case "menu":
 				<path d="M4 6h16M4 12h16M4 18h16"></path>
 			case "search":

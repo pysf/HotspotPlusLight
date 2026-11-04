@@ -24,15 +24,17 @@ The admin CSS and JS are plain files in `internal/web/static/` (no build step, n
 
 ### First start
 
-On the very first start the server creates `hsp.db` in `HSP_DATA_DIR`, generates the admin password and prints it **once** to stdout in a block starting with `=== HotspotPlusLight first start ===`. It is never shown again, so copy it from the terminal (or from the service journal) right away.
+On the very first start the server creates `hsp.db` in `HSP_DATA_DIR`, creates the admin account with the default login `admin` / `admin` (the username can be set with `HSP_ADMIN_USERNAME`) and prints a block starting with `=== HotspotPlusLight first start ===` that says so. When you log in, you are sent to the password page and cannot use any other page until you set a new password. The new password needs at least 10 characters (at most 72 bytes), must not be the username, `admin` or a very common password. There are no other rules. Press **Generate** to get a random one. Log in right after the first start: until the password is changed, anyone who can reach port 8081 can use `admin` / `admin`.
 
-Change the password at any time with the command line (there is no password form in the web UI):
+You can change the password at any time on the **Password** page (link in the top bar). The current password is asked, and wrong tries are throttled like login. Your other admin sessions end; this one stays.
+
+If you forget the password, reset it with the command line:
 
 ```sh
 ./bin/hotspotpluslight admin set-password     # or: make set-password (for the ./data database)
 ```
 
-It prompts twice without echo (or reads one line with `--stdin`). Rules: at least 16 characters with upper case, lower case, digit and symbol. It ends every open admin session.
+It prompts twice without echo (or reads one line with `--stdin`). It uses the same rules as the page, and it ends every open admin session.
 
 No plan exists after the first start: log in to the admin panel and create plans before adding members.
 
@@ -100,4 +102,4 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
-`systemctl stop` sends SIGTERM: the server stops accepting, lets accounting requests in flight finish, then closes the database. The first-start password appears in `journalctl -u hotspotpluslight` (stdout).
+`systemctl stop` sends SIGTERM: the server stops accepting, lets accounting requests in flight finish, then closes the database. The first-start block appears in `journalctl -u hotspotpluslight` (stdout).

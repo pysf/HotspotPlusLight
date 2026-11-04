@@ -8,10 +8,12 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // AdminClient is a browser stand-in for the admin listener: cookie jar, no
@@ -113,23 +115,33 @@ func (c *AdminClient) PostLogin(username, password string) Resp {
 	return c.Do("POST", "/admin/login", url.Values{"username": {username}, "password": {password}}, "")
 }
 
-// Login logs in and loads the CSRF token from the landing page; it fails the
-// test on any other outcome.
+// Login logs in and loads the CSRF token from the landing page: the members page, or
+// the password page while the first-start password is still in use. Any other outcome
+// fails the test.
 func (c *AdminClient) Login(username, password string) {
 	c.t.Helper()
 	r := c.PostLogin(username, password)
-	if r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/members" {
-		c.t.Fatalf("login: status %d location %q", r.StatusCode, r.Header.Get("Location"))
+	loc := r.Header.Get("Location")
+	if r.StatusCode != http.StatusSeeOther || (loc != "/admin/members" && loc != "/admin/password") {
+		c.t.Fatalf("login: status %d location %q", r.StatusCode, loc)
 	}
-	c.RefreshCSRF()
+	c.loadCSRF(loc)
 }
 
 // RefreshCSRF re-reads the CSRF token from an authenticated page.
 func (c *AdminClient) RefreshCSRF() {
 	c.t.Helper()
-	r := c.Get("/admin/members")
+	c.loadCSRF("/admin/members")
+}
+
+// RefreshCSRFFrom reads the CSRF token from the given authenticated page.
+func (c *AdminClient) RefreshCSRFFrom(path string) { c.t.Helper(); c.loadCSRF(path) }
+
+func (c *AdminClient) loadCSRF(path string) {
+	c.t.Helper()
+	r := c.Get(path)
 	if r.StatusCode != 200 {
-		c.t.Fatalf("members page: %d", r.StatusCode)
+		c.t.Fatalf("%s: %d", path, r.StatusCode)
 	}
 	c.CSRF = CSRFFromDoc(c.t, r.Doc(c.t))
 }
@@ -159,15 +171,45 @@ func (c *AdminClient) SessionCookie() string {
 	return ""
 }
 
-// LoginAsAdmin returns a logged-in client using the first-start printed password.
+// AdminPassword is the password LoginAsAdmin sets at the first forced change.
+const AdminPassword = "Test-Admin-Pass-42"
+
+// SetPassword sends the password page form (current, new, confirm) as an htmx request.
+func (c *AdminClient) SetPassword(current, next, confirm string) Resp {
+	c.t.Helper()
+	return c.Send("PUT", "/admin/password", url.Values{"current_password": {current}, "new_password": {next}, "confirm_password": {confirm}})
+}
+
+var (
+	adminHashOnce sync.Once
+	adminHash     string
+)
+
+// LoginAsAdmin returns a logged-in client. A server that still has the first-start
+// password (admin/admin) gets AdminPassword written straight into the admin row (flag
+// cleared), so tests do not pay for the forced-change flow. The bcrypt hash is made once
+// per process. Tests of the forced flow log in by hand with admin/admin instead.
 func LoginAsAdmin(t *testing.T, s *Server) *AdminClient {
 	t.Helper()
-	pw, ok := AdminPasswordFromStdout(s.Stdout.String())
-	if !ok {
-		t.Fatal("no first-start password in stdout")
-	}
 	c := NewAdminClient(t, s)
-	c.Login("admin", pw)
+	db := DB(t, s.DataDir)
+	var must int
+	if err := db.QueryRow(`SELECT must_change_password FROM admin WHERE id=1`).Scan(&must); err != nil {
+		t.Fatal(err)
+	}
+	if must != 0 {
+		adminHashOnce.Do(func() {
+			h, err := bcrypt.GenerateFromPassword([]byte(AdminPassword), bcrypt.DefaultCost)
+			if err != nil {
+				panic(err)
+			}
+			adminHash = string(h)
+		})
+		if _, err := db.Exec(`UPDATE admin SET password_hash=?, must_change_password=0 WHERE id=1`, adminHash); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c.Login("admin", AdminPassword)
 	return c
 }
 

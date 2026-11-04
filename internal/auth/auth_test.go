@@ -55,6 +55,16 @@ func (f *fakeRepo) SetAdminPassword(_ context.Context, hash string, _ int64) err
 	return nil
 }
 
+func (f *fakeRepo) ChangeAdminPassword(_ context.Context, hash string, _ int64, keep string) error {
+	f.a.PasswordHash, f.a.MustChangePassword = hash, false
+	for h := range f.sessions {
+		if h != keep {
+			delete(f.sessions, h)
+		}
+	}
+	return nil
+}
+
 const goodPW = "Correct-Horse-9-Battery"
 
 func newSvc(t *testing.T) (*Service, *fakeRepo, *clock.Fake) {
@@ -182,6 +192,69 @@ func TestSetAdminPassword(t *testing.T) {
 	}
 	if ok, _ := s.VerifyAdmin(ctx, "admin", "Another-Passw0rd-OK!"); !ok {
 		t.Fatal("new password does not verify")
+	}
+}
+
+func TestChangePassword(t *testing.T) {
+	s, r, _ := newSvc(t)
+	ctx := context.Background()
+	r.a.MustChangePassword = true
+	keep, _ := s.Login(ctx, "admin", goodPW, "ip")
+	s.Login(ctx, "admin", goodPW, "ip2") // a second session
+	if len(r.sessions) != 2 {
+		t.Fatalf("sessions %d", len(r.sessions))
+	}
+	if errs, _ := s.ChangePassword(ctx, keep.Token, "ip", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345"); errs["current_password"] == "" {
+		t.Fatal("wrong current accepted")
+	}
+	if errs, _ := s.ChangePassword(ctx, keep.Token, "ip", goodPW, "short", "short"); errs["new_password"] == "" {
+		t.Fatal("short password accepted")
+	}
+	if errs, _ := s.ChangePassword(ctx, keep.Token, "ip", goodPW, "Fresh-Pass-12345", "different-one-1"); errs["confirm_password"] == "" {
+		t.Fatal("mismatch accepted")
+	}
+	if !r.a.MustChangePassword || len(r.sessions) != 2 {
+		t.Fatal("a rejected change touched the state")
+	}
+	if errs, err := s.ChangePassword(ctx, keep.Token, "ip", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345"); err != nil || len(errs) > 0 {
+		t.Fatalf("%v %v", errs, err)
+	}
+	if r.a.MustChangePassword || len(r.sessions) != 1 {
+		t.Fatalf("flag %v sessions %d", r.a.MustChangePassword, len(r.sessions))
+	}
+	if _, ok, _ := s.Authenticate(ctx, keep.Token); !ok {
+		t.Fatal("current session was ended")
+	}
+}
+
+// A right current password with an invalid new one must not reset the failure counter.
+func TestChangePasswordInvalidNewKeepsCounter(t *testing.T) {
+	s, _, _ := newSvc(t)
+	ctx := context.Background()
+	for i := 0; i < loginMaxFailures-1; i++ {
+		s.ChangePassword(ctx, "t", "ip", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345")
+	}
+	if errs, _ := s.ChangePassword(ctx, "t", "ip", goodPW, "short", "short"); errs["new_password"] == "" {
+		t.Fatal("short password accepted")
+	}
+	s.ChangePassword(ctx, "t", "ip", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345") // the failure that locks
+	_, err := s.ChangePassword(ctx, "t", "ip", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345")
+	var th *ThrottledError
+	if !errors.As(err, &th) {
+		t.Fatalf("counter was reset, want throttled, got %v", err)
+	}
+}
+
+func TestChangePasswordWrongCurrentIsThrottled(t *testing.T) {
+	s, _, _ := newSvc(t)
+	ctx := context.Background()
+	for i := 0; i < loginMaxFailures; i++ {
+		s.ChangePassword(ctx, "t", "ip", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345")
+	}
+	_, err := s.ChangePassword(ctx, "t", "ip", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345")
+	var th *ThrottledError
+	if !errors.As(err, &th) {
+		t.Fatalf("want throttled, got %v", err)
 	}
 }
 

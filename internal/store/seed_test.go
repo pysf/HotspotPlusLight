@@ -16,7 +16,7 @@ func migrated(t *testing.T) *Store {
 func TestFirstBootSeedsOnce(t *testing.T) {
 	s := migrated(t)
 	ctx := context.Background()
-	in := SeedInput{AdminUsername: "admin", AdminPasswordHash: "h", KeyCheck: "kc", RadiusSecret: "sec", Now: fixed()}
+	in := SeedInput{AdminUsername: "admin", AdminPasswordHash: "h", KeyCheck: "kc", RadiusSecret: "sec", MustChangePassword: true, Now: fixed()}
 	first, err := s.FirstBoot(ctx, in)
 	if err != nil || !first {
 		t.Fatalf("first=%v err=%v", first, err)
@@ -27,7 +27,7 @@ func TestFirstBootSeedsOnce(t *testing.T) {
 		t.Fatalf("second: first=%v err=%v", first, err)
 	}
 	a, err := s.GetAdmin(ctx)
-	if err != nil || a.PasswordHash != "h" {
+	if err != nil || a.PasswordHash != "h" || !a.MustChangePassword {
 		t.Fatalf("admin %+v %v", a, err)
 	}
 	plans, _ := s.ListPlans(ctx)

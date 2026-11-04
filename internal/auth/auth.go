@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"math/big"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -24,6 +25,9 @@ type Repo interface {
 	PurgeExpiredAdminSessions(ctx context.Context, now int64) error
 	// SetAdminPassword stores the hash and deletes every admin session, atomically.
 	SetAdminPassword(ctx context.Context, hash string, now int64) error
+	// ChangeAdminPassword stores the hash, clears the must-change flag and deletes every
+	// admin session except keepTokenHash, atomically.
+	ChangeAdminPassword(ctx context.Context, hash string, now int64, keepTokenHash string) error
 }
 
 type Service struct {
@@ -48,7 +52,8 @@ func (s *Service) VerifyAdmin(ctx context.Context, username, password string) (b
 }
 
 // SetAdminPassword enforces BR-20, stores the bcrypt hash and ends every admin
-// session (PLAN 9.5). It is the only way the password changes (CLI only).
+// session (PLAN 9.5). This is the CLI path (forgotten password); the web page
+// uses ChangePassword.
 func (s *Service) SetAdminPassword(ctx context.Context, password string) error {
 	a, err := s.repo.GetAdmin(ctx)
 	if err != nil {
@@ -63,6 +68,56 @@ func (s *Service) SetAdminPassword(ctx context.Context, password string) error {
 	}
 	return s.repo.SetAdminPassword(ctx, hash, s.clock.Now().Unix())
 }
+
+// MustChangePassword reports whether the admin still has to set a new password (first start).
+func (s *Service) MustChangePassword(ctx context.Context) (bool, error) {
+	a, err := s.repo.GetAdmin(ctx)
+	return a.MustChangePassword, err
+}
+
+// ChangePassword is the admin password page (BR-20). The current password is checked
+// first; a wrong one counts in the login throttle (same clientKey) and is returned as a
+// field error. The new password is then checked by the rule and the confirmation. On
+// success the hash is stored, the flag is cleared and every session except the one for
+// token is deleted. A non-empty FieldErrors means nothing was changed.
+func (s *Service) ChangePassword(ctx context.Context, token, clientKey, current, next, confirm string) (domain.FieldErrors, error) {
+	defer s.throttle.Lock(clientKey)()
+	now := s.clock.Now()
+	if wait := s.throttle.RetryAfter(clientKey, now); wait > 0 {
+		return nil, &ThrottledError{RetryAfter: wait}
+	}
+	a, err := s.repo.GetAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if bcrypt.CompareHashAndPassword([]byte(a.PasswordHash), []byte(current)) != nil {
+		s.throttle.Failure(clientKey, now)
+		return domain.FieldErrors{"current_password": "Current password is wrong."}, nil
+	}
+	errs := domain.FieldErrors{}
+	if err := domain.ValidateAdminPassword(next, a.Username); err != nil {
+		errs["new_password"] = capitalize(err.Error()) + "."
+	}
+	if next != confirm {
+		errs["confirm_password"] = "The two passwords do not match."
+	}
+	if len(errs) > 0 {
+		return errs, nil
+	}
+	hash, err := HashPassword(next)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.ChangeAdminPassword(ctx, hash, now.Unix(), hashToken(token)); err != nil {
+		return nil, err
+	}
+	// Only a finished change clears the counter. A right current password with a bad
+	// new one must not reset it.
+	s.throttle.Success(clientKey)
+	return nil, nil
+}
+
+func capitalize(s string) string { return strings.ToUpper(s[:1]) + s[1:] }
 
 // HashPassword returns the bcrypt hash stored in admin.password_hash.
 func HashPassword(password string) (string, error) {

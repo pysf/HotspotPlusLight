@@ -106,6 +106,17 @@ func TestAdminSessions(t *testing.T) {
 	if a, _ := s.GetAdmin(ctx); a.PasswordHash != "newhash" {
 		t.Fatal("hash not stored")
 	}
+	s.InsertAdminSession(ctx, "k1", "c", 100, 1000)
+	s.InsertAdminSession(ctx, "k2", "c", 100, 1000)
+	if err := s.ChangeAdminPassword(ctx, "h3", 700, "k1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := s.TouchAdminSession(ctx, "k1", 701, 800); !ok {
+		t.Fatal("kept session was deleted")
+	}
+	if _, ok, _ := s.TouchAdminSession(ctx, "k2", 701, 800); ok {
+		t.Fatal("other session survives")
+	}
 }
 
 // The default plan is never deleted (and never reported as "used by 0 members"),

@@ -32,6 +32,8 @@ type AuthService interface {
 	Login(ctx context.Context, username, password, clientKey string) (auth.AdminSession, error)
 	Authenticate(ctx context.Context, token string) (csrf string, found bool, err error)
 	Logout(ctx context.Context, token string) error
+	MustChangePassword(ctx context.Context) (bool, error)
+	ChangePassword(ctx context.Context, token, clientKey, current, next, confirm string) (domain.FieldErrors, error)
 }
 
 type PlanService interface {
@@ -109,9 +111,11 @@ func Handler(d Deps) http.Handler {
 			r.Group(func(r chi.Router) {
 				// MONITOR: sessions are opaque server-side rows (sliding 1 h); a stolen
 				// cookie is valid until it idles out or the admin logs out / changes password.
-				r.Use(h.requireSession, h.requireCSRF)
+				r.Use(h.requireSession, h.requireCSRF, h.requirePasswordChanged)
 				r.Get("/", redirect("/admin/members"))
 				r.Post("/logout", h.logout)
+				r.Get("/password", h.passwordPage)
+				r.Put("/password", h.passwordChange)
 				r.Route("/members", func(r chi.Router) {
 					r.Get("/", h.members)
 					r.Post("/", h.memberCreate)
@@ -219,7 +223,7 @@ var nav = []ui.NavItem{
 
 func layout(r *http.Request, title, active string) ui.LayoutData {
 	csrf, _ := r.Context().Value(ctxKey{}).(string)
-	return ui.LayoutData{Title: title, CSRF: csrf, Nav: nav, Active: active, LogoutURL: "/admin/logout"}
+	return ui.LayoutData{Title: title, CSRF: csrf, Nav: nav, Active: active, LogoutURL: "/admin/logout", PasswordURL: passwordHome}
 }
 
 func (h handlers) render(w http.ResponseWriter, r *http.Request, status int, c templ.Component) {
@@ -384,7 +388,14 @@ func (h handlers) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		// Session cookie: no Max-Age, so it lives while the browser does; the
 		// server-side row decides validity. No Secure flag: plain HTTP on the LAN (D9).
 		http.SetCookie(w, &http.Cookie{Name: cookieName, Value: sess.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
-		http.Redirect(w, r, "/admin/members", http.StatusSeeOther)
+		to := "/admin/members"
+		if must, err := h.Auth.MustChangePassword(r.Context()); err != nil {
+			h.serverError(w, r, err)
+			return
+		} else if must {
+			to = passwordHome
+		}
+		http.Redirect(w, r, to, http.StatusSeeOther)
 	}
 }
 

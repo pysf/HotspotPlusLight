@@ -15,7 +15,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -189,16 +188,6 @@ func Get(t *testing.T, url string) (*http.Response, string) {
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
 	return resp, string(b)
-}
-
-// AdminPasswordFromStdout extracts the printed first-start password.
-func AdminPasswordFromStdout(out string) (string, bool) {
-	for _, l := range strings.Split(out, "\n") {
-		if p, ok := strings.CutPrefix(l, "Admin password: "); ok {
-			return strings.TrimSpace(p), true
-		}
-	}
-	return "", false
 }
 
 var (

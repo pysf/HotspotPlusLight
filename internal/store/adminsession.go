@@ -33,17 +33,34 @@ func (s *Store) PurgeExpiredAdminSessions(ctx context.Context, now int64) error 
 	return err
 }
 
-// SetAdminPassword updates the hash and deletes every admin session in one transaction.
+// SetAdminPassword updates the hash, clears the must-change flag and deletes every admin session in one transaction.
 func (s *Store) SetAdminPassword(ctx context.Context, hash string, now int64) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `UPDATE admin SET password_hash=?, updated_at=? WHERE id=1`, hash, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE admin SET password_hash=?, must_change_password=0, updated_at=? WHERE id=1`, hash, now); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM admin_session`); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ChangeAdminPassword is SetAdminPassword for the web page: it keeps the session
+// keepTokenHash and deletes all the others.
+func (s *Store) ChangeAdminPassword(ctx context.Context, hash string, now int64, keepTokenHash string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE admin SET password_hash=?, must_change_password=0, updated_at=? WHERE id=1`, hash, now); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM admin_session WHERE token_hash<>?`, keepTokenHash); err != nil {
 		return err
 	}
 	return tx.Commit()

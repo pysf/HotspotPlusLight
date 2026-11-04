@@ -48,3 +48,46 @@ One fixture change: E9.03 used the default 10 GB plan with 12 GB of traffic. The
 - Up to one accounting interval of overshoot (default 60 s) if the router ignores layer 1.
 - The Disconnect is best effort (the router must have `/radius incoming` on our port).
 - Hardware items are in PLAN section 13: Recv/Xmit direction, Gigawords limits, Disconnect on a Hotspot user.
+
+# Step B: default admin/admin and the password page (2026-11-04)
+
+## What changed
+- Migration `0003_admin_must_change.sql`: `admin.must_change_password INTEGER NOT NULL DEFAULT 0`. Existing installs keep 0 and are not forced. A fresh install is seeded with 1.
+- First start creates `admin` / `admin` (bcrypt) and prints a block that says so. No random password any more. `HSP_ADMIN_USERNAME` still sets the username.
+- BR-20 is now: 10+ characters, at most 72 bytes, not the username (any case), not `admin`, not in a list of about 100 common passwords (`internal/domain/commonpasswords.go`, only entries of 10+ characters). No class rules. UI and CLI use the same function.
+- Page `GET/PUT /admin/password` (`internal/web/admin/password.go`, form in `pages.templ`). Fields: current, new, confirm. Reveal (existing `data-reveal`) and Generate (new `static/js/password.js`, 36 lines, `crypto.getRandomValues`, 16 characters without look-alikes, fills new and confirm). Top bar link "Password".
+- `requirePasswordChanged` middleware after `requireSession` and `requireCSRF`: while the flag is set, only `/admin/password`, `/admin/logout` and static files are open.
+- `auth.Service.ChangePassword` checks the current password inside the same per-IP throttle as login (wrong = a failure, locked = 429), then the BR-20 rule and the confirmation. `store.ChangeAdminPassword` keeps the current session and deletes the others. The CLI path (`SetAdminPassword`) deletes all sessions and also clears the flag.
+- `htmxConfig` now also swaps `429` responses (so the "too many attempts" message shows in the form).
+
+## Tests
+New: `e2e/phase11b_test.go` E11.20 to E11.26. Unit tests: `domain` BR-20 table, `auth.ChangePassword` (rules, sessions, throttle), `store.ChangeAdminPassword`.
+
+Old tests changed (owner-approved rule change, not weakened):
+| Test | Change |
+|---|---|
+| E0.01 | checks the admin/admin block, bcrypt("admin") and the flag instead of a 20-character printed password |
+| E0.02 | second start prints no "first start" block |
+| E0.09 | shipped migration count 3; the deliberately bad migration is now `0004_bad.sql` |
+| E1.01 | logs in with admin/admin, lands on `/admin/password`; after the change the landing page is `/admin/members` |
+| E1.02 | throttle uses the password `admin` |
+| E1.05 | inverted: the password page exists and is the only one with password inputs (old `/admin/account*` routes stay 404) |
+| E1.06 | also asserts a session existed before the CLI change |
+| E1.14 | admin/admin is printed and works; second start prints no block |
+| E1.15 | new rule (10 chars, 72 bytes, username, common); a lower-case phrase is accepted |
+| E8.07b, E8.08 | no printed password any more; E8.08 checks the block is on stdout and not in the log |
+| E8.09 | unchanged, README first-start text updated and still satisfies it |
+Unit: `TestValidateAdminPassword` (domain) rewritten for the new rule.
+
+Harness: `LoginAsAdmin` reads the flag from the DB. If it is set, it logs in with admin/admin and sets `harness.AdminPassword` through the page. Otherwise it logs in with `harness.AdminPassword`. `Login` accepts a landing on `/admin/members` or `/admin/password`. `AdminPasswordFromStdout` is removed.
+
+## Decisions I made (please check)
+- Non-GET requests while forced get `HX-Redirect` + 403 (like `requireSession` does with 401), not 303. GET requests get 303.
+- After a successful change the toast text travels in a 30-second cookie `hsp_toast` that `toast.js` shows and clears, because the page is reloaded by `HX-Redirect` and an event would be lost.
+- A wrong current password is a field error (422), not a toast. A locked client gets 429 and the form with a notice.
+- The password fields are never filled again on a 422.
+- Generate also switches the new-password field to visible so the admin can copy it.
+- The list of common passwords is my own short list; extend it if you like.
+
+## Known gaps (step B)
+- Until the first password change, anyone who can reach port 8081 can log in with `admin` / `admin`. The README tells the owner to log in right after the first start.

@@ -415,11 +415,10 @@ func TestE8_07b_PanelResetsOnRestart(t *testing.T) {
 	if got := link(t, c.Get("/admin/router").Doc(t), "access-request"); got.from != "127.0.0.1" {
 		t.Fatalf("before restart: %+v", got)
 	}
-	pw, _ := harness.AdminPasswordFromStdout(s.Stdout.String())
 	s.Stop()
 	s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey, Clock: fc})
 	c2 := harness.NewAdminClient(t, s2)
-	c2.Login("admin", pw)
+	c2.Login("admin", harness.AdminPassword)
 	if got := link(t, c2.Get("/admin/router").Doc(t), "access-request"); got.at != "never" {
 		t.Errorf("after restart: %+v", got)
 	}
@@ -551,9 +550,8 @@ func TestE8_08_LogFormatAndSignal(t *testing.T) {
 		if !strings.Contains(logs, "shutdown complete") {
 			t.Errorf("format %q: no 'shutdown complete' in\n%s", format, logs)
 		}
-		pw, _ := harness.AdminPasswordFromStdout(so.String())
-		if pw == "" || strings.Contains(logs, pw) || strings.Contains(logs, "Env-Seeded-Secret-77") {
-			t.Errorf("format %q: password missing from stdout or a secret in the log", format)
+		if !strings.Contains(so.String(), "password: admin") || strings.Contains(logs, "password: admin") || strings.Contains(logs, "Env-Seeded-Secret-77") {
+			t.Errorf("format %q: first-start block missing from stdout, or a password or secret in the log", format)
 		}
 		lines := strings.Split(strings.TrimSpace(logs), "\n")
 		for _, l := range lines {

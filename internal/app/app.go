@@ -208,14 +208,10 @@ func (r sessionRepo) InAcctTx(ctx context.Context, fn func(session.AcctTx) error
 	return r.Store.InAcctTx(ctx, func(tx *store.AcctTx) error { return fn(tx) })
 }
 
-// seed performs first-boot seeding (O15, BR-21) and prints the generated admin
-// password exactly once.
+// seed performs first-boot seeding (O15, BR-21). The admin starts as admin/admin and
+// must set a new password at first login (BR-20); the stdout block says so.
 func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
-	pw, err := auth.GeneratePassword(20)
-	if err != nil {
-		return err
-	}
-	hash, err := auth.HashPassword(pw)
+	hash, err := auth.HashPassword("admin")
 	if err != nil {
 		return err
 	}
@@ -230,11 +226,12 @@ func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
 		}
 	}
 	seeded, err := a.store.FirstBoot(ctx, store.SeedInput{
-		AdminUsername:     a.cfg.AdminUsername,
-		AdminPasswordHash: hash,
-		KeyCheck:          kc,
-		RadiusSecret:      radiusSecret,
-		Now:               opts.Clock.Now(),
+		AdminUsername:      a.cfg.AdminUsername,
+		AdminPasswordHash:  hash,
+		MustChangePassword: true,
+		KeyCheck:           kc,
+		RadiusSecret:       radiusSecret,
+		Now:                opts.Clock.Now(),
 	})
 	if err != nil {
 		return fmt.Errorf("first-boot seeding: %w", err)
@@ -242,9 +239,9 @@ func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
 	if !seeded {
 		return nil
 	}
-	fmt.Fprintf(opts.Stdout, "=== HotspotPlusLight first start ===\nAdmin username: %s\nAdmin password: %s\nChange it with: hotspotpluslight admin set-password\n====================================\n",
-		a.cfg.AdminUsername, pw)
-	a.log.Info("admin password generated at first start")
+	fmt.Fprintf(opts.Stdout, "=== HotspotPlusLight first start ===\nLog in with username: %s  password: admin\nYou will be asked to set a new password right after you log in.\nForgot it later? Run: hotspotpluslight admin set-password\n====================================\n",
+		a.cfg.AdminUsername)
+	a.log.Info("admin account created with the default password; it must be changed at first login")
 	return nil
 }
 
@@ -365,7 +362,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 
 // SetAdminPassword is the `admin set-password` subcommand: it opens the existing
 // database (no migration, no seeding), applies BR-20, stores the bcrypt hash and
-// deletes every admin session. The password is never printed or logged.
+// clears the must-change flag and deletes every admin session. The password is never printed or logged.
 func SetAdminPassword(ctx context.Context, opts Options, password string) error {
 	if opts.Getenv == nil {
 		opts.Getenv = os.Getenv

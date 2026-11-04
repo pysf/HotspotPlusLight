@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -11,23 +12,26 @@ func TestValidateAdminPassword(t *testing.T) { // BR-20
 		name, pw string
 		ok       bool
 	}{
-		{"good", "Abcdefghijklmn1!xyz", true},
-		{"exactly16", "Abcdefghijklm1!x", true},
-		{"short15", "Abcdefghijkl1!x", false},
-		{"no upper", "abcdefghijklmn1!xyz", false},
-		{"no lower", "ABCDEFGHIJKLMN1!XYZ", false},
-		{"no digit", "Abcdefghijklmnop!xyz", false},
-		{"no symbol", "Abcdefghijklmnop1xyz", false},
-		{"equals username", "admin", false},
+		{"words only", "correct horse battery", true},
+		{"exactly10", "zxqjkwvmbt", true},
+		{"short9", "abcdefghi", false},
+		{"counts characters not bytes", "ééééééééé", false},
+		{"10 multi-byte characters", "éééééééééé", true},
+		{"72 bytes", strings.Repeat("a", 72), true},
+		{"73 bytes", strings.Repeat("a", 73), false},
+		{"admin", "admin", false},
+		{"common", "Password123", false},
+		{"common, upper case", "QWERTYUIOP", false},
+		{"digits only but not common", "4829175036", true},
 	}
 	for _, c := range cases {
-		err := ValidateAdminPassword(c.pw, "admin")
+		err := ValidateAdminPassword(c.pw, "root")
 		if (err == nil) != c.ok {
 			t.Errorf("%s: got err=%v, want ok=%v", c.name, err, c.ok)
 		}
 	}
-	if ValidateAdminPassword("Abcdefghijklmn1!xyz", "Abcdefghijklmn1!xyz") == nil {
-		t.Error("password equal to username must be rejected")
+	if ValidateAdminPassword("Some-User-Name", "some-user-name") == nil {
+		t.Error("password equal to username (any case) must be rejected")
 	}
 }
 
