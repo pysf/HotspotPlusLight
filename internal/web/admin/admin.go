@@ -101,6 +101,11 @@ func Handler(d Deps) http.Handler {
 	}
 	h := handlers{d}
 	r := chi.NewRouter()
+	// Health check for service managers and monitors: no login, never cached.
+	r.With(noStore).Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte("ok\n"))
+	})
 	r.Route("/admin", func(r chi.Router) {
 		// Assets cache by their hash; pages are never cached.
 		r.Handle("/static/*", http.StripPrefix(static.Prefix, h.Assets.Handler()))

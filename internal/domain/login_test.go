@@ -94,7 +94,7 @@ func TestActiveSince(t *testing.T) {
 }
 
 func TestReplyMessage(t *testing.T) {
-	if got := ReasonOutOfTime.ReplyMessage(); got != "OUT_OF_TIME: Your time allowance is used up." {
+	if got := ReasonOutOfTime.ReplyMessage(); got != "OUT_OF_TIME" {
 		t.Error(got)
 	}
 	for r := range reasonMessages {

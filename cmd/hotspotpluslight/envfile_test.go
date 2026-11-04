@@ -17,12 +17,12 @@ import (
 func TestE11_32_EnvFile(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "hsp.env")
-	body := "# comment\r\n\r\n  HSP_DATA_DIR = C:\\Data Dir\\data  \r\nHSP_LOG_FORMAT=\"json\"\nHSP_HTTP_ADDR=:9000\nHSP_EMPTY=\nHSP_NOTE=abc # a comment\nHSP_HASH=ab#cd\nHSP_QUOTED=\"x # y\"\n"
+	body := "# comment\r\n\r\n  HSP_DATA_DIR = C:\\Data Dir\\data  \r\nHSP_LOG_FORMAT=\"json\"\nHSP_ADMIN_ADDR=:9000\nHSP_EMPTY=\nHSP_NOTE=abc # a comment\nHSP_HASH=ab#cd\nHSP_QUOTED=\"x # y\"\n"
 	if err := os.WriteFile(f, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	real := func(k string) string {
-		if k == "HSP_HTTP_ADDR" {
+		if k == "HSP_ADMIN_ADDR" {
 			return ":7000"
 		}
 		return ""
@@ -34,7 +34,7 @@ func TestE11_32_EnvFile(t *testing.T) {
 	for k, want := range map[string]string{
 		"HSP_DATA_DIR":    `C:\Data Dir\data`,
 		"HSP_LOG_FORMAT":  "json",
-		"HSP_HTTP_ADDR":   ":7000", // real env wins
+		"HSP_ADMIN_ADDR":  ":7000", // real env wins
 		"HSP_EMPTY":       "",
 		"HSP_NOTE":        "abc",
 		"HSP_HASH":        "ab#cd",

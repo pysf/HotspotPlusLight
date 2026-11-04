@@ -831,7 +831,7 @@ func TestE2_13_UsageSummaryAndVerdict(t *testing.T) {
 				}
 				continue
 			}
-			if msg := rfc2865.ReplyMessage_GetString(resp); resp.Code != radius.CodeAccessReject || !strings.HasPrefix(msg, c.verdict+":") {
+			if msg := rfc2865.ReplyMessage_GetString(resp); resp.Code != radius.CodeAccessReject || msg != c.verdict {
 				t.Errorf("%s: page says %s, RADIUS answered %v %q", c.name, c.verdict, resp.Code, msg)
 			}
 		}

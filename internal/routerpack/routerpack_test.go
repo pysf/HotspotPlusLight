@@ -35,10 +35,10 @@ func TestRegistry(t *testing.T) {
 	}
 }
 
-func TestLoginHTMLEscapesAndBakes(t *testing.T) {
+func TestLoginHTMLEscapes(t *testing.T) {
 	p, _ := New()
 	th, _ := p.Theme(DefaultTheme)
-	out, err := p.LoginHTML(th, Config{SiteTitle: `Caf<e> "Wi-Fi"`, PublicBaseURL: "http://10.0.0.2:8080/"})
+	out, err := p.LoginHTML(th, Config{SiteTitle: `Caf<e> "Wi-Fi"`})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,8 +46,8 @@ func TestLoginHTMLEscapesAndBakes(t *testing.T) {
 	if strings.Contains(s, "Caf<e>") || !strings.Contains(s, "Caf&lt;e&gt;") {
 		t.Error("site title is not HTML-escaped")
 	}
-	if !strings.Contains(s, `HSP_API_BASE = "http://10.0.0.2:8080"`) {
-		t.Error("API base not baked (trailing slash must be trimmed)")
+	if strings.Contains(s, "HSP_API_BASE") || strings.Contains(s, "fetch(") {
+		t.Error("the page must not call the server")
 	}
 	if !strings.Contains(s, "$(link-login-only)") {
 		t.Error("router variables must be left for the router")
@@ -97,7 +97,7 @@ func TestZipLayout(t *testing.T) {
 
 func TestSetupScriptDefensive(t *testing.T) {
 	// a newline can never end the quoted secret
-	got := SetupScript(ScriptConfig{PublicBaseURL: "http://10.0.0.2:8080", Secret: "a\nb\r/system reset", AuthPort: 1812, AcctPort: 1813, CoaPort: 3799, InterimSeconds: 60})
+	got := SetupScript(ScriptConfig{Secret: "a\nb\r/system reset", AuthPort: 1812, AcctPort: 1813, CoaPort: 3799, InterimSeconds: 60})
 	for _, l := range strings.Split(got, "\n") {
 		if strings.HasPrefix(l, "/system") {
 			t.Errorf("injected command line: %q", l)
@@ -107,7 +107,7 @@ func TestSetupScriptDefensive(t *testing.T) {
 		t.Errorf("secret not escaped:\n%s", got)
 	}
 	// no interval: no radius-interim-update at all
-	got = SetupScript(ScriptConfig{PublicBaseURL: "http://10.0.0.2:8080", Secret: "s", AuthPort: 1812, AcctPort: 1813, CoaPort: 3799})
+	got = SetupScript(ScriptConfig{Secret: "s", AuthPort: 1812, AcctPort: 1813, CoaPort: 3799})
 	if strings.Contains(got, "radius-interim-update=") {
 		t.Errorf("zero interval emitted:\n%s", got)
 	}

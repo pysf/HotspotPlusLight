@@ -80,7 +80,6 @@ func NewKey() string {
 func (o Options) env(dir, key string) map[string]string {
 	e := map[string]string{
 		"HSP_DATA_DIR":         dir,
-		"HSP_HTTP_ADDR":        "127.0.0.1:0",
 		"HSP_ADMIN_ADDR":       "127.0.0.1:0",
 		"HSP_RADIUS_AUTH_ADDR": "127.0.0.1:0",
 		"HSP_RADIUS_ACCT_ADDR": "127.0.0.1:0",

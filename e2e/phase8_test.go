@@ -77,18 +77,15 @@ func (f *p8) script() (string, *goquery.Document) {
 	return s.Text(), d
 }
 
-// E8.03 the setup script carries the secret, ports, interval, CoA port and the walled-garden entry, and follows settings.
+// E8.03 the setup script carries the secret, ports, interval and CoA port, and follows settings.
 func TestE8_03_SetupScript(t *testing.T) {
 	f := newP8(t)
-	f.exec(`UPDATE settings SET public_base_url='http://192.168.88.2:8080', accounting_interval_seconds=120, coa_port=3799, radius_shared_secret='Sup3r-Secret-Value'`)
-	script, d := f.script()
-	if d.Find("[data-warning=public-base-url]").Length() != 0 {
-		t.Error("warning shown although public_base_url is set")
-	}
+	f.exec(`UPDATE settings SET accounting_interval_seconds=120, coa_port=3799, radius_shared_secret='Sup3r-Secret-Value'`)
+	script, _ := f.script()
 	for _, want := range []string{
 		"/radius add",
 		"service=hotspot",
-		"address=192.168.88.2",
+		"address=<SERVER-IP>", // no public base URL any more: the admin fills in the server address (Phase 12a)
 		`secret="Sup3r-Secret-Value"`,
 		"authentication-port=" + portOf(t, f.s.Addrs.RadiusAuth),
 		"accounting-port=" + portOf(t, f.s.Addrs.RadiusAcct),
@@ -98,13 +95,8 @@ func TestE8_03_SetupScript(t *testing.T) {
 		"login-by=http-pap",
 		"radius-accounting=yes",
 		"radius-interim-update=120s",
-		"/ip hotspot walled-garden ip add",
-		"dst-address=192.168.88.2",
-		"dst-port=8080", // only the page API port: the admin port must stay unreachable from the hotspot
-		"action=accept",
 		"VERIFY-ON-HARDWARE",
 		"files.zip",
-		"html-directory",
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("script lacks %q\n%s", want, script)
@@ -112,7 +104,7 @@ func TestE8_03_SetupScript(t *testing.T) {
 	}
 	// match the port as a whole number, so a random port that is a substring of other digits does not trip the check
 	adminPort := regexp.MustCompile(`(^|[^0-9])` + portOf(t, f.s.Addrs.Admin) + `([^0-9]|$)`)
-	if adminPort.MatchString(script) && portOf(t, f.s.Addrs.Admin) != portOf(t, f.s.Addrs.HTTP) {
+	if adminPort.MatchString(script) {
 		t.Error("the admin port appears in the script")
 	}
 	// every RouterOS command line sits under a comment, and every unverified command says so
@@ -128,35 +120,19 @@ func TestE8_03_SetupScript(t *testing.T) {
 	if !strings.Contains(script, "radius-interim-update=300s") || !strings.Contains(script, "port=3800") || !strings.Contains(script, `secret="another-one"`) || strings.Contains(script, "Sup3r-Secret-Value") {
 		t.Errorf("script did not follow the settings:\n%s", script)
 	}
-	// the admin listener only
-	if r, _ := harness.Get(t, "http://"+f.s.Addrs.HTTP+"/admin/router"); r.StatusCode != 404 {
-		t.Errorf("public listener served /admin/router: %d", r.StatusCode)
-	}
 }
 
-// E8.03b a host name in public_base_url, characters RouterOS treats specially in the secret, and an unset base URL.
+// E8.03b characters RouterOS treats specially in the secret are escaped, and the server address stays a placeholder.
 func TestE8_03b_ScriptVariants(t *testing.T) {
 	f := newP8(t)
-	f.exec(`UPDATE settings SET public_base_url='http://hotspot.lan:8080/', radius_shared_secret=?`, `a"b$c\d?e`)
+	f.exec(`UPDATE settings SET radius_shared_secret=?`, `a"b$c\d?e`)
 	script, _ := f.script()
 	if !strings.Contains(script, `secret="a\"b\$c\\d\?e"`) {
 		t.Errorf("secret not escaped for RouterOS:\n%s", script)
 	}
-	if !strings.Contains(script, "/ip hotspot walled-garden add dst-host=\"hotspot.lan\" dst-port=8080 action=allow") {
-		t.Errorf("no host-name walled garden entry:\n%s", script)
-	}
 	// /radius needs an address, not a name: say so instead of guessing.
 	if !strings.Contains(script, "address=<SERVER-IP>") {
-		t.Errorf("a host name must not be used as the RADIUS address:\n%s", script)
-	}
-
-	f.exec(`UPDATE settings SET public_base_url=''`)
-	script, d := f.script()
-	if d.Find("[data-warning=public-base-url]").Length() != 1 {
-		t.Error("no warning although public_base_url is empty")
-	}
-	if !strings.Contains(script, "<SERVER-IP>") || strings.Contains(script, "dst-address=192") {
-		t.Errorf("empty base URL must leave placeholders:\n%s", script)
+		t.Errorf("the RADIUS address must be a placeholder:\n%s", script)
 	}
 	// a blind paste must not half-apply: no executable line may contain a placeholder
 	for _, l := range strings.Split(script, "\n") {
@@ -178,11 +154,10 @@ func TestE8_03c_RouterPageNeedsLogin(t *testing.T) {
 	}
 }
 
-// E8.04 files.zip: the customizable login.html with the API base baked, no server template tokens, the router
+// E8.04 files.zip: the customizable login.html, no server template tokens, the router
 // pages, and no plain-passwd anywhere.
 func TestE8_04_PackContents(t *testing.T) {
 	f := newP8(t)
-	f.exec(`UPDATE settings SET public_base_url='http://192.168.88.2:8080'`)
 	for _, theme := range []string{"", "alpha-fall", "alpha-space"} {
 		path := "/admin/router/files.zip"
 		if theme != "" {
@@ -219,9 +194,6 @@ func TestE8_04_PackContents(t *testing.T) {
 					t.Errorf("%s: %s puts a password into a URL", path, zf.Name)
 				}
 			}
-			if zf.Name == "hotspot/login.html" && !strings.Contains(string(b), `HSP_API_BASE = "http://192.168.88.2:8080"`) {
-				t.Errorf("%s: API base not baked into login.html", path)
-			}
 		}
 		sort.Strings(names)
 		want := []string{"hotspot/alogin.html", "hotspot/background.jpg", "hotspot/error.html", "hotspot/login.html", "hotspot/logo.png", "hotspot/logout.html", "hotspot/redirect.html", "hotspot/rlogin.html", "hotspot/status.html"}
@@ -237,7 +209,6 @@ func TestE8_04_PackContents(t *testing.T) {
 func TestE8_05_SecretOnlyMasked(t *testing.T) {
 	f := newP8(t)
 	secret := f.nas.Secret // the generated 24-character secret; the fake router and the fake CoA listener use it too
-	f.exec(`UPDATE settings SET public_base_url='http://192.168.88.2:8080'`)
 
 	// The page is HTML: a secret containing & < > " ' appears escaped in the markup.
 	esc := html.EscapeString(secret)
@@ -282,7 +253,7 @@ func TestE8_05_SecretOnlyMasked(t *testing.T) {
 	wrong.Timeout = 300 * time.Millisecond
 	wrong.Authenticate("alice", "secret1")
 
-	// every other admin page and the public listener are free of it; /admin/router only inside the script
+	// every other admin page is free of it; /admin/router only inside the script
 	for _, p := range []string{"/admin/members", "/admin/members/" + strconv.FormatInt(f.memberIDByName("alice"), 10), "/admin/plans", "/admin/sessions", "/admin/batches", "/admin/router/themes", "/admin/members/new", "/admin/plans/new"} {
 		if body := f.c.Get(p).Body; has(body) {
 			t.Errorf("%s contains the secret", p)
@@ -294,10 +265,8 @@ func TestE8_05_SecretOnlyMasked(t *testing.T) {
 	if h, _ := rd.Html(); has(h) {
 		t.Error("/admin/router shows the secret outside the setup script")
 	}
-	for _, p := range []string{"/healthz", "/api/v1/config"} {
-		if _, body := harness.Get(t, "http://"+f.s.Addrs.HTTP+p); has(body) {
-			t.Errorf("%s contains the secret", p)
-		}
+	if _, body := harness.Get(t, "http://"+f.s.Addrs.Admin+"/healthz"); has(body) {
+		t.Error("/healthz contains the secret")
 	}
 	if logs := f.logs.String(); strings.Contains(logs, secret) || strings.Contains(logs, "not-the-secret") {
 		t.Errorf("a secret reached the log:\n%s", logs)
@@ -471,7 +440,6 @@ func TestE8_06_GracefulShutdown(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 		}
 	}
-	waitClosed(f.s.Addrs.HTTP)
 	waitClosed(f.s.Addrs.Admin)
 
 	close(release) // let the commit go
@@ -519,7 +487,7 @@ func TestE8_08_LogFormatAndSignal(t *testing.T) {
 		cmd := exec.Command(harness.Binary(t), "serve")
 		cmd.Env = []string{
 			"PATH=" + os.Getenv("PATH"), "HSP_DATA_DIR=" + dir, "HSP_SECRET_KEY=" + harness.NewKey(),
-			"HSP_HTTP_ADDR=127.0.0.1:0", "HSP_ADMIN_ADDR=127.0.0.1:0", "HSP_RADIUS_AUTH_ADDR=127.0.0.1:0", "HSP_RADIUS_ACCT_ADDR=127.0.0.1:0",
+			"HSP_ADMIN_ADDR=127.0.0.1:0", "HSP_RADIUS_AUTH_ADDR=127.0.0.1:0", "HSP_RADIUS_ACCT_ADDR=127.0.0.1:0",
 			"HSP_RADIUS_SHARED_SECRET=Env-Seeded-Secret-77",
 		}
 		if format != "" {
@@ -590,15 +558,20 @@ func TestE8_09_Readme(t *testing.T) {
 	}
 	r := string(b)
 	for _, want := range []string{
-		"make build", "HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_HTTP_ADDR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "HSP_LOG_LEVEL", "HSP_LOG_FORMAT",
+		"make build", "HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "HSP_LOG_LEVEL", "HSP_LOG_FORMAT",
 		"first start", "make set-password", "admin set-password",
-		"/admin/router", "files.zip", "public_base_url", "walled garden",
-		"8080", "8081", "firewall",
+		"/admin/router", "files.zip",
+		"8081", "firewall",
 		"sqlite3 hsp.db", "unrecoverable",
 		"[Unit]", "ExecStart=", "PLAN.md", "VERIFY-ON-HARDWARE",
 	} {
 		if !strings.Contains(r, want) {
 			t.Errorf("README lacks %q", want)
+		}
+	}
+	for _, gone := range []string{"public_base_url", "walled garden", "walled-garden", "8080", "HSP_HTTP_ADDR", "Public base URL"} {
+		if strings.Contains(r, gone) {
+			t.Errorf("README still mentions %q (removed in Phase 12a)", gone)
 		}
 	}
 	if regexp.MustCompile(`[^\x00-\x7F]`).MatchString(strings.ReplaceAll(strings.ReplaceAll(r, "—", "-"), "…", "...")) {
@@ -635,26 +608,6 @@ func TestE8_10_SecretControlCharacters(t *testing.T) {
 	}
 	if got := scalar[string](t, f.db, `SELECT radius_shared_secret FROM settings`); got != ` sp ace"$\? ` {
 		t.Errorf("stored %q, want exactly as typed", got)
-	}
-}
-
-// E8.11 public_base_url: the host ends up in the pasted script, so odd characters are refused.
-func TestE8_11_PublicBaseURLHost(t *testing.T) {
-	f := newP8(t)
-	d := f.c.Get("/admin/settings").Doc(t)
-	for _, bad := range []string{"http://ho$t.lan", "http://a;b.lan:8080", "http://x.lan\\y"} {
-		form := harness.FormValues(t, d, "form#settings-form")
-		form.Set("public_base_url", bad)
-		if r := f.c.Send("PUT", "/admin/settings", form); r.StatusCode != 422 {
-			t.Errorf("%q: %d, want 422", bad, r.StatusCode)
-		}
-	}
-	for _, ok := range []string{"http://192.168.88.2:8080", "http://hotspot-1.lan", "http://[fd00::1]:8080"} {
-		form := harness.FormValues(t, d, "form#settings-form")
-		form.Set("public_base_url", ok)
-		if r := f.c.Send("PUT", "/admin/settings", form); r.StatusCode != 200 {
-			t.Errorf("%q: %d, want 200", ok, r.StatusCode)
-		}
 	}
 }
 

@@ -79,21 +79,15 @@ func TestE0_02_SecondBootKeepsData(t *testing.T) {
 	}
 }
 
-// E0.03 /healthz on the public listener; the admin listener serves nothing outside /admin
-// ("/admin" itself is Phase 1: E1.03).
+// E0.03 /healthz on the admin listener (the only listener since Phase 12a); "/" is a 404.
 func TestE0_03_Healthz(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
-	resp, body := harness.Get(t, "http://"+s.Addrs.HTTP+"/healthz")
+	resp, body := harness.Get(t, "http://"+s.Addrs.Admin+"/healthz")
 	if resp.StatusCode != 200 || strings.TrimSpace(body) != "ok" {
 		t.Fatalf("healthz: %d %q", resp.StatusCode, body)
 	}
-	for _, p := range []string{"/", "/healthz"} {
-		if r, _ := harness.Get(t, "http://"+s.Addrs.Admin+p); r.StatusCode != 404 {
-			t.Errorf("admin %s: %d", p, r.StatusCode)
-		}
-	}
-	if r, _ := harness.Get(t, "http://"+s.Addrs.HTTP+"/admin"); r.StatusCode != 404 {
-		t.Errorf("public /admin: %d", r.StatusCode)
+	if r, _ := harness.Get(t, "http://"+s.Addrs.Admin+"/"); r.StatusCode != 404 {
+		t.Errorf("admin /: %d", r.StatusCode)
 	}
 }
 
@@ -108,7 +102,7 @@ func TestE0_04_FakeNASSmoke(t *testing.T) {
 	if reply.Code != radius.CodeAccessReject {
 		t.Fatalf("code %v", reply.Code)
 	}
-	if !strings.HasPrefix(rfc2865.ReplyMessage_GetString(reply), "INVALID_CREDENTIALS: ") {
+	if rfc2865.ReplyMessage_GetString(reply) != "INVALID_CREDENTIALS" {
 		t.Fatalf("reply message %q", rfc2865.ReplyMessage_GetString(reply))
 	}
 }
@@ -196,8 +190,8 @@ func TestE0_08_NoPlanAtFirstStart(t *testing.T) {
 	}
 }
 
-// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily, 0003_admin_must_change).
-const wantMigrations = 3
+// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily, 0003_admin_must_change, 0004_drop_page_api_settings).
+const wantMigrations = 4
 
 // E0.09 (startup side) failing migration aborts startup at the previous version;
 // editing an applied migration is refused by checksum.
@@ -217,10 +211,11 @@ func TestE0_09_MigrationsAtStartup(t *testing.T) {
 
 	// deliberately failing migration after the shipped ones
 	fsys := fstest.MapFS{
-		"0001_init.sql":              {Data: mustRead(t, "internal/store/migrations/0001_init.sql")},
-		"0002_usage_daily.sql":       {Data: mustRead(t, "internal/store/migrations/0002_usage_daily.sql")},
-		"0003_admin_must_change.sql": {Data: mustRead(t, "internal/store/migrations/0003_admin_must_change.sql")},
-		"0004_bad.sql":               {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
+		"0001_init.sql":                   {Data: mustRead(t, "internal/store/migrations/0001_init.sql")},
+		"0002_usage_daily.sql":            {Data: mustRead(t, "internal/store/migrations/0002_usage_daily.sql")},
+		"0003_admin_must_change.sql":      {Data: mustRead(t, "internal/store/migrations/0003_admin_must_change.sql")},
+		"0004_drop_page_api_settings.sql": {Data: mustRead(t, "internal/store/migrations/0004_drop_page_api_settings.sql")},
+		"0005_bad.sql":                    {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
 	}
 	_, err := harness.TryStart(harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey, Migrations: fsys})
 	if err == nil {
@@ -290,6 +285,5 @@ func TestE0_10_Layering(t *testing.T) {
 		forbid("internal/"+svc, "internal/web", "internal/radius", "internal/store")
 	}
 	forbid("internal/radius", "internal/store")
-	forbid("internal/web/pageapi", "internal/store")
 	forbid("internal/web/admin", "internal/store")
 }

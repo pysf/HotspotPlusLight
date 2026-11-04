@@ -16,9 +16,6 @@ import (
 type LoginRepo interface {
 	// GetMemberForLogin is case-insensitive on the username; domain.ErrNotFound if unknown.
 	GetMemberForLogin(ctx context.Context, username string) (domain.Member, []byte, error)
-	// ListActiveMembersByMAC returns the active members with that normalized MAC (BR-3),
-	// newest first, with their encrypted passwords (parallel slices).
-	ListActiveMembersByMAC(ctx context.Context, mac string) ([]domain.Member, [][]byte, error)
 	// GetPlan returns domain.ErrNotFound if the plan does not exist.
 	GetPlan(ctx context.Context, id int64) (domain.Plan, error)
 	GetSettings(ctx context.Context) (domain.Settings, error)
@@ -33,8 +30,7 @@ type Cipher interface {
 	Decrypt(data []byte) ([]byte, error)
 }
 
-// Evaluator is THE member login check (PLAN 7.2), used by the RADIUS handler
-// and (Phase 6) the page API. The rules themselves live in domain.
+// Evaluator is THE member login check (PLAN 7.2), used by the RADIUS handler. The rules themselves live in domain.
 type Evaluator struct {
 	repo   LoginRepo
 	cipher Cipher
@@ -158,77 +154,4 @@ func (e *Evaluator) planOf(ctx context.Context, m domain.Member) (domain.Plan, d
 		return domain.Plan{}, domain.ReasonPlanRemoved, nil
 	}
 	return plan, "", err
-}
-
-// Account is the read-only status behind GET /api/v1/account (PLAN 8.1).
-type Account struct {
-	// Plan is nil for NO_PLAN / PLAN_REMOVED.
-	Plan *domain.Plan
-	// State is the member state the figures are computed from: when the window has
-	// lapsed and the plan renews automatically, the state after that renewal (what
-	// the next login will see). Nothing is renewed here.
-	State domain.MemberState
-	Quota domain.Quota
-	// Reason is why a login would be rejected by checks 1-8 of PLAN 7.2 ("" = allowed).
-	// The concurrent-session check (9) is not part of it.
-	Reason domain.Reason
-}
-
-// Account verifies the credentials (ErrInvalidCredentials otherwise) and reports
-// the member's status with the same rules as Login, without side effects.
-func (e *Evaluator) Account(ctx context.Context, username, password string) (Account, error) {
-	m, ok, err := e.authenticate(ctx, username, password)
-	if err != nil {
-		return Account{}, err
-	}
-	if !ok {
-		return Account{}, ErrInvalidCredentials
-	}
-	plan, why, err := e.planOf(ctx, m)
-	if err != nil {
-		return Account{}, err
-	}
-	if why != "" {
-		return Account{State: m.State(), Reason: why}, nil
-	}
-	now := e.clock.Now()
-	state := m.State()
-	d := domain.Evaluate(state, plan, now)
-	if d.Renew {
-		state = domain.RenewedState(state, now)
-	}
-	return Account{Plan: &plan, State: state, Quota: domain.QuotaOf(state, plan), Reason: d.Reason}, nil
-}
-
-// CredentialsByMAC is the MAC auto-login lookup (O8): the username and password
-// (BR-3 formats) of an active member with that MAC. Several members may share a
-// MAC: the newest one whose login would be allowed wins; if none is allowed, the
-// newest active one, so the page shows its real reject reason.
-// The caller decides whether the feature is switched on.
-func (e *Evaluator) CredentialsByMAC(ctx context.Context, mac string) (username, password string, found bool, err error) {
-	n, ok := domain.NormalizeMAC(mac)
-	if !ok || n == "" {
-		return "", "", false, nil
-	}
-	ms, encs, err := e.repo.ListActiveMembersByMAC(ctx, n)
-	if err != nil || len(ms) == 0 {
-		return "", "", false, err
-	}
-	pick := 0 // newest active member, unless a newer-first scan finds one that is allowed
-	now := e.clock.Now()
-	for i, m := range ms {
-		plan, why, err := e.planOf(ctx, m)
-		if err != nil {
-			return "", "", false, err
-		}
-		if why == "" && domain.Evaluate(m.State(), plan, now).Allowed() {
-			pick = i
-			break
-		}
-	}
-	pw, err := e.cipher.Decrypt(encs[pick])
-	if err != nil {
-		return "", "", false, fmt.Errorf("decrypt password of member %d: %w", ms[pick].ID, err)
-	}
-	return ms[pick].Username, string(pw), true, nil
 }

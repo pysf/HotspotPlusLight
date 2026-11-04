@@ -14,14 +14,11 @@ type Settings struct {
 	CoaPort                   int
 	AccountingIntervalSeconds int
 	DefaultPlanID             *int64 // nil = none
-	MacAutoLogin              bool
-	AfterLoginURL             string
 	BatchUsernamePrefix       string
 	BatchCounter              int
 	BatchMaxCount             int
 	VoucherPasswordLength     int
 	VoucherHelp               string
-	PublicBaseURL             string
 	SessionRetentionDays      int
 }
 
@@ -38,9 +35,8 @@ func (s Settings) Location() (*time.Location, error) {
 type SettingsForm struct {
 	SiteTitle, Timezone, RadiusSharedSecret, CoaPort, AccountingIntervalSeconds string
 	DefaultPlanID                                                               string // "" = none
-	MacAutoLogin                                                                bool
-	AfterLoginURL, BatchUsernamePrefix, BatchCounter, BatchMaxCount             string
-	VoucherPasswordLength, VoucherHelp, PublicBaseURL, SessionRetentionDays     string
+	BatchUsernamePrefix, BatchCounter, BatchMaxCount                            string
+	VoucherPasswordLength, VoucherHelp, SessionRetentionDays                    string
 }
 
 // FormFromSettings renders stored settings back into form text.
@@ -53,9 +49,9 @@ func FormFromSettings(s Settings) SettingsForm {
 	return SettingsForm{
 		SiteTitle: s.SiteTitle, Timezone: s.Timezone, RadiusSharedSecret: s.RadiusSharedSecret,
 		CoaPort: i(s.CoaPort), AccountingIntervalSeconds: i(s.AccountingIntervalSeconds), DefaultPlanID: def,
-		MacAutoLogin: s.MacAutoLogin, AfterLoginURL: s.AfterLoginURL, BatchUsernamePrefix: s.BatchUsernamePrefix,
-		BatchCounter: i(s.BatchCounter), BatchMaxCount: i(s.BatchMaxCount), VoucherPasswordLength: i(s.VoucherPasswordLength),
-		VoucherHelp: s.VoucherHelp, PublicBaseURL: s.PublicBaseURL, SessionRetentionDays: i(s.SessionRetentionDays),
+		BatchUsernamePrefix: s.BatchUsernamePrefix,
+		BatchCounter:        i(s.BatchCounter), BatchMaxCount: i(s.BatchMaxCount), VoucherPasswordLength: i(s.VoucherPasswordLength),
+		VoucherHelp: s.VoucherHelp, SessionRetentionDays: i(s.SessionRetentionDays),
 	}
 }
 
@@ -70,14 +66,11 @@ func ParseSettings(f SettingsForm) (Settings, FieldErrors) {
 		RadiusSharedSecret:        p.secret("radius_shared_secret", f.RadiusSharedSecret, 128),
 		CoaPort:                   p.integer("coa_port", f.CoaPort, 1, 65535),
 		AccountingIntervalSeconds: p.integer("accounting_interval_seconds", f.AccountingIntervalSeconds, 10, 86400),
-		MacAutoLogin:              f.MacAutoLogin,
-		AfterLoginURL:             p.httpURL("after_login_url", f.AfterLoginURL),
 		BatchUsernamePrefix:       p.alnum("batch_username_prefix", f.BatchUsernamePrefix, 20),
 		BatchCounter:              p.integer("batch_counter", f.BatchCounter, 0, 999_999_999),
 		BatchMaxCount:             p.integer("batch_max_count", f.BatchMaxCount, 1, 1000),
 		VoucherPasswordLength:     p.integer("voucher_password_length", f.VoucherPasswordLength, 4, 20),
 		VoucherHelp:               p.text("voucher_help", f.VoucherHelp, false, 2000),
-		PublicBaseURL:             p.publicURL("public_base_url", f.PublicBaseURL),
 		SessionRetentionDays:      p.integer("session_retention_days", f.SessionRetentionDays, 0, 36500),
 	}
 	if f.DefaultPlanID != "" {

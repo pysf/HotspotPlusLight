@@ -53,8 +53,9 @@ var reasonMessages = map[Reason]string{
 // Message is the English text of a rejection code; the empty Reason has none.
 func (r Reason) Message() string { return reasonMessages[r] }
 
-// ReplyMessage is the RADIUS Reply-Message of a rejection: "CODE: message" (O20).
-func (r Reason) ReplyMessage() string { return string(r) + ": " + r.Message() }
+// ReplyMessage is the RADIUS Reply-Message of a rejection: only the code (O20, changed 2026-11-04).
+// The router page maps the code to text, so it can be translated by hand.
+func (r Reason) ReplyMessage() string { return string(r) }
 
 // MemberState is what the login rules need to know about a member.
 type MemberState struct {

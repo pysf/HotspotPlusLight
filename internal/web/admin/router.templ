@@ -8,12 +8,6 @@ import (
 templ RouterPage(l ui.LayoutData, p RouterProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Router")
-		if p.NoBaseURL {
-			<div class="c-notice" data-kind="warn" data-warning="public-base-url">
-				The public base URL is not set, so the login page cannot reach this server.
-				Set it in <a href="/admin/settings">Settings</a> before you download the folder.
-			</div>
-		}
 		<div class="l-gap-bottom">
 			@ui.Card() {
 				@ui.CardTitle("Login page")

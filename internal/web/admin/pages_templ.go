@@ -885,18 +885,6 @@ func SettingsFormView(p SettingsProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Checkbox(ui.CheckboxProps{Label: "MAC auto-login", Name: "mac_auto_login", Checked: p.Form.MacAutoLogin, Hint: "Warning: a device can spoof another device's MAC address and sign in as that member."}).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = ui.Field(ui.FieldProps{Label: "After-login URL", Name: "after_login_url", Value: p.Form.AfterLoginURL, Error: p.Errors["after_login_url"], Hint: "Optional http:// or https:// address."}).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = ui.Field(ui.FieldProps{Label: "Public base URL", Name: "public_base_url", Value: p.Form.PublicBaseURL, Error: p.Errors["public_base_url"], Hint: "How clients reach this server, e.g. http://192.168.1.10:8080."}).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
 			templ_7745c5c3_Err = ui.Field(ui.FieldProps{Label: "Voucher username prefix", Name: "batch_username_prefix", Value: p.Form.BatchUsernamePrefix, Error: p.Errors["batch_username_prefix"], Hint: "English letters and digits."}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

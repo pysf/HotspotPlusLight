@@ -48,7 +48,6 @@ func TestParseSettings(t *testing.T) {
 	for field, mutate := range map[string]func(*SettingsForm){
 		"coa_port":                    func(f *SettingsForm) { f.CoaPort = "0" },
 		"accounting_interval_seconds": func(f *SettingsForm) { f.AccountingIntervalSeconds = "9" },
-		"after_login_url":             func(f *SettingsForm) { f.AfterLoginURL = "ftp://x" },
 		"batch_username_prefix":       func(f *SettingsForm) { f.BatchUsernamePrefix = "a-b" },
 		"default_plan_id":             func(f *SettingsForm) { f.DefaultPlanID = "x" },
 		"session_retention_days":      func(f *SettingsForm) { f.SessionRetentionDays = "-1" },

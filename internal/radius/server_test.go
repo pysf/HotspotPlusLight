@@ -172,7 +172,7 @@ func TestRejectCarriesCodeAndMessage(t *testing.T) {
 	if err != nil || reply.Code != radius.CodeAccessReject {
 		t.Fatalf("%v %v", reply, err)
 	}
-	if got := rfc2865.ReplyMessage_GetString(reply); got != "OUT_OF_BULK: Your data allowance is used up." {
+	if got := rfc2865.ReplyMessage_GetString(reply); got != "OUT_OF_BULK" {
 		t.Fatalf("reply message %q", got)
 	}
 	fa.mu.Lock()

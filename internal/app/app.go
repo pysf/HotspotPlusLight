@@ -34,7 +34,6 @@ import (
 	"hotspotpluslight/internal/usage"
 	"hotspotpluslight/internal/voucher"
 	"hotspotpluslight/internal/web/admin"
-	"hotspotpluslight/internal/web/pageapi"
 	"hotspotpluslight/internal/web/static"
 )
 
@@ -57,7 +56,7 @@ type Options struct {
 }
 
 // Addrs are the bound listener addresses (useful when configured with port 0).
-type Addrs struct{ HTTP, Admin, RadiusAuth, RadiusAcct string }
+type Addrs struct{ Admin, RadiusAuth, RadiusAcct string }
 
 type services struct {
 	auth      *auth.Service
@@ -79,9 +78,9 @@ type App struct {
 	// enforcer is layer 2 of the quota enforcement (O3/O4): it disconnects online members who must not be online.
 	enforcer *session.Enforcer
 
-	httpSrv, adminSrv  *http.Server
+	adminSrv           *http.Server
 	authConn, acctConn net.PacketConn
-	httpLn, adminLn    net.Listener
+	adminLn            net.Listener
 	addrs              Addrs
 	addrMu             sync.RWMutex // guards addrs: written by Start, read by admin handlers
 	stopOnce           sync.Once
@@ -193,7 +192,6 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return fail(err)
 	}
-	a.httpSrv = &http.Server{Handler: pageapi.Handler(pageapi.Deps{Accounts: a.svc.evaluator, Settings: a.svc.settings, Clock: opts.Clock, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, Assets: assets, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
@@ -252,7 +250,7 @@ func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
 	return nil
 }
 
-// Start binds the four sockets and begins serving.
+// Start binds the three sockets and begins serving.
 func (a *App) Start() (err error) {
 	var closers []io.Closer
 	defer func() {
@@ -262,10 +260,6 @@ func (a *App) Start() (err error) {
 			}
 		}
 	}()
-	if a.httpLn, err = net.Listen("tcp", a.cfg.HTTPAddr); err != nil {
-		return fmt.Errorf("listen HSP_HTTP_ADDR: %w", err)
-	}
-	closers = append(closers, a.httpLn)
 	if a.adminLn, err = net.Listen("tcp", a.cfg.AdminAddr); err != nil {
 		return fmt.Errorf("listen HSP_ADMIN_ADDR: %w", err)
 	}
@@ -278,14 +272,13 @@ func (a *App) Start() (err error) {
 		return fmt.Errorf("listen HSP_RADIUS_ACCT_ADDR: %w", err)
 	}
 	a.addrMu.Lock()
-	a.addrs = Addrs{a.httpLn.Addr().String(), a.adminLn.Addr().String(), a.authConn.LocalAddr().String(), a.acctConn.LocalAddr().String()}
+	a.addrs = Addrs{a.adminLn.Addr().String(), a.authConn.LocalAddr().String(), a.acctConn.LocalAddr().String()}
 	a.addrMu.Unlock()
-	go a.serveHTTP("public", a.httpSrv, a.httpLn)
 	go a.serveHTTP("admin", a.adminSrv, a.adminLn)
 	a.startPruning()
 	a.enforcer.Start(a.svc.session)
 	a.radius.Serve(a.authConn, a.acctConn)
-	a.log.Info("listening", "http", a.addrs.HTTP, "admin", a.addrs.Admin, "radius_auth", a.addrs.RadiusAuth, "radius_acct", a.addrs.RadiusAcct)
+	a.log.Info("listening", "admin", a.addrs.Admin, "radius_auth", a.addrs.RadiusAuth, "radius_acct", a.addrs.RadiusAcct)
 	return nil
 }
 
@@ -359,7 +352,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 			a.pruneCancel()
 			<-a.pruneDone
 		}
-		err = errors.Join(a.httpSrv.Shutdown(ctx), a.adminSrv.Shutdown(ctx), a.radius.Shutdown(ctx))
+		err = errors.Join(a.adminSrv.Shutdown(ctx), a.radius.Shutdown(ctx))
 		a.enforcer.Stop() // after RADIUS: no more checks are queued; waits for the running ones
 		err = errors.Join(err, a.store.Close())
 		a.log.Info("shutdown complete")

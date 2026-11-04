@@ -176,10 +176,10 @@ func binaryPath(t *testing.T) string {
 	return harness.Binary(t)
 }
 
-func freePorts(t *testing.T) (httpAddr, adminAddr, authAddr, acctAddr string) {
-	var out [4]string
+func freePorts(t *testing.T) (adminAddr, authAddr, acctAddr string) {
+	var out [3]string
 	for i := range out {
-		if i < 2 {
+		if i < 1 {
 			l, err := net.Listen("tcp", "127.0.0.1:0")
 			if err != nil {
 				t.Fatal(err)
@@ -195,7 +195,7 @@ func freePorts(t *testing.T) (httpAddr, adminAddr, authAddr, acctAddr string) {
 			l.Close()
 		}
 	}
-	return out[0], out[1], out[2], out[3]
+	return out[0], out[1], out[2]
 }
 
 type child struct {
@@ -214,7 +214,7 @@ func startChild(t *testing.T, bin string) *child {
 	if err != nil {
 		t.Fatal(err)
 	}
-	httpA, adminA, authA, acctA := freePorts(t)
+	adminA, authA, acctA := freePorts(t)
 	key := harness.NewKey()
 	logf := filepath.Join(dir, "server.log")
 	lf, err := os.Create(logf)
@@ -223,7 +223,7 @@ func startChild(t *testing.T, bin string) *child {
 	}
 	cmd := exec.Command(bin, "serve")
 	cmd.Env = append(os.Environ(), "HSP_DATA_DIR="+dir, "HSP_SECRET_KEY="+key,
-		"HSP_HTTP_ADDR="+httpA, "HSP_ADMIN_ADDR="+adminA, "HSP_RADIUS_AUTH_ADDR="+authA, "HSP_RADIUS_ACCT_ADDR="+acctA,
+		"HSP_ADMIN_ADDR="+adminA, "HSP_RADIUS_AUTH_ADDR="+authA, "HSP_RADIUS_ACCT_ADDR="+acctA,
 		"HSP_RADIUS_SHARED_SECRET="+radiusSecret)
 	cmd.Stdout, cmd.Stderr = lf, lf
 	if err := cmd.Start(); err != nil {
@@ -232,7 +232,7 @@ func startChild(t *testing.T, bin string) *child {
 	c := &child{cmd: cmd, logf: logf, dir: dir, admin: adminA, auth: authA, acct: acctA, key: key, exited: make(chan struct{})}
 	go func() { cmd.Wait(); lf.Close(); close(c.exited) }()
 	for i := 0; i < 200; i++ {
-		if r, err := http.Get("http://" + httpA + "/healthz"); err == nil {
+		if r, err := http.Get("http://" + adminA + "/healthz"); err == nil {
 			r.Body.Close()
 			return c
 		}

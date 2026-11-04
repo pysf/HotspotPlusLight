@@ -453,8 +453,8 @@ func TestE1_10_Settings(t *testing.T) {
 	d := page.Doc(t)
 	form := harness.FormValues(t, d, "form#settings-form")
 	for _, f := range []string{"site_title", "timezone", "radius_shared_secret", "coa_port", "accounting_interval_seconds",
-		"default_plan_id", "mac_auto_login", "after_login_url", "batch_username_prefix", "batch_counter", "batch_max_count",
-		"voucher_password_length", "voucher_help", "public_base_url", "session_retention_days"} {
+		"default_plan_id", "batch_username_prefix", "batch_counter", "batch_max_count",
+		"voucher_password_length", "voucher_help", "session_retention_days"} {
 		if d.Find(`form#settings-form [name="`+f+`"]`).Length() != 1 {
 			t.Errorf("settings form lacks %s", f)
 		}
@@ -468,8 +468,10 @@ func TestE1_10_Settings(t *testing.T) {
 	if d.Find(`select[name="default_plan_id"] option`).Length() != 2 { // none + the one plan
 		t.Errorf("default plan select options: %d", d.Find(`select[name="default_plan_id"] option`).Length())
 	}
-	if !strings.Contains(strings.ToLower(d.Text()), "spoof") {
-		t.Error("MAC auto-login warning missing (O8)")
+	for _, gone := range []string{"mac_auto_login", "after_login_url", "public_base_url"} {
+		if d.Find(`form#settings-form [name="`+gone+`"]`).Length() != 0 {
+			t.Errorf("settings form still has %s (removed in Phase 12a)", gone)
+		}
 	}
 
 	// Invalid values: 422, message next to the field, nothing stored.
@@ -477,8 +479,7 @@ func TestE1_10_Settings(t *testing.T) {
 		{"site_title", ""}, {"timezone", "Mars/Base"}, {"radius_shared_secret", ""},
 		{"coa_port", "0"}, {"coa_port", "65536"}, {"coa_port", "abc"},
 		{"accounting_interval_seconds", "9"}, {"accounting_interval_seconds", "x"},
-		{"default_plan_id", "9999"}, {"after_login_url", "ftp://x"}, {"public_base_url", "not a url"},
-		{"batch_username_prefix", "wi-fi"}, {"batch_counter", "-1"}, {"batch_max_count", "0"},
+		{"default_plan_id", "9999"}, {"batch_username_prefix", "wi-fi"}, {"batch_counter", "-1"}, {"batch_max_count", "0"},
 		{"voucher_password_length", "0"}, {"voucher_password_length", "x"}, {"session_retention_days", "-1"},
 	}
 	before := scalar[string](t, db, `SELECT site_title||coa_port||accounting_interval_seconds||radius_shared_secret FROM settings`)
@@ -498,10 +499,10 @@ func TestE1_10_Settings(t *testing.T) {
 	f := harness.FormValues(t, d, "form#settings-form")
 	for k, v := range map[string]string{
 		"site_title": "My Cafe", "timezone": "Asia/Tehran", "radius_shared_secret": "s3cret-value", "coa_port": "3800",
-		"accounting_interval_seconds": "120", "default_plan_id": fmt.Sprint(plan), "mac_auto_login": "on",
-		"after_login_url": "https://example.com/welcome", "batch_username_prefix": "cafe", "batch_counter": "2000",
+		"accounting_interval_seconds": "120", "default_plan_id": fmt.Sprint(plan),
+		"batch_username_prefix": "cafe", "batch_counter": "2000",
 		"batch_max_count": "50", "voucher_password_length": "8", "voucher_help": "Connect to the WiFi and sign in.",
-		"public_base_url": "http://192.168.1.10:8080", "session_retention_days": "0",
+		"session_retention_days": "0",
 	} {
 		f.Set(k, v)
 	}
@@ -509,33 +510,32 @@ func TestE1_10_Settings(t *testing.T) {
 	if r.StatusCode != 200 || !strings.Contains(r.Body, "Settings saved") {
 		t.Fatalf("save: %d %s", r.StatusCode, r.Body)
 	}
-	row := db.QueryRow(`SELECT site_title,timezone,radius_shared_secret,coa_port,accounting_interval_seconds,default_plan_id,mac_auto_login,after_login_url,batch_username_prefix,batch_counter,batch_max_count,voucher_password_length,voucher_help,public_base_url,session_retention_days FROM settings`)
+	row := db.QueryRow(`SELECT site_title,timezone,radius_shared_secret,coa_port,accounting_interval_seconds,default_plan_id,batch_username_prefix,batch_counter,batch_max_count,voucher_password_length,voucher_help,session_retention_days FROM settings`)
 	var (
-		title, tz, sec, after, prefix, help, base       string
-		coa, interval, mac, counter, maxc, vlen, retain int
-		def                                             sql.NullInt64
+		title, tz, sec, prefix, help               string
+		coa, interval, counter, maxc, vlen, retain int
+		def                                        sql.NullInt64
 	)
-	if err := row.Scan(&title, &tz, &sec, &coa, &interval, &def, &mac, &after, &prefix, &counter, &maxc, &vlen, &help, &base, &retain); err != nil {
+	if err := row.Scan(&title, &tz, &sec, &coa, &interval, &def, &prefix, &counter, &maxc, &vlen, &help, &retain); err != nil {
 		t.Fatal(err)
 	}
 	if title != "My Cafe" || tz != "Asia/Tehran" || sec != "s3cret-value" || coa != 3800 || interval != 120 || !def.Valid || def.Int64 != plan ||
-		mac != 1 || after != "https://example.com/welcome" || prefix != "cafe" || counter != 2000 || maxc != 50 || vlen != 8 ||
-		help != "Connect to the WiFi and sign in." || base != "http://192.168.1.10:8080" || retain != 0 {
-		t.Fatalf("stored: %v", []any{title, tz, sec, coa, interval, def, mac, after, prefix, counter, maxc, vlen, help, base, retain})
+		prefix != "cafe" || counter != 2000 || maxc != 50 || vlen != 8 ||
+		help != "Connect to the WiFi and sign in." || retain != 0 {
+		t.Fatalf("stored: %v", []any{title, tz, sec, coa, interval, def, prefix, counter, maxc, vlen, help, retain})
 	}
-	// Reload shows what was saved; unchecked box turns the flag off; "" clears the default plan.
+	// Reload shows what was saved; "" clears the default plan.
 	d2 := c.Get("/admin/settings").Doc(t)
 	f2 := harness.FormValues(t, d2, "form#settings-form")
-	if f2.Get("site_title") != "My Cafe" || f2.Get("mac_auto_login") == "" || f2.Get("default_plan_id") != fmt.Sprint(plan) {
+	if f2.Get("site_title") != "My Cafe" || f2.Get("default_plan_id") != fmt.Sprint(plan) {
 		t.Fatalf("reloaded form: %v", f2)
 	}
-	f2.Del("mac_auto_login")
 	f2.Set("default_plan_id", "")
 	if r := c.Send("PUT", "/admin/settings", f2); r.StatusCode != 200 {
 		t.Fatalf("second save: %d", r.StatusCode)
 	}
-	if scalar[int](t, db, `SELECT mac_auto_login FROM settings`) != 0 || scalar[sql.NullInt64](t, db, `SELECT default_plan_id FROM settings`).Valid {
-		t.Fatal("flag/default not cleared")
+	if scalar[sql.NullInt64](t, db, `SELECT default_plan_id FROM settings`).Valid {
+		t.Fatal("default plan not cleared")
 	}
 }
 
@@ -612,28 +612,6 @@ func TestE1_15_PasswordStrength(t *testing.T) {
 		t.Fatalf("compliant rejected: %s", se)
 	}
 	harness.NewAdminClient(t, s).Login(username, good)
-}
-
-// E1.16 D23: admin routes 404 on the public listener and the reverse.
-func TestE1_16_ListenerSeparation(t *testing.T) {
-	s := harness.Start(t, harness.Options{})
-	for _, p := range []string{"/admin", "/admin/login", "/admin/plans", "/admin/settings", "/admin/static/htmx.min.js"} {
-		if r, _ := harness.Get(t, "http://"+s.Addrs.HTTP+p); r.StatusCode != 404 {
-			t.Errorf("public %s: %d", p, r.StatusCode)
-		}
-	}
-	if r, b := harness.Get(t, "http://"+s.Addrs.HTTP+"/healthz"); r.StatusCode != 200 || !strings.HasPrefix(b, "ok") {
-		t.Errorf("public /healthz: %d", r.StatusCode)
-	}
-	c := harness.LoginAsAdmin(t, s)
-	for _, p := range []string{"/", "/healthz", "/api/v1/config", "/api/v1/account", "/static/htmx.min.js"} {
-		if r := c.Get(p); r.StatusCode != 404 {
-			t.Errorf("admin %s: %d", p, r.StatusCode)
-		}
-	}
-	if r := c.Get("/admin/login"); r.StatusCode != 200 {
-		t.Errorf("admin login page: %d", r.StatusCode)
-	}
 }
 
 // E1.17 admin session: opaque cookie, sliding 1 h, logout and set-password invalidate, hash only.

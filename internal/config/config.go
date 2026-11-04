@@ -11,7 +11,6 @@ import (
 
 type Config struct {
 	DataDir            string
-	HTTPAddr           string
 	AdminAddr          string
 	RadiusAuthAddr     string
 	RadiusAcctAddr     string
@@ -33,7 +32,6 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	c := Config{
 		DataDir:            get("DATA_DIR", "data"),
-		HTTPAddr:           get("HTTP_ADDR", ":8080"),
 		AdminAddr:          get("ADMIN_ADDR", ":8081"),
 		RadiusAuthAddr:     get("RADIUS_AUTH_ADDR", ":1812"),
 		RadiusAcctAddr:     get("RADIUS_ACCT_ADDR", ":1813"),

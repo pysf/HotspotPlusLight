@@ -59,12 +59,12 @@ func (f *p3) accepted(user, pw string) *radius.Packet {
 	return r
 }
 
-// rejected asserts an Access-Reject whose Reply-Message starts with "<code>: ".
+// rejected asserts an Access-Reject whose Reply-Message is exactly "<code>" (O20, Phase 12a).
 func (f *p3) rejected(user, pw, code string) *radius.Packet {
 	f.t.Helper()
 	r := f.login(user, pw)
 	msg := rfc2865.ReplyMessage_GetString(r)
-	if r.Code != radius.CodeAccessReject || !strings.HasPrefix(msg, code+": ") {
+	if r.Code != radius.CodeAccessReject || msg != code {
 		f.t.Fatalf("%q: want Reject %s, got %v %q", user, code, r.Code, msg)
 	}
 	return r
@@ -173,7 +173,7 @@ func TestE3_01_AcceptWithAttributes(t *testing.T) {
 func TestE3_02_InvalidCredentialsIndistinguishable(t *testing.T) {
 	f := newP3(t)
 	f.member(f.plan("Basic"), "alice", "password", "secret1")
-	const want = "INVALID_CREDENTIALS: Wrong username or password."
+	const want = "INVALID_CREDENTIALS"
 	for _, c := range []struct{ user, pw string }{{"alice", "wrong"}, {"alice", ""}, {"nobody", "secret1"}} {
 		r := f.login(c.user, c.pw)
 		if msg := rfc2865.ReplyMessage_GetString(r); r.Code != radius.CodeAccessReject || msg != want {
@@ -193,7 +193,7 @@ func TestE3_03_Inactive(t *testing.T) {
 	f.accepted("alice", "secret1")
 	f.exec(`UPDATE member SET active=0 WHERE id=?`, id)
 	r := f.rejected("alice", "secret1", "INACTIVE_USER")
-	if msg := rfc2865.ReplyMessage_GetString(r); msg != "INACTIVE_USER: This account is disabled." {
+	if msg := rfc2865.ReplyMessage_GetString(r); msg != "INACTIVE_USER" {
 		t.Errorf("message %q", msg)
 	}
 }
@@ -218,12 +218,12 @@ func TestE3_04_NoPlanAndPlanRemoved(t *testing.T) {
 	}
 	set(0)
 	r := f.rejected("alice", "secret1", "NO_PLAN")
-	if msg := rfc2865.ReplyMessage_GetString(r); msg != "NO_PLAN: No internet plan is assigned to this account." {
+	if msg := rfc2865.ReplyMessage_GetString(r); msg != "NO_PLAN" {
 		t.Errorf("message %q", msg)
 	}
 	set(9999)
 	r = f.rejected("alice", "secret1", "PLAN_REMOVED")
-	if msg := rfc2865.ReplyMessage_GetString(r); msg != "PLAN_REMOVED: This plan has been removed." {
+	if msg := rfc2865.ReplyMessage_GetString(r); msg != "PLAN_REMOVED" {
 		t.Errorf("message %q", msg)
 	}
 }
@@ -242,7 +242,7 @@ func TestE3_05_WindowLapsedAndAutoResubscribe(t *testing.T) {
 	f.accepted("plain", "pw")
 	f.exec(`UPDATE member SET subscription_date=? WHERE id=?`, t0.Unix()-30*day-1, p)
 	r := f.rejected("plain", "pw", "NO_ACTIVE_SUBSCRIPTION")
-	if msg := rfc2865.ReplyMessage_GetString(r); msg != "NO_ACTIVE_SUBSCRIPTION: Your plan period has ended." {
+	if msg := rfc2865.ReplyMessage_GetString(r); msg != "NO_ACTIVE_SUBSCRIPTION" {
 		t.Errorf("message %q", msg)
 	}
 	if n := scalar[int](t, f.db, `SELECT renewal_count FROM member WHERE id=?`, p); n != 0 {
@@ -280,7 +280,7 @@ func TestE3_06_OutOfBulkAndExtraBulk(t *testing.T) {
 	id := f.member(plan, "alice", "password", "pw")
 	f.exec(`UPDATE member SET used_download_bytes=?, used_upload_bytes=? WHERE id=?`, 70*mb, 30*mb, id)
 	r := f.rejected("alice", "pw", "OUT_OF_BULK")
-	if msg := rfc2865.ReplyMessage_GetString(r); msg != "OUT_OF_BULK: Your data allowance is used up." {
+	if msg := rfc2865.ReplyMessage_GetString(r); msg != "OUT_OF_BULK" {
 		t.Errorf("message %q", msg)
 	}
 	resp := f.c.Send("PUT", mpath(id)+"/extra-bulk", url.Values{"value": {"50"}, "unit": {"MB"}})
@@ -324,7 +324,7 @@ func TestE3_08_TimeQuota(t *testing.T) {
 	}
 	f.exec(`UPDATE member SET used_seconds=3600 WHERE id=?`, id)
 	r := f.rejected("alice", "pw", "OUT_OF_TIME")
-	if msg := rfc2865.ReplyMessage_GetString(r); msg != "OUT_OF_TIME: Your time allowance is used up." {
+	if msg := rfc2865.ReplyMessage_GetString(r); msg != "OUT_OF_TIME" {
 		t.Errorf("message %q", msg)
 	}
 	f.exec(`UPDATE member SET used_seconds=99999 WHERE id=?`, id)
@@ -423,7 +423,7 @@ func TestE3_12_ConcurrentSessions(t *testing.T) {
 	f.openSession(one, "one", "s1", now)
 	f.openSession(two, "two", "s1", now)
 	r := f.rejected("one", "pw", "NO_MORE_SESSION")
-	if msg := rfc2865.ReplyMessage_GetString(r); msg != "NO_MORE_SESSION: Someone else is using this account. Try again in a few minutes." {
+	if msg := rfc2865.ReplyMessage_GetString(r); msg != "NO_MORE_SESSION" {
 		t.Errorf("message %q", msg)
 	}
 	f.accepted("two", "pw") // one of two used
@@ -467,7 +467,7 @@ func TestE3_13_ChapRejected(t *testing.T) {
 			t.Fatalf("%s: %v", name, err)
 		}
 		msg := rfc2865.ReplyMessage_GetString(r)
-		if r.Code != radius.CodeAccessReject || msg != "UNSUPPORTED_AUTH_METHOD: This network only supports PAP login." {
+		if r.Code != radius.CodeAccessReject || msg != "UNSUPPORTED_AUTH_METHOD" {
 			t.Errorf("%s: %v %q", name, r.Code, msg)
 		}
 	}
@@ -517,7 +517,7 @@ func TestE3_16_ExpiresAt(t *testing.T) {
 	f.accepted("alice", "pw")
 	f.advance(time.Second)
 	r := f.rejected("alice", "pw", "EXPIRED")
-	if msg := rfc2865.ReplyMessage_GetString(r); msg != "EXPIRED: This account has expired." {
+	if msg := rfc2865.ReplyMessage_GetString(r); msg != "EXPIRED" {
 		t.Errorf("message %q", msg)
 	}
 	f.exec(`UPDATE member SET expires_at=NULL WHERE id=?`, id) // never

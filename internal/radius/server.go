@@ -219,6 +219,9 @@ func (s *Server) reply(w radius.ResponseWriter, r *radius.Request, v auth.Verdic
 		}
 	} else {
 		resp = r.Response(radius.CodeAccessReject)
+		// The Reply-Message is only the code; the logs keep code and English text (O20).
+		name, _ := rfc2865.UserName_LookupString(r.Packet)
+		s.log.Info("access-reject", "username", name, "code", string(v.Reason), "message", v.Reason.Message())
 		rfc2865.ReplyMessage_SetString(resp, v.Reason.ReplyMessage())
 	}
 	if err := w.Write(resp); err != nil {

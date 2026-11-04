@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -118,30 +116,6 @@ func (p *parser) secret(field, raw string, maxLen int) string {
 	}
 	return raw
 }
-
-func (p *parser) httpURL(field, raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ""
-	}
-	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		p.errs.add(field, "Enter a full http:// or https:// address, or leave empty.")
-	}
-	return raw
-}
-
-// publicURL is an http(s) address whose host is also pasted into the router
-// setup script, so the host is limited to letters, digits, dot, dash, colon and brackets.
-func (p *parser) publicURL(field, raw string) string {
-	raw = p.httpURL(field, raw)
-	if u, err := url.Parse(raw); err == nil && raw != "" && u.Host != "" && !hostRE.MatchString(u.Host) {
-		p.errs.add(field, "The host may only contain letters, digits, dots, dashes, colons and brackets.")
-	}
-	return raw
-}
-
-var hostRE = regexp.MustCompile(`^[A-Za-z0-9.:\-\[\]]+$`)
 
 // Checked reports whether a checkbox value means "on".
 func Checked(v string) bool {

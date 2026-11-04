@@ -25,7 +25,7 @@ type RouterPack interface {
 const routerHome = "/admin/router"
 
 func packConfig(st domain.Settings) routerpack.Config {
-	return routerpack.Config{SiteTitle: st.SiteTitle, PublicBaseURL: st.PublicBaseURL}
+	return routerpack.Config{SiteTitle: st.SiteTitle}
 }
 
 func themeURL(id string) string { return routerHome + "/themes/" + id }
@@ -64,17 +64,16 @@ func (h handlers) routerPage(w http.ResponseWriter, r *http.Request) {
 	// the pasted script needs it. Admin listener only, behind login, Cache-Control: no-store (admin group).
 	authPort, acctPort := h.RadiusPorts()
 	script := routerpack.SetupScript(routerpack.ScriptConfig{
-		PublicBaseURL: st.PublicBaseURL, Secret: st.RadiusSharedSecret, AuthPort: authPort, AcctPort: acctPort,
+		Secret: st.RadiusSharedSecret, AuthPort: authPort, AcctPort: acctPort,
 		CoaPort: st.CoaPort, InterimSeconds: st.AccountingIntervalSeconds,
 	})
 	h.render(w, r, http.StatusOK, RouterPage(layout(r, "Router", routerHome), RouterProps{
-		NoBaseURL: st.PublicBaseURL == "", DefaultTheme: routerpack.DefaultTheme, Script: script, Link: linkRows(h.Link.Snapshot(), loc),
+		DefaultTheme: routerpack.DefaultTheme, Script: script, Link: linkRows(h.Link.Snapshot(), loc),
 	}))
 }
 
 // RouterProps is everything the router page shows.
 type RouterProps struct {
-	NoBaseURL    bool
 	DefaultTheme string
 	Script       string
 	Link         linkView
@@ -148,7 +147,6 @@ func (h handlers) themePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := packConfig(st)
-	cfg.PublicBaseURL = ""
 	page, err := h.Router.LoginHTML(t, cfg)
 	if err != nil {
 		h.serverError(w, r, err)

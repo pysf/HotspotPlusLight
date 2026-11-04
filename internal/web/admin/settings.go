@@ -12,10 +12,9 @@ func settingsForm(r *http.Request) domain.SettingsForm {
 	return domain.SettingsForm{
 		SiteTitle: v("site_title"), Timezone: v("timezone"), RadiusSharedSecret: v("radius_shared_secret"),
 		CoaPort: v("coa_port"), AccountingIntervalSeconds: v("accounting_interval_seconds"), DefaultPlanID: v("default_plan_id"),
-		MacAutoLogin: domain.Checked(v("mac_auto_login")), AfterLoginURL: v("after_login_url"),
 		BatchUsernamePrefix: v("batch_username_prefix"), BatchCounter: v("batch_counter"), BatchMaxCount: v("batch_max_count"),
 		VoucherPasswordLength: v("voucher_password_length"), VoucherHelp: v("voucher_help"),
-		PublicBaseURL: v("public_base_url"), SessionRetentionDays: v("session_retention_days"),
+		SessionRetentionDays: v("session_retention_days"),
 	}
 }
 

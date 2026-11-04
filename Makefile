@@ -51,7 +51,7 @@ release: build-cross
 	$$SUM *.zip *.tar.gz > SHA256SUMS; \
 	ls -l
 
-# Build and start the whole stack (public :8080, admin :8081, RADIUS :1812/:1813) with data in ./data.
+# Build and start the whole stack (admin :8081, RADIUS :1812/:1813) with data in ./data.
 run: build
 	@test -f $(DEV_KEY_FILE) || openssl rand -base64 32 > $(DEV_KEY_FILE)
 	HSP_SECRET_KEY="$${HSP_SECRET_KEY:-$$(cat $(DEV_KEY_FILE))}" ./bin/hotspotpluslight serve

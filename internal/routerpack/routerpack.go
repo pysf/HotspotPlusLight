@@ -43,8 +43,6 @@ type Theme struct {
 // Config is what the pack is generated from (taken from the settings).
 type Config struct {
 	SiteTitle string
-	// PublicBaseURL is how the router's clients reach this server (settings.public_base_url).
-	PublicBaseURL string
 }
 
 // Pack holds the parsed themes and the login page template.
@@ -128,14 +126,13 @@ type Message struct{ Code, Text string }
 type loginData struct {
 	Theme
 	SiteTitle string
-	APIBase   string
 	Messages  []Message
 }
 
 // LoginHTML renders the customizable member page of a theme. Router variables
 // such as $(link-login-only) are left for the router to substitute.
 func (p *Pack) LoginHTML(t Theme, c Config) ([]byte, error) {
-	d := loginData{Theme: t, SiteTitle: c.SiteTitle, APIBase: strings.TrimRight(c.PublicBaseURL, "/")}
+	d := loginData{Theme: t, SiteTitle: c.SiteTitle}
 	for _, r := range domain.AllReasons() {
 		d.Messages = append(d.Messages, Message{string(r), r.Message()})
 	}
