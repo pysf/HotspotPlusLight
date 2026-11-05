@@ -251,7 +251,7 @@ func TestE9_09_NavAndAuth(t *testing.T) {
 		t.Fatal("no nav link to /admin/usage")
 	}
 	anon := harness.NewAdminClient(t, f.s)
-	if r := anon.Get("/admin/usage"); r.StatusCode != 302 && r.StatusCode != 303 {
+	if r := anon.GetPage("/admin/usage"); r.StatusCode != 302 && r.StatusCode != 303 {
 		t.Fatalf("anonymous /admin/usage: %d", r.StatusCode)
 	}
 }

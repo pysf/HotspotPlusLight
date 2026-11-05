@@ -51,7 +51,7 @@ func TestE10_20_PlansListAndMenu(t *testing.T) {
 	// Delete blocked: 409 with the clear message in a toast, nothing swapped.
 	r := f.c.SendHX("DELETE", "/admin/plans/"+strconv.FormatInt(used, 10), nil, planTarget)
 	ev := hxTrigger(t, r)
-	if r.StatusCode != 409 || r.Header.Get("HX-Reswap") != "none" || ev["toast"] == nil || !strings.Contains(ev["toast"].(string), "used by 1 members and cannot be deleted") {
+	if r.StatusCode != 409 || r.Header.Get("HX-Reswap") != "none" || ev["toast"] == nil || !strings.Contains(ev["toast"].(string), "used by 1 member and cannot be deleted") {
 		t.Errorf("blocked delete: %d %v", r.StatusCode, r.Header)
 	}
 	// Delete works.
@@ -59,7 +59,7 @@ func TestE10_20_PlansListAndMenu(t *testing.T) {
 	if ev := hxTrigger(t, r); r.StatusCode != 200 || ev["plans-changed"] == nil || ev["toast"] == nil || r.Header.Get("HX-Redirect") != "" {
 		t.Errorf("delete: %d %v", r.StatusCode, r.Header)
 	}
-	if r := f.c.Send("DELETE", "/admin/plans/"+strconv.FormatInt(used, 10), nil); r.StatusCode != 409 || !strings.Contains(r.Body, "used by 1 members") {
+	if r := f.c.Send("DELETE", "/admin/plans/"+strconv.FormatInt(used, 10), nil); r.StatusCode != 409 || !strings.Contains(r.Body, "used by 1 member") {
 		t.Errorf("blocked delete without target must keep its body: %d %s", r.StatusCode, r.Body)
 	}
 }
@@ -304,5 +304,20 @@ func TestE16_02_TinyBulkRejected(t *testing.T) {
 	}
 	if n := scalar[int](t, db, `SELECT count(*) FROM plan`); n != 0 {
 		t.Fatalf("tiny plan stored: %d", n)
+	}
+}
+
+// E16.12 (review B11) a plan used by members and by a batch names both counts in the refusal.
+func TestE16_12_DeletePlanInUseNamesMembersAndBatches(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	id := c.CreatePlan(harness.PlanForm("Both"))
+	c.CreateMember(harness.MemberForm(id, "solo"))
+	if r := c.Send("POST", "/admin/batches", url.Values{"plan_id": {fmt.Sprint(id)}, "count": {"2"}}); r.StatusCode != 201 {
+		t.Fatalf("create batch: %d", r.StatusCode)
+	}
+	r := c.Send("DELETE", fmt.Sprintf("/admin/plans/%d", id), nil)
+	if r.StatusCode != 409 || !strings.Contains(r.Body, "3 members") || !strings.Contains(r.Body, "1 batch") {
+		t.Fatalf("delete in use: %d %q", r.StatusCode, r.Body)
 	}
 }

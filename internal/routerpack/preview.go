@@ -24,9 +24,9 @@ var sampleVars = map[string]string{
 // It only approximates RouterOS: an unknown variable is empty. Relative links (css/, img/) are
 // served by PreviewAsset.
 func (p *Pack) Preview(key, page, errCode string) ([]byte, error) {
-	files, err := p.Files(key)
-	if err != nil {
-		return nil, err
+	files, ok := p.builtFiles(key)
+	if !ok {
+		return nil, fmt.Errorf("unknown design %q", key)
 	}
 	src, ok := files[page+".html"]
 	if !ok {
@@ -50,8 +50,8 @@ func (p *Pack) PreviewAsset(key, name string) ([]byte, string, bool) {
 	if !ok {
 		return nil, "", false
 	}
-	files, err := p.Files(key)
-	if err != nil || files[name] == nil {
+	files, ok := p.builtFiles(key)
+	if !ok || files[name] == nil {
 		return nil, "", false
 	}
 	return files[name], ct, true

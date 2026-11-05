@@ -212,3 +212,35 @@ func TestRenderTemplate(t *testing.T) {
 		}
 	}
 }
+
+// Preview and PreviewAsset read the copy made in New: same bytes as Files, not built again per call (review B10.5).
+func TestPreviewUsesTheBuiltCopy(t *testing.T) {
+	p, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range p.Designs() {
+		want, err := p.Files(d.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a, _, ok := p.PreviewAsset(d.Key, "css/"+cssName(want))
+		b, _, _ := p.PreviewAsset(d.Key, "css/"+cssName(want))
+		if !ok || !bytes.Equal(a, want["css/"+cssName(want)]) {
+			t.Fatalf("%s: preview asset differs from Files", d.Key)
+		}
+		if &a[0] != &b[0] {
+			t.Errorf("%s: the asset was built again for the second request", d.Key)
+		}
+	}
+}
+
+// cssName returns the name of one stylesheet in the files.
+func cssName(files map[string][]byte) string {
+	for n := range files {
+		if strings.HasPrefix(n, "css/") {
+			return strings.TrimPrefix(n, "css/")
+		}
+	}
+	return ""
+}

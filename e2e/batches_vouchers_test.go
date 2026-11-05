@@ -608,7 +608,7 @@ func TestE7_11_Reprint(t *testing.T) {
 		t.Errorf("POST vouchers: %d", r.StatusCode)
 	}
 	anon := harness.NewAdminClient(t, f.s)
-	if r := anon.Get(bpath(id) + "/vouchers"); r.StatusCode != 303 || r.Header.Get("Location") != "/admin/login" {
+	if r := anon.GetPage(bpath(id) + "/vouchers"); r.StatusCode != 303 || r.Header.Get("Location") != "/admin/login" {
 		t.Errorf("anonymous: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
 	if r := anon.Get("/admin/static/voucher.css"); r.StatusCode != 200 {
@@ -663,7 +663,7 @@ func TestE7_12_SingleVoucher(t *testing.T) {
 	if r := f.c.Send("PUT", mpath(solo)+"/voucher", nil); r.StatusCode != 405 {
 		t.Errorf("PUT: %d", r.StatusCode)
 	}
-	if r := harness.NewAdminClient(t, f.s).Get(mpath(solo) + "/voucher"); r.StatusCode != 303 {
+	if r := harness.NewAdminClient(t, f.s).GetPage(mpath(solo) + "/voucher"); r.StatusCode != 303 {
 		t.Errorf("anonymous: %d", r.StatusCode)
 	}
 }

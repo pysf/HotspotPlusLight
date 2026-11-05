@@ -251,15 +251,6 @@ func (s *Service) Update(ctx context.Context, id int64, f domain.MemberForm) (do
 	if len(errs) > 0 {
 		return errs, KickResult{}, nil
 	}
-	if in.Username != before.Username { // the accounting key of a session is its username
-		open, err := s.repo.OpenSessions(ctx, domain.MemberSelection{IDs: []int64{id}}, e.now)
-		if err != nil {
-			return nil, KickResult{}, err
-		}
-		if len(open) > 0 {
-			return domain.FieldErrors{"username": "This member is online: disconnect the member before renaming."}, KickResult{}, nil
-		}
-	}
 	// A past expires_at needs no kick here: session.Enforcer disconnects the member at the next Interim.
 	err = s.repo.UpdateMember(ctx, id, in, e.now)
 	if errors.Is(err, domain.ErrUsernameTaken) {
@@ -267,6 +258,9 @@ func (s *Service) Update(ctx context.Context, id int64, f domain.MemberForm) (do
 	}
 	if errors.Is(err, domain.ErrPlanGone) { // deleted between the check and the update
 		return domain.FieldErrors{"plan_id": planChoiceMsg}, KickResult{}, nil
+	}
+	if errors.Is(err, domain.ErrMemberOnline) {
+		return domain.FieldErrors{"username": "This member is online: disconnect the member before renaming."}, KickResult{}, nil
 	}
 	if err != nil {
 		return nil, KickResult{}, err
@@ -439,13 +433,14 @@ func (s *Service) Delete(ctx context.Context, sel domain.MemberSelection) (Delet
 	if err != nil {
 		return DeleteResult{}, err
 	}
-	done := map[domain.SessionTarget]bool{}
+	// Key by row id: an Interim can change the IP or MAC of a session after the first read.
+	done := map[int64]bool{}
 	for _, t := range kicked {
-		done[t] = true
+		done[t.ID] = true
 	}
 	var missed []domain.SessionTarget
 	for _, t := range deleted {
-		if !done[t] {
+		if !done[t.ID] {
 			missed = append(missed, t)
 		}
 	}

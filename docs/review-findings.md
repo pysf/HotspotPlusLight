@@ -127,26 +127,47 @@ Pieces: 1 domain + auth, 2 radius + linkstatus, 3 session + usage + member + pla
 ### B10. Admin web page problems (confirmed 1 to 4, claim 5 to 10)
 All in piece 6.
 1. **Expired session on a self-refreshing list:** `internal/web/admin/admin.go:356` and `password.go:34`. `requireSession` and `requirePasswordChanged` answer GET and HEAD with a 303 to the login page and never check `HX-Request`. The Online page polls every 10 seconds. When the session ends, the login page is swapped into the table. Fix: when `HX-Request` is set, answer 401 plus `HX-Redirect`.
+   - **Result: Fixed (2026-11-04), tests E16.08, E16.09.** An htmx GET now gets 401 + `HX-Redirect` (login) or 403 + `HX-Redirect` (password page, as before for changes); only a plain page load gets the 303. The e2e harness sends `HX-Request` on every call, so it got `GetPage` (no HX-Request) and the old 303 checks use it.
 2. **Stale list after a bulk delete:** `internal/web/admin/members.go:451`. When some Disconnects fail, the branch renders `DeletedNotice` but does not send the `membersChanged` trigger. Deleted rows stay, and clicking one gives a 404 until a reload. Fix: send the trigger in this branch too.
+   - **Result: Fixed (2026-11-04), test E16.10.** The failed-Disconnect branch sends `members-changed` when the request has an `HX-Target`.
 3. **Error messages dropped:** `internal/web/ui/ui.templ:26`. `htmxConfig` swaps only 422, 409, 429 and 502. Handlers that render `ErrorFragment` with 400, 404 or 500 are ignored by htmx. Fix: return a swappable code (usually 422) or add the codes to the config.
+   - **Result: Fixed (2026-11-04), test E16.11.** `htmxConfig` now swaps 400, 404, 409, 422, 429, 500, 502. 401 and 403 stay errors (they carry `HX-Redirect`). Full-page 404/500 for normal browser requests are not htmx, so they are unchanged. The test reads the meta tag and applies the rules like htmx.
+   - **Follow-up (2026-11-05), test E16.15:** `serverError` and `notFound` answer an htmx request whose `HX-Target` is not a list or the sheet (for example `session-list`, `flash`) with `HX-Reswap: none` and a toast, so a polled table keeps its rows on a transient error.
 4. **Generic toast covers the specific one:** `internal/web/static/js/toast.js:34`. `htmx:responseError` shows "Something went wrong." even when the response carried its own toast. Fix: skip the generic toast when `HX-Trigger` carries one.
+   - **Result: Fixed (2026-11-04), no automated test.** There is no JS test runner. `toast.js` now skips "Something went wrong." when the response's `HX-Trigger` has a toast. Not run in a browser.
+   - **Follow-up (2026-11-05), untested (no JS runner):** `toast.js` also skips the generic toast when the response has `HX-Redirect`.
 5. **Preview rebuilds on every request (efficiency):** `internal/routerpack/preview.go:53`. `Files(key)` rebuilds the messages block and CSS each time. The Router page has 8 iframes. Fix: build once per key.
+   - **Result: Fixed (2026-11-04), test `TestPreviewUsesTheBuiltCopy`.** `New` keeps the built files of each design; `Preview` and `PreviewAsset` read that read-only copy (no lock needed). `Files` still builds fresh.
 6. **Extra database reads on polling (efficiency):** `internal/web/admin/admin.go:190`. Each poll runs `Settings.Get`, `Authenticate` and `MustChangePassword`. Fix: load settings only for full-page renders.
+   - **Result: Fixed (2026-11-04), no test.** `pageEnv` skips `Settings.Get` when the request has an `HX-Target` (a fragment). The read cannot be seen from e2e (no query counter on the real store), and the business-name tests (E14.*) still pass for page loads. `Authenticate` and `MustChangePassword` stay: they are needed on every request.
 7. **Three copies of the `{id}` parse:** `pathID` (`members.go:26`), `planID` (`plans.go:32`), and an inline copy in `sessions.go:76`. Fix: use `pathID` everywhere.
+   - **Result: Fixed (2026-11-04).** `planID` removed, `sessions.go` uses `pathID`. Existing tests cover it.
 8. **`planOptions` duplicates `planFilterOptions`:** `pages.templ:211` and `members.templ:22`. Fix: call `planFilterOptions(plans, "(none)")`.
+   - **Result: Fixed (2026-11-04).** `planOptions` removed; the settings form calls `planFilterOptions(plans, "(none)")`.
 9. **Hard-coded confirm texts:** `members.templ:462-464` repeats `confirmRenew`, `confirmDisconnect` and `confirmDelete` (lines 217-220). Fix: use the constants.
+   - **Result: Fixed (2026-11-04).** The member page uses the constants.
 10. **Fragment comments break the sentence rule:** `sessions.go:85` and `ui.templ:76`. Fix: rewrite as full sentences.
+   - **Result: Fixed (2026-11-04).** Both comments are full sentences (`ui.templ:76` was the crumbs comment).
 
 ### B11. Smaller items from pieces 2, 3 and 5
 - **Rename while online (claim):** `internal/member/member.go:248-262`. The "is the member online?" check and the rename are separate steps. If the member logs in between them, the next Interim cannot find the session under the new name and inserts a second open row. Data is counted twice. Fix: do the check inside the `UpdateMember` transaction.
+  - **Result: Fixed (2026-11-04), test `TestUpdateMemberRefusesRenameWhileOnline`.** `Store.UpdateMember` checks open sessions and updates in one transaction on the write connection and returns the new `domain.ErrMemberOnline`; the service no longer pre-checks. The race itself is not tested (hard to time); the test proves the store refuses.
 - **Plan delete message (claim):** `internal/plan/plan.go:93-110`. `Delete` pre-checks only `CountMembersOnPlan`. With members and batches it returns `InUseError{Members: n}` without the batch count. Fix: let the store's `DeletePlan` decide.
+  - **Result: Fixed (2026-11-04), test E16.12.** `plan.Service.Delete` no longer pre-counts members; `DeletePlan` returns both counts and the page names both.
 - **Bulk delete keyed by IP and MAC (claim):** `internal/member/member.go:433-440`. The `done` set is keyed by the whole `SessionTarget`, including mutable `FramedIP` and MAC. If an Interim changes either, the session is counted as missed and gets a second Disconnect. Fix: key by target ID.
+  - **Result: Fixed (2026-11-04), test `TestDeleteDoesNotKickTwiceWhenTheSessionChanged`.** `done` is keyed by session row id.
 - **Missing member in the Enforcer (claim):** `internal/session/enforcer.go:229`. A member deleted before the worker runs returns `ErrNotFound`, which is logged as an ERROR. Fix: treat it as nothing to do. The same for a missing plan.
+  - **Result: Fixed (2026-11-04), test `TestEnforcerDeletedMemberOrPlanIsQuiet`.** `domain.ErrNotFound` from member or plan is not logged.
 - **Settings read per packet (claim):** `internal/session/session.go:197`. Every accounting packet reads the whole settings row just for the time zone, and the Enforcer reads it again on each Interim. About 330 extra reads per second at the 20,000-user load. Fix: cache it, or read it inside the open transaction.
+  - **Result: Fixed (2026-11-04), test `TestAccountReadsTimeZoneInsideTheTransaction`.** The time zone is read inside the accounting transaction (`AcctTx.Settings`), only when a day row is written, so no cache is needed and a saved change counts at once (E9.02 still passes). The Enforcer reads settings only on the retry path, so it was not changed.
 - **Key check skipped in a race (confirmed trigger, body not read):** `internal/app/app.go:148-165` (piece 5). When `IsFirstBoot` is true only `seed` runs. If another process created the row, this process runs with a key that may not match. Fix: run `VerifyKeyCheck` after `seed` when it did not seed.
+  - **Result: Fixed (2026-11-04), test `TestLostFirstBootRaceStillChecksTheKey`.** `seed` returns whether it seeded; if not, the key check runs. The test calls `initKey` twice with different keys to simulate the lost race.
 - **Trailing space in a piped password on Windows (confirmed):** `cmd/hotspotpluslight/main.go:116` (piece 5). Only `\r\n` is trimmed. `echo pw | hotspotpluslight admin set-password` in cmd sends `pw \r\n`, so the stored password has a trailing space. Fix: document it, or read from a prompt or file.
+  - **Result: Fixed by warning (2026-11-04), test E16.13.** Trimming is unsafe because a password may end in a space. The password is kept as typed and the CLI prints a note to stderr with the cmd workaround. The site pages were not changed.
 - **`set-password` on an old database (claim):** `internal/app/app.go` around line 355. It does not migrate first. On a database from before 0003 it fails with a raw "no such column must_change_password" error. Fix: show a clear hint to run `serve` first, or migrate.
+  - **Result: Fixed (2026-11-04), test E16.14.** A "no such column/table" error now says to run `hotspotpluslight serve` once.
 - **`OpenSessions` on the write connection (claim):** `internal/store/members.go:338` (piece 4). It runs on the write connection outside a transaction. The read pool also sees committed WAL data, so a bulk kick holds the writer for no reason. Fix: use the read pool and correct the comment.
+  - **Result: Fixed (2026-11-04), test `TestOpenSessionsSeesEveryCommit`** (a guard: it also passes on the old code). The read pool sees every commit made before the call in WAL mode, so the kick misses nothing. Comment corrected.
 
 ### B12. Cleanups (not bugs)
 - `internal/linkstatus/linkstatus.go:28`: the `Event.Detail` comment is stale. Disconnect also records "NAK (session not found)" and "NAK (Error-Cause N)".

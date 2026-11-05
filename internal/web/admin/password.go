@@ -15,7 +15,7 @@ const passwordHome = "/admin/password"
 
 // requirePasswordChanged sends the admin to the password page while the first-start
 // password (admin/admin) is still in use. Only the password page and logout stay open.
-// A page request is redirected (303); a change request (htmx) gets HX-Redirect and 403.
+// A page load is redirected (303); any htmx request gets HX-Redirect and 403.
 func (h handlers) requirePasswordChanged(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == passwordHome || r.URL.Path == "/admin/logout" {
@@ -31,7 +31,7 @@ func (h handlers) requirePasswordChanged(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		if isPageRequest(r) {
 			http.Redirect(w, r, passwordHome, http.StatusSeeOther)
 			return
 		}

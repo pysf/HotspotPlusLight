@@ -25,6 +25,8 @@ type fakeRepo struct {
 	planGone bool // the write fails as if the plan was deleted after the check
 	deleted  []domain.MemberSelection
 	late     []domain.SessionTarget // sessions that appear after the kick step, seen inside the delete transaction
+	// changeAtDelete, when set, edits each session as the delete transaction sees it (an Interim moved the IP).
+	changeAtDelete func(*domain.SessionTarget)
 }
 
 func newRepo() *fakeRepo {
@@ -80,6 +82,9 @@ func (f *fakeRepo) UpdateMember(_ context.Context, id int64, in domain.MemberInp
 		return domain.ErrPlanGone
 	}
 	m := f.members[id]
+	if m.Username != in.Username && len(f.sessions) > 0 { // the store refuses a rename while online
+		return domain.ErrMemberOnline
+	}
 	m.Username, m.Active, m.PlanID = in.Username, in.Active, in.PlanID
 	f.members[id] = m
 	return nil
@@ -138,7 +143,13 @@ func (f *fakeRepo) OpenSessions(context.Context, domain.MemberSelection, time.Ti
 
 func (f *fakeRepo) DeleteMembers(_ context.Context, sel domain.MemberSelection, _ time.Time) (int, []domain.SessionTarget, error) {
 	f.deleted = append(f.deleted, sel)
-	return len(sel.IDs), append(append([]domain.SessionTarget(nil), f.sessions...), f.late...), nil
+	out := append(append([]domain.SessionTarget(nil), f.sessions...), f.late...)
+	if f.changeAtDelete != nil {
+		for i := range out {
+			f.changeAtDelete(&out[i])
+		}
+	}
+	return len(sel.IDs), out, nil
 }
 
 func (f *fakeRepo) GetPlan(_ context.Context, id int64) (domain.Plan, error) {
@@ -314,6 +325,18 @@ func TestDeleteKicksSessionsThatAppearBeforeTheTransaction(t *testing.T) {
 	res, err := s.Delete(context.Background(), domain.MemberSelection{IDs: []int64{1}})
 	if err != nil || len(d.calls) != 1 || d.calls[0].AcctSessionID != "late" || res.Kick.Attempted != 1 {
 		t.Fatalf("%+v %v %+v", res, err, d.calls)
+	}
+}
+
+// A session whose IP or MAC changed between the kick read and the delete is the same session (review B11): it gets one Disconnect.
+func TestDeleteDoesNotKickTwiceWhenTheSessionChanged(t *testing.T) {
+	s, r, d := setup()
+	r.sessions = []domain.SessionTarget{{ID: 5, Username: "a", AcctSessionID: "1", FramedIP: "10.0.0.2", MAC: "AA:BB:CC:DD:EE:01"}}
+	r.late = []domain.SessionTarget{{ID: 6, Username: "a", AcctSessionID: "2"}}
+	r.changeAtDelete = func(t *domain.SessionTarget) { t.FramedIP, t.MAC = "10.0.0.9", "AA:BB:CC:DD:EE:02" }
+	res, err := s.Delete(context.Background(), domain.MemberSelection{IDs: []int64{1}})
+	if err != nil || len(d.calls) != 2 || res.Kick.Attempted != 2 {
+		t.Fatalf("%+v %v %d calls", res, err, len(d.calls))
 	}
 }
 

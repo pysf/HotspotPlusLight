@@ -31,5 +31,11 @@ document.addEventListener("click", (e) => {
   if (btn) { show(btn.getAttribute("data-toast")); }
 });
 
-document.body.addEventListener("htmx:responseError", () => show("Something went wrong."));
+// An error response that carried its own toast in HX-Trigger keeps that text.
+document.body.addEventListener("htmx:responseError", (e) => {
+  const xhr = e.detail.xhr;
+  const trigger = (xhr && xhr.getResponseHeader("HX-Trigger")) || "";
+  const redirecting = xhr && xhr.getResponseHeader("HX-Redirect"); // 401/403: the page is leaving
+  if (!redirecting && !trigger.includes('"toast"')) { show("Something went wrong."); }
+});
 document.body.addEventListener("htmx:sendError", () => show("Cannot reach the server."));

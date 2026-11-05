@@ -1753,15 +1753,15 @@ func MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) templ.Component 
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = ui.ConfirmAction("Disconnect", "post", memberURL(m.ID)+"/disconnections", "Disconnect all open sessions of this member?").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.ConfirmAction("Disconnect", "post", memberURL(m.ID)+"/disconnections", confirmDisconnect).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = ui.ConfirmAction("Renew now", "post", memberURL(m.ID)+"/renewals", "Restart this member's validity window? Used data, time and extra data are cleared.").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.ConfirmAction("Renew now", "post", memberURL(m.ID)+"/renewals", confirmRenew).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = ui.ConfirmDelete("Delete member", memberURL(m.ID), "Delete this member? Open sessions are disconnected first.").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.ConfirmDelete("Delete member", memberURL(m.ID), confirmDelete).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

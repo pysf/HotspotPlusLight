@@ -32,6 +32,11 @@ func (s *Store) InAcctTx(ctx context.Context, fn func(tx *AcctTx) error) error {
 	return tx.Commit()
 }
 
+// Settings returns the settings row, read inside the transaction.
+func (t *AcctTx) Settings(ctx context.Context) (domain.Settings, error) {
+	return scanSettings(t.tx.QueryRowContext(ctx, settingsSelect))
+}
+
 // MemberByUsername returns the member, or domain.ErrNotFound.
 func (t *AcctTx) MemberByUsername(ctx context.Context, username string) (domain.Member, error) {
 	m, err := scanMember(t.tx.QueryRowContext(ctx, `SELECT `+memberCols+` FROM member m WHERE m.username = ?`, username), nil)

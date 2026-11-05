@@ -459,9 +459,9 @@ templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 			<div class="l-section">
 				@ui.Actions() {
 					@ui.LinkButton("secondary", memberURL(m.ID)+"/voucher", "Print voucher", templ.Attributes{"target": "_blank", "rel": "noopener"})
-					@ui.ConfirmAction("Disconnect", "post", memberURL(m.ID)+"/disconnections", "Disconnect all open sessions of this member?")
-					@ui.ConfirmAction("Renew now", "post", memberURL(m.ID)+"/renewals", "Restart this member's validity window? Used data, time and extra data are cleared.")
-					@ui.ConfirmDelete("Delete member", memberURL(m.ID), "Delete this member? Open sessions are disconnected first.")
+					@ui.ConfirmAction("Disconnect", "post", memberURL(m.ID)+"/disconnections", confirmDisconnect)
+					@ui.ConfirmAction("Renew now", "post", memberURL(m.ID)+"/renewals", confirmRenew)
+					@ui.ConfirmDelete("Delete member", memberURL(m.ID), confirmDelete)
 				}
 			</div>
 		</div>

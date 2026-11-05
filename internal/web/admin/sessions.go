@@ -11,7 +11,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/a-h/templ"
-	"github.com/go-chi/chi/v5"
 
 	"hotspotpluslight/internal/domain"
 	"hotspotpluslight/internal/session"
@@ -73,8 +72,8 @@ func (h handlers) sessionsTable(w http.ResponseWriter, r *http.Request) {
 
 // sessionKick disconnects one session (BR-18).
 func (h handlers) sessionKick(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil || id <= 0 {
+	id, ok := pathID(r)
+	if !ok {
 		h.notFound(w, r, "Session")
 		return
 	}
@@ -82,7 +81,7 @@ func (h handlers) sessionKick(w http.ResponseWriter, r *http.Request) {
 		h.kickFailed(w, r, err)
 		return
 	}
-	// Back to the page the admin was on (the row button carries page and per).
+	// The row button carries page and per, so the admin returns to the page they were on.
 	to := sessionsHome
 	if q := r.URL.Query(); q.Get("page") != "" || q.Get("per") != "" {
 		to = sessionsHref(atoi(q.Get("per")))(atoi(q.Get("page")))

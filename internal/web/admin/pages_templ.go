@@ -805,15 +805,6 @@ func SettingsPage(l ui.LayoutData, p SettingsProps) templ.Component {
 	})
 }
 
-// planOptions returns the select options for the default plan, with a first entry for none.
-func planOptions(plans []domain.Plan) []ui.Option {
-	o := []ui.Option{{Value: "", Label: "(none)"}}
-	for _, p := range plans {
-		o = append(o, ui.Option{Value: strconv.FormatInt(p.ID, 10), Label: p.Name})
-	}
-	return o
-}
-
 // SettingsFormView is the settings form and the PUT response body: 200 with a flash, or 422 with field errors.
 func SettingsFormView(p SettingsProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -896,7 +887,7 @@ func SettingsFormView(p SettingsProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Select(ui.SelectProps{Label: "Default plan", Name: "default_plan_id", Value: p.Form.DefaultPlanID, Options: planOptions(p.Plans), Error: p.Errors["default_plan_id"], Hint: "Preselected on the new-member form; nothing is assigned silently."}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Select(ui.SelectProps{Label: "Default plan", Name: "default_plan_id", Value: p.Form.DefaultPlanID, Options: planFilterOptions(p.Plans, "(none)"), Error: p.Errors["default_plan_id"], Hint: "Preselected on the new-member form; nothing is assigned silently."}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

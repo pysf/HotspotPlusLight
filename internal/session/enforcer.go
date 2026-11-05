@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -225,7 +226,8 @@ func (e *Enforcer) interval(ctx context.Context) time.Duration {
 // session must be disconnected.
 func (e *Enforcer) decide(ctx context.Context, j job) (domain.Reason, Target, bool) {
 	fail := func(err error) (domain.Reason, Target, bool) {
-		if ctx.Err() == nil {
+		// A member or plan deleted before the worker ran leaves nothing to enforce.
+		if ctx.Err() == nil && !errors.Is(err, domain.ErrNotFound) {
 			e.log.Error("enforcement check failed", "username", j.key.username, "err", err)
 		}
 		return "", Target{}, false

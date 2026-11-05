@@ -93,9 +93,31 @@ func (s *Store) GetMember(ctx context.Context, id int64) (domain.Member, error) 
 }
 
 // UpdateMember changes the editable fields only; window, counters and extra bulk stay (BR-13a).
-// It returns domain.ErrNotFound, domain.ErrUsernameTaken or domain.ErrPlanGone.
+// A member with an open session cannot get a new username, because the session is found by it;
+// the check and the update are one transaction. It returns domain.ErrNotFound,
+// domain.ErrUsernameTaken, domain.ErrPlanGone or domain.ErrMemberOnline.
 func (s *Store) UpdateMember(ctx context.Context, id int64, in domain.MemberInput, now time.Time) error {
-	res, err := s.db.ExecContext(ctx, `UPDATE member SET username=?, active=?, first_name=?, last_name=?, mobile=?, email=?, national_code=?,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var old string
+	if err := tx.QueryRowContext(ctx, `SELECT username FROM member WHERE id=?`, id).Scan(&old); errors.Is(err, sql.ErrNoRows) {
+		return domain.ErrNotFound
+	} else if err != nil {
+		return err
+	}
+	if old != in.Username {
+		var open int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM session WHERE member_id=? AND ended_at IS NULL`, id).Scan(&open); err != nil {
+			return err
+		}
+		if open > 0 {
+			return domain.ErrMemberOnline
+		}
+	}
+	res, err := tx.ExecContext(ctx, `UPDATE member SET username=?, active=?, first_name=?, last_name=?, mobile=?, email=?, national_code=?,
 		mac=?, plan_id=?, expires_at=?, updated_at=? WHERE id=?`,
 		in.Username, boolInt(in.Active), in.FirstName, in.LastName, in.Mobile, in.Email, in.NationalCode,
 		in.MAC, in.PlanID, optUnix(in.ExpiresAt), now.Unix(), id)
@@ -108,7 +130,10 @@ func (s *Store) UpdateMember(ctx context.Context, id int64, in domain.MemberInpu
 	if err != nil {
 		return err
 	}
-	return affected(res)
+	if err := affected(res); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // SetMemberActive changes only the active flag. It returns domain.ErrNotFound for an unknown member.
@@ -315,12 +340,12 @@ func (s *Store) SelectionStats(ctx context.Context, sel domain.MemberSelection, 
 	return
 }
 
-// OpenSessions returns the open sessions of the selected members. It reads on the write
-// connection, because a kick must see every commit made before it. The display counts
-// use the read pool, where a tiny mismatch is fine.
+// OpenSessions returns the open sessions of the selected members. It reads from the read pool,
+// which sees every transaction committed before the call (WAL), so a kick misses no session;
+// this keeps the single write connection free for accounting.
 func (s *Store) OpenSessions(ctx context.Context, sel domain.MemberSelection, now time.Time) ([]domain.SessionTarget, error) {
 	where, args := selectionClause(sel, now)
-	return openSessions(ctx, s.db, where, args)
+	return openSessions(ctx, s.r, where, args)
 }
 
 // querier is what openSessions needs from a *sql.DB or a *sql.Tx.

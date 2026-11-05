@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,12 +15,15 @@ import (
 )
 
 type enfRepo struct {
-	member domain.Member
-	plan   domain.Plan
+	member             domain.Member
+	plan               domain.Plan
+	memberErr, planErr error
 }
 
-func (r *enfRepo) GetMember(context.Context, int64) (domain.Member, error) { return r.member, nil }
-func (r *enfRepo) GetPlan(context.Context, int64) (domain.Plan, error)     { return r.plan, nil }
+func (r *enfRepo) GetMember(context.Context, int64) (domain.Member, error) {
+	return r.member, r.memberErr
+}
+func (r *enfRepo) GetPlan(context.Context, int64) (domain.Plan, error) { return r.plan, r.planErr }
 func (r *enfRepo) GetSettings(context.Context) (domain.Settings, error) {
 	return domain.Settings{AccountingIntervalSeconds: 60}, nil
 }
@@ -161,4 +165,36 @@ func TestEnforcerStopTwice(t *testing.T) {
 	e.Start(&enfEnder{})
 	e.Stop()
 	e.Stop()
+}
+
+// logBuf is a log sink that is safe to read while a worker may still write.
+type logBuf struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (l *logBuf) Write(p []byte) (int, error) { l.mu.Lock(); defer l.mu.Unlock(); return l.b.Write(p) }
+func (l *logBuf) String() string              { l.mu.Lock(); defer l.mu.Unlock(); return l.b.String() }
+
+// A member or plan deleted before the worker runs is nothing to do, not an error (review B11).
+func TestEnforcerDeletedMemberOrPlanIsQuiet(t *testing.T) {
+	for name, repo := range map[string]*enfRepo{
+		"member": {memberErr: domain.ErrNotFound},
+		"plan":   {member: domain.Member{ID: 1, Active: true, SubscriptionDate: t0}, planErr: domain.ErrNotFound},
+		"broken": {memberErr: errors.New("disk I/O error")},
+	} {
+		logs := &logBuf{}
+		end := &enfEnder{}
+		e := NewEnforcer(repo, clock.NewFake(t0), slog.New(slog.NewTextHandler(logs, nil)))
+		e.Start(end)
+		e.Check(1, "alice", "s1", "10.0.0.1")
+		settle(t, e)
+		e.Stop()
+		if end.count() != 0 {
+			t.Errorf("%s: disconnected", name)
+		}
+		if got := strings.Contains(logs.String(), "level=ERROR"); got != (name == "broken") {
+			t.Errorf("%s: ERROR logged = %v, log: %s", name, got, logs.String())
+		}
+	}
 }

@@ -25,6 +25,8 @@ type AcctTx interface {
 	AddUsage(ctx context.Context, memberID int64, d domain.Counters, now time.Time) error
 	// AddDailyUsage adds the same delta to the member's row of the given day (D12).
 	AddDailyUsage(ctx context.Context, memberID int64, day string, d domain.Counters) error
+	// Settings reads the settings row inside the transaction, so a saved change counts at once.
+	Settings(ctx context.Context) (domain.Settings, error)
 }
 
 // Repo is what the Service needs from storage (implemented by store).
@@ -194,19 +196,9 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 		s.log.Warn("unparsable Calling-Station-Id in accounting; stored without MAC", "session", rec.SessionID, "value", raw)
 	}
 	rec.MAC = mac
-	st, err := s.repo.GetSettings(ctx)
-	if err != nil {
-		return err
-	}
-	loc, err := st.Location()
-	if err != nil { // usage history must never block quota accounting
-		s.log.Warn("invalid settings timezone; booking usage history in UTC", "err", err)
-		loc = time.UTC
-	}
-	day := domain.DayKey(now, loc)
 	var check *domain.Session // checked by the Enforcer after the commit
 	var checkMember int64
-	err = s.repo.InAcctTx(ctx, func(tx AcctTx) error {
+	err := s.repo.InAcctTx(ctx, func(tx AcctTx) error {
 		check = nil
 		m, err := tx.MemberByUsername(ctx, rec.Username)
 		if errors.Is(err, domain.ErrNotFound) {
@@ -240,6 +232,10 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 				if err := tx.AddUsage(ctx, m.ID, res.Delta, now); err != nil {
 					return err
 				}
+				day, err := s.dayKey(ctx, tx, now)
+				if err != nil {
+					return err
+				}
 				if err := tx.AddDailyUsage(ctx, m.ID, day, res.Delta); err != nil {
 					return err
 				}
@@ -263,6 +259,21 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 		s.enforcer.Check(checkMember, check.Username, check.AcctSessionID, check.NASIP)
 	}
 	return err
+}
+
+// dayKey returns the usage day of now in the time zone of the settings, read inside tx.
+// An invalid time zone books the day in UTC, because usage history must never block quota accounting.
+func (s *Service) dayKey(ctx context.Context, tx AcctTx, now time.Time) (string, error) {
+	st, err := tx.Settings(ctx)
+	if err != nil {
+		return "", err
+	}
+	loc, err := st.Location()
+	if err != nil {
+		s.log.Warn("invalid settings timezone; booking usage history in UTC", "err", err)
+		loc = time.UTC
+	}
+	return domain.DayKey(now, loc), nil
 }
 
 // Prune deletes sessions older than settings.session_retention_days (O18) and

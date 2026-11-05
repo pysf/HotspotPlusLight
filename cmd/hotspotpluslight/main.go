@@ -115,6 +115,10 @@ func setPassword(args []string, stdin io.Reader, stderr io.Writer, getenv func(s
 			return errors.New("no password on stdin")
 		}
 		pw = strings.TrimRight(line, "\r\n")
+		// A password may end in a space, so it is kept; but "echo pw | ..." in Windows cmd adds one by mistake.
+		if strings.HasSuffix(pw, " ") {
+			fmt.Fprintln(stderr, "Note: the password read from stdin ends with a space, and it was kept. In Windows cmd, \"echo pw | ...\" adds that space: write \"echo pw| ...\" without a space before the pipe, or type the password at the prompt.")
+		}
 	}
 	if err := app.SetAdminPassword(context.Background(), app.Options{Getenv: getenv}, pw); err != nil {
 		return err

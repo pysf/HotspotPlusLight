@@ -13,6 +13,8 @@ var (
 	ErrNotFound  = errors.New("not found")
 	ErrNameTaken = errors.New("name already taken")
 	ErrDefault   = errors.New("plan is the default plan")
+	// ErrMemberOnline means a member with an open session cannot be renamed: the session is found by its username.
+	ErrMemberOnline = errors.New("member is online")
 )
 
 // InUseError is returned when a plan cannot be deleted because members use it (O12).

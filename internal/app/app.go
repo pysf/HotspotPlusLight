@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -144,21 +145,8 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return fail(err)
 	}
-	if first {
-		if err := a.seed(ctx, box, opts); err != nil {
-			return fail(err)
-		}
-	} else {
-		kc, found, err := st.KeyCheck(ctx)
-		if err != nil {
-			return fail(err)
-		}
-		if !found {
-			return fail(errors.New("settings.key_check is empty: database is not usable with this version"))
-		}
-		if err := box.VerifyKeyCheck(kc); err != nil {
-			return fail(err)
-		}
+	if err := a.initKey(ctx, box, first, opts); err != nil {
+		return fail(err)
 	}
 
 	link := linkstatus.New(opts.Clock)
@@ -220,21 +208,41 @@ func (r sessionRepo) InAcctTx(ctx context.Context, fn func(session.AcctTx) error
 	return r.Store.InAcctTx(ctx, func(tx *store.AcctTx) error { return fn(tx) })
 }
 
-// seed creates the first-boot data (O15, BR-21): the admin account with the
-// password "admin" and the must-change flag (BR-20), and the RADIUS shared secret. The stdout block says so.
-func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
-	hash, err := auth.HashPassword("admin")
+// initKey seeds a new database, or checks that the key matches an existing one.
+func (a *App) initKey(ctx context.Context, box *secret.Box, first bool, opts Options) error {
+	if first {
+		seeded, err := a.seed(ctx, box, opts)
+		if err != nil || seeded {
+			return err
+		}
+		// Another process seeded first, with a key that may differ from ours.
+	}
+	kc, found, err := a.store.KeyCheck(ctx)
 	if err != nil {
 		return err
 	}
+	if !found {
+		return errors.New("settings.key_check is empty: database is not usable with this version")
+	}
+	return box.VerifyKeyCheck(kc)
+}
+
+// seed creates the first-boot data (O15, BR-21): the admin account with the
+// password "admin" and the must-change flag (BR-20), and the RADIUS shared secret. The stdout block says so.
+// It returns false when another process had already seeded the database.
+func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) (bool, error) {
+	hash, err := auth.HashPassword("admin")
+	if err != nil {
+		return false, err
+	}
 	kc, err := box.KeyCheck()
 	if err != nil {
-		return err
+		return false, err
 	}
 	radiusSecret := a.cfg.RadiusSharedSecret
 	if radiusSecret == "" {
 		if radiusSecret, err = auth.GeneratePassword(24); err != nil {
-			return err
+			return false, err
 		}
 	}
 	seeded, err := a.store.FirstBoot(ctx, store.SeedInput{
@@ -246,15 +254,15 @@ func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
 		Now:                opts.Clock.Now(),
 	})
 	if err != nil {
-		return fmt.Errorf("first-boot seeding: %w", err)
+		return false, fmt.Errorf("first-boot seeding: %w", err)
 	}
 	if !seeded {
-		return nil
+		return false, nil
 	}
 	fmt.Fprintf(opts.Stdout, "=== HotspotPlus Lite first start ===\nLog in with username: %s  password: admin\nYou will be asked to set a new password right after you log in.\nForgot it later? Run: hotspotpluslight admin set-password\n====================================\n",
 		a.cfg.AdminUsername)
 	a.log.Info("admin account created with the default password; it must be changed at first login")
-	return nil
+	return true, nil
 }
 
 // Start binds the admin HTTP socket and the two RADIUS sockets, and begins serving.
@@ -398,6 +406,10 @@ func SetAdminPassword(ctx context.Context, opts Options, password string) error 
 	err = auth.New(st, opts.Clock).SetAdminPassword(ctx, password)
 	if errors.Is(err, domain.ErrNotFound) {
 		return errors.New("the database has no admin account yet: run `hotspotpluslight serve` once")
+	}
+	// This command does not migrate, so a database from an older version lacks newer columns.
+	if err != nil && (strings.Contains(err.Error(), "no such column") || strings.Contains(err.Error(), "no such table")) {
+		return errors.New("the database is from an older version: run `hotspotpluslight serve` once to update it")
 	}
 	return err
 }

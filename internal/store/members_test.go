@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -210,5 +211,54 @@ func TestForeignKeyFailuresBecomePlanGone(t *testing.T) {
 	st.DefaultPlanID = &gone
 	if err := s.UpdateSettings(ctx, st, fixed()); !errors.Is(err, domain.ErrPlanGone) {
 		t.Errorf("UpdateSettings: %v", err)
+	}
+}
+
+// The online check and the rename are one transaction (review B11): UpdateMember itself refuses to
+// rename a member who has an open session, and still allows other edits and an ended session.
+func TestUpdateMemberRefusesRenameWhileOnline(t *testing.T) {
+	s := seeded(t)
+	ctx := context.Background()
+	p, _ := s.CreatePlan(ctx, samplePlan("P"), fixed())
+	id := addMember(t, s, "alice", p, nil)
+	s.db.Exec(`INSERT INTO session(member_id,username,acct_session_id,nas_ip,status,started_at,last_update_at) VALUES (?, 'alice','s1','10.0.0.1',1,?,?)`, id, fixed().Unix(), fixed().Unix())
+	in := domain.MemberInput{Username: "bob", PlanID: p, Active: true}
+	if err := s.UpdateMember(ctx, id, in, fixed()); !errors.Is(err, domain.ErrMemberOnline) {
+		t.Fatalf("rename while online: %v", err)
+	}
+	if m, _ := s.GetMember(ctx, id); m.Username != "alice" {
+		t.Fatalf("the name changed: %q", m.Username)
+	}
+	in.Username = "alice" // the same name is not a rename
+	in.FirstName = "Ann"
+	if err := s.UpdateMember(ctx, id, in, fixed()); err != nil {
+		t.Fatalf("edit while online: %v", err)
+	}
+	s.db.Exec(`UPDATE session SET ended_at=?`, fixed().Unix())
+	in.Username = "bob"
+	if err := s.UpdateMember(ctx, id, in, fixed()); err != nil {
+		t.Fatalf("rename after the session ended: %v", err)
+	}
+	if err := s.UpdateMember(ctx, 999, in, fixed()); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("unknown member: %v", err)
+	}
+}
+
+// OpenSessions reads from the read pool but sees every session committed before the call (review B11).
+func TestOpenSessionsSeesEveryCommit(t *testing.T) {
+	s := seeded(t)
+	ctx := context.Background()
+	p, _ := s.CreatePlan(ctx, samplePlan("P"), fixed())
+	id := addMember(t, s, "alice", p, nil)
+	for i := 1; i <= 100; i++ {
+		if err := s.InAcctTx(ctx, func(tx *AcctTx) error {
+			return tx.InsertSession(ctx, domain.Session{MemberID: id, Username: "alice", AcctSessionID: "s" + strconv.Itoa(i), NASIP: "10.0.0.1", Status: domain.AcctStart, StartedAt: fixed(), LastUpdateAt: fixed()})
+		}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.OpenSessions(ctx, domain.MemberSelection{IDs: []int64{id}}, fixed())
+		if err != nil || len(got) != i {
+			t.Fatalf("after commit %d the kick sees %d sessions (%v)", i, len(got), err)
+		}
 	}
 }

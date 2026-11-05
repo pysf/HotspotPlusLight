@@ -449,6 +449,10 @@ func (h handlers) memberBulkDelete(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		h.serverError(w, r, err)
 	case res.Kick.Failed > 0:
+		// The members are gone even though a Disconnect failed, so the list must refresh too.
+		if hxTarget(r) != "" {
+			setTrigger(w, map[string]any{membersChanged: true})
+		}
 		h.render(w, r, http.StatusOK, DeletedNotice(res, membersHome, "Back to members"))
 	case hxTarget(r) != "": // from the page: refresh the list, chips and pager; the empty body clears the confirm box
 		setTrigger(w, map[string]any{membersChanged: true, "toast": "Members deleted."})
