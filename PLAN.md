@@ -683,6 +683,8 @@ All E2E tests green on a clean checkout with no external services; hardware chec
 13. (Phase 12b) `api.json` is served and valid JSON for a logged-in and a logged-out client (RFC 8908), and `errors.txt` messages appear for router-side errors.
 14. (Phase 12b) The new pages look right and work in the phone captive-portal mini browsers (no external requests; `backdrop-filter`, `color-mix`, `100dvh` on old iOS).
 15. (Phase 15) RouterOS accepts replies that carry Message-Authenticator as the first attribute (Access-Accept, Access-Reject, and Disconnect requests on port 3799), and `require-message-auth=yes` on the router works with this server.
+16. (2026-11-07, verified on RouterOS 6.49.23, hAP 951Ui-2nD) A server on the hotspot network is an unauthenticated guest: its replies are ignored and logins fail with "RADIUS server is not responding", although a capture shows correct replies (source, ports, Response Authenticator and Message-Authenticator all valid). Fixed on the router (hotspot rules). The docs only name it as a common issue.
+17. (2026-11-07, verified on RouterOS 6.49.23) Disconnect goes to the source address of the session's accounting packets (BR-18). When the router had talked from its uplink address (ether1, DHCP), the default input rule "drop all not coming from LAN" dropped the request and the panel showed "no answer"; with that rule disabled the Disconnect was ACKed. Keep the router talking from its LAN address. Each Disconnect is now logged (`disconnect`, with the outcome). The docs name this only as a common issue.
 10. (informational) `Acct-Session-Id` reuse after reboot is an accepted risk.
 
 ---

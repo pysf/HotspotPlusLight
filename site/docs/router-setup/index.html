@@ -75,6 +75,7 @@
 <section><h2 id="firewall"><a href="#firewall">Firewall</a></h2>
 <p>These ports must be open. HotspotPlus Lite never talks to members, only to the router and to you:</p>
 <div class="tbl" tabindex="0" role="region" aria-label="Firewall rules"><table><thead><tr><th scope="col">Where</th><th scope="col">Rule</th></tr></thead><tbody><tr><td>On the server, from the router</td><td>UDP 1812 (login) and UDP 1813 (accounting), inbound.</td></tr><tr><td>On the server, from your computer</td><td>TCP 8081 (admin panel), inbound. Do not allow it from the hotspot network.</td></tr><tr><td>On the router, from the server</td><td>UDP 3799 (Disconnect), inbound. The router must accept it, and <code>/radius incoming set accept=yes port=3799</code> turns the listener on.</td></tr></tbody></table></div>
+<p><strong>Common issue:</strong> if the server is on the hotspot network (for example on the same bridge as your members), the router may treat it as an unauthenticated guest and ignore its replies. Logins then fail with <em>RADIUS server is not responding</em>, although the server answers. Check the hotspot and firewall rules on your router. The same applies to Disconnect: the server sends it to the address the router used for accounting, and the default firewall of the router drops traffic that arrives from its uplink.</p>
 <p>On Linux with ufw, for example (replace the addresses):</p>
 <pre><code>sudo ufw allow from ROUTER-IP to any port 1812 proto udp
 sudo ufw allow from ROUTER-IP to any port 1813 proto udp
