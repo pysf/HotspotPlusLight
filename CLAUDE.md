@@ -33,7 +33,7 @@ If `PLAN.md` and this file disagree, `PLAN.md` wins; fix this file.
 All open decisions are resolved except the hardware items (VERIFY-ON-HARDWARE). See `PLAN.md` §3 for the full list.
 
 ## Current status
-All phases 0–15 are done and committed. The project is feature-complete. The only remaining work is hardware validation — see `PLAN.md` §13 for the checklist. Per-phase notes are in `docs/phaseN-notes.md` and in git history.
+Phases 0–16 are done and committed. Phases 17–19 are planned (the dashboard home page, `PLAN.md` D25–D28, BR-25–BR-30, §11). Hardware validation is still open — see `PLAN.md` §13 for the checklist. Per-phase notes are in `docs/phaseN-notes.md` and in git history.
 
 ## How we work here
 00. **Simple language.** Short sentences, plain words. No jargon. This applies to chat, docs, comments, and commit messages.
