@@ -98,8 +98,14 @@ sequenceDiagram
     A->>S: log in as admin / admin
     S-->>A: redirect to /admin/password
     A->>S: set a new password
-    S-->>A: flag cleared, admin panel opens
+    S-->>A: flag cleared, admin panel opens on the Dashboard (/admin)
 ```
+
+### Dashboard
+
+The admin home page (`/admin`) shows three tiles (online now with today's peak, traffic today, failed logins today), the router status panel (last login request, accounting packet and Disconnect; moved here from the Router page), a short Needs attention list (members expiring in 7 days, members at 80% of their data) and three charts (traffic for 14 days, busy hours, active members per day). Only the online tile and the router status refresh by themselves.
+
+**Failed logins** are counted per day and reason code, one count for every Access-Reject the server sends. No user names and no addresses are stored. A router retry of the same request counts once. Packets the server does not answer (for example a wrong shared secret) are not counted here; the router status panel counts those. The counts are kept for the *session retention* days of the Settings page (90 by default, 0 = forever) and deleted with the old sessions. See the site page "Dashboard" for what each number means.
 
 ## Package map
 
@@ -107,14 +113,15 @@ sequenceDiagram
 |---|---|
 | `cmd/hotspotpluslight` | the binary: `serve`, `admin set-password`, `gen-key`, `service` (Windows), `version`; `--env-file` |
 | `internal/app` | the only place that wires everything together (listeners, services, shutdown) |
-| `internal/domain` | pure business rules (BR-1...BR-24): login verdict, quota, units, MAC, forms. No I/O, no clock |
+| `internal/domain` | pure business rules (BR-1...BR-30): login verdict, quota, units, MAC, forms. No I/O, no clock |
 | `internal/auth` | admin sessions, login throttle, the login evaluator used by RADIUS |
 | `internal/member`, `internal/plan`, `internal/voucher` | member, plan and batch voucher services |
 | `internal/session` | online sessions, kick, and the Enforcer (server-side Disconnect) |
 | `internal/usage` | usage summary and daily history |
 | `internal/radius` | RADIUS auth and accounting server, Disconnect client (`layeh.com/radius`) |
 | `internal/routerpack` | the 8 hotspot folder downloads, the RouterOS setup script, built into the binary |
-| `internal/linkstatus` | in-memory "last packet seen" panel on the Router page |
+| `internal/linkstatus` | in-memory "last packet seen" data for the router status panel on the Dashboard |
+| `internal/dashboard` | read service for the Dashboard numbers (online, traffic, failed logins, attention lists, charts) |
 | `internal/settings`, `internal/config` | the single-row settings and the `HSP_*` environment |
 | `internal/secret` | AES-GCM for stored member passwords |
 | `internal/clock` | injected clock |
@@ -137,7 +144,8 @@ sequenceDiagram
 | Own CSS, no Tailwind, no build step | D24 |
 | Two layers of limits: router attributes plus server Disconnect | O3, O4, BR-10 |
 | Expiry is enforced at login | O7 |
-| First login: admin / admin, then a forced password change | O15 |
+| First login: admin / admin, then a forced password change; the admin panel then opens on the Dashboard | O15, D25 |
+| Failed logins are counted per day and reason, with counts only (no user names, no addresses), kept for the session retention days | D27 |
 | Deleting a plan that members use is blocked | O12 |
 | AES-256 key auto-generated on first start (only if `hsp.db` does not exist), saved to `{DATA_DIR}/hsp.key`; back this file up with `hsp.db` | -- |
 | Listen addresses and log settings: env vars seed the first start; the Settings page is the only place after that | -- |

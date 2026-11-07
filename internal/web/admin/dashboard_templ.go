@@ -593,7 +593,7 @@ func LinkStatusPanel(v linkView) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" hx-trigger=\"every 5s\" hx-swap=\"outerHTML\"><h2 class=\"l-gap-bottom\">Router link status</h2><p class=\"u-muted l-gap-bottom\">Since the server started. Updates every 5 seconds. A wrong shared secret on the router shows up as bad-secret packets.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" hx-trigger=\"every 5s\" hx-swap=\"outerHTML\"><h2 class=\"l-gap-bottom\">Router status</h2><p class=\"u-muted l-gap-bottom\">Since the server started. Updates every 5 seconds. A wrong shared secret on the router shows up as bad-secret packets.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -682,7 +682,7 @@ func LinkStatusPanel(v linkView) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = ui.Table("Router link status", []string{"", "When", "Router address", "Result"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var29), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ui.Table("Router status", []string{"", "When", "Router address", "Result"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var29), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

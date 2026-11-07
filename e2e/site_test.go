@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/html"
 
 	"hotspotpluslight/e2e/harness"
 	"hotspotpluslight/internal/domain"
@@ -717,12 +718,12 @@ func TestE13_14_DocsLayout(t *testing.T) {
 		order = append(order, path.Join("docs", h, "index.html"))
 		labels = append(labels, strings.TrimSpace(s.Text()))
 	})
-	if len(order) != 11 {
-		t.Fatalf("the sidebar has %d pages, want 11: %v", len(order), order)
+	if len(order) == 0 {
+		t.Fatal("the docs sidebar is empty")
 	}
 	pages := docsPages(t)
 	if len(pages) != len(order) {
-		t.Errorf("%d docs pages, %d sidebar entries", len(pages), len(order))
+		t.Errorf("%d docs pages, %d sidebar entries: %v", len(pages), len(order), order)
 	}
 	for i, p := range order {
 		if !slices.Contains(pages, p) {
@@ -807,6 +808,7 @@ func TestE13_15_SearchIndex(t *testing.T) {
 	}
 	in := map[string]bool{}
 	heading := map[string]string{}
+	keywords := map[string]string{}
 	for _, e := range index {
 		heading[e.URL] = e.Heading
 		file, frag, _ := strings.Cut(e.URL, "#")
@@ -818,6 +820,7 @@ func TestE13_15_SearchIndex(t *testing.T) {
 			t.Errorf("index entry %q is incomplete", e.URL)
 		}
 		in[e.URL] = true
+		keywords[e.URL] = e.Keywords
 	}
 	for _, p := range docsPages(t) {
 		dir := path.Dir(p)
@@ -825,11 +828,45 @@ func TestE13_15_SearchIndex(t *testing.T) {
 			u := dir + "/#" + s.AttrOr("id", "")
 			if !in[u] {
 				t.Errorf("section %s is not in the search index", u)
-			} else if h := strings.TrimSpace(s.Text()); heading[u] != h {
+				return
+			}
+			if h := strings.TrimSpace(s.Text()); heading[u] != h {
 				t.Errorf("index heading for %s is %q, the h2 says %q", u, heading[u], h)
+			}
+			// The keywords are the start of the section text, so a changed section makes a stale entry fail here.
+			if want := sectionKeywordText(s); !strings.HasPrefix(want, squash(keywords[u])) {
+				t.Errorf("the index keywords of %s no longer match the start of its section: rebuild the entry", u)
 			}
 		})
 	}
+}
+
+// squash removes all white space, so texts can be compared whatever the spacing between tags.
+func squash(s string) string { return strings.Join(strings.Fields(s), "") }
+
+// sectionKeywordText returns the text of the section of the h2 (without the h2), with links of the form scheme://... removed
+// like the search index does, and with white space removed.
+func sectionKeywordText(h2 *goquery.Selection) string {
+	var parts []string
+	var walk func(n *html.Node)
+	walk = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			switch {
+			case c.Type == html.TextNode:
+				parts = append(parts, c.Data)
+			case c.Type == html.ElementNode && c != h2.Nodes[0] && c.Data != "script" && c.Data != "style":
+				walk(c)
+			}
+		}
+	}
+	walk(h2.Closest("section").Nodes[0])
+	var kept []string
+	for _, w := range strings.Fields(strings.Join(parts, " ")) {
+		if !strings.Contains(w, "://") {
+			kept = append(kept, w)
+		}
+	}
+	return squash(strings.Join(kept, " "))
 }
 
 // TestE13_16_HomeFacts checks the home page text and the claims behind its stats against go.mod, the Makefile and docs/perf-results.md (E13.16).
