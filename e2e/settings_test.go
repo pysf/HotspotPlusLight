@@ -149,8 +149,8 @@ func TestE14_03_Migration0005(t *testing.T) {
 		old[n] = &fstest.MapFile{Data: read(n)}
 	}
 	for _, c := range []struct{ before, after string }{{"HotspotPlus", ""}, {"Hotel Aria", "Hotel Aria"}} {
-		s := harness.Start(t, harness.Options{Migrations: old})
-		db := harness.DB(t, s.DataDir)
+		in := seedOldDB(t, old)
+		db := harness.DB(t, in.DataDir)
 		if scalar[int](t, db, `SELECT count(*) FROM pragma_table_info('settings') WHERE name='site_title'`) != 1 {
 			t.Fatal("before 0005 the column site_title should exist")
 		}
@@ -158,9 +158,8 @@ func TestE14_03_Migration0005(t *testing.T) {
 			t.Fatal(err)
 		}
 		secret := scalar[string](t, db, `SELECT radius_shared_secret FROM settings`)
-		s.Stop()
 
-		s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey})
+		s2 := startUpgraded(t, in)
 		if n := scalar[int](t, db, `SELECT count(*) FROM schema_migrations`); n != wantMigrations {
 			t.Errorf("%d migrations, want %d", n, wantMigrations)
 		}
@@ -323,6 +322,143 @@ func TestE1_11_SharedSecretAppliesWithoutRestart(t *testing.T) {
 	stale.Timeout = 1500 * time.Millisecond
 	if r, err := stale.Authenticate("u", "p"); err == nil {
 		t.Fatalf("old secret still verifies replies: %v", r.Code)
+	}
+}
+
+// E16.01 the settings form shows server config fields; invalid addresses/log values are rejected; valid values persist.
+func TestE16_01_ServerSettingsForm(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	db := harness.DB(t, s.DataDir)
+
+	d := c.Get("/admin/settings").Doc(t)
+	for _, f := range []string{"admin_addr", "radius_auth_addr", "radius_acct_addr", "log_level", "log_format"} {
+		if d.Find(`form#settings-form [name="`+f+`"]`).Length() != 1 {
+			t.Errorf("settings form lacks %s", f)
+		}
+	}
+	// The harness seeds the addresses from env on first boot, and the form shows what is stored.
+	form := harness.FormValues(t, d, "form#settings-form")
+	if v := form.Get("admin_addr"); v != "127.0.0.1:0" {
+		t.Errorf("seeded admin_addr %q", v)
+	}
+	if v := form.Get("log_level"); v != "info" {
+		t.Errorf("default log_level %q", v)
+	}
+
+	// Invalid values: bad address format, bad log level.
+	for _, iv := range []struct{ field, val string }{
+		{"admin_addr", "8081"},          // missing colon
+		{"radius_auth_addr", ""},        // empty
+		{"radius_acct_addr", ":999999"}, // port out of range
+		{"log_level", "verbose"},        // unknown level
+		{"log_format", "yaml"},          // unknown format
+	} {
+		f := harness.FormValues(t, d, "form#settings-form")
+		f.Set(iv.field, iv.val)
+		r := c.Send("PUT", "/admin/settings", f)
+		if r.StatusCode != 422 || fieldError(r, t, iv.field) == "" {
+			t.Errorf("%s=%q: status %d err %q", iv.field, iv.val, r.StatusCode, fieldError(r, t, iv.field))
+		}
+	}
+
+	// Two listeners on the same port are rejected.
+	dup := harness.FormValues(t, d, "form#settings-form")
+	dup.Set("admin_addr", ":9090")
+	dup.Set("radius_auth_addr", ":9090")
+	if r := c.Send("PUT", "/admin/settings", dup); r.StatusCode != 422 || (fieldError(r, t, "admin_addr") == "" && fieldError(r, t, "radius_auth_addr") == "") {
+		t.Errorf("duplicate ports: status %d", r.StatusCode)
+	}
+
+	// A PUT without the server fields keeps the stored values.
+	before := scalar[string](t, db, `SELECT admin_addr||'|'||radius_auth_addr||'|'||radius_acct_addr||'|'||log_level||'|'||log_format FROM settings`)
+	partial := harness.FormValues(t, d, "form#settings-form")
+	for _, k := range []string{"admin_addr", "radius_auth_addr", "radius_acct_addr", "log_level", "log_format"} {
+		partial.Del(k)
+	}
+	if r := c.Send("PUT", "/admin/settings", partial); r.StatusCode != 200 {
+		t.Fatalf("partial save: %d", r.StatusCode)
+	}
+	if after := scalar[string](t, db, `SELECT admin_addr||'|'||radius_auth_addr||'|'||radius_acct_addr||'|'||log_level||'|'||log_format FROM settings`); after != before {
+		t.Errorf("server settings changed: %q -> %q", before, after)
+	}
+
+	// Valid update: save new values and verify they persist.
+	f := harness.FormValues(t, d, "form#settings-form")
+	f.Set("admin_addr", ":9090")
+	f.Set("radius_auth_addr", ":1812")
+	f.Set("radius_acct_addr", ":1813")
+	f.Set("log_level", "debug")
+	f.Set("log_format", "json")
+	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 200 || !strings.Contains(r.Body, "Settings saved") {
+		t.Fatalf("save: %d %s", r.StatusCode, r.Body)
+	}
+	if v := scalar[string](t, db, `SELECT admin_addr FROM settings`); v != ":9090" {
+		t.Errorf("admin_addr %q", v)
+	}
+	if v := scalar[string](t, db, `SELECT log_level FROM settings`); v != "debug" {
+		t.Errorf("log_level %q", v)
+	}
+}
+
+// E16.02 after the first boot the settings row wins over HSP_* env vars for the server settings.
+func TestE16_02_DatabaseWinsOverEnvAfterFirstBoot(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	s.Stop()
+	s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey,
+		Env: map[string]string{"ADMIN_ADDR": "127.0.0.1:1", "LOG_LEVEL": "debug", "LOG_FORMAT": "json"}})
+	db := harness.DB(t, s.DataDir)
+	if v := scalar[string](t, db, `SELECT admin_addr FROM settings`); v != "127.0.0.1:0" {
+		t.Errorf("admin_addr %q changed by env", v)
+	}
+	if v := scalar[string](t, db, `SELECT log_level FROM settings`); v != "info" {
+		t.Errorf("log_level %q changed by env", v)
+	}
+	// Port 1 would fail to bind or be fixed; the DB address picks a free port instead.
+	if strings.HasSuffix(s2.Addrs.Admin, ":1") {
+		t.Errorf("admin bound to the env address %s", s2.Addrs.Admin)
+	}
+}
+
+// E16.03 the first boot stores the HSP_* server settings from env in the settings row.
+func TestE16_03_FirstBootSeedsServerSettingsFromEnv(t *testing.T) {
+	s := harness.Start(t, harness.Options{Env: map[string]string{
+		"ADMIN_ADDR": "127.0.0.1:0", "LOG_LEVEL": "debug", "LOG_FORMAT": "json"}})
+	db := harness.DB(t, s.DataDir)
+	if v := scalar[string](t, db, `SELECT admin_addr FROM settings`); v != "127.0.0.1:0" {
+		t.Errorf("admin_addr %q", v)
+	}
+	if v := scalar[string](t, db, `SELECT log_level FROM settings`); v != "debug" {
+		t.Errorf("log_level %q", v)
+	}
+	if v := scalar[string](t, db, `SELECT log_format FROM settings`); v != "json" {
+		t.Errorf("log_format %q", v)
+	}
+}
+
+// E16.04 the settings page shows a restart notice only when the saved server settings differ from the running ones.
+func TestE16_04_RestartNotice(t *testing.T) {
+	const notice = "Restart the server to apply"
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+
+	d := c.Get("/admin/settings")
+	if strings.Contains(d.Body, notice) {
+		t.Fatal("restart notice shown before any change")
+	}
+	f := harness.FormValues(t, d.Doc(t), "form#settings-form")
+	f.Set("log_level", "debug")
+	r := c.Send("PUT", "/admin/settings", f)
+	if r.StatusCode != 200 || !strings.Contains(r.Body, "Settings saved") || !strings.Contains(r.Body, notice) {
+		t.Fatalf("save: %d %s", r.StatusCode, r.Body)
+	}
+	if !strings.Contains(c.Get("/admin/settings").Body, notice) {
+		t.Error("restart notice missing on the page after a saved change")
+	}
+	// Saving the running value again clears the notice.
+	f.Set("log_level", "info")
+	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 200 || strings.Contains(r.Body, notice) {
+		t.Errorf("notice still shown after restoring the running value: %d", r.StatusCode)
 	}
 }
 

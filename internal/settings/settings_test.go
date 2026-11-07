@@ -25,7 +25,8 @@ func (f *fakeRepo) PlanExists(context.Context, int64) (bool, error) { return f.p
 
 func goodForm() domain.SettingsForm {
 	return domain.SettingsForm{BusinessName: "T", Timezone: "Asia/Tehran", RadiusSharedSecret: "s", CoaPort: "3799", AccountingIntervalSeconds: "60",
-		BatchUsernamePrefix: "wifi", BatchCounter: "1", BatchMaxCount: "30", VoucherPasswordLength: "6", SessionRetentionDays: "90"}
+		BatchUsernamePrefix: "wifi", BatchCounter: "1", BatchMaxCount: "30", VoucherPasswordLength: "6", SessionRetentionDays: "90",
+		AdminAddr: ":8081", RadiusAuthAddr: ":1812", RadiusAcctAddr: ":1813", LogLevel: "info", LogFormat: "text"}
 }
 
 func TestUpdate(t *testing.T) {

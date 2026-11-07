@@ -79,7 +79,7 @@
 <pre><code>sudo ufw allow from ROUTER-IP to any port 1812 proto udp
 sudo ufw allow from ROUTER-IP to any port 1813 proto udp
 sudo ufw allow from ADMIN-PC-IP to any port 8081 proto tcp</code></pre>
-<p>On Windows, see the <code>netsh</code> commands in <a href="../running-as-a-service/#windows">Running as a service</a>. To keep the admin panel off the hotspot network, you can also bind it to one address, for example <code>HSP_ADMIN_ADDR=192.168.1.10:8081</code>.</p></section>
+<p>On Windows, see the <code>netsh</code> commands in <a href="../running-as-a-service/#windows">Running as a service</a>. To keep the admin panel off the hotspot network, you can also bind it to one address, for example <code>HSP_ADMIN_ADDR=192.168.1.10:8081</code> at the first start, or on the Settings page later.</p></section>
 <section><h2 id="test"><a href="#test">Test it</a></h2>
 <p>Make a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the <strong>Online</strong> page. The Router page also has a <strong>link status</strong> panel: the time and source address of the last login request, the last accounting packet and the last Disconnect, and how many packets were dropped because of a wrong shared secret. It is kept in memory and is empty after a restart.</p>
 <p>If something fails, see <a href="../troubleshooting/">Troubleshooting</a>.</p></section>

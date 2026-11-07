@@ -88,6 +88,8 @@ type Deps struct {
 	Link     LinkStatus
 	// RadiusPorts gives the RADIUS UDP ports for the router setup script, read when the page is rendered.
 	RadiusPorts func() (authPort, acctPort int)
+	// RunningServer gives the server settings the running process started with (nil = never show the restart notice).
+	RunningServer func() domain.ServerSettings
 	// Assets serves the CSS, JS, font and htmx files under /admin/static/ (built once at startup).
 	Assets *static.Assets
 	// Dev turns on /admin/dev/components (HSP_DEV=1). Off = 404.

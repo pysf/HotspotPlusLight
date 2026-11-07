@@ -1,8 +1,5 @@
 .PHONY: reset-db release build-cross perf perf-quick perf-windows build build-windows build-all run set-password reset-password vet test ci clean generate
 
-# Key used by `make run` when HSP_SECRET_KEY is not set. Created once, kept out of git.
-DEV_KEY_FILE := .dev-secret-key
-
 VERSION ?= dev
 
 build:
@@ -53,17 +50,17 @@ release: build-cross
 	ls -l
 
 # Build and start the whole stack (admin :8081, RADIUS :1812/:1813) with data in ./data.
+# The key is auto-generated to data/hsp.key on first start and reused on restarts.
 run: build
-	@test -f $(DEV_KEY_FILE) || openssl rand -base64 32 > $(DEV_KEY_FILE)
-	HSP_SECRET_KEY="$${HSP_SECRET_KEY:-$$(cat $(DEV_KEY_FILE))}" ./bin/hotspotpluslight serve
+	./bin/hotspotpluslight serve
 
 # Delete the dev database (hsp.db, -wal, -shm in $(DATA_DIR)) so the next `make run` starts fresh (admin/admin).
 # Asks you to type "yes"; `make reset-db FORCE=1` skips the question. Stop `make run` first.
-# The dev key file .dev-secret-key is kept on purpose: a fresh database works with the same key.
+# data/hsp.key is kept so the new database uses the same key.
 DATA_DIR ?= data
 reset-db:
 	@echo "Will delete: $(DATA_DIR)/hsp.db $(DATA_DIR)/hsp.db-wal $(DATA_DIR)/hsp.db-shm"
-	@echo "Stop 'make run' first. The key file $(DEV_KEY_FILE) is kept."
+	@echo "Stop 'make run' first. $(DATA_DIR)/hsp.key is kept."
 	@set -e; \
 	if [ -z "$(FORCE)" ]; then \
 	  printf 'Type "yes" to continue: '; read ans </dev/tty; \
@@ -75,8 +72,7 @@ reset-db:
 # Set (or reset) the admin password for the ./data database; prompts twice without echo.
 # Rules (BR-20): at least 10 characters, not the username, "admin" or a common password. Logs out every open admin session.
 set-password reset-password: build
-	@test -f $(DEV_KEY_FILE) || openssl rand -base64 32 > $(DEV_KEY_FILE)
-	HSP_SECRET_KEY="$${HSP_SECRET_KEY:-$$(cat $(DEV_KEY_FILE))}" ./bin/hotspotpluslight admin set-password
+	./bin/hotspotpluslight admin set-password
 
 vet:
 	go vet ./...

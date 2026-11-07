@@ -139,6 +139,8 @@ sequenceDiagram
 | Expiry is enforced at login | O7 |
 | First login: admin / admin, then a forced password change | O15 |
 | Deleting a plan that members use is blocked | O12 |
+| AES-256 key auto-generated on first start (only if `hsp.db` does not exist), saved to `{DATA_DIR}/hsp.key`; back this file up with `hsp.db` | -- |
+| Listen addresses and log settings: env vars seed the first start; the Settings page is the only place after that | -- |
 
 ## Develop
 
@@ -146,8 +148,8 @@ Requires Go 1.26 (see `go.mod`). No CGO, no external services, no Node.
 
 | Command | What it does |
 |---|---|
-| `make run` | build and start with data in `./data` (dev key in the git-ignored `.dev-secret-key`) |
-| `make reset-db` | delete the dev database in `./data` (asks first; `FORCE=1` skips; keeps the dev key) |
+| `make run` | build and start with data in `./data` (key auto-generated to `data/hsp.key` on first run) |
+| `make reset-db` | delete the dev database in `./data` (asks first; `FORCE=1` skips; keeps `data/hsp.key`) |
 | `make test` | all tests with the race detector |
 | `make ci` | `go vet` and the tests |
 | `make generate` | regenerate the templ components (the generated files are committed) |

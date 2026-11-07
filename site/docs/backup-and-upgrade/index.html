@@ -51,9 +51,9 @@
 <p>The state is two things:</p>
 <ol class="steps">
 <li><b>The database</b>, <code>hsp.db</code> in the data folder.</li>
-<li><b>The secret key</b>, <code>HSP_SECRET_KEY</code> (in your env file, for example <code>hsp.env</code>).</li>
+<li><b>The secret key</b>, <code>hsp.key</code> in the data folder (or <code>HSP_SECRET_KEY</code> in your env file, if you set it manually).</li>
 </ol>
-<div class="note warn"><b>Keep the key</b><p>If the key is lost, the stored member passwords are <strong>unrecoverable</strong>, and the server will not start on that database, because the key does not fit. Keep a copy of the key in a safe place, apart from the machine.</p></div></section>
+<div class="note warn"><b>Keep the key</b><p>If the key is lost, the stored member passwords are <strong>unrecoverable</strong>, and the server will not start on that database. It never makes a new key when <code>hsp.db</code> exists. Back up the data folder: it holds both <code>hsp.db</code> and <code>hsp.key</code>. Keep a copy in a safe place, apart from the machine.</p></div></section>
 <section><h2 id="backup"><a href="#backup">Back up the database</a></h2>
 <p>Use SQLite's own backup command. It makes a consistent copy while the server is running. The <code>sqlite3</code> tool is separate from HotspotPlus Lite, so install it if you do not have it.</p>
 <pre><code>sqlite3 hsp.db ".backup backup-$(date +%F).db"</code></pre>
@@ -64,7 +64,7 @@
 <ol class="steps">
 <li>Stop the server.</li>
 <li>Put the backup file in the data folder as <code>hsp.db</code>, and delete old <code>hsp.db-wal</code> and <code>hsp.db-shm</code> files there.</li>
-<li>Start the server with the same <code>HSP_SECRET_KEY</code> that the database was made with.</li>
+<li>Start the server with the data folder that holds both <code>hsp.db</code> and <code>hsp.key</code>. If you use an env file with <code>HSP_SECRET_KEY</code>, use the same key.</li>
 </ol>
 <p>To move to a new machine, copy the database (from a backup) and the key, and start the program there.</p></section>
 <section><h2 id="upgrade"><a href="#upgrade">Upgrade</a></h2>

@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -102,7 +103,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if opts.Clock == nil {
 		opts.Clock = clock.Real{}
 	}
-	cfg, err := config.Load(opts.Getenv)
+	cfg, err := config.LoadWithKey(opts.Getenv)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +162,24 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		}
 	}
 
+	// The settings row is the source of truth for the server settings. Env vars only seeded it on first boot.
+	dbSt, err := st.GetSettings(ctx)
+	if err != nil {
+		return fail(fmt.Errorf("read settings: %w", err))
+	}
+	if err := a.applyServerSettings(dbSt); err != nil {
+		return fail(err)
+	}
+	if opts.Logger == nil {
+		lw := opts.LogWriter
+		if lw == nil {
+			lw = os.Stderr
+		}
+		log = newLogger(lw, a.cfg)
+		a.log = log
+	}
+	warnIgnoredEnv(log, opts.Getenv, dbSt)
+
 	link := linkstatus.New(opts.Clock)
 	disc := opts.Disconnector
 	if disc == nil {
@@ -194,7 +213,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return fail(err)
 	}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, Assets: assets, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, RunningServer: a.runningServer, Assets: assets, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 
@@ -207,6 +226,40 @@ func newLogger(w io.Writer, cfg config.Config) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, ho))
 }
 
+// applyServerSettings copies the listen addresses and log settings from the settings row into the config.
+func (a *App) applyServerSettings(st domain.Settings) error {
+	var lvl slog.Level
+	if err := lvl.UnmarshalText([]byte(st.LogLevel)); err != nil {
+		return fmt.Errorf("settings log_level %q is invalid: %w", st.LogLevel, err)
+	}
+	if st.LogFormat != "text" && st.LogFormat != "json" {
+		return fmt.Errorf("settings log_format %q is invalid (use text or json)", st.LogFormat)
+	}
+	a.cfg.AdminAddr, a.cfg.RadiusAuthAddr, a.cfg.RadiusAcctAddr = st.AdminAddr, st.RadiusAuthAddr, st.RadiusAcctAddr
+	a.cfg.LogLevel, a.cfg.LogFormat = lvl, st.LogFormat
+	return nil
+}
+
+// runningServer returns the server settings this process started with.
+func (a *App) runningServer() domain.ServerSettings {
+	return domain.ServerSettings{AdminAddr: a.cfg.AdminAddr, RadiusAuthAddr: a.cfg.RadiusAuthAddr, RadiusAcctAddr: a.cfg.RadiusAcctAddr,
+		LogLevel: strings.ToLower(a.cfg.LogLevel.String()), LogFormat: a.cfg.LogFormat}
+}
+
+// warnIgnoredEnv logs a warning for each server env var that is set but differs from the saved setting.
+// The saved setting wins after the first boot, so the env var has no effect.
+func warnIgnoredEnv(log *slog.Logger, getenv func(string) string, st domain.Settings) {
+	for _, e := range []struct{ env, saved string }{
+		{"HSP_ADMIN_ADDR", st.AdminAddr}, {"HSP_RADIUS_AUTH_ADDR", st.RadiusAuthAddr}, {"HSP_RADIUS_ACCT_ADDR", st.RadiusAcctAddr},
+		{"HSP_LOG_LEVEL", st.LogLevel}, {"HSP_LOG_FORMAT", st.LogFormat},
+	} {
+		if v := getenv(e.env); v != "" && !strings.EqualFold(v, e.saved) {
+			log.Warn("env var ignored: the saved setting wins after the first start; change it on the Settings page",
+				"env", e.env, "env_value", v, "saved_value", e.saved)
+		}
+	}
+}
+
 // sessionRepo adapts the store to session.Repo. The store's transaction type is
 // concrete, and the service wants its own interface.
 type sessionRepo struct{ *store.Store }
@@ -217,7 +270,8 @@ func (r sessionRepo) InAcctTx(ctx context.Context, fn func(session.AcctTx) error
 }
 
 // seed creates the first-boot data (O15, BR-21): the admin account with the
-// password "admin" and the must-change flag (BR-20), and the RADIUS shared secret. The stdout block says so.
+// password "admin" and the must-change flag (BR-20), the RADIUS shared secret, and the server settings from the env.
+// The stdout block says so.
 func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
 	hash, err := auth.HashPassword("admin")
 	if err != nil {
@@ -239,6 +293,11 @@ func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
 		MustChangePassword: true,
 		KeyCheck:           kc,
 		RadiusSecret:       radiusSecret,
+		AdminAddr:          a.cfg.AdminAddr,
+		RadiusAuthAddr:     a.cfg.RadiusAuthAddr,
+		RadiusAcctAddr:     a.cfg.RadiusAcctAddr,
+		LogLevel:           strings.ToLower(a.cfg.LogLevel.String()),
+		LogFormat:          a.cfg.LogFormat,
 		Now:                opts.Clock.Now(),
 	})
 	if err != nil {
@@ -265,15 +324,15 @@ func (a *App) Start() (err error) {
 		}
 	}()
 	if a.adminLn, err = net.Listen("tcp", a.cfg.AdminAddr); err != nil {
-		return fmt.Errorf("listen HSP_ADMIN_ADDR: %w", err)
+		return fmt.Errorf("listen admin_addr (saved in the settings table; see Troubleshooting to reset it): %w", err)
 	}
 	closers = append(closers, a.adminLn)
 	if a.authConn, err = radius.Listen(a.cfg.RadiusAuthAddr, a.log); err != nil {
-		return fmt.Errorf("listen HSP_RADIUS_AUTH_ADDR: %w", err)
+		return fmt.Errorf("listen radius_auth_addr (saved in the settings table; see Troubleshooting to reset it): %w", err)
 	}
 	closers = append(closers, a.authConn)
 	if a.acctConn, err = radius.Listen(a.cfg.RadiusAcctAddr, a.log); err != nil {
-		return fmt.Errorf("listen HSP_RADIUS_ACCT_ADDR: %w", err)
+		return fmt.Errorf("listen radius_acct_addr (saved in the settings table; see Troubleshooting to reset it): %w", err)
 	}
 	a.addrMu.Lock()
 	a.addrs = Addrs{a.adminLn.Addr().String(), a.authConn.LocalAddr().String(), a.acctConn.LocalAddr().String()}
@@ -378,11 +437,8 @@ func SetAdminPassword(ctx context.Context, opts Options, password string) error 
 	if opts.Clock == nil {
 		opts.Clock = clock.Real{}
 	}
-	cfg, err := config.Load(opts.Getenv)
-	if err != nil {
-		return err
-	}
-	dbPath := filepath.Join(cfg.DataDir, "hsp.db")
+	// The key is not needed here, so this never creates a key file or a data folder.
+	dbPath := filepath.Join(config.DataDir(opts.Getenv), "hsp.db")
 	if _, err := os.Stat(dbPath); err != nil {
 		return fmt.Errorf("no database at %s: run `hotspotpluslight serve` once, or check HSP_DATA_DIR", dbPath)
 	}

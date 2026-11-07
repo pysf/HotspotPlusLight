@@ -48,11 +48,12 @@
 <aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="./" aria-current="page">Run as a service</a><ul class="sub"><li><a href="#systemd">Linux (systemd)</a></li><li><a href="#windows">Windows service</a></li><li><a href="#macos">macOS (launchd)</a></li><li><a href="#check">Check that it runs</a></li></ul></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
 <article class="doc"><span class="kick">Documentation</span><h1>Running as a service</h1><p class="intro">Run HotspotPlus Lite in the background and start it at boot, on Linux, Windows or macOS.</p>
 <section><h2 id="systemd"><a href="#systemd">Linux (systemd)</a></h2>
-<p>Create a user for the service, and a settings file that only root and that user can read. It holds the secret key.</p>
+<p>Create a user for the service and a settings file that only root and that user can read:</p>
 <pre><code>sudo useradd --system --no-create-home --shell /usr/sbin/nologin hsp
-printf 'HSP_SECRET_KEY=%s\nHSP_DATA_DIR=/var/lib/hotspotpluslight\n' "$(hotspotpluslight gen-key)" | sudo tee /etc/hotspotpluslight.env &gt;/dev/null
+printf 'HSP_DATA_DIR=/var/lib/hotspotpluslight\n' | sudo tee /etc/hotspotpluslight.env &gt;/dev/null
 sudo chown root:hsp /etc/hotspotpluslight.env
 sudo chmod 640 /etc/hotspotpluslight.env</code></pre>
+<p>The secret key is created automatically on first start (only when there is no database yet) and saved to <code>/var/lib/hotspotpluslight/hsp.key</code>. Back up that folder — it holds both the database and the key.</p>
 <p>Create <code>/etc/systemd/system/hotspotpluslight.service</code>:</p>
 <pre><code>[Unit]
 Description=HotspotPlus Lite
@@ -102,7 +103,7 @@ systemctl status hotspotpluslight</code></pre>
 netsh advfirewall firewall add rule name="HotspotPlus Lite RADIUS" dir=in action=allow protocol=UDP localport=1812-1813</code></pre>
 <div class="note"><b>Keep a copy of hsp.env</b><p>It holds the secret key. Without it the stored member passwords cannot be read. See <a href="../backup-and-upgrade/">Backup and upgrade</a>.</p></div></section>
 <section><h2 id="macos"><a href="#macos">macOS (launchd)</a></h2>
-<p>The <code>service</code> commands work only on Windows. On macOS, use launchd. Put the settings in <code>/usr/local/etc/hotspotpluslight.env</code> (same format as above, readable only by root) and create <code>/Library/LaunchDaemons/local.hotspotpluslight.plist</code>:</p>
+<p>The <code>service</code> commands work only on Windows. On macOS, use launchd. Put settings such as <code>HSP_DATA_DIR</code> in <code>/usr/local/etc/hotspotpluslight.env</code> (readable only by root) and create <code>/Library/LaunchDaemons/local.hotspotpluslight.plist</code>:</p>
 <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;plist version="1.0"&gt;
 &lt;dict&gt;

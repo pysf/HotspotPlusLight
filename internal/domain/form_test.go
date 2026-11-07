@@ -35,9 +35,16 @@ func TestParsePlanInvalid(t *testing.T) {
 	}
 }
 
+func goodSettingsForm() SettingsForm {
+	return SettingsForm{
+		BusinessName: "T", Timezone: "UTC", RadiusSharedSecret: "s", CoaPort: "3799", AccountingIntervalSeconds: "60",
+		BatchUsernamePrefix: "wifi", BatchCounter: "1360", BatchMaxCount: "30", VoucherPasswordLength: "6", SessionRetentionDays: "90",
+		AdminAddr: ":8081", RadiusAuthAddr: ":1812", RadiusAcctAddr: ":1813", LogLevel: "info", LogFormat: "text",
+	}
+}
+
 func TestParseSettings(t *testing.T) {
-	good := SettingsForm{BusinessName: "T", Timezone: "UTC", RadiusSharedSecret: "s", CoaPort: "3799", AccountingIntervalSeconds: "60",
-		BatchUsernamePrefix: "wifi", BatchCounter: "1360", BatchMaxCount: "30", VoucherPasswordLength: "6", SessionRetentionDays: "90"}
+	good := goodSettingsForm()
 	if s, errs := ParseSettings(good); len(errs) != 0 || s.DefaultPlanID != nil {
 		t.Fatalf("%+v %v", s, errs)
 	}
@@ -52,8 +59,13 @@ func TestParseSettings(t *testing.T) {
 		"default_plan_id":             func(f *SettingsForm) { f.DefaultPlanID = "x" },
 		"session_retention_days":      func(f *SettingsForm) { f.SessionRetentionDays = "-1" },
 		"business_name":               func(f *SettingsForm) { f.BusinessName = "Hotel\nAria" },
+		"admin_addr":                  func(f *SettingsForm) { f.AdminAddr = "8081" }, // missing colon
+		"radius_auth_addr":            func(f *SettingsForm) { f.RadiusAuthAddr = "" },
+		"radius_acct_addr":            func(f *SettingsForm) { f.RadiusAcctAddr = ":65536" }, // port out of range
+		"log_level":                   func(f *SettingsForm) { f.LogLevel = "verbose" },
+		"log_format":                  func(f *SettingsForm) { f.LogFormat = "yaml" },
 	} {
-		f := good
+		f := goodSettingsForm()
 		mutate(&f)
 		if _, errs := ParseSettings(f); errs[field] == "" {
 			t.Errorf("%s not rejected: %v", field, errs)
@@ -62,8 +74,9 @@ func TestParseSettings(t *testing.T) {
 }
 
 func TestSharedSecretKeptVerbatim(t *testing.T) {
-	f := SettingsForm{BusinessName: "T", Timezone: "UTC", RadiusSharedSecret: "  se cret  ", CoaPort: "3799", AccountingIntervalSeconds: "60",
-		BatchUsernamePrefix: "wifi", BatchCounter: "1", BatchMaxCount: "30", VoucherPasswordLength: "6", SessionRetentionDays: "90"}
+	f := goodSettingsForm()
+	f.BatchCounter = "1"
+	f.RadiusSharedSecret = "  se cret  "
 	s, errs := ParseSettings(f)
 	if len(errs) != 0 || s.RadiusSharedSecret != "  se cret  " {
 		t.Fatalf("%q %v", s.RadiusSharedSecret, errs)
@@ -75,6 +88,26 @@ func TestSharedSecretKeptVerbatim(t *testing.T) {
 		f.RadiusSharedSecret = bad
 		if _, errs := ParseSettings(f); errs["radius_shared_secret"] == "" {
 			t.Errorf("%q accepted", bad)
+		}
+	}
+}
+
+func TestRestartNeeded(t *testing.T) {
+	run := ServerSettings{":8081", ":1812", ":1813", "info", "text"}
+	if RestartNeeded(run, run) || RestartNeeded(ServerSettings{":8081", ":1812", ":1813", "INFO", "text"}, run) {
+		t.Fatal("same settings must not need a restart")
+	}
+	for name, mutate := range map[string]func(*ServerSettings){
+		"admin":  func(s *ServerSettings) { s.AdminAddr = ":9090" },
+		"auth":   func(s *ServerSettings) { s.RadiusAuthAddr = "10.0.0.1:1812" },
+		"acct":   func(s *ServerSettings) { s.RadiusAcctAddr = ":2000" },
+		"level":  func(s *ServerSettings) { s.LogLevel = "debug" },
+		"format": func(s *ServerSettings) { s.LogFormat = "json" },
+	} {
+		saved := run
+		mutate(&saved)
+		if !RestartNeeded(saved, run) {
+			t.Errorf("%s change not detected", name)
 		}
 	}
 }
