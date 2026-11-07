@@ -146,6 +146,19 @@ func TestNearLimitList(t *testing.T) {
 	}
 }
 
+func TestNearLimitNeverListsUnlimitedPlans(t *testing.T) {
+	unlimited := limited(1, "unlimited", 10<<10) // 10 GB used
+	unlimited.Plan.BulkValue = 0
+	f := &fakeRepo{limited: []domain.MemberRow{unlimited, limited(2, "at80", 80)}}
+	o, err := New(f, clock.NewFake(t0)).Overview(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.NearLimit.Count != 1 || o.NearLimit.Rows[0].Username != "at80" {
+		t.Fatalf("%+v, want only at80", o.NearLimit)
+	}
+}
+
 func TestNearLimitSkipsLapsedAndFutureWindows(t *testing.T) {
 	old, future := limited(1, "lapsed", 90), limited(2, "future", 90)
 	old.Member.SubscriptionDate = t0.AddDate(0, 0, -40) // a 30-day window that ended 10 days ago

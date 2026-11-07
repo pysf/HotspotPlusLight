@@ -324,7 +324,8 @@ func TestE18_08_NeedsAttention(t *testing.T) {
 	used("p79", 79*mb)
 	p80 := used("p80", 80*mb)
 	full := used("full", 100*mb)
-	unlimited := f.member(basic, "unlimited")
+	// The default test plan has a 10 GB limit, so the unlimited member needs a plan with bulk_value 0.
+	unlimited := f.member(f.plan("Unlimited", "bulk_value", "0"), "unlimited")
 	f.exec(`UPDATE member SET used_download_bytes=? WHERE id=?`, 10*gb, unlimited)
 	f.exec(`UPDATE member SET extra_bulk_bytes=? WHERE id=?`, 100*mb, used("extra", 90*mb)) // 90 of 200 MB
 	f.exec(`UPDATE member SET active=0 WHERE id=?`, used("pdisabled", 95*mb))
@@ -453,6 +454,10 @@ func TestE18_12_TimezoneDayBoundaries(t *testing.T) {
 	f.advance(9 * time.Hour) // 21:00 UTC is 00:30 on the 2nd in Tehran
 	f.login("nobody", "x")
 
+	// A chart with no traffic shows an empty text, not bars (E18.13), so seed one usage row on the Tehran "today".
+	alice := f.member(f.plan("Basic"), "alice")
+	addUsage(f.p2, alice, "2026-11-02", 7, 3)
+
 	d := dashDoc(t, f.c)
 	bars := chartBars(d, "traffic")
 	if bars.Length() != 14 {
@@ -460,6 +465,9 @@ func TestE18_12_TimezoneDayBoundaries(t *testing.T) {
 	}
 	if first, last := bars.First().AttrOr("data-day", ""), bars.Last().AttrOr("data-day", ""); first != "2026-10-20" || last != "2026-11-02" {
 		t.Errorf("chart runs from %q to %q, want 2026-10-20 to 2026-11-02 (Tehran days)", first, last)
+	}
+	if down := bars.Last().AttrOr("data-down", ""); down != "7" {
+		t.Errorf("the last bar (the 2nd in Tehran) has %q down, want 7", down)
 	}
 	// Only the second reject belongs to "today" (the 2nd in Tehran); the first was counted on the 1st.
 	if got := attr(d, "[data-failed-total]", "data-failed-total"); got != "1" {
