@@ -5,9 +5,11 @@ package e2e
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/url"
@@ -15,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -740,4 +743,62 @@ func startUpgraded(t *testing.T, in oldInstall) *harness.Server {
 		t.Fatal(err)
 	}
 	return harness.Start(t, harness.Options{DataDir: in.DataDir, SecretKey: in.Key})
+}
+
+// dbSnapshot returns a checksum of the rows of every table except the ones in skip, keyed by table name.
+// It tells a test that a request changed no row (or only the rows it expects).
+func dbSnapshot(t *testing.T, db *sql.DB, skip ...string) map[string]string {
+	t.Helper()
+	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tables []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(skip, n) {
+			tables = append(tables, n)
+		}
+	}
+	rows.Close()
+	out := map[string]string{}
+	for _, tbl := range tables {
+		r, err := db.Query(`SELECT * FROM "` + tbl + `"`) // the name comes from sqlite_master, not from input
+		if err != nil {
+			t.Fatal(err)
+		}
+		cols, _ := r.Columns()
+		var lines []string
+		for r.Next() {
+			vals := make([]any, len(cols))
+			ptrs := make([]any, len(cols))
+			for i := range vals {
+				ptrs[i] = &vals[i]
+			}
+			if err := r.Scan(ptrs...); err != nil {
+				t.Fatal(err)
+			}
+			lines = append(lines, fmt.Sprint(vals...))
+		}
+		r.Close()
+		sort.Strings(lines)
+		sum := sha256.Sum256([]byte(strings.Join(lines, "\n")))
+		out[tbl] = fmt.Sprintf("%d rows, %x", len(lines), sum[:8])
+	}
+	return out
+}
+
+// snapshotDiff names the tables that differ between two snapshots ("" = identical).
+func snapshotDiff(a, b map[string]string) string {
+	var diff []string
+	for k, v := range a {
+		if b[k] != v {
+			diff = append(diff, k)
+		}
+	}
+	sort.Strings(diff)
+	return strings.Join(diff, ", ")
 }

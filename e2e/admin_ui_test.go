@@ -25,7 +25,7 @@ func adminPages(t *testing.T, c *harness.AdminClient) []string {
 	}
 	m := "/admin/members/" + strconv.FormatInt(member, 10)
 	return []string{
-		"/admin/members", "/admin/members/new", m, m + "/voucher",
+		"/admin", "/admin/members", "/admin/members/new", m, m + "/voucher",
 		"/admin/plans", "/admin/plans/new", "/admin/plans/" + strconv.FormatInt(plan, 10),
 		"/admin/batches", "/admin/batches/new", r.Header.Get("Location"),
 		"/admin/sessions", "/admin/usage", "/admin/router", "/admin/settings",
@@ -331,8 +331,8 @@ func TestE1_20_SidebarGroupsAndIcons(t *testing.T) {
 			t.Errorf("empty nav group heading")
 		}
 	})
-	if d.Find("#sidebar a.l-nav__link").Length() != 7 {
-		t.Errorf("want 7 nav links")
+	if d.Find("#sidebar a.l-nav__link").Length() != 8 {
+		t.Errorf("want 8 nav links")
 	}
 	d.Find("#sidebar a.l-nav__link").Each(func(_ int, a *goquery.Selection) {
 		if a.Find("svg > path, svg > rect, svg > circle").Length() == 0 {

@@ -216,7 +216,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return fail(err)
 	}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, RunningServer: a.runningServer, Assets: assets, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Dashboard: a.svc.dashboard, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, RunningServer: a.runningServer, Assets: assets, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 

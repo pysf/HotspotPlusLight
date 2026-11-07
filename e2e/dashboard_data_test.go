@@ -207,7 +207,7 @@ func TestE17_03_OnlyRejectsAreCounted(t *testing.T) {
 	if n := failedTotal(f); n != 0 {
 		t.Errorf("packets without a reply were counted: %d", n)
 	}
-	d := f.c.Get("/admin/router/link-status").Doc(t)
+	d := f.c.Get("/admin/dashboard/link-status").Doc(t)
 	if got := text(d.Find("[data-bad-secret-count]")); got == "0" || got == "" {
 		t.Errorf("bad-secret packets are missing from the link status: %q", got)
 	}

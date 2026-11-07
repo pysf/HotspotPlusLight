@@ -77,15 +77,16 @@ type LinkStatus interface {
 
 // Deps holds what the admin handler needs.
 type Deps struct {
-	Auth     AuthService
-	Plans    PlanService
-	Members  MemberService
-	Batches  BatchService
-	Sessions SessionService
-	Usage    UsageService
-	Settings SettingsService
-	Router   RouterPack
-	Link     LinkStatus
+	Auth      AuthService
+	Plans     PlanService
+	Members   MemberService
+	Batches   BatchService
+	Sessions  SessionService
+	Usage     UsageService
+	Dashboard DashboardService
+	Settings  SettingsService
+	Router    RouterPack
+	Link      LinkStatus
 	// RadiusPorts gives the RADIUS UDP ports for the router setup script, read when the page is rendered.
 	RadiusPorts func() (authPort, acctPort int)
 	// RunningServer gives the server settings the running process started with (nil = never show the restart notice).
@@ -126,7 +127,9 @@ func Handler(d Deps) http.Handler {
 				// MONITOR: sessions are opaque server-side rows (sliding 1 h); a stolen
 				// cookie is valid until it idles out or the admin logs out / changes password.
 				r.Use(h.requireSession, h.requireCSRF, h.requirePasswordChanged)
-				r.Get("/", redirect("/admin/members"))
+				r.Get("/", h.dashboardPage)
+				r.Get("/dashboard/online", h.dashboardOnline)
+				r.Get("/dashboard/link-status", h.linkStatus)
 				r.Post("/logout", h.logout)
 				r.Get("/password", h.passwordPage)
 				r.Put("/password", h.passwordChange)
@@ -175,7 +178,6 @@ func Handler(d Deps) http.Handler {
 				})
 				r.Route("/router", func(r chi.Router) {
 					r.Get("/", h.routerPage)
-					r.Get("/link-status", h.linkStatus)
 					r.Get("/pages/{key}.zip", h.packDownload)
 					r.Get("/pages/{key}/preview", h.packPreview)
 					r.Get("/pages/{key}/*", h.packAsset)
@@ -224,13 +226,9 @@ func noStore(next http.Handler) http.Handler {
 	})
 }
 
-// redirect returns a handler that redirects to the path to.
-func redirect(to string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, to, http.StatusSeeOther) }
-}
-
 // nav is the sidebar menu.
 var nav = []ui.NavItem{
+	{Label: "Dashboard", Href: dashboardHome, Group: "Manage", Icon: "home"},
 	{Label: "Members", Href: "/admin/members", Group: "Manage", Icon: "users"},
 	{Label: "Batches", Href: batchesHome, Group: "Manage", Icon: "ticket"},
 	{Label: "Online", Href: sessionsHome, Group: "Manage", Icon: "wifi"},
@@ -415,7 +413,7 @@ func (h handlers) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	default:
 		// No Max-Age: the server-side row decides validity. No Secure flag: plain HTTP on the LAN (D9).
 		http.SetCookie(w, &http.Cookie{Name: cookieName, Value: sess.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
-		to := "/admin/members"
+		to := dashboardHome
 		if must, err := h.Auth.MustChangePassword(r.Context()); err != nil {
 			h.serverError(w, r, err)
 			return

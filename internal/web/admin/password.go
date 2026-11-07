@@ -72,6 +72,6 @@ func (h handlers) passwordChange(w http.ResponseWriter, r *http.Request) {
 	default:
 		// The page changes, so the toast text goes in a short cookie that toast.js shows and clears.
 		http.SetCookie(w, &http.Cookie{Name: "hsp_toast", Value: url.PathEscape("Password changed"), Path: "/admin", MaxAge: 30, SameSite: http.SameSiteStrictMode})
-		htmxRedirect(w, r, http.StatusOK, "/admin/members")
+		htmxRedirect(w, r, http.StatusOK, dashboardHome)
 	}
 }
