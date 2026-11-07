@@ -114,7 +114,7 @@ func TestE18_02_SidebarHasDashboardFirst(t *testing.T) {
 	}
 }
 
-// E18.03 Online now equals the Online page (a stale session is not counted) and its fragment polls every 10 seconds.
+// E18.03 Online now equals the Online page (a stale session is not counted).
 func TestE18_03_OnlineNowTile(t *testing.T) {
 	f := newP4(t)
 	plan := f.plan("Basic")
@@ -130,22 +130,6 @@ func TestE18_03_OnlineNowTile(t *testing.T) {
 	}
 	if peak := dashInt(t, d, "[data-peak-today]", "data-peak-today"); peak < now {
 		t.Errorf("peak %d is below online now %d", peak, now)
-	}
-
-	r := f.c.Get("/admin/dashboard/online")
-	if r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-store" {
-		t.Fatalf("fragment: %d Cache-Control %q", r.StatusCode, r.Header.Get("Cache-Control"))
-	}
-	if strings.Contains(strings.ToLower(r.Body), "<html") {
-		t.Error("the response must be the tile fragment, not a full page")
-	}
-	frag := r.Doc(t)
-	tile := frag.Find(`[data-tile="online"]`)
-	if tile.AttrOr("hx-get", "") != "/admin/dashboard/online" || tile.AttrOr("hx-trigger", "") != "every 10s" || tile.AttrOr("hx-swap", "") != "outerHTML" {
-		t.Errorf("tile attributes: hx-get=%q hx-trigger=%q hx-swap=%q", tile.AttrOr("hx-get", ""), tile.AttrOr("hx-trigger", ""), tile.AttrOr("hx-swap", ""))
-	}
-	if got := dashInt(t, frag, "[data-online-now]", "data-online-now"); got != 1 {
-		t.Errorf("fragment Online now %d", got)
 	}
 }
 
@@ -242,15 +226,13 @@ func TestE18_06_FailedLoginsTile(t *testing.T) {
 	}
 }
 
-// E18.07 the router status panel is on the dashboard and polls every 5 seconds; the Router page no longer has it.
+// E18.07 the router status panel is on the dashboard (it refreshes with the whole dashboard, E18.15); the Router page no longer has it.
 func TestE18_07_RouterStatusMovedToDashboard(t *testing.T) {
 	f := newP3(t)
-	const path = "/admin/dashboard/link-status"
 
 	d := dashDoc(t, f.c)
-	panel := d.Find("[data-link-status]")
-	if panel.Length() != 1 || panel.AttrOr("hx-get", "") != path || panel.AttrOr("hx-trigger", "") != "every 5s" || panel.AttrOr("hx-swap", "") != "outerHTML" {
-		t.Errorf("dashboard panel: %d found, hx-get=%q hx-trigger=%q hx-swap=%q", panel.Length(), panel.AttrOr("hx-get", ""), panel.AttrOr("hx-trigger", ""), panel.AttrOr("hx-swap", ""))
+	if n := d.Find("[data-link-status]").Length(); n != 1 {
+		t.Errorf("the dashboard shows %d router status panels, want 1", n)
 	}
 	for _, k := range []string{"access-request", "accounting", "disconnect"} {
 		if got := link(t, d, k); got.at != "never" {
@@ -266,17 +248,10 @@ func TestE18_07_RouterStatusMovedToDashboard(t *testing.T) {
 		t.Error("the Router page lost the setup script or the page designs")
 	}
 
-	if r := f.c.Get(path); r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-store" {
-		t.Errorf("fragment route: %d Cache-Control %q", r.StatusCode, r.Header.Get("Cache-Control"))
-	}
-	anon := harness.NewAdminClient(t, f.s)
-	if r := anon.Get(path); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
-		t.Errorf("anonymous fragment: %d %q", r.StatusCode, r.Header.Get("Location"))
-	}
 	// The panel is empty again after a restart: E8.07b.
 }
 
-// E18.08 Needs attention: expiring within 7 days and near the data limit, with the boundaries, the 5-row cap and the member links.
+// E18.08 Needs attention: expiring within 3 days and near the data limit, with the boundaries, the 5-row cap and the member links.
 func TestE18_08_NeedsAttention(t *testing.T) {
 	f := newP3(t)
 	now := f.fc.Now()
@@ -288,13 +263,13 @@ func TestE18_08_NeedsAttention(t *testing.T) {
 	}
 	day := 24 * time.Hour
 	expiring("e1", day)
-	expiring("e7", 7*day)                 // exactly 7 days counts
-	expiring("e7plus", 7*day+time.Second) // one second more does not
+	expiring("e3", 3*day)                 // exactly 3 days counts (the Members page uses the same rule)
+	expiring("e3plus", 3*day+time.Second) // one second more does not
 	f.exec(`UPDATE member SET active=0 WHERE id=?`, expiring("edisabled", 2*day))
 	expiring("eexpired", -time.Hour)
 
 	d := dashDoc(t, f.c)
-	if got, want := strings.Join(attentionNames(d, "expiring"), ","), "e1,e7"; got != want {
+	if got, want := strings.Join(attentionNames(d, "expiring"), ","), "e1,e3"; got != want {
 		t.Errorf("expiring rows %q, want %q", got, want)
 	}
 	if got := d.Find(`[data-attention="expiring"]`).AttrOr("data-count", ""); got != "2" {
@@ -303,7 +278,7 @@ func TestE18_08_NeedsAttention(t *testing.T) {
 
 	// At most 5 rows, with the full count, soonest first.
 	for i := 2; i <= 6; i++ {
-		expiring("x"+strconv.Itoa(i), time.Duration(i)*day)
+		expiring("x"+strconv.Itoa(i), time.Duration(24+6*(i-1))*time.Hour) // 30 h to 54 h, between e1 and e3
 	}
 	d = dashDoc(t, f.c)
 	if got, want := strings.Join(attentionNames(d, "expiring"), ","), "e1,x2,x3,x4,x5"; got != want {
@@ -506,13 +481,55 @@ func TestE18_13_NewInstall(t *testing.T) {
 	}
 }
 
-// E18.14 both fragment routes need a login.
-func TestE18_14_FragmentsNeedLogin(t *testing.T) {
+// E18.14 the dashboard fragment needs a login.
+func TestE18_14_FragmentNeedsLogin(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	anon := harness.NewAdminClient(t, s)
-	for _, p := range []string{"/admin/dashboard/online", "/admin/dashboard/link-status"} {
-		if r := anon.Get(p); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
-			t.Errorf("%s anonymous: %d %q", p, r.StatusCode, r.Header.Get("Location"))
+	const p = "/admin/dashboard/content"
+	if r := anon.Get(p); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
+		t.Errorf("%s anonymous: %d %q", p, r.StatusCode, r.Header.Get("Location"))
+	}
+}
+
+// E18.15 the whole dashboard refreshes by itself: one container polls the content fragment every 10 seconds,
+// and the fragment has every part of the page (tiles, router status, Needs attention, three charts) and no page frame.
+func TestE18_15_WholeDashboardRefreshes(t *testing.T) {
+	f := newP4(t)
+	plan := f.plan("Basic")
+	f.member(plan, "alice")
+	f.start("alice", "s1")
+	const path = "/admin/dashboard/content"
+
+	d := dashDoc(t, f.c)
+	box := d.Find("[data-dashboard]")
+	if box.Length() != 1 || box.AttrOr("hx-get", "") != path || box.AttrOr("hx-trigger", "") != "every 10s" || box.AttrOr("hx-swap", "") != "outerHTML" {
+		t.Errorf("dashboard container: %d found, hx-get=%q hx-trigger=%q hx-swap=%q",
+			box.Length(), box.AttrOr("hx-get", ""), box.AttrOr("hx-trigger", ""), box.AttrOr("hx-swap", ""))
+	}
+	for _, sel := range []string{"[data-tile]", "[data-link-status]", "[data-attention]", "[data-chart]"} {
+		if d.Find("[data-dashboard] "+sel).Length() == 0 {
+			t.Errorf("%s is outside the polled container", sel)
 		}
+	}
+
+	r := f.c.Get(path)
+	if r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("fragment: %d Cache-Control %q", r.StatusCode, r.Header.Get("Cache-Control"))
+	}
+	if strings.Contains(strings.ToLower(r.Body), "<html") {
+		t.Error("the response must be the fragment, not a full page")
+	}
+	frag := r.Doc(t)
+	if n := frag.Find(`[data-tile]`).Length(); n != 3 {
+		t.Errorf("fragment has %d tiles, want 3", n)
+	}
+	if n := frag.Find(`[data-chart]`).Length(); n != 3 {
+		t.Errorf("fragment has %d charts, want 3", n)
+	}
+	if frag.Find(`[data-link-status]`).Length() != 1 || frag.Find(`[data-attention]`).Length() != 2 {
+		t.Error("the fragment lacks the router status or the Needs attention lists")
+	}
+	if got := dashInt(t, frag, "[data-online-now]", "data-online-now"); got != 1 {
+		t.Errorf("fragment Online now %d, want 1", got)
 	}
 }

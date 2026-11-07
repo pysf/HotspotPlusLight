@@ -7,7 +7,7 @@ Built: migration `0007_login_failure_daily.sql` (`login_failure_daily(day, reaso
 - Only counts are stored: no user names, no addresses. Rows are pruned with `session_retention_days`.
 - If the counter cannot be written, the reject is still sent and the error is logged. The write happens before the reply (one SQLite write per reject, accepted at LAN scale; `MONITOR:` in `countFailure`). A failed write is forgotten by the cache, so the next retry is counted.
 - `radius.New` takes options (`WithFailureRecorder`, `WithClock`), so old callers did not change.
-- Members "Expiring soon" (3 days) and the dashboard list (7 days) use one rule, `domain.ExpiresWithin`, with two named day constants.
+- Members "Expiring soon" and the dashboard list use one rule, `domain.ExpiresWithin`, and one constant, `domain.ExpiringDays` (3). The dashboard list was 7 days until 2026-11-07.
 - Peak today is never lower than online now. The running hour counts by the part that has passed (BR-29).
 
 ## Tests

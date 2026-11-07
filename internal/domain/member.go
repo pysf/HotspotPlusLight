@@ -219,16 +219,13 @@ const (
 	StatusExpired  = "expired"
 )
 
-// MemberExpiringDays is how many days before expires_at a member counts as "expiring" in the member list (BR-24).
-const MemberExpiringDays = 3
-
-// DashboardExpiringDays is the "expiring" window of the dashboard list (BR-30). It is longer on purpose:
-// that list is a reminder to renew, not a status.
-const DashboardExpiringDays = 7
+// ExpiringDays is how many days before expires_at a member counts as "expiring". The member list (BR-24)
+// and the dashboard list (BR-30) both use it.
+const ExpiringDays = 3
 
 // MemberStatus returns the status shown in the list (BR-24), with precedence
 // expired, inactive, expiring, active. Expired means now is strictly after
-// expires_at (O7); exactly MemberExpiringDays left still counts as expiring. Times
+// expires_at (O7); exactly ExpiringDays left still counts as expiring. Times
 // are compared in whole seconds, because store.statusClause must agree.
 func MemberStatus(active bool, expiresAt *time.Time, now time.Time) string {
 	n := now.Unix()
@@ -237,7 +234,7 @@ func MemberStatus(active bool, expiresAt *time.Time, now time.Time) string {
 		return StatusExpired
 	case !active:
 		return StatusInactive
-	case ExpiresWithin(now, expiresAt, MemberExpiringDays):
+	case ExpiresWithin(now, expiresAt, ExpiringDays):
 		return StatusExpiring
 	}
 	return StatusActive

@@ -171,7 +171,7 @@ func likePattern(q string) string {
 // The four statuses exclude each other and cover every member. An unknown status matches nothing.
 func statusClause(status string, now time.Time) (string, []any) {
 	n := now.Unix()
-	soon := domain.ExpiryLimit(now, domain.MemberExpiringDays)
+	soon := domain.ExpiryLimit(now, domain.ExpiringDays)
 	switch status {
 	case domain.StatusExpired:
 		return `(m.expires_at IS NOT NULL AND m.expires_at < ?)`, []any{n}

@@ -118,23 +118,6 @@ func (s *Service) RecordLoginFailure(ctx context.Context, reason domain.Reason) 
 	return s.repo.AddLoginFailure(ctx, domain.DayKey(e.now, e.loc), reason)
 }
 
-// Online returns the online count and today's peak (BR-25). The page polls this one.
-func (s *Service) Online(ctx context.Context) (OnlineNow, error) {
-	e, err := s.env(ctx)
-	if err != nil {
-		return OnlineNow{}, err
-	}
-	n, err := s.repo.CountOnlineSessions(ctx, domain.ActiveSince(e.now, e.st.AccountingIntervalSeconds))
-	if err != nil {
-		return OnlineNow{}, err
-	}
-	spans, err := s.repo.SessionSpansSince(ctx, midnight(e.now, e.loc))
-	if err != nil {
-		return OnlineNow{}, err
-	}
-	return onlineOf(e, n, spans), nil
-}
-
 // onlineOf builds the first tile from the online count and the session spans that reach back to today's midnight or further.
 // A session that started this very second has no length yet, so the peak never falls below the count.
 func onlineOf(e env, n int, spans []domain.SessionSpan) OnlineNow {
@@ -188,7 +171,7 @@ func (s *Service) Overview(ctx context.Context) (Overview, error) {
 	if o.Failures, err = s.failures(ctx, domain.DayKey(e.now, e.loc)); err != nil {
 		return o, err
 	}
-	if o.Expiring.Rows, o.Expiring.Count, err = s.repo.ExpiringMembers(ctx, e.now, domain.DashboardExpiringDays, ListMax); err != nil {
+	if o.Expiring.Rows, o.Expiring.Count, err = s.repo.ExpiringMembers(ctx, e.now, domain.ExpiringDays, ListMax); err != nil {
 		return o, err
 	}
 	o.NearLimit, err = s.nearLimit(ctx, e.now)

@@ -14,3 +14,5 @@ Built: `GET /admin` is the Dashboard (it replaced the redirect to Members) and t
 ## Not verified / known
 - No e2e test was run by the agents. The page was not looked at in a browser, including the tile styling in both themes.
 - Traffic today and Failed logins today are drawn on page load and go stale on a dashboard that stays open (by design, D25).
+
+**Change on 2026-11-07 (owner):** the expiring list is 3 days, not 7 (`domain.ExpiringDays`, the same as the Members chip). The whole dashboard refreshes by itself: one container polls `GET /admin/dashboard/content` every 10 s. The routes `/admin/dashboard/online` and `/admin/dashboard/link-status` are gone. E18.15 is new; E18.03, E18.07, E18.08, E18.14 and E8.13 changed.

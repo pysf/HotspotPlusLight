@@ -182,10 +182,11 @@ func TestOnlineAndPeak(t *testing.T) {
 		{StartedAt: min(-10), LastUpdate: min(-1)},                    // open and online
 		{StartedAt: min(-200), LastUpdate: min(-100)},                 // stale: ended at its last update
 	}}
-	got, err := New(f, clock.NewFake(t0)).Online(context.Background())
+	o, err := New(f, clock.NewFake(t0)).Overview(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
+	got := o.Online
 	if got.Now != 1 || got.PeakToday != 2 {
 		t.Errorf("%+v, want now 1 peak 2", got)
 	}

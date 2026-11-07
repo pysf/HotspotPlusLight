@@ -133,7 +133,7 @@ func TestExpiresWithinAndMemberStatusBoundaries(t *testing.T) {
 	now := dt0
 	at := func(d time.Duration) *time.Time { v := now.Add(d); return &v }
 	day := 24 * time.Hour
-	if ExpiresWithin(now, nil, 7) {
+	if ExpiresWithin(now, nil, ExpiringDays) {
 		t.Error("nil expiry")
 	}
 	for name, c := range map[string]struct {
@@ -141,13 +141,12 @@ func TestExpiresWithinAndMemberStatusBoundaries(t *testing.T) {
 		days int
 		want bool
 	}{
-		"exactly now":       {at(0), 7, true},
-		"one second past":   {at(-time.Second), 7, false},
-		"exactly 7 days":    {at(7 * day), 7, true},
-		"7 days + 1 s":      {at(7*day + time.Second), 7, false},
-		"exactly 3 days":    {at(3 * day), 3, true},
-		"3 days + 1 s":      {at(3*day + time.Second), 3, false},
-		"far in the future": {at(400 * day), 7, false},
+		"exactly now":       {at(0), ExpiringDays, true},
+		"one second past":   {at(-time.Second), ExpiringDays, false},
+		"exactly 3 days":    {at(3 * day), ExpiringDays, true},
+		"3 days + 1 s":      {at(3*day + time.Second), ExpiringDays, false},
+		"a longer window":   {at(7 * day), 7, true},
+		"far in the future": {at(400 * day), ExpiringDays, false},
 	} {
 		if got := ExpiresWithin(now, c.exp, c.days); got != c.want {
 			t.Errorf("%s: %v, want %v", name, got, c.want)

@@ -172,25 +172,25 @@ export default [
   "page": "Dashboard",
   "heading": "Open the dashboard",
   "url": "docs/dashboard/#open",
-  "keywords": "After you log in, the Dashboard is the first page. It is also the first item in the sidebar. The brand name in the top bar takes you back to it. All times and days follow the time zone on the Settings page. A new install has no data yet, so the lists and chart"
+  "keywords": "After you log in, the Dashboard is the first page. It is also the first item in the sidebar. The brand name in the top bar takes you back to it. The whole page refreshes by itself every 10 seconds, so you can leave it open. All times and days follow the time z"
  },
  {
   "page": "Dashboard",
   "heading": "The three tiles",
   "url": "docs/dashboard/#tiles",
-  "keywords": "Tile What it shows Online now The open sessions that the router still reports. It is the same number as on the Online page, so one member on two devices counts twice. The note shows the peak today : the most sessions online at one moment since midnight. The ti"
+  "keywords": "Tile What it shows Online now The open sessions that the router still reports. It is the same number as on the Online page, so one member on two devices counts twice. The note shows the peak today : the most sessions online at one moment since midnight. Traffi"
  },
  {
   "page": "Dashboard",
   "heading": "Router status",
   "url": "docs/dashboard/#router-status",
-  "keywords": "This panel shows what the router last sent to the server: the time and source address of the last login request, the last accounting packet and the last Disconnect result, and how many packets had a wrong shared secret. It refreshes every 5 seconds. It lives i"
+  "keywords": "This panel shows what the router last sent to the server: the time and source address of the last login request, the last accounting packet and the last Disconnect result, and how many packets had a wrong shared secret. It lives in memory and starts empty afte"
  },
  {
   "page": "Dashboard",
   "heading": "Needs attention",
   "url": "docs/dashboard/#attention",
-  "keywords": "Two short lists, with the full count in the heading and at most five members shown: Expiring in 7 days : active members whose expiry date is in the next 7 days. They are good people to renew. The Members page has its own Expiring filter, which looks only 3 day"
+  "keywords": "Two short lists, with the full count in the heading and at most five members shown: Expiring in 3 days : active members whose expiry date is in the next 3 days. They are good people to renew. It is the same rule as the Expiring filter on the Members page. Near"
  },
  {
   "page": "Dashboard",

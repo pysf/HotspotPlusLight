@@ -19,17 +19,13 @@ import (
 // DashboardService is the read-only numbers of internal/dashboard.
 type DashboardService interface {
 	Overview(ctx context.Context) (dashboard.Overview, error)
-	Online(ctx context.Context) (dashboard.OnlineNow, error)
 }
 
 // dashboardHome is the path of the dashboard, the first page after login.
 const dashboardHome = "/admin"
 
-// onlineTileURL is the fragment that the Online now tile polls.
-const onlineTileURL = "/admin/dashboard/online"
-
-// linkStatusURL is the fragment that the router status panel polls.
-const linkStatusURL = "/admin/dashboard/link-status"
+// dashboardContentURL is the fragment that the whole dashboard polls.
+const dashboardContentURL = "/admin/dashboard/content"
 
 // dashboardView is the dashboard prepared for display.
 type dashboardView struct {
@@ -178,7 +174,8 @@ func newDashboardView(o dashboard.Overview, snap linkstatus.Snapshot) dashboardV
 	if o.Failures.HasTop {
 		v.Failed.Code, v.Failed.Text, v.Failed.Count = string(o.Failures.Top.Reason), o.Failures.Top.Reason.Message(), o.Failures.Top.Count
 	}
-	v.Expiring = attentionView{Key: "expiring", Title: "Expiring in 7 days", Column: "Expires", Empty: "No member expires in the next 7 days.", Count: o.Expiring.Count}
+	days := strconv.Itoa(domain.ExpiringDays)
+	v.Expiring = attentionView{Key: "expiring", Title: "Expiring in " + days + " days", Column: "Expires", Empty: "No member expires in the next " + days + " days.", Count: o.Expiring.Count}
 	for _, r := range o.Expiring.Rows {
 		v.Expiring.Rows = append(v.Expiring.Rows, attentionRow{ID: r.MemberID, Username: r.Username,
 			Detail: r.ExpiresAt.In(o.Loc).Format("2006-01-02") + " (" + domain.FormatRelative(o.Now, r.ExpiresAt) + ")"})
@@ -206,44 +203,33 @@ func newDashboardView(o dashboard.Overview, snap linkstatus.Snapshot) dashboardV
 	return v
 }
 
-// dashboardPage shows the home page.
-func (h handlers) dashboardPage(w http.ResponseWriter, r *http.Request) {
+// dashboardView builds the whole dashboard for one request.
+func (h handlers) dashboardView(r *http.Request) (dashboardView, error) {
 	o, err := h.Dashboard.Overview(r.Context())
 	if err != nil {
-		h.serverError(w, r, err)
-		return
+		return dashboardView{}, err
 	}
-	h.render(w, r, http.StatusOK, DashboardPage(layout(r, "Dashboard", dashboardHome), newDashboardView(o, h.Link.Snapshot())))
+	return newDashboardView(o, h.Link.Snapshot()), nil
 }
 
-// dashboardOnline shows the Online now tile alone. The dashboard polls it every 10 seconds.
-func (h handlers) dashboardOnline(w http.ResponseWriter, r *http.Request) {
-	o, err := h.Dashboard.Online(r.Context())
+// dashboardPage shows the home page.
+func (h handlers) dashboardPage(w http.ResponseWriter, r *http.Request) {
+	v, err := h.dashboardView(r)
 	if err != nil {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, OnlineTile(o))
+	h.render(w, r, http.StatusOK, DashboardPage(layout(r, "Dashboard", dashboardHome), v))
 }
 
-// displayLocation returns the display time zone (settings.timezone), the same source the dashboard service uses.
-func (h handlers) displayLocation(ctx context.Context) (*time.Location, error) {
-	st, err := h.Settings.Get(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return st.Location()
-}
-
-// linkStatus shows the router link status panel alone. The dashboard polls it every 5 seconds.
-// It reads only the time zone, not the whole overview, so a poll stays cheap.
-func (h handlers) linkStatus(w http.ResponseWriter, r *http.Request) {
-	loc, err := h.displayLocation(r.Context())
+// dashboardContent shows everything under the page title as a fragment. The dashboard polls it every 10 seconds.
+func (h handlers) dashboardContent(w http.ResponseWriter, r *http.Request) {
+	v, err := h.dashboardView(r)
 	if err != nil {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, LinkStatusPanel(linkRows(h.Link.Snapshot(), loc)))
+	h.render(w, r, http.StatusOK, DashboardContent(v))
 }
 
 // linkEvent is one row of the link status table.

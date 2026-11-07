@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -561,7 +560,7 @@ func TestE8_07_LinkStatusPanel(t *testing.T) {
 	// Reading the panel and its fragment writes nothing.
 	reads := dbSnapshot(t, f.db, sliding)
 	panel()
-	f.c.Get("/admin/dashboard/link-status")
+	f.c.Get("/admin/dashboard/content")
 	if diff := snapshotDiff(reads, dbSnapshot(t, f.db, sliding)); diff != "" {
 		t.Errorf("reading the panel changed: %s", diff)
 	}
@@ -697,22 +696,11 @@ func TestE8_12_RouterPageAssets(t *testing.T) {
 	}
 }
 
-// E8.13 the link status panel refreshes itself: the dashboard polls /admin/dashboard/link-status, a fragment
-// with the three rows that needs a login and shows a new packet without a full page load.
+// E8.13 the router status panel refreshes with the whole dashboard: the content fragment has the three rows and shows
+// a new packet without a full page load.
 func TestE8_13_LinkStatusPolling(t *testing.T) {
 	f := newP8(t)
-	const path = "/admin/dashboard/link-status"
-
-	anon := harness.NewAdminClient(t, f.s)
-	if r := anon.Get(path); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
-		t.Errorf("anonymous: %d %q", r.StatusCode, r.Header.Get("Location"))
-	}
-
-	panel := f.c.Get("/admin").Doc(t).Find("[data-link-status]")
-	if panel.AttrOr("hx-get", "") != path || panel.AttrOr("hx-trigger", "") != "every 5s" || panel.AttrOr("hx-swap", "") != "outerHTML" {
-		t.Errorf("panel attributes: hx-get=%q hx-trigger=%q hx-swap=%q",
-			panel.AttrOr("hx-get", ""), panel.AttrOr("hx-trigger", ""), panel.AttrOr("hx-swap", ""))
-	}
+	const path = "/admin/dashboard/content"
 
 	r := f.c.Get(path)
 	if r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-store" {
@@ -720,7 +708,7 @@ func TestE8_13_LinkStatusPolling(t *testing.T) {
 	}
 	d := r.Doc(t)
 	if strings.Contains(strings.ToLower(r.Body), "<html") || d.Find("[data-link-status]").Length() != 1 {
-		t.Error("the response must be the panel fragment, not a full page")
+		t.Error("the response must be the dashboard fragment with one router status panel, not a full page")
 	}
 	for _, k := range []string{"access-request", "accounting", "disconnect"} {
 		if got := link(t, d, k); got.at != "never" {

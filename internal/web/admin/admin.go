@@ -128,8 +128,7 @@ func Handler(d Deps) http.Handler {
 				// cookie is valid until it idles out or the admin logs out / changes password.
 				r.Use(h.requireSession, h.requireCSRF, h.requirePasswordChanged)
 				r.Get("/", h.dashboardPage)
-				r.Get("/dashboard/online", h.dashboardOnline)
-				r.Get("/dashboard/link-status", h.linkStatus)
+				r.Get("/dashboard/content", h.dashboardContent)
 				r.Post("/logout", h.logout)
 				r.Get("/password", h.passwordPage)
 				r.Put("/password", h.passwordChange)

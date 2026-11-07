@@ -11,6 +11,14 @@ import (
 templ DashboardPage(l ui.LayoutData, v dashboardView) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Dashboard")
+		<p class="u-muted l-gap-bottom">Updates every 10 seconds.</p>
+		@DashboardContent(v)
+	}
+}
+
+// DashboardContent is everything under the page title. It is the polled fragment: it re-fetches itself every 10 s (htmx), keeping the page.
+templ DashboardContent(v dashboardView) {
+	<div data-dashboard hx-get={ dashboardContentURL } hx-trigger="every 10s" hx-swap="outerHTML">
 		@ui.Tiles() {
 			@OnlineTile(v.Online)
 			@ui.Tile("Traffic today (so far)", templ.Attributes{"data-tile": "traffic"}) {
@@ -37,12 +45,12 @@ templ DashboardPage(l ui.LayoutData, v dashboardView) {
 		for _, c := range v.Charts {
 			@ChartSection(c)
 		}
-	}
+	</div>
 }
 
-// OnlineTile is the Online now tile. It is the polled fragment: it re-fetches itself every 10 s (htmx), keeping the page.
+// OnlineTile is the Online now tile.
 templ OnlineTile(o dashboard.OnlineNow) {
-	@ui.Tile("Online now", templ.Attributes{"data-tile": "online", "hx-get": onlineTileURL, "hx-trigger": "every 10s", "hx-swap": "outerHTML"}) {
+	@ui.Tile("Online now", templ.Attributes{"data-tile": "online"}) {
 		@ui.TileValue(strconv.Itoa(o.Now), templ.Attributes{"data-online-now": strconv.Itoa(o.Now)})
 		@ui.TileNote("Peak today: "+strconv.Itoa(o.PeakToday), templ.Attributes{"data-peak-today": strconv.Itoa(o.PeakToday)})
 	}
@@ -90,11 +98,10 @@ templ ChartSection(c chartView) {
 }
 
 // LinkStatusPanel shows what the router last sent. It lives in memory and starts empty after a restart.
-// It is the polled fragment: it re-fetches itself every 5 s (htmx), keeping the page.
 templ LinkStatusPanel(v linkView) {
-	<div data-link-status hx-get={ linkStatusURL } hx-trigger="every 5s" hx-swap="outerHTML">
+	<div data-link-status>
 		<h2 class="l-gap-bottom">Router status</h2>
-		<p class="u-muted l-gap-bottom">Since the server started. Updates every 5 seconds. A wrong shared secret on the router shows up as bad-secret packets.</p>
+		<p class="u-muted l-gap-bottom">Since the server started. A wrong shared secret on the router shows up as bad-secret packets.</p>
 		@ui.Table("Router status", []string{"", "When", "Router address", "Result"}) {
 			for _, e := range v.Events {
 				<tr data-link={ e.Key }>
