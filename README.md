@@ -141,6 +141,7 @@ sequenceDiagram
 | Deleting a plan that members use is blocked | O12 |
 | AES-256 key auto-generated on first start (only if `hsp.db` does not exist), saved to `{DATA_DIR}/hsp.key`; back this file up with `hsp.db` | -- |
 | Listen addresses and log settings: env vars seed the first start; the Settings page is the only place after that | -- |
+| Time zone is a dropdown. The RADIUS secret is letters and digits only (use 20 or more); the first-start secret is generated that way | -- |
 
 ## Develop
 

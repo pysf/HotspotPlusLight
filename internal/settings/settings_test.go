@@ -11,12 +11,11 @@ import (
 
 type fakeRepo struct {
 	saved  *domain.Settings
+	cur    domain.Settings // the stored row GetSettings returns
 	planOK bool
 }
 
-func (f *fakeRepo) GetSettings(context.Context) (domain.Settings, error) {
-	return domain.Settings{}, nil
-}
+func (f *fakeRepo) GetSettings(context.Context) (domain.Settings, error) { return f.cur, nil }
 func (f *fakeRepo) UpdateSettings(_ context.Context, s domain.Settings, _ time.Time) error {
 	f.saved = &s
 	return nil
@@ -61,5 +60,27 @@ func TestTimezoneValidation(t *testing.T) {
 		if err != nil || (errs["timezone"] == "") != ok {
 			t.Errorf("%q: ok=%v errs=%v err=%v", tz, ok, errs, err)
 		}
+	}
+}
+
+func TestEveryListedTimezoneLoads(t *testing.T) {
+	for _, n := range domain.TimezoneNames {
+		if _, err := time.LoadLocation(n); err != nil {
+			t.Errorf("%s: %v", n, err)
+		}
+	}
+}
+
+func TestStoredSecretWithSymbolsStillSaves(t *testing.T) {
+	r := &fakeRepo{cur: domain.Settings{RadiusSharedSecret: "old s3cret!"}}
+	s := New(r, clock.NewFake(time.Unix(0, 0)))
+	f := goodForm()
+	f.RadiusSharedSecret = "old s3cret!"
+	if errs, err := s.Update(context.Background(), f); err != nil || len(errs) != 0 {
+		t.Fatalf("%v %v", errs, err)
+	}
+	f.RadiusSharedSecret = "new s3cret!"
+	if errs, _ := s.Update(context.Background(), f); errs["radius_shared_secret"] == "" {
+		t.Fatal("a new secret with symbols was accepted")
 	}
 }

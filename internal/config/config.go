@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"hotspotpluslight/internal/domain"
 	"hotspotpluslight/internal/secret"
 )
 
@@ -114,6 +115,11 @@ func Load(getenv func(string) string) (Config, error) {
 		RadiusAcctAddr:     get("RADIUS_ACCT_ADDR", ":1813"),
 		AdminUsername:      get("ADMIN_USERNAME", "admin"),
 		RadiusSharedSecret: get("RADIUS_SHARED_SECRET", ""),
+	}
+	if v := c.RadiusSharedSecret; v != "" {
+		if msg := domain.SecretProblem(v); msg != "" {
+			return c, fmt.Errorf("HSP_RADIUS_SHARED_SECRET invalid: %s", msg)
+		}
 	}
 	raw := getenv("HSP_SECRET_KEY")
 	if raw == "" {

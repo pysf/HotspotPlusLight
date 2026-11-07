@@ -451,7 +451,7 @@ func TestE8_08_LogFormatAndSignal(t *testing.T) {
 		cmd.Env = []string{
 			"PATH=" + os.Getenv("PATH"), "HSP_DATA_DIR=" + dir, "HSP_SECRET_KEY=" + harness.NewKey(),
 			"HSP_ADMIN_ADDR=127.0.0.1:0", "HSP_RADIUS_AUTH_ADDR=127.0.0.1:0", "HSP_RADIUS_ACCT_ADDR=127.0.0.1:0",
-			"HSP_RADIUS_SHARED_SECRET=Env-Seeded-Secret-77",
+			"HSP_RADIUS_SHARED_SECRET=EnvSeededSecret77",
 		}
 		if format != "" {
 			cmd.Env = append(cmd.Env, "HSP_LOG_FORMAT="+format)
@@ -488,7 +488,7 @@ func TestE8_08_LogFormatAndSignal(t *testing.T) {
 		if runtime.GOOS != "windows" && !strings.Contains(logs, "shutdown complete") {
 			t.Errorf("format %q: no 'shutdown complete' in\n%s", format, logs)
 		}
-		if !strings.Contains(so.String(), "password: admin") || strings.Contains(logs, "password: admin") || strings.Contains(logs, "Env-Seeded-Secret-77") {
+		if !strings.Contains(so.String(), "password: admin") || strings.Contains(logs, "password: admin") || strings.Contains(logs, "EnvSeededSecret77") {
 			t.Errorf("format %q: first-start block missing from stdout, or a password or secret in the log", format)
 		}
 		lines := strings.Split(strings.TrimSpace(logs), "\n")

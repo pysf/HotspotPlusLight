@@ -298,3 +298,12 @@ func TestThrottleConcurrentAttempts(t *testing.T) {
 		t.Fatalf("%d throttled, want %d", got, n-loginMaxFailures)
 	}
 }
+
+func TestGeneratedSecretIsLettersAndDigits(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		v, err := GenerateSecret(24)
+		if err != nil || len(v) != 24 || domain.SecretProblem(v) != "" {
+			t.Fatalf("%q %v", v, err)
+		}
+	}
+}

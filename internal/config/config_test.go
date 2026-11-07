@@ -61,3 +61,14 @@ func TestEnsureKeyGeneratesOnceAndNeverReplaces(t *testing.T) {
 		t.Fatal("key file was created next to an existing database")
 	}
 }
+
+func TestRadiusSharedSecretFromEnvMustBeLettersAndDigits(t *testing.T) {
+	key := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	if _, err := Load(env(map[string]string{"HSP_SECRET_KEY": key, "HSP_RADIUS_SHARED_SECRET": "Good123"})); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(env(map[string]string{"HSP_SECRET_KEY": key, "HSP_RADIUS_SHARED_SECRET": "bad secret!"}))
+	if err == nil || !strings.Contains(err.Error(), "HSP_RADIUS_SHARED_SECRET") {
+		t.Fatalf("want a clear error, got %v", err)
+	}
+}

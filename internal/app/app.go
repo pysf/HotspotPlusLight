@@ -283,7 +283,7 @@ func (a *App) seed(ctx context.Context, box *secret.Box, opts Options) error {
 	}
 	radiusSecret := a.cfg.RadiusSharedSecret
 	if radiusSecret == "" {
-		if radiusSecret, err = auth.GeneratePassword(24); err != nil {
+		if radiusSecret, err = auth.GenerateSecret(24); err != nil {
 			return err
 		}
 	}

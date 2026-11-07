@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func okForm() PlanForm { f := NewPlanForm(); f.Name = "Gold"; return f }
 
@@ -73,21 +76,57 @@ func TestParseSettings(t *testing.T) {
 	}
 }
 
-func TestSharedSecretKeptVerbatim(t *testing.T) {
+// The owner replaced the old "kept verbatim" rule on 2026-11-07: a secret is letters and digits only.
+func TestSharedSecretLettersAndDigitsOnly(t *testing.T) {
 	f := goodSettingsForm()
 	f.BatchCounter = "1"
-	f.RadiusSharedSecret = "  se cret  "
+	f.RadiusSharedSecret = "Abc123xyz"
 	s, errs := ParseSettings(f)
-	if len(errs) != 0 || s.RadiusSharedSecret != "  se cret  " {
+	if len(errs) != 0 || s.RadiusSharedSecret != "Abc123xyz" {
 		t.Fatalf("%q %v", s.RadiusSharedSecret, errs)
 	}
-	if got := FormFromSettings(s).RadiusSharedSecret; got != "  se cret  " {
+	if got := FormFromSettings(s).RadiusSharedSecret; got != "Abc123xyz" {
 		t.Fatalf("round trip: %q", got)
 	}
-	for _, bad := range []string{"", "   ", "\t"} {
+	for _, bad := range []string{"", "   ", "\t", " se cret ", "abc def", "abc-def", "p@ss", "caf\u00e9", "abc\n", strings.Repeat("a", SecretMaxLen+1)} {
 		f.RadiusSharedSecret = bad
 		if _, errs := ParseSettings(f); errs["radius_shared_secret"] == "" {
 			t.Errorf("%q accepted", bad)
+		}
+	}
+	f.RadiusSharedSecret = strings.Repeat("a", SecretMaxLen)
+	if _, errs := ParseSettings(f); errs["radius_shared_secret"] != "" {
+		t.Errorf("max length rejected: %v", errs)
+	}
+}
+
+// An older database may hold a secret with symbols. Saving it unchanged must still work.
+func TestStoredSecretWithSymbolsIsKept(t *testing.T) {
+	f := goodSettingsForm()
+	f.RadiusSharedSecret = "old s3cret!"
+	if _, errs := ParseSettingsKeeping(f, "old s3cret!"); errs["radius_shared_secret"] != "" {
+		t.Errorf("unchanged stored secret rejected: %v", errs)
+	}
+	if _, errs := ParseSettingsKeeping(f, "different"); errs["radius_shared_secret"] == "" {
+		t.Error("a new secret with symbols accepted")
+	}
+	f.RadiusSharedSecret = "bad\nsecret"
+	if _, errs := ParseSettingsKeeping(f, "bad\nsecret"); errs["radius_shared_secret"] == "" {
+		t.Error("control characters accepted for a stored secret")
+	}
+}
+
+func TestTimezoneNamesAreUnique(t *testing.T) {
+	seen := map[string]bool{}
+	for _, n := range TimezoneNames {
+		if seen[n] {
+			t.Errorf("%s is listed twice", n)
+		}
+		seen[n] = true
+	}
+	for _, want := range []string{"UTC", "Asia/Tehran", "Europe/London"} {
+		if !seen[want] {
+			t.Errorf("%s is missing", want)
 		}
 	}
 }

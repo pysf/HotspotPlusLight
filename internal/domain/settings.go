@@ -70,12 +70,16 @@ func FormFromSettings(s Settings) SettingsForm {
 // ParseSettings validates the form with the ranges of the DDL (plus sane
 // upper bounds). Existence of the default plan and the timezone name are
 // checked by the settings service, which has the data for it.
-func ParseSettings(f SettingsForm) (Settings, FieldErrors) {
+func ParseSettings(f SettingsForm) (Settings, FieldErrors) { return ParseSettingsKeeping(f, "") }
+
+// ParseSettingsKeeping is ParseSettings for a row that already holds storedSecret.
+// Submitting that same secret again is accepted even if it breaks the current secret rule.
+func ParseSettingsKeeping(f SettingsForm, storedSecret string) (Settings, FieldErrors) {
 	p := &parser{errs: FieldErrors{}}
 	s := Settings{
 		BusinessName:              p.line("business_name", f.BusinessName, false, 100),
 		Timezone:                  p.text("timezone", f.Timezone, true, 64),
-		RadiusSharedSecret:        p.secret("radius_shared_secret", f.RadiusSharedSecret, 128),
+		RadiusSharedSecret:        p.secret("radius_shared_secret", f.RadiusSharedSecret, storedSecret),
 		CoaPort:                   p.integer("coa_port", f.CoaPort, 1, 65535),
 		AccountingIntervalSeconds: p.integer("accounting_interval_seconds", f.AccountingIntervalSeconds, 10, 86400),
 		BatchUsernamePrefix:       p.alnum("batch_username_prefix", f.BatchUsernamePrefix, 20),

@@ -51,7 +51,7 @@
 <p>This page assumes the Hotspot already works on the router (a hotspot server, a hotspot profile and an address pool). You then change three things: the router asks HotspotPlus Lite for logins and accounting, it accepts Disconnect requests, and it uses a login page from this program.</p>
 <div class="note warn"><b>Not yet tested on a real router</b><p>The generated commands follow the MikroTik documentation but have not been run on real hardware yet. Check each step on your router and version, and tell us what differs.</p></div></section>
 <section><h2 id="settings"><a href="#settings">Step 1: the shared secret</a></h2>
-<p>In the admin panel open <strong>Settings</strong>. Note the <strong>RADIUS shared secret</strong> (a random one was made at the first start, or the value of <code>HSP_RADIUS_SHARED_SECRET</code>). You can change it. Note also the <strong>Disconnect (CoA) port</strong>, 3799 by default.</p></section>
+<p>In the admin panel open <strong>Settings</strong>. Note the <strong>RADIUS shared secret</strong> (a random one was made at the first start, or the value of <code>HSP_RADIUS_SHARED_SECRET</code>). You can change it: use letters and digits only (no spaces or symbols), and make it long and random, 20 or more characters. Note also the <strong>Disconnect (CoA) port</strong>, 3799 by default.</p></section>
 <section><h2 id="script"><a href="#script">Step 2: the setup script</a></h2>
 <p>Open <strong>Router</strong> (<code>/admin/router</code>). It shows a setup script for RouterOS with your secret and ports filled in. It looks like this:</p>
 <pre><code># 1. RADIUS server. Replace &lt;SERVER-IP&gt;, and use the secret from the Settings page.
