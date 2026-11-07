@@ -54,10 +54,11 @@ templ RouterPage(l ui.LayoutData, p RouterProps) {
 }
 
 // LinkStatusPanel shows what the router last sent. It lives in memory and starts empty after a restart.
+// It is the polled fragment: it re-fetches itself every 5 s (htmx), keeping the page.
 templ LinkStatusPanel(v linkView) {
-	<div data-link-status>
+	<div data-link-status hx-get="/admin/router/link-status" hx-trigger="every 5s" hx-swap="outerHTML">
 		<h2 class="l-gap-bottom">Router link status</h2>
-		<p class="u-muted l-gap-bottom">Since the server started. A wrong shared secret on the router shows up as bad-secret packets.</p>
+		<p class="u-muted l-gap-bottom">Since the server started. Updates every 5 seconds. A wrong shared secret on the router shows up as bad-secret packets.</p>
 		@ui.Table("Router link status", []string{"", "When", "Router address", "Result"}) {
 			for _, e := range v.Events {
 				<tr data-link={ e.Key }>

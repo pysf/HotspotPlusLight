@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -670,5 +671,45 @@ func TestE8_12_RouterPageAssets(t *testing.T) {
 	js := f.c.Get(clip)
 	if js.StatusCode != 200 || !strings.Contains(js.Body, "data-copy-target") {
 		t.Errorf("clipboard.js: %d", js.StatusCode)
+	}
+}
+
+// E8.13 the link status panel refreshes itself: the page polls /admin/router/link-status, a fragment
+// with the three rows that needs a login and shows a new packet without a full page load.
+func TestE8_13_LinkStatusPolling(t *testing.T) {
+	f := newP8(t)
+	const path = "/admin/router/link-status"
+
+	anon := harness.NewAdminClient(t, f.s)
+	if r := anon.Get(path); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
+		t.Errorf("anonymous: %d %q", r.StatusCode, r.Header.Get("Location"))
+	}
+
+	panel := f.c.Get("/admin/router").Doc(t).Find("[data-link-status]")
+	if panel.AttrOr("hx-get", "") != path || panel.AttrOr("hx-trigger", "") != "every 5s" || panel.AttrOr("hx-swap", "") != "outerHTML" {
+		t.Errorf("panel attributes: hx-get=%q hx-trigger=%q hx-swap=%q",
+			panel.AttrOr("hx-get", ""), panel.AttrOr("hx-trigger", ""), panel.AttrOr("hx-swap", ""))
+	}
+
+	r := f.c.Get(path)
+	if r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("fragment: %d Cache-Control %q", r.StatusCode, r.Header.Get("Cache-Control"))
+	}
+	d := r.Doc(t)
+	if strings.Contains(strings.ToLower(r.Body), "<html") || d.Find("[data-link-status]").Length() != 1 {
+		t.Error("the response must be the panel fragment, not a full page")
+	}
+	for _, k := range []string{"access-request", "accounting", "disconnect"} {
+		if got := link(t, d, k); got.at != "never" {
+			t.Errorf("%s before any traffic: %+v", k, got)
+		}
+	}
+
+	// A new Access-Request shows up in the fragment without loading the full page again.
+	if _, err := f.nas.Authenticate("nobody", "x"); err != nil {
+		t.Fatal(err)
+	}
+	if got := link(t, f.c.Get(path).Doc(t), "access-request"); got.at == "never" || got.from != "127.0.0.1" {
+		t.Errorf("after an Access-Request: %+v", got)
 	}
 }

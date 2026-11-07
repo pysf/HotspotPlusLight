@@ -175,6 +175,7 @@ func Handler(d Deps) http.Handler {
 				})
 				r.Route("/router", func(r chi.Router) {
 					r.Get("/", h.routerPage)
+					r.Get("/link-status", h.linkStatus)
 					r.Get("/pages/{key}.zip", h.packDownload)
 					r.Get("/pages/{key}/preview", h.packPreview)
 					r.Get("/pages/{key}/*", h.packAsset)

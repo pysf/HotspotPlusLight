@@ -54,6 +54,21 @@ func (h handlers) routerPage(w http.ResponseWriter, r *http.Request) {
 	}))
 }
 
+// linkStatus shows the link status panel alone. The router page polls it every 5 seconds.
+func (h handlers) linkStatus(w http.ResponseWriter, r *http.Request) {
+	st, err := h.Settings.Get(r.Context())
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	loc, err := st.Location()
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	h.render(w, r, http.StatusOK, LinkStatusPanel(linkRows(h.Link.Snapshot(), loc)))
+}
+
 // RouterProps holds what the router page shows.
 type RouterProps struct {
 	Designs []routerpack.Design
