@@ -133,7 +133,7 @@ func TestStatusClauseMatchesGoRule(t *testing.T) {
 	ctx := context.Background()
 	now := fixed()
 	p, _ := s.CreatePlan(ctx, samplePlan("P"), now)
-	soon := domain.ExpiringSoon
+	soon := time.Duration(domain.MemberExpiringDays) * 24 * time.Hour
 	offsets := []time.Duration{-time.Second, 0, time.Second, soon - time.Second, soon, soon + time.Second, 30 * 24 * time.Hour}
 	type want struct{ name, status string }
 	var all []want

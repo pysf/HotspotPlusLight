@@ -32,8 +32,9 @@ type Repo interface {
 	CountOpenSessions(ctx context.Context) (int, error)
 	// InAcctTx runs fn in one transaction: committed when fn returns nil, rolled back otherwise.
 	InAcctTx(ctx context.Context, fn func(AcctTx) error) error
-	SessionRetentionDays(ctx context.Context) (int, error)
 	PruneSessions(ctx context.Context, cutoff time.Time) (int, error)
+	// PruneLoginFailures deletes the failed-login counts of the days before beforeDay (BR-27).
+	PruneLoginFailures(ctx context.Context, beforeDay string) (int, error)
 	GetSettings(ctx context.Context) (domain.Settings, error)
 	CountOnlineSessions(ctx context.Context, since time.Time) (int, error)
 	ListOnlineSessions(ctx context.Context, since time.Time, limit, offset int) ([]domain.Session, error)
@@ -265,17 +266,25 @@ func (s *Service) Account(ctx context.Context, rec domain.AcctRecord) error {
 	return err
 }
 
-// Prune deletes sessions older than settings.session_retention_days (O18) and
-// returns how many it deleted. Retention 0 keeps everything. Member usage is on
-// the member row and is not affected.
+// Prune deletes sessions and failed-login counts older than settings.session_retention_days (O18) and
+// returns how many sessions it deleted. Retention 0 keeps everything. Member usage is on
+// the member row and is not affected. The two deletes are independent: if one fails, the other still
+// runs, and the errors are returned together.
 func (s *Service) Prune(ctx context.Context) (int, error) {
-	days, err := s.repo.SessionRetentionDays(ctx)
-	if err != nil || days <= 0 {
+	st, err := s.repo.GetSettings(ctx)
+	if err != nil || st.SessionRetentionDays <= 0 {
 		return 0, err
 	}
-	n, err := s.repo.PruneSessions(ctx, s.clock.Now().Add(-time.Duration(days)*24*time.Hour))
-	if err == nil && n > 0 {
+	days := st.SessionRetentionDays
+	cutoff := s.clock.Now().Add(-time.Duration(days) * 24 * time.Hour)
+	n, sessErr := s.repo.PruneSessions(ctx, cutoff)
+	if sessErr == nil && n > 0 {
 		s.log.Info("old sessions pruned", "count", n, "retention_days", days)
 	}
-	return n, err
+	loc, locErr := st.Location()
+	if locErr != nil {
+		return n, errors.Join(sessErr, locErr)
+	}
+	_, failErr := s.repo.PruneLoginFailures(ctx, domain.DayKey(cutoff, loc))
+	return n, errors.Join(sessErr, failErr)
 }

@@ -117,13 +117,6 @@ func (t *AcctTx) AddDailyUsage(ctx context.Context, memberID int64, day string, 
 	return err
 }
 
-// SessionRetentionDays returns the session retention setting (O18). It is read at each pruning run, so a change applies without restart.
-func (s *Store) SessionRetentionDays(ctx context.Context) (int, error) {
-	var n int
-	err := s.r.QueryRowContext(ctx, `SELECT session_retention_days FROM settings WHERE id=1`).Scan(&n)
-	return n, err
-}
-
 // PruneSessions deletes finished sessions that ended before cutoff, and open
 // ones that have been silent since before cutoff (their Stop never came). It
 // returns how many rows went.

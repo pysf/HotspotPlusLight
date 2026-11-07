@@ -234,7 +234,9 @@ func TestE0_09_MigrationsAtStartup(t *testing.T) {
 		"0003_admin_must_change.sql":      {Data: mustRead(t, "internal/store/migrations/0003_admin_must_change.sql")},
 		"0004_drop_page_api_settings.sql": {Data: mustRead(t, "internal/store/migrations/0004_drop_page_api_settings.sql")},
 		"0005_business_name.sql":          {Data: mustRead(t, "internal/store/migrations/0005_business_name.sql")},
-		"0006_bad.sql":                    {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
+		"0006_server_settings.sql":        {Data: mustRead(t, "internal/store/migrations/0006_server_settings.sql")},
+		"0007_login_failure_daily.sql":    {Data: mustRead(t, "internal/store/migrations/0007_login_failure_daily.sql")},
+		"0008_bad.sql":                    {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
 	}
 	_, err := harness.TryStart(harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey, Migrations: fsys})
 	if err == nil {

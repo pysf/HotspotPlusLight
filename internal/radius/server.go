@@ -24,6 +24,7 @@ import (
 	"layeh.com/radius/vendors/mikrotik"
 
 	"hotspotpluslight/internal/auth"
+	"hotspotpluslight/internal/clock"
 	"hotspotpluslight/internal/domain"
 )
 
@@ -60,6 +61,20 @@ type LinkRecorder interface {
 	BadSecret(addr string)
 }
 
+// FailureRecorder counts one failed login by reason (BR-27, implemented by dashboard.Service).
+type FailureRecorder interface {
+	RecordLoginFailure(ctx context.Context, reason domain.Reason) error
+}
+
+// Option changes how New builds a Server.
+type Option func(*Server)
+
+// WithFailureRecorder makes the server count every Access-Reject it sends (BR-27).
+func WithFailureRecorder(f FailureRecorder) Option { return func(s *Server) { s.failures = f } }
+
+// WithClock sets the clock of the retransmission cache. The default is the system clock.
+func WithClock(c clock.Clock) Option { return func(s *Server) { s.clock = c } }
+
 // Server runs the auth and accounting packet servers.
 //
 // Shutdown does not use radius.PacketServer.Shutdown. It has a race in
@@ -73,8 +88,12 @@ type Server struct {
 	login   Authenticator
 	acctg   Accountant
 	link    LinkRecorder
-	auth    *radius.PacketServer
-	acct    *radius.PacketServer
+	clock   clock.Clock
+	// failures counts failed logins (nil: not counted). retries makes a retransmitted reject count once.
+	failures FailureRecorder
+	retries  *retryCache
+	auth     *radius.PacketServer
+	acct     *radius.PacketServer
 
 	mu       sync.Mutex
 	stopping bool
@@ -85,9 +104,12 @@ type Server struct {
 }
 
 // New returns a Server. Call Serve to start it.
-func New(secrets SecretProvider, login Authenticator, acctg Accountant, link LinkRecorder, log *slog.Logger) *Server {
+func New(secrets SecretProvider, login Authenticator, acctg Accountant, link LinkRecorder, log *slog.Logger, opts ...Option) *Server {
 	src := secretSource{secrets}
-	s := &Server{log: log, secrets: secrets, login: login, acctg: acctg, link: link}
+	s := &Server{log: log, secrets: secrets, login: login, acctg: acctg, link: link, clock: clock.Real{}, retries: newRetryCache()}
+	for _, o := range opts {
+		o(s)
+	}
 	s.auth = &radius.PacketServer{SecretSource: src, Handler: s.track(s.handleAuth)}
 	s.acct = &radius.PacketServer{SecretSource: src, Handler: s.track(s.handleAcct)}
 	return s
@@ -328,8 +350,30 @@ func (s *Server) reply(w radius.ResponseWriter, r *radius.Request, v auth.Verdic
 		name, _ := rfc2865.UserName_LookupString(r.Packet)
 		s.log.Info("access-reject", "username", name, "code", string(v.Reason), "message", v.Reason.Message())
 		rfc2865.ReplyMessage_SetString(resp, v.Reason.ReplyMessage())
+		s.countFailure(r, v.Reason)
 	}
 	_ = w.Write(resp) // loggedWriter logs a failure
+}
+
+// countFailure adds a reject to the daily failed-login count (BR-27), once per request: the router
+// repeats a request every few seconds when it does not get the reply. A counter error is logged and
+// never stops the reject. The request is forgotten again then, so its next retransmission is counted.
+// MONITOR: the cache is per process, so a restart can count one repeated request twice.
+// MONITOR: the count is written before the reply leaves, one SQLite write per reject. That is fine at LAN scale.
+// MONITOR: above 1024 distinct rejects per minute the oldest requests are evicted and their repeats count twice.
+// MONITOR: the key has the source port, so a router that retries from a new port is counted again.
+func (s *Server) countFailure(r *radius.Request, reason domain.Reason) {
+	if s.failures == nil {
+		return
+	}
+	key := retryKey{from: r.RemoteAddr.String(), id: r.Identifier, auth: r.Authenticator}
+	if s.retries.repeated(key, s.clock.Now()) {
+		return
+	}
+	if err := s.failures.RecordLoginFailure(context.WithoutCancel(r.Context()), reason); err != nil {
+		s.retries.forget(key)
+		s.log.Error("failed-login counter not written; the reject is still sent", "reason", string(reason), "err", err)
+	}
 }
 
 // microsoftVendorID is the vendor id of the MS-CHAP attributes.

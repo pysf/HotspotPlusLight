@@ -22,6 +22,7 @@ import (
 	"hotspotpluslight/internal/auth"
 	"hotspotpluslight/internal/clock"
 	"hotspotpluslight/internal/config"
+	"hotspotpluslight/internal/dashboard"
 	"hotspotpluslight/internal/domain"
 	"hotspotpluslight/internal/linkstatus"
 	"hotspotpluslight/internal/member"
@@ -61,6 +62,7 @@ type Addrs struct{ Admin, RadiusAuth, RadiusAcct string }
 
 type services struct {
 	auth      *auth.Service
+	dashboard *dashboard.Service
 	evaluator *auth.Evaluator
 	member    *member.Service
 	plan      *plan.Service
@@ -196,6 +198,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	members := member.New(st, box, sess, opts.Clock) // kicks go through the session service, so an ACK ends the session row
 	a.svc = services{
 		auth:      auth.New(st, opts.Clock),
+		dashboard: dashboard.New(st, opts.Clock),
 		evaluator: auth.NewEvaluator(st, box, opts.Clock, log),
 		member:    members,
 		plan:      plan.New(st, opts.Clock),
@@ -204,7 +207,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		usage:     usage.New(st, opts.Clock),
 		voucher:   voucher.New(st, box, members, opts.Clock), // batch delete reuses the member delete path: kick, then remove
 	}
-	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, link, log)
+	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, link, log, radius.WithFailureRecorder(a.svc.dashboard), radius.WithClock(opts.Clock))
 	pack, err := routerpack.New()
 	if err != nil {
 		return fail(err)
