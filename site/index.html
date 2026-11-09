@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
 <title>HotspotPlus Lite - Wi-Fi accounts for your MikroTik hotspot</title>
-<meta name="description" content="Self-hosted Wi-Fi accounts for MikroTik hotspots: members, plans, vouchers and live sessions. One Go binary with SQLite inside. Open source, AGPL-3.0.">
+<meta name="description" content="Self-hosted Wi-Fi accounts for one MikroTik hotspot router: members, vouchers, plans, limits and live sessions. One program, one SQLite file. Open source, AGPL-3.0.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#09090b">
 <link rel="canonical" href="https://pysf.github.io/HotspotPlusLight/">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="HotspotPlus Lite">
 <meta property="og:title" content="HotspotPlus Lite - Wi-Fi accounts for your MikroTik hotspot">
-<meta property="og:description" content="Self-hosted Wi-Fi accounts for MikroTik hotspots: members, plans, vouchers and live sessions. One Go binary with SQLite inside. Open source, AGPL-3.0.">
+<meta property="og:description" content="Self-hosted Wi-Fi accounts for one MikroTik hotspot router: members, vouchers, plans, limits and live sessions. One program, one SQLite file. Open source, AGPL-3.0.">
 <meta property="og:url" content="https://pysf.github.io/HotspotPlusLight/">
 <meta property="og:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -21,7 +21,7 @@
 <meta property="og:image:alt" content="HotspotPlus Lite: Wi-Fi accounts for your MikroTik hotspot, on your own network.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="HotspotPlus Lite - Wi-Fi accounts for your MikroTik hotspot">
-<meta name="twitter:description" content="Self-hosted Wi-Fi accounts for MikroTik hotspots: members, plans, vouchers and live sessions. One Go binary with SQLite inside. Open source, AGPL-3.0.">
+<meta name="twitter:description" content="Self-hosted Wi-Fi accounts for one MikroTik hotspot router: members, vouchers, plans, limits and live sessions. One program, one SQLite file. Open source, AGPL-3.0.">
 <meta name="twitter:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
 <link rel="stylesheet" href="assets/css/tokens.css">
 <link rel="stylesheet" href="assets/css/site.css">
@@ -48,7 +48,7 @@
   <div>
    <span class="tag">open source &middot; self-hosted &middot; AGPL-3.0</span>
    <h1>Wi-Fi accounts for your MikroTik hotspot, <em>on your own network.</em></h1>
-   <p class="lead">Members, plans, vouchers and live sessions for hotels, cafes and small ISPs. One Go binary with SQLite inside. No cloud, no database server.</p>
+   <p class="lead">Members, vouchers, plans and live sessions. One program and one SQLite file. No cloud, no database server.</p>
    <div class="os-tabs" data-os-tabs>
    <div class="os-panel" id="os-linux" data-os="linux" data-label="Linux">
     <span class="os-label">Linux, 64-bit x86</span>
@@ -82,24 +82,24 @@ time=2026-11-04T17:44:47.594+01:00 level=INFO msg=listening admin=[::]:8081 radi
 </div>
 
 <section class="blk" id="features"><div class="wrap">
-  <span class="eyebrow">// features</span><h2>Everything for Wi-Fi accounts. Nothing extra to look after.</h2>
-  <p class="sec-lead">Hand out accounts, set the limits, see who is online and disconnect any member. The rest of the hotspot stays on your router.</p>
+  <span class="eyebrow">// features</span><h2>What it does</h2>
+  <p class="sec-lead">Create accounts, set limits, see who is online and disconnect any member. The Dashboard shows the state of the hotspot.</p>
   <div class="bento">
-   <div class="cell w"><h3>Members and vouchers</h3><p>Add members one by one, or print a batch of vouchers on A4 sheets. You can always look up a member's password again.</p>
+   <div class="cell w"><h3>Members and vouchers</h3><p>Add members one by one, or print a batch of vouchers on A4. You can look up any password later.</p>
      <div class="viz bars" aria-hidden="true"><i><b></b></i><i><b></b></i><i><b></b></i></div></div>
-   <div class="cell w"><h3>Plans</h3><p>Set the data limit, time limit, validity period, speed limit and simultaneous devices. Define a plan once and give it to as many members as you like.</p>
+   <div class="cell w"><h3>Plans</h3><p>Data limit, time limit, validity period, speed limit and simultaneous devices. One plan, many members.</p>
      <div class="viz sq" role="img" aria-label="An example plan: 20 GB, 30 days, 10 Mbps, 2 devices"><span>20 GB</span><span>30 days</span><span>10 Mbps</span><span>2 devices</span></div></div>
-   <div class="cell"><h3>Limits that hold</h3><p>The router gets the limits at login. The server also watches the usage and disconnects a member who goes over a limit.</p></div>
-   <div class="cell"><h3>Your login page</h3><p>8 designs to download. Change the text and logo by hand, and translate the messages.</p>
+   <div class="cell"><h3>Limits that hold</h3><p>The router gets the limits at login. The server also disconnects a member who goes over.</p></div>
+   <div class="cell"><h3>Your login page</h3><p>8 designs to download. Edit the text and logo, and translate the messages.</p>
      <div class="viz dots" role="img" aria-label="Seven theme colors"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
-   <div class="cell"><h3>Runs anywhere</h3><p>Run it as a Windows service, or on Linux or macOS. 9 builds, including 32-bit and 64-bit ARM.</p></div>
+   <div class="cell"><h3>Runs anywhere</h3><p>A Windows service, or Linux and macOS. 9 builds, including 32-bit and 64-bit ARM.</p></div>
   </div>
-  <div class="stats"><div><b>1</b><span>binary to deploy</span></div><div><b>1</b><span>SQLite file is your whole database</span></div><div><b>30,000</b><span>online users tested</span></div></div>
-  <p class="stats-note">The test used a simulated router on one machine. Your router may be the limit, not the server. See the <a href="https://github.com/pysf/HotspotPlusLight#performance" rel="noopener">performance section</a> of the README.</p>
-  <p class="credit">HotspotPlus Lite is a small rewrite of <a href="https://github.com/pysf/hotspotplus" rel="noopener">HotspotPlus</a>. It keeps the rules for members, plans and limits. It drops the parts built for many businesses.</p>
+  <div class="stats"><div><b>1</b><span>binary to deploy</span></div><div><b>1</b><span>SQLite file, the whole database</span></div><div><b>30,000</b><span>online users tested</span></div></div>
+  <p class="stats-note">Tested with a simulated router on one machine. Your router may be the limit. See the <a href="https://github.com/pysf/HotspotPlusLight#performance" rel="noopener">performance section</a></p>
+  <p class="credit">A small rewrite of <a href="https://github.com/pysf/hotspotplus" rel="noopener">HotspotPlus</a> for one router. It keeps the same rules for members, plans and limits.</p>
 </div></section>
 
-<div class="wrap"><div class="cta-band"><h2>Ready to try it?</h2><p>Install the program, open the admin panel, then set up the router.</p>
+<div class="wrap"><div class="cta-band"><h2>Try it</h2><p>Install the program, then set up the router.</p>
  <div class="cta"><a class="btn primary" href="docs/installation/">Installation guide</a><a class="btn" href="docs/">All docs</a></div></div></div>
 </main>
 <footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>

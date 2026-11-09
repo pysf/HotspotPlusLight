@@ -878,7 +878,7 @@ func TestE13_16_HomeFacts(t *testing.T) {
 	if em := strings.TrimSpace(home.Find("h1 em").Text()); em != "on your own network." {
 		t.Errorf("h1 emphasis %q", em)
 	}
-	if lead := strings.TrimSpace(home.Find(".lead").Text()); lead != "Members, plans, vouchers and live sessions for hotels, cafes and small ISPs. One Go binary with SQLite inside. No cloud, no database server." {
+	if lead := strings.TrimSpace(home.Find(".lead").Text()); lead != "Members, vouchers, plans and live sessions. One program and one SQLite file. No cloud, no database server." {
 		t.Errorf("lead %q", lead)
 	}
 	if n := home.Find(".bento .cell").Length(); n != 5 {
