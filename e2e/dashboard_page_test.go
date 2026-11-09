@@ -57,7 +57,7 @@ func addClosedSession(f *p2, memberID int64, username, sid string, start, end ti
 // attentionNames lists the usernames of one Needs attention list, in order.
 func attentionNames(d *goquery.Document, key string) []string {
 	var out []string
-	d.Find(`[data-attention="` + key + `"] tr[data-attention-row]`).Each(func(_ int, s *goquery.Selection) {
+	d.Find(`[data-attention="` + key + `"] [data-attention-row]`).Each(func(_ int, s *goquery.Selection) {
 		out = append(out, s.AttrOr("data-username", ""))
 	})
 	return out
@@ -84,16 +84,16 @@ func TestE18_01_DashboardIsTheHomePage(t *testing.T) {
 	}
 }
 
-// E18.02 the sidebar lists Dashboard first and marks it as the current page; the other items are as before.
+// E18.02 the sidebar lists the 8 pages in the design order (Vouchers is the batches page) and marks the current one.
 func TestE18_02_SidebarHasDashboardFirst(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	c := harness.LoginAsAdmin(t, s)
-	want := []string{"Dashboard", "Members", "Batches", "Online", "Usage", "Plans", "Router", "Settings"}
+	want := []string{"Dashboard", "Members", "Online now", "Plans", "Vouchers", "Usage", "Router", "Settings"}
 	links := func(d *goquery.Document) (names []string, current []string) {
 		d.Find("#sidebar a.l-nav__link").Each(func(_ int, a *goquery.Selection) {
-			names = append(names, text(a))
+			names = append(names, text(a.Find(".l-nav__text")))
 			if a.AttrOr("aria-current", "") == "page" {
-				current = append(current, text(a))
+				current = append(current, text(a.Find(".l-nav__text")))
 			}
 		})
 		return names, current
@@ -313,7 +313,7 @@ func TestE18_08_NeedsAttention(t *testing.T) {
 	if near.AttrOr("data-count", "") != "2" {
 		t.Errorf("near-limit count %q", near.AttrOr("data-count", ""))
 	}
-	rows := near.Find("tr[data-attention-row]")
+	rows := near.Find("[data-attention-row]")
 	if got := text(rows.Eq(0).Find("[data-detail]")); got != "Out of data" {
 		t.Errorf("full: %q", got)
 	}
@@ -520,8 +520,8 @@ func TestE18_15_WholeDashboardRefreshes(t *testing.T) {
 		t.Error("the response must be the fragment, not a full page")
 	}
 	frag := r.Doc(t)
-	if n := frag.Find(`[data-tile]`).Length(); n != 3 {
-		t.Errorf("fragment has %d tiles, want 3", n)
+	if n := frag.Find(`[data-tile]`).Length(); n != 4 {
+		t.Errorf("fragment has %d tiles, want 4 (online, peak, traffic, failed logins)", n)
 	}
 	if n := frag.Find(`[data-chart]`).Length(); n != 3 {
 		t.Errorf("fragment has %d charts, want 3", n)

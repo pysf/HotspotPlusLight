@@ -1,20 +1,22 @@
-/* Text input and textarea. The border is a ring, so the focus ring can replace it. */
+/* Text input and textarea. The border is 3:1 against the surface, so it stays visible. */
 @layer components {
   .c-input {
     inline-size: 100%;
-    block-size: var(--h-input);
-    padding-inline: var(--s-3);
-    border: 0;
-    border-radius: var(--r-ctl);
-    background: var(--panel);
-    box-shadow: 0 0 0 1px var(--line-strong);
-    outline: none;
-    transition: box-shadow var(--ease);
+    min-block-size: var(--ctl);
+    padding-inline: var(--input-pad-x);
+    border: 1px solid var(--c-input-line);
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: var(--fs-md);
+    transition: border-color var(--dur) var(--ease);
   }
-  textarea.c-input { block-size: auto; padding-block: var(--s-3); resize: vertical; }
-  .c-input::placeholder { color: var(--faint); }
-  .c-input:focus-visible { box-shadow: 0 0 0 var(--ring-w) var(--accent); }
-  .c-input[aria-invalid="true"] { box-shadow: 0 0 0 1px var(--bad); }
-  .c-input:disabled { opacity: var(--opacity-disabled); }
-  .c-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-small); }
+  textarea.c-input { padding-block: var(--s-3); resize: vertical; }
+  .c-input::placeholder { color: var(--c-text-3); }
+  .c-input:hover, .c-input.is-hover { border-color: var(--c-text-3); }
+  .c-input:focus, .c-input.is-focus { outline: var(--ring-w) solid var(--c-focus); outline-offset: 1px; border-color: var(--c-focus); }
+  .c-input[aria-invalid="true"], .c-input.is-error { border-color: var(--st-bad-dot); box-shadow: inset 0 0 0 1px var(--st-bad-dot); }
+  .c-input:disabled { background: var(--c-fill); color: var(--c-text-3); cursor: not-allowed; border-color: var(--c-line-strong); }
+  .c-input[inputmode="numeric"], .c-input[inputmode="decimal"] { font-variant-numeric: tabular-nums; }
+  .c-input[data-mono] { font-family: var(--font-mono); letter-spacing: .02em; }
 }

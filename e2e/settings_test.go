@@ -94,26 +94,26 @@ func TestE14_02_SetShowsEverywhere(t *testing.T) {
 	for _, id := range []int64{m1, m2} {
 		pr := c.Get(fmt.Sprintf("/admin/members/%d/voucher", id))
 		pd := pr.Doc(t)
-		if got := strings.TrimSpace(pd.Find("[data-voucher] [data-business]").Text()); got != name+" · Wi-Fi" {
-			t.Errorf("voucher line %q", got)
+		if got := strings.TrimSpace(pd.Find("[data-voucher] [data-business]").Text()); got != name {
+			t.Errorf("voucher business name %q", got)
 		}
 		if strings.Contains(pr.Body, "<Aria>") {
 			t.Error("business name is not HTML-escaped on the voucher")
 		}
 	}
 
-	// Every voucher of a batch gets the line, and 14 still fit on a sheet.
-	form := batchForm(plan, 15)
+	// Every voucher of a batch gets the line, and 18 still fit on a sheet.
+	form := batchForm(plan, 19)
 	if br := c.Send("POST", "/admin/batches", form); br.StatusCode != 201 {
 		t.Fatalf("batch: %d %s", br.StatusCode, br.Body)
 	} else {
 		loc := br.Header.Get("Location")
 		pd := c.Get(loc).Doc(t)
-		if n, b := pd.Find("[data-voucher]").Length(), pd.Find("[data-voucher] [data-business]").Length(); n != 15 || b != 15 {
+		if n, b := pd.Find("[data-voucher]").Length(), pd.Find("[data-voucher] [data-business]").Length(); n != 19 || b != 19 {
 			t.Errorf("%d vouchers, %d with the line", n, b)
 		}
-		if pd.Find("[data-page]").Length() != 2 || pd.Find("[data-page]").First().Find("[data-voucher]").Length() != 14 {
-			t.Error("a sheet no longer holds 14 vouchers")
+		if pd.Find("[data-page]").Length() != 2 || pd.Find("[data-page]").First().Find("[data-voucher]").Length() != 18 {
+			t.Error("a sheet no longer holds 18 vouchers")
 		}
 	}
 
@@ -219,7 +219,7 @@ func TestE1_10_Settings(t *testing.T) {
 			t.Errorf("settings form lacks %s", f)
 		}
 	}
-	if d.Find(`input[name="radius_shared_secret"][type="password"]`).Length() != 1 || d.Find(`#reveal-secret`).Length() != 1 {
+	if d.Find(`input[name="radius_shared_secret"][type="password"]`).Length() != 1 || d.Find(`button[data-reveal="radius_shared_secret"]`).Length() != 1 || d.Find(`button[data-generate-alnum="radius_shared_secret"]`).Length() != 1 {
 		t.Error("secret must be masked with a reveal button")
 	}
 	if v := form.Get("coa_port"); v != "3799" {

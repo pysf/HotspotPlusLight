@@ -29,6 +29,9 @@ const dashboardContentURL = "/admin/dashboard/content"
 
 // dashboardView is the dashboard prepared for display.
 type dashboardView struct {
+	Summary   string // the line under the page title
+	Items     string // text of the pill in the Needs attention heading
+	ItemsTone string
 	Online    dashboard.OnlineNow
 	Traffic   trafficTile
 	Failed    failedTile
@@ -40,7 +43,7 @@ type dashboardView struct {
 
 // trafficTile is the Traffic today tile as text.
 type trafficTile struct {
-	Today                   string
+	Today                   string // size with its unit, such as "38.4 GB"
 	Yesterday, LastWeek     string // sizes
 	VsYesterday, VsLastWeek string // "+12%", "-5%" or "no data"
 	TodayBytes              int64
@@ -57,26 +60,29 @@ type failedTile struct {
 
 // attentionView is one Needs attention list.
 type attentionView struct {
-	Key, Title, Column, Empty string
-	Count                     int
-	Rows                      []attentionRow
+	Key, Title, Empty string
+	Count             int
+	Rows              []attentionRow
 }
 
-// attentionRow is one member of an attention list.
+// attentionRow is one member of an attention list. Tone and Icon pick the colour and the icon of its pill.
 type attentionRow struct {
-	ID       int64
-	Username string
-	Detail   string
+	ID         int64
+	Username   string
+	Sub        string // small text under the name
+	Detail     string // text of the pill
+	Tone, Icon string
 }
 
 // chartView is one chart with its heading and the link under it.
 type chartView struct {
-	Key, Title, Caption string
-	Bars                []ui.Bar
-	Top                 int64
-	Empty               string // shown instead of the chart when every bar is 0
-	More                string // link text to a longer report ("" = none)
-	MoreHref            string
+	Key, Title, Sub, Caption string
+	Kind                     string // ui.PlotArea, ui.PlotBars or ui.PlotDots
+	Bars                     []ui.Bar
+	Top                      int64
+	Empty                    string // shown instead of the chart when every bar is 0
+	More                     string // link text to a longer report ("" = none)
+	MoreHref                 string
 }
 
 // changeText renders a percent change; a base of 0 has no percent (BR-26).
@@ -99,12 +105,24 @@ func topOf(bars []ui.Bar) int64 {
 	return top
 }
 
+// dayLabel is the axis label of a day key such as "2026-11-02": the weekday, or "Today" for the last day.
+func dayLabel(day string, last bool) string {
+	if last {
+		return "Today"
+	}
+	t, err := time.Parse("2006-01-02", day)
+	if err != nil {
+		return day
+	}
+	return t.Format("Mon")
+}
+
 // trafficBars maps the zero-filled days to chart columns (the same hooks as the usage page).
 func trafficBars(days []domain.UsageDay) []ui.Bar {
 	bars := make([]ui.Bar, len(days))
 	for i, d := range days {
 		bars[i] = ui.Bar{
-			Label: d.Day,
+			Label: dayLabel(d.Day, i == len(days)-1),
 			Value: d.Total(),
 			Tip:   d.Day + ": " + domain.FormatSize(d.Down) + " down, " + domain.FormatSize(d.Up) + " up",
 			Attrs: templ.Attributes{"data-bar": true, "data-day": d.Day, "data-down": strconv.FormatInt(d.Down, 10), "data-up": strconv.FormatInt(d.Up, 10)},
@@ -118,7 +136,7 @@ func activeBars(days []domain.DayCount) []ui.Bar {
 	bars := make([]ui.Bar, len(days))
 	for i, d := range days {
 		bars[i] = ui.Bar{
-			Label: d.Day,
+			Label: dayLabel(d.Day, i == len(days)-1),
 			Value: int64(d.Count),
 			Tip:   d.Day + ": " + strconv.Itoa(d.Count) + " members",
 			Attrs: templ.Attributes{"data-bar": true, "data-day": d.Day, "data-count": strconv.Itoa(d.Count)},
@@ -159,6 +177,30 @@ func busyPeak(avg [24]float64) string {
 // capPeak is a chart caption that ends with the peak value.
 func capPeak(what, peak string) string { return what + "; peak " + peak }
 
+// summaryText is the line under the page title. It counts the members in Needs attention.
+func summaryText(items int, badSecret bool) string {
+	switch {
+	case items == 1:
+		return "1 item needs attention."
+	case items > 1:
+		return strconv.Itoa(items) + " items need attention."
+	case badSecret:
+		return "The router sends packets with a wrong shared secret."
+	}
+	return "Everything is running normally."
+}
+
+// itemsText is the text of the pill in the Needs attention heading.
+func itemsText(items int) string {
+	switch items {
+	case 0:
+		return "All clear"
+	case 1:
+		return "1 item"
+	}
+	return strconv.Itoa(items) + " items"
+}
+
 // newDashboardView prepares the overview and the link status snapshot for display.
 func newDashboardView(o dashboard.Overview, snap linkstatus.Snapshot) dashboardView {
 	v := dashboardView{
@@ -169,35 +211,42 @@ func newDashboardView(o dashboard.Overview, snap linkstatus.Snapshot) dashboardV
 			TodayBytes: o.Traffic.Today,
 		},
 		Failed: failedTile{Total: o.Failures.Total, HasTop: o.Failures.HasTop},
-		Link:   linkRows(snap, o.Loc),
+		Link:   linkRows(snap, o.Loc, o.Now),
 	}
 	if o.Failures.HasTop {
 		v.Failed.Code, v.Failed.Text, v.Failed.Count = string(o.Failures.Top.Reason), o.Failures.Top.Reason.Message(), o.Failures.Top.Count
 	}
 	days := strconv.Itoa(domain.ExpiringDays)
-	v.Expiring = attentionView{Key: "expiring", Title: "Expiring in " + days + " days", Column: "Expires", Empty: "No member expires in the next " + days + " days.", Count: o.Expiring.Count}
+	v.Expiring = attentionView{Key: "expiring", Title: "Expiring in " + days + " days", Empty: "No member expires in the next " + days + " days.", Count: o.Expiring.Count}
 	for _, r := range o.Expiring.Rows {
 		v.Expiring.Rows = append(v.Expiring.Rows, attentionRow{ID: r.MemberID, Username: r.Username,
-			Detail: r.ExpiresAt.In(o.Loc).Format("2006-01-02") + " (" + domain.FormatRelative(o.Now, r.ExpiresAt) + ")"})
+			Sub: r.ExpiresAt.In(o.Loc).Format("2006-01-02"), Detail: domain.FormatRelative(o.Now, r.ExpiresAt), Tone: "warn", Icon: "clock"})
 	}
-	v.NearLimit = attentionView{Key: "near-limit", Title: "Near the data limit", Column: "Data used", Empty: "No member is near the data limit.", Count: o.NearLimit.Count}
+	v.NearLimit = attentionView{Key: "near-limit", Title: "Near the data limit", Empty: "No member is near the data limit.", Count: o.NearLimit.Count}
 	for _, r := range o.NearLimit.Rows {
-		d := strconv.Itoa(r.Percent) + "% used"
+		row := attentionRow{ID: r.MemberID, Username: r.Username, Detail: strconv.Itoa(r.Percent) + "% used", Tone: "warn", Icon: "alert"}
 		if r.OutOfData {
-			d = "Out of data"
+			row.Detail, row.Tone = "Out of data", "bad"
 		}
-		v.NearLimit.Rows = append(v.NearLimit.Rows, attentionRow{ID: r.MemberID, Username: r.Username, Detail: d})
+		v.NearLimit.Rows = append(v.NearLimit.Rows, row)
 	}
+	items := o.Expiring.Count + o.NearLimit.Count
+	v.Items = itemsText(items)
+	v.ItemsTone = "warn"
+	if items == 0 {
+		v.ItemsTone = "ok"
+	}
+	v.Summary = summaryText(items, snap.BadSecretTotal > 0)
 	traffic := trafficBars(o.TrafficDays)
 	busy := busyBars(o.BusyHours)
 	active := activeBars(o.ActiveDays)
 	n := strconv.Itoa(len(o.TrafficDays))
 	v.Charts = []chartView{
-		{Key: "traffic", Title: "Traffic, last " + n + " days", Bars: traffic, Top: topOf(traffic), Empty: "No traffic recorded yet.",
+		{Key: "busy-hours", Title: "Busy hours", Sub: "Last " + n + " days", Kind: ui.PlotArea, Bars: busy, Top: topOf(busy), Empty: "No sessions recorded yet.",
+			Caption: capPeak("average people online, by hour", busyPeak(o.BusyHours))},
+		{Key: "traffic", Title: "Traffic", Sub: "Per day", Kind: ui.PlotBars, Bars: traffic, Top: topOf(traffic), Empty: "No traffic recorded yet.",
 			Caption: capPeak("download + upload", domain.FormatSize(topOf(traffic))), More: "Usage details", MoreHref: usageHome},
-		{Key: "busy-hours", Title: "Busy hours", Bars: busy, Top: topOf(busy), Empty: "No sessions recorded yet.",
-			Caption: capPeak("average people online, by hour, last "+n+" days", busyPeak(o.BusyHours))},
-		{Key: "active-members", Title: "Active members per day", Bars: active, Top: topOf(active), Empty: "No member used the internet yet.",
+		{Key: "active-members", Title: "Active members", Sub: "Per day", Kind: ui.PlotDots, Bars: active, Top: topOf(active), Empty: "No member used the internet yet.",
 			Caption: capPeak("members with traffic", strconv.FormatInt(topOf(active), 10))},
 	}
 	return v
@@ -229,27 +278,38 @@ func (h handlers) dashboardContent(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, DashboardContent(v))
+	h.render(w, r, http.StatusOK, DashboardContent(v, true))
 }
 
-// linkEvent is one row of the link status table.
+// linkEvent is one row of the Router link card.
 type linkEvent struct{ Key, Label, At, From, Detail string }
 
 // badSource is one row of the bad-secret table.
 type badSource struct{ From, Count, At string }
 
-// linkView is the link status prepared for display.
+// linkView is the link status prepared for display. Tone, Icon and State make the pill in the card heading.
 type linkView struct {
-	Events     []linkEvent
-	BadTotal   string
-	BadSources []badSource
+	Events            []linkEvent
+	BadTotal          string
+	BadNone           bool
+	BadSources        []badSource
+	Tone, Icon, State string
 }
 
 // linkTimeFormat is the time format of the link status.
 const linkTimeFormat = "2006-01-02 15:04:05"
 
-// linkRows returns the link status in snapshot s with times in loc.
-func linkRows(s linkstatus.Snapshot, loc *time.Location) linkView {
+// routerUp reports whether the router sent a login or accounting packet in the last routerRecent time.
+func routerUp(s linkstatus.Snapshot, now time.Time) bool {
+	last := s.AccessRequest.At
+	if s.Accounting.At.After(last) {
+		last = s.Accounting.At
+	}
+	return !last.IsZero() && now.Sub(last) < routerRecent
+}
+
+// linkRows returns the link status in snapshot s with times in loc. A wrong shared secret turns the state red.
+func linkRows(s linkstatus.Snapshot, loc *time.Location, now time.Time) linkView {
 	ev := func(key, label string, e linkstatus.Event) linkEvent {
 		if e.At.IsZero() {
 			return linkEvent{Key: key, Label: label, At: "never"}
@@ -258,11 +318,20 @@ func linkRows(s linkstatus.Snapshot, loc *time.Location) linkView {
 	}
 	v := linkView{
 		Events: []linkEvent{
-			ev("access-request", "Last Access-Request", s.AccessRequest),
-			ev("accounting", "Last Accounting packet", s.Accounting),
-			ev("disconnect", "Last Disconnect", s.Disconnect),
+			ev("access-request", "Last login request", s.AccessRequest),
+			ev("accounting", "Last accounting packet", s.Accounting),
+			ev("disconnect", "Last disconnect", s.Disconnect),
 		},
 		BadTotal: strconv.Itoa(s.BadSecretTotal),
+		BadNone:  s.BadSecretTotal == 0,
+	}
+	switch {
+	case s.BadSecretTotal > 0:
+		v.Tone, v.Icon, v.State = "bad", "alert", "Wrong secret"
+	case routerUp(s, now):
+		v.Tone, v.Icon, v.State = "ok", "check-circle", "Healthy"
+	default:
+		v.Tone, v.Icon, v.State = "off", "slash", "No recent packets"
 	}
 	for _, b := range s.BadSecretSources {
 		v.BadSources = append(v.BadSources, badSource{b.From, strconv.Itoa(b.Count), b.Last.In(loc).Format(linkTimeFormat)})

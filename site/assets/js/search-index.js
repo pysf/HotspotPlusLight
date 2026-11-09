@@ -124,49 +124,49 @@ export default [
   "page": "Configuration",
   "heading": "The Settings page",
   "url": "docs/configuration/#settings-page",
-  "keywords": "These settings are saved in the database. You change them on the Settings page of the admin panel. Settings marked restart required take effect at the next server start. After you save one, the page shows a notice until you restart the server yourself. The lis"
+  "keywords": "These settings are saved in the database. You change them on the Settings page of the admin panel. The page has groups: Business, RADIUS, Members, Voucher defaults, Server addresses and Logs. One Save settings button at the bottom saves all of them. Next to th"
  },
  {
   "page": "First login",
   "heading": "Log in",
   "url": "docs/first-login/#login",
-  "keywords": "Open . After you set your password, the admin panel opens on the Dashboard . At the first start, the user name is admin and the password is admin . You can change the user name with HSP_ADMIN_USERNAME before the first start. The first-start block that the serv"
+  "keywords": "Open . After you set your password, the admin panel opens on the Dashboard . At the first start, the user name is admin and the password is admin . You can set another user name with HSP_ADMIN_USERNAME before the first start, or change it later on the Password"
  },
  {
   "page": "First login",
   "heading": "Set a new password",
   "url": "docs/first-login/#password",
-  "keywords": "After you log in, the server sends you to the Password page. No other page opens until you set a new password. The rules are: At least 10 characters, and at most 72 bytes. Not your user name, not admin , and not a very common password. There are no other rules"
+  "keywords": "After you log in, the server sends you to the password page. No other page opens until you set a new password. The page also has a Username field that shows the current name. Keep admin or type your own: 4 to 32 letters, numbers, dots or dashes. The server sav"
  },
  {
   "page": "First login",
   "heading": "If you forget it",
   "url": "docs/first-login/#forgot",
-  "keywords": "Reset it on the command line of the server. The command asks for the new password twice and does not show what you type. It uses the same rules as the page and ends every open admin session: hotspotpluslight admin set-password If you build from source, make se"
+  "keywords": "Reset it on the command line of the server. The command asks for the new password twice and does not show what you type. It uses the same rules as the page and ends every open admin session. It does not change the user name: hotspotpluslight admin set-password"
  },
  {
   "page": "First login",
   "heading": "Create a plan",
   "url": "docs/first-login/#plan",
-  "keywords": "After the first start there are no plans, and every member needs a plan. Open the Plans page and choose New plan : Field Meaning Name Shown in lists. Each name must be unique (case does not matter). Validity (days) A whole number, at least 1. The member can us"
+  "keywords": "After the first start there are no plans, and every member needs a plan. Open the Plans page and choose Add plan . A side panel opens: Field Meaning Name Shown in lists. Each name must be unique (case does not matter). Valid for (days) A whole number, at least"
  },
  {
   "page": "First login",
   "heading": "Create a member",
   "url": "docs/first-login/#member",
-  "keywords": "Open the Members page and choose New member . Pick a plan. A user name can have only English letters and digits (up to 64), and case does not matter. If you leave the user name empty, the server uses the mobile number. If you leave the password empty, the serv"
+  "keywords": "Open the Members page and choose Add member . A side panel opens with a user name, a password and a plan. Under the plan, a short line shows what the plan gives: data, days, speed and devices. The Generate button puts a random 6-digit password in the field. A "
  },
  {
   "page": "First login",
   "heading": "Print vouchers",
   "url": "docs/first-login/#vouchers",
-  "keywords": "Open the Batches page and choose New batch . Choose a plan, the number of vouchers and an optional label. The number can be up to the maximum set on the Settings page (30 by default). Each voucher is a member. Its user name is the prefix plus a number (for exa"
+  "keywords": "Open the Vouchers page. The form is on the left and the list of batches is on the right. Choose a plan, the number of vouchers and an optional batch name. The number can be up to the maximum set on the Settings page (30 by default). Each voucher is a member. I"
  },
  {
   "page": "First login",
   "heading": "See who is online",
   "url": "docs/first-login/#online",
-  "keywords": "The Dashboard shows how many members are online now, today's traffic and the router status. The Online page lists the open sessions and refreshes every 10 seconds. The Disconnect button sends a Disconnect request to the router. This is a RADIUS message (RADIUS"
+  "keywords": "The Dashboard shows how many members are online now, today's traffic and the Router link card. The Online now page lists the open sessions (user name, name, IP and MAC address, time online, data down and up) and refreshes every 10 seconds. The Kick button asks"
  },
  {
   "page": "Dashboard",
@@ -176,27 +176,27 @@ export default [
  },
  {
   "page": "Dashboard",
-  "heading": "The three tiles",
+  "heading": "The four tiles",
   "url": "docs/dashboard/#tiles",
-  "keywords": "Tile What it shows Online now The open sessions that the router still reports. This is the same number as on the Online page, so one member on 2 devices counts twice. The tile also shows the peak today : the most sessions online at one moment since midnight. T"
+  "keywords": "Tile What it shows Online now The open sessions that the router still reports. This is the same number as on the Online now page, so one member on 2 devices counts twice. Peak today The most sessions online at one moment since midnight. Traffic today Download "
  },
  {
   "page": "Dashboard",
-  "heading": "Router status",
+  "heading": "Router link",
   "url": "docs/dashboard/#router-status",
-  "keywords": "The Router status panel shows what the MikroTik router last sent to the server: the time and source address of the last login request, the last accounting packet and the last Disconnect result. It also shows how many packets had a wrong shared secret. The pane"
+  "keywords": "The Router link card shows what the MikroTik router last sent to the server: the time and source address of the last login request, the last accounting packet and the last Disconnect result. It also shows how many packets had a wrong shared secret. The label n"
  },
  {
   "page": "Dashboard",
   "heading": "Needs attention",
   "url": "docs/dashboard/#attention",
-  "keywords": "This section has 2 short lists. Each heading shows the full count, and each list shows at most 5 members: Expiring in 3 days : active members whose expiry time is in the next 3 days. You may want to renew them. The list uses the same rule as the Expiring soon "
+  "keywords": "This is one card with 2 short lists. Each list shows the full count in its title and at most 5 members. The label next to the card title shows the number of items, or All clear : Expiring in 3 days : active members whose expiry time is in the next 3 days. You "
  },
  {
   "page": "Dashboard",
   "heading": "The three charts",
   "url": "docs/dashboard/#charts",
-  "keywords": "Traffic, last 14 days : download plus upload for all members, one bar per day. The Usage page has longer ranges and the top members. Busy hours : for each hour of the day, the average number of people online over the last 14 days. Use it to see when the Wi-Fi "
+  "keywords": "Traffic, last 14 days : download plus upload for all members, one bar per day. The Usage page has 7, 30 and 90 day ranges and the top members. Busy hours : for each hour of the day, the average number of people online over the last 14 days. Use it to see when "
  },
  {
   "page": "Dashboard",
@@ -226,7 +226,7 @@ export default [
   "page": "Router setup",
   "heading": "Step 3: the login page",
   "url": "docs/router-setup/#page",
-  "keywords": "On the same Router page, choose a design and click Download . You get a zip file with a folder named hotspot . Unzip it. Then upload the hotspot folder to the router (with Files in WinBox, or with FTP) and replace the old one. On routers that keep files on fla"
+  "keywords": "On the same Router page, under Sign-in pages , choose a design and click Download ( Open preview shows it first). You get a zip file with a folder named hotspot . Unzip it. Then upload the hotspot folder to the router (with Files in WinBox, or with FTP) and re"
  },
  {
   "page": "Router setup",
@@ -238,7 +238,7 @@ export default [
   "page": "Router setup",
   "heading": "Test it",
   "url": "docs/router-setup/#test",
-  "keywords": "Create a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the Online page. The Dashboard has a Router status panel. It shows the time and source address of the last login request, the last accounting packe"
+  "keywords": "Create a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the Online now page. The Dashboard has a Router link card. It shows the time and source address of the last login request, the last accounting pack"
  },
  {
   "page": "Hotspot login pages",
@@ -304,7 +304,7 @@ export default [
   "page": "How it works",
   "heading": "Disconnect (kick)",
   "url": "docs/how-it-works/#kick",
-  "keywords": "The Disconnect button on the Online page and the automatic disconnects above send a RADIUS Disconnect-Request to the router. The request goes to the Disconnect port (UDP 3799 by default) with the user name and the session details. If the router answers with Di"
+  "keywords": "The Kick button on the Online now page and the automatic disconnects above send a RADIUS Disconnect-Request to the router. The request goes to the Disconnect port (UDP 3799 by default) with the user name and the session details. If the router answers with Disc"
  },
  {
   "page": "How it works",
@@ -376,13 +376,13 @@ export default [
   "page": "Troubleshooting",
   "heading": "Logins fail",
   "url": "docs/troubleshooting/#login-problems",
-  "keywords": "Nobody can log in, and the login page waits or fails Check in this order: Open the Dashboard and look at the Router status panel. If no login request arrived, the router cannot reach the server. Check <SERVER-IP> in /radius , and check that UDP 1812 and UDP 18"
+  "keywords": "Nobody can log in, and the login page waits or fails Check in this order: Open the Dashboard and look at the Router link card. If no login request arrived, the router cannot reach the server. Check <SERVER-IP> in /radius , and check that UDP 1812 and UDP 1813 "
  },
  {
   "page": "Troubleshooting",
   "heading": "Router and usage",
   "url": "docs/troubleshooting/#router-problems",
-  "keywords": "Disconnect does nothing, or the admin panel shows an error On the router, run /radius incoming set accept=yes port=3799 . Use the same port as the Disconnect (CoA) port setting on the Settings page. Check that the router firewall accepts UDP 3799 from the serv"
+  "keywords": "Kick does nothing, or the admin panel shows an error On the router, run /radius incoming set accept=yes port=3799 . Use the same port as the Disconnect (CoA) port setting on the Settings page. Check that the router firewall accepts UDP 3799 from the server. Th"
  },
  {
   "page": "Troubleshooting",

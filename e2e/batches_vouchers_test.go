@@ -310,12 +310,12 @@ func TestE7_05_PasswordLength(t *testing.T) {
 	}
 }
 
-// E7.06 print page: 14 vouchers per A4 page, 2 columns, correct page count (BR-16).
+// E7.06 print page: 18 vouchers per A4 page, 3 columns of 6 rows, correct page count (BR-16).
 func TestE7_06_PrintLayout(t *testing.T) {
 	f := newP7(t)
 	p := f.plan("Basic")
 	f.exec(`UPDATE settings SET batch_max_count=100`)
-	for _, c := range []struct{ n, pages int }{{1, 1}, {14, 1}, {15, 2}, {28, 2}, {29, 3}, {30, 3}} {
+	for _, c := range []struct{ n, pages int }{{1, 1}, {18, 1}, {19, 2}, {36, 2}, {37, 3}, {38, 3}} {
 		id := f.batch(p, c.n)
 		d, _ := f.printPage(bpath(id) + "/vouchers")
 		pages := d.Find("[data-page]")
@@ -327,7 +327,7 @@ func TestE7_06_PrintLayout(t *testing.T) {
 			t.Fatalf("%d vouchers listed, want %d", len(vs), c.n)
 		}
 		pages.Each(func(i int, pg *goquery.Selection) {
-			want := min(14, c.n-14*i)
+			want := min(18, c.n-18*i)
 			if got := pg.Find("[data-voucher]").Length(); got != want {
 				t.Errorf("%d vouchers: page %d holds %d, want %d", c.n, i+1, got, want)
 			}
@@ -338,7 +338,7 @@ func TestE7_06_PrintLayout(t *testing.T) {
 	}
 
 	// Chrome: a standalone page with its own print stylesheet, no admin shell.
-	id := f.batch(p, 14)
+	id := f.batch(p, 18)
 	d, body := f.printPage(bpath(id) + "/vouchers")
 	var sheets []string
 	d.Find(`link[rel=stylesheet]`).Each(func(_ int, s *goquery.Selection) { sheets = append(sheets, s.AttrOr("href", "")) })
@@ -352,7 +352,7 @@ func TestE7_06_PrintLayout(t *testing.T) {
 	if css.StatusCode != 200 || !strings.Contains(css.Header.Get("Content-Type"), "css") {
 		t.Fatalf("print stylesheet: %d %q", css.StatusCode, css.Header.Get("Content-Type"))
 	}
-	for _, want := range []string{"@media print", "@page", "A4", "repeat(2", "repeat(7", "page-break-after"} {
+	for _, want := range []string{"@media print", "@page", "A4", "repeat(3", "repeat(6", "page-break-after"} {
 		if !strings.Contains(css.Body, want) {
 			t.Errorf("print stylesheet lacks %q", want)
 		}
@@ -490,14 +490,14 @@ func TestE7_10_BatchList(t *testing.T) {
 		t.Fatalf("%d rows", len(rows))
 	}
 	ra, rb := rows[ka], rows[kb]
-	if cell(ra, "label") != "Room 12" || cell(ra, "plan") != "Basic" || cell(ra, "members") != "4" || cell(ra, "unused") != "4" {
-		t.Errorf("row a: label %q plan %q members %q unused %q", cell(ra, "label"), cell(ra, "plan"), cell(ra, "members"), cell(ra, "unused"))
+	if part(ra, "label") != "Room 12" || part(ra, "plan") != "Basic" || part(ra, "members") != "4" || part(ra, "unused") != "4" {
+		t.Errorf("row a: label %q plan %q members %q unused %q", part(ra, "label"), part(ra, "plan"), part(ra, "members"), part(ra, "unused"))
 	}
-	if cell(ra, "created") != "2026-11-01 15:30" { // t0 12:00 UTC in Asia/Tehran
-		t.Errorf("created %q", cell(ra, "created"))
+	if part(ra, "created") != "2026-11-01 15:30" { // t0 12:00 UTC in Asia/Tehran
+		t.Errorf("created %q", part(ra, "created"))
 	}
-	if cell(rb, "label") != "(no label)" || cell(rb, "plan") != "Premium" || cell(rb, "members") != "3" {
-		t.Errorf("row b: label %q plan %q members %q", cell(rb, "label"), cell(rb, "plan"), cell(rb, "members"))
+	if part(rb, "label") != "(no label)" || part(rb, "plan") != "Premium" || part(rb, "members") != "3" {
+		t.Errorf("row b: label %q plan %q members %q", part(rb, "label"), part(rb, "plan"), part(rb, "members"))
 	}
 	// Newest first.
 	var order []string
@@ -509,11 +509,11 @@ func TestE7_10_BatchList(t *testing.T) {
 	if href := ra.Find("a[data-reprint]").AttrOr("href", ""); href != bpath(a)+"/vouchers" {
 		t.Errorf("reprint href %q", href)
 	}
-	// Navigation has a Batches item.
-	if d.Find(`nav a[href="/admin/batches"]`).Length() != 1 {
-		t.Error("no Batches nav item")
+	// Navigation has a Vouchers item (the batches page).
+	if d.Find(`#sidebar a[href="/admin/batches"]`).Length() != 1 {
+		t.Error("no Vouchers nav item")
 	}
-	if d.Find(`nav a[href="/admin/batches"][aria-current="page"]`).Length() != 1 {
+	if d.Find(`#sidebar a[href="/admin/batches"][aria-current="page"]`).Length() != 1 {
 		t.Error("Batches is not the active item on its own page")
 	}
 
@@ -523,11 +523,11 @@ func TestE7_10_BatchList(t *testing.T) {
 	f.interim(us[0], "s1", 100, 50, 10)
 	f.start(us[1], "s2") // a session row with no traffic still counts as used
 	rows = batchRows(f.c.Get("/admin/batches").Doc(t))
-	if got := cell(rows[ka], "unused"); got != "2" {
+	if got := part(rows[ka], "unused"); got != "2" {
 		t.Errorf("unused after usage: %q, want 2", got)
 	}
 	f.exec(`UPDATE member SET used_seconds=5 WHERE username=?`, us[2])
-	if got := cell(batchRows(f.c.Get("/admin/batches").Doc(t))[ka], "unused"); got != "1" {
+	if got := part(batchRows(f.c.Get("/admin/batches").Doc(t))[ka], "unused"); got != "1" {
 		t.Errorf("unused after counters: %q, want 1", got)
 	}
 	// An individual delete lowers the member count; the stored size stays.
@@ -535,8 +535,8 @@ func TestE7_10_BatchList(t *testing.T) {
 		t.Fatalf("delete member: %d", r.StatusCode)
 	}
 	rows = batchRows(f.c.Get("/admin/batches").Doc(t))
-	if cell(rows[ka], "members") != "3" || cell(rows[ka], "unused") != "0" {
-		t.Errorf("after individual delete: members %q unused %q", cell(rows[ka], "members"), cell(rows[ka], "unused"))
+	if part(rows[ka], "members") != "3" || part(rows[ka], "unused") != "0" {
+		t.Errorf("after individual delete: members %q unused %q", part(rows[ka], "members"), part(rows[ka], "unused"))
 	}
 	if n := scalar[int](t, f.db, `SELECT count FROM batch WHERE id=?`, a); n != 4 {
 		t.Errorf("stored count %d, want the original 4", n)
@@ -887,5 +887,21 @@ func TestE16_04_BatchSkipsTakenUsernames(t *testing.T) {
 	id := f.batch(p, 3)
 	if got := f.users(id); strings.Join(got, ",") != "wifi1360,wifi1363,wifi1364" || f.counter() != 1365 {
 		t.Fatalf("usernames %v counter %d", got, f.counter())
+	}
+}
+
+// E7.16 the vouchers page holds the new-batch form and the batch list together; /admin/batches/new is the same page.
+func TestE7_16_FormAndListOnOnePage(t *testing.T) {
+	f := newP7(t)
+	p := f.plan("Basic")
+	f.batch(p, 2, "label", "First")
+	for _, path := range []string{"/admin/batches", "/admin/batches/new"} {
+		d := f.c.Get(path).Doc(t)
+		if d.Find("#batch-form").Length() != 1 || d.Find("tr[data-batch]").Length() != 1 {
+			t.Errorf("%s: %d forms, %d batch rows", path, d.Find("#batch-form").Length(), d.Find("tr[data-batch]").Length())
+		}
+		if got := text(d.Find("tr[data-batch] [data-col=used]")); got != "0" {
+			t.Errorf("%s: used %q, want 0 of 2", path, got)
+		}
 	}
 }

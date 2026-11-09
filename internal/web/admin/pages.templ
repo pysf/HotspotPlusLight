@@ -5,24 +5,25 @@ import (
 	"strconv"
 
 	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/plan"
 	"hotspotpluslight/internal/web/ui"
 )
 
-// LoginPage is the admin login form. errMsg is shown above the form when it is not empty.
+// LoginPage is the admin login form. errMsg is shown in the card when it is not empty.
 templ LoginPage(username, errMsg string) {
-	@ui.Layout(ui.LayoutData{Title: "Log in", Bare: true}) {
-		<div class="l-stack">
-			<span class="l-logo" aria-hidden="true"></span>
-			<h1 class="l-login__title">Admin login</h1>
+	@ui.Layout(ui.LayoutData{Title: "Sign in", Bare: true}) {
+		<form class="c-auth" method="post" action="/admin/login">
+			@ui.AuthHead("Sign in", ui.EnvFrom(ctx).BrandLine())
 			if errMsg != "" {
 				@ui.ErrorFragment(errMsg)
 			}
-			<form class="l-stack" method="post" action="/admin/login">
-				@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: username, Attrs: templ.Attributes{"autocomplete": "username", "autofocus": true}})
-				@ui.Field(ui.FieldProps{Label: "Password", Name: "password", Type: "password", Attrs: templ.Attributes{"autocomplete": "current-password"}})
-				@ui.Button("primary", "Log in", templ.Attributes{"type": "submit", "data-size": "block"})
-			</form>
-		</div>
+			@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: username, Attrs: templ.Attributes{"autocomplete": "username", "autofocus": true, "autocapitalize": "none", "spellcheck": "false"}})
+			@ui.FieldPair(ui.PairProps{Label: "Password", For: "password"}) {
+				@ui.InputControl(ui.FieldProps{Name: "password", Type: "password", Attrs: templ.Attributes{"autocomplete": "current-password"}})
+				@ui.RevealButton("password")
+			}
+			@ui.Button("primary", "Sign in", templ.Attributes{"type": "submit", "data-size": "block"})
+		</form>
 	}
 }
 
@@ -37,21 +38,32 @@ func limit(v float64, unit string) string {
 	return num(v) + " " + unit
 }
 
-// minutes returns a time limit as text, and "Unlimited" for 0.
-func minutes(m int) string {
-	if m == 0 {
-		return "Unlimited"
+// limitText returns a speed or size for the plan card, and "No limit" for 0.
+func limitText(v float64, unit string) string {
+	if v == 0 {
+		return "No limit"
+	}
+	return num(v) + " " + unit
+}
+
+// timeText returns a time limit for the plan card: whole hours when it divides by 60, else minutes. "No limit" for 0.
+func timeText(m int) string {
+	switch {
+	case m == 0:
+		return "No limit"
+	case m%60 == 0:
+		return plural(m/60, "hour")
 	}
 	return strconv.Itoa(m) + " min"
 }
 
 // PlansPage lists the plans.
-templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
+templ PlansPage(l ui.LayoutData, plans []plan.Detail) {
 	@ui.Layout(l) {
-		@ui.PageHeader("Plans") {
-			@ui.LinkButton("primary", "/admin/plans/new", "New plan", sheetOpen("/admin/plans/new"))
+		@ui.PageHeaderSub("Plans", "What each kind of guest gets.") {
+			@ui.LinkButtonIcon("primary", "plus", "/admin/plans/new", "Add plan", sheetOpen("/admin/plans/new"))
 		}
-		<div id="plan-list" aria-live="polite" aria-busy="false">
+		<div id="plan-list" class="l-flow" aria-live="polite" aria-busy="false">
 			@PlanListBody(plans)
 		</div>
 		@ui.SheetHost("sheet")
@@ -59,42 +71,81 @@ templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
 }
 
 // PlanListFragment is the answer to a request from the plan list region.
-templ PlanListFragment(plans []domain.Plan) {
+templ PlanListFragment(plans []plan.Detail) {
 	@PlanListBody(plans)
 }
 
 // PlanListBody is the inside of the plan list region.
-templ PlanListBody(plans []domain.Plan) {
+templ PlanListBody(plans []plan.Detail) {
 	if len(plans) == 0 {
-		@ui.EmptyState("No plans yet. Create the first one.")
-	} else {
-		@ui.Table("Plans", []string{"Name", "Validity", "Speed", "Data", "Time", "Devices", ""}) {
-			for _, p := range plans {
-				<tr>
-					<td data-label="Name"><a href={ templ.SafeURL(planURL(p.ID)) }>{ p.Name }</a></td>
-					<td data-label="Validity" class="u-nums">{ strconv.Itoa(p.DurationDays) } days</td>
-					<td data-label="Speed">{ limit(p.SpeedValue, p.SpeedUnit) }</td>
-					<td data-label="Data">{ limit(p.BulkValue, p.BulkUnit) }</td>
-					<td data-label="Time">{ minutes(p.TimeLimitMinutes) }</td>
-					<td data-label="Devices">{ strconv.Itoa(p.MaxSessions) }</td>
-					<td data-slot="actions">
-						@ui.Menu("plan-menu-"+strconv.FormatInt(p.ID, 10), "Actions for "+p.Name) {
-							@ui.MenuItem("Edit", false, sheetOpen(planURL(p.ID)))
-							@ui.MenuSep()
-							@ui.MenuItem("Delete", true, templ.Attributes{"hx-delete": planURL(p.ID), "hx-target": "#" + planListID, "hx-swap": "none", "hx-confirm": "Delete plan " + p.Name + "?"})
-						}
-					</td>
-				</tr>
-			}
+		@ui.EmptyState("No plans yet", "Create the first one.") {
+			@ui.LinkButtonIcon("primary", "plus", "/admin/plans/new", "Add plan", sheetOpen("/admin/plans/new"))
 		}
+	} else {
+		<div class="l-grid">
+			for _, d := range plans {
+				@PlanCard(d)
+			}
+		</div>
 	}
 	@ui.Refresher(plansHome, plansChanged, "#"+planListID)
+}
+
+// PlanCard is one plan: its limits, and Edit and Delete. Delete is disabled, with the reason below, while the plan cannot be deleted.
+templ PlanCard(d plan.Detail) {
+	{{ id := strconv.FormatInt(d.Plan.ID, 10) }}
+	{{ reason := blockedReason(d) }}
+	<article class="c-card c-plan" data-pad data-plan data-id={ id } data-name={ d.Plan.Name }>
+		<div class="c-plan__head">
+			<h2 class="c-plan__name">{ d.Plan.Name }</h2>
+			<span class="c-plan__members u-nums" data-plan-members>{ plural(d.Members, "member") }</span>
+		</div>
+		<dl>
+			<div><dt>Data limit</dt><dd>{ limitText(d.Plan.BulkValue, d.Plan.BulkUnit) }</dd></div>
+			<div><dt>Time limit</dt><dd>{ timeText(d.Plan.TimeLimitMinutes) }</dd></div>
+			<div><dt>Valid for</dt><dd>{ plural(d.Plan.DurationDays, "day") }</dd></div>
+			<div><dt>Speed limit</dt><dd>{ limitText(d.Plan.SpeedValue, d.Plan.SpeedUnit) }</dd></div>
+			<div><dt>Devices</dt><dd>{ strconv.Itoa(d.Plan.MaxSessions) }</dd></div>
+		</dl>
+		<div class="c-plan__foot">
+			<div class="c-plan__actions">
+				@ui.LinkButtonIcon("secondary", "edit", planURL(d.Plan.ID), "Edit", planEditAttrs(d.Plan))
+				if reason == "" {
+					@ui.ButtonIcon("danger", "trash", "Delete", planDeleteAttrs(d.Plan))
+				} else {
+					@ui.ButtonIcon("danger", "trash", "Delete", templ.Attributes{"data-size": "sm", "aria-disabled": "true", "aria-describedby": "why-" + id})
+				}
+			</div>
+			if reason != "" {
+				<p class="c-hint c-plan__why" id={ "why-" + id } data-plan-why>
+					@ui.Icon("info")
+					<span>Can’t delete: { reason }</span>
+				</p>
+			}
+		</div>
+	</article>
+}
+
+// planEditAttrs makes the Edit link of a card open the plan in the sheet.
+func planEditAttrs(p domain.Plan) templ.Attributes {
+	a := sheetOpen(planURL(p.ID))
+	a["data-size"] = "sm"
+	a["aria-label"] = "Edit " + p.Name
+	return a
+}
+
+// planDeleteAttrs is the Delete button of a plan that can be deleted: it asks first, and the answer goes to the toast and the list refresh.
+func planDeleteAttrs(p domain.Plan) templ.Attributes {
+	a := rowAction("delete", planURL(p.ID), planListID, "Delete plan "+p.Name+"?")
+	a["data-size"] = "sm"
+	a["aria-label"] = "Delete " + p.Name
+	return a
 }
 
 // PlanNewPage is the new plan form as a page (the no-JavaScript fallback of the sheet).
 templ PlanNewPage(l ui.LayoutData) {
 	@ui.Layout(l) {
-		@ui.PageHeader("New plan")
+		@ui.PageHeader("Add plan")
 		@PlanFormView(PlanFormProps{Form: domain.NewPlanForm(), Action: "post", URL: "/admin/plans"})
 	}
 }
@@ -113,7 +164,8 @@ type PlanFormProps struct {
 	Errors  domain.FieldErrors
 	Action  string // "post" or "put"
 	URL     string
-	Members int // members using the plan (edit only)
+	Members int  // members using the plan (edit only)
+	Blocked string // why the plan cannot be deleted, "" if it can (edit only)
 	Sheet   bool // shown in the sheet: targets the sheet body, no card
 }
 
@@ -140,23 +192,39 @@ func planFormAttrs(p PlanFormProps) templ.Attributes {
 	if p.Sheet {
 		a["hx-target"], a["hx-swap"] = "#"+sheetBodyID, "innerHTML"
 		a["data-sheet-title"] = "Edit plan"
+		if p.Form.Name != "" {
+			a["data-sheet-title"] = "Edit plan · " + p.Form.Name
+		}
 		if p.Action == "post" {
-			a["data-sheet-title"] = "New plan"
+			a["data-sheet-title"] = "Add plan"
 		}
 	}
 	a["hx-"+p.Action] = p.URL
 	return a
 }
 
-// PlanFormView is both the new and edit form; it is also the 422 response body. In the sheet it has no card.
+// PlanFormView is both the new and edit form; it is also the 422 response body. In the sheet it fills the sheet: fields scroll, buttons stay at the bottom.
 templ PlanFormView(p PlanFormProps) {
 	if p.Sheet {
-		@ui.SheetForm(planFormAttrs(p)) {
-			@planFields(p)
+		@ui.SheetFormPane(planFormAttrs(p)) {
+			@ui.SheetBody() {
+				@planFields(p)
+			}
+			@ui.SheetFoot() {
+				@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
+				@ui.Button("primary", "Save plan", templ.Attributes{"type": "submit"})
+			}
 		}
 	} else {
 		@ui.FormCard(planFormAttrs(p)) {
 			@planFields(p)
+			@ui.Actions() {
+				@ui.Button("primary", "Save plan", templ.Attributes{"type": "submit"})
+				@ui.LinkButton("secondary", "/admin/plans", "Cancel", nil)
+				if p.Action == "put" && p.Blocked == "" {
+					@ui.ConfirmDelete("Delete plan", p.URL, "Delete this plan?")
+				}
+			}
 		}
 	}
 }
@@ -167,28 +235,20 @@ templ planFields(p PlanFormProps) {
 		<div class="c-notice" data-kind="warn" data-plan-warning>{ membersWarning(p.Members) }</div>
 	}
 	@ui.Field(ui.FieldProps{Label: "Name", Name: "name", Value: p.Form.Name, Error: p.Errors["name"]})
-	@ui.Field(ui.FieldProps{Label: "Validity (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Whole number, at least 1."})
+	@ui.Field(ui.FieldProps{Label: "Valid for (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Whole number, at least 1."})
 	@ui.FieldPair(ui.PairProps{Label: "Speed limit", For: "speed_value", Hint: "0 = no speed limit. Decimals allowed.", Errors: []ui.NamedError{{Name: "speed_value", Msg: p.Errors["speed_value"]}, {Name: "speed_unit", Msg: p.Errors["speed_unit"]}}}) {
-		@ui.InputControl(ui.FieldProps{Name: "speed_value", Value: p.Form.SpeedValue, Error: p.Errors["speed_value"]})
-		@ui.SelectControl(ui.SelectProps{Name: "speed_unit", Value: p.Form.SpeedUnit, Options: unitOptions(domain.SpeedUnits), Error: p.Errors["speed_unit"]})
+		@ui.InputControl(ui.FieldProps{Name: "speed_value", Value: p.Form.SpeedValue, Error: p.Errors["speed_value"], Attrs: templ.Attributes{"inputmode": "decimal"}})
+		@ui.SelectControl(ui.SelectProps{AriaLabel: "Speed unit", Name: "speed_unit", Value: p.Form.SpeedUnit, Options: unitOptions(domain.SpeedUnits), Error: p.Errors["speed_unit"]})
 	}
 	@ui.FieldPair(ui.PairProps{Label: "Data limit", For: "bulk_value", Hint: "0 = unlimited data. Decimals allowed.", Errors: []ui.NamedError{{Name: "bulk_value", Msg: p.Errors["bulk_value"]}, {Name: "bulk_unit", Msg: p.Errors["bulk_unit"]}}}) {
-		@ui.InputControl(ui.FieldProps{Name: "bulk_value", Value: p.Form.BulkValue, Error: p.Errors["bulk_value"]})
-		@ui.SelectControl(ui.SelectProps{Name: "bulk_unit", Value: p.Form.BulkUnit, Options: unitOptions(domain.BulkUnits), Error: p.Errors["bulk_unit"]})
+		@ui.InputControl(ui.FieldProps{Name: "bulk_value", Value: p.Form.BulkValue, Error: p.Errors["bulk_value"], Attrs: templ.Attributes{"inputmode": "decimal"}})
+		@ui.SelectControl(ui.SelectProps{AriaLabel: "Data unit", Name: "bulk_unit", Value: p.Form.BulkUnit, Options: unitOptions(domain.BulkUnits), Error: p.Errors["bulk_unit"]})
 	}
-	@ui.Field(ui.FieldProps{Label: "Time limit (minutes)", Name: "time_limit_minutes", Value: p.Form.TimeLimitMinutes, Error: p.Errors["time_limit_minutes"], Hint: "0 = unlimited time."})
-	@ui.Field(ui.FieldProps{Label: "Simultaneous devices", Name: "max_sessions", Value: p.Form.MaxSessions, Error: p.Errors["max_sessions"], Hint: "Whole number, at least 1."})
+	@ui.Field(ui.FieldProps{Label: "Time limit (minutes)", Name: "time_limit_minutes", Value: p.Form.TimeLimitMinutes, Error: p.Errors["time_limit_minutes"], Hint: "0 = unlimited time.", Attrs: templ.Attributes{"inputmode": "numeric"}})
+	@ui.Field(ui.FieldProps{Label: "Devices at the same time", Name: "max_sessions", Value: p.Form.MaxSessions, Error: p.Errors["max_sessions"], Hint: "Whole number, at least 1.", Attrs: templ.Attributes{"inputmode": "numeric"}})
 	@ui.Checkbox(ui.CheckboxProps{Label: "Renew automatically when the validity ends", Name: "auto_resubscribe", Checked: p.Form.AutoResubscribe})
-	@ui.Actions() {
-		@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
-		if p.Sheet {
-			@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
-		} else {
-			@ui.LinkButton("secondary", "/admin/plans", "Cancel", nil)
-			if p.Action == "put" {
-				@ui.ConfirmDelete("Delete plan", p.URL, "Delete this plan?")
-			}
-		}
+	if p.Blocked != "" {
+		@ui.NoticeTitled("warn", "This plan can’t be deleted", p.Blocked)
 	}
 }
 
@@ -205,7 +265,8 @@ type SettingsProps struct {
 // SettingsPage shows the settings form.
 templ SettingsPage(l ui.LayoutData, p SettingsProps) {
 	@ui.Layout(l) {
-		@ui.PageHeader("Settings")
+		@ui.PageHeaderSub("Settings", "Change what you need, then save once.") {
+		}
 		@SettingsFormView(p)
 	}
 }
@@ -232,76 +293,166 @@ func planOptions(plans []domain.Plan) []ui.Option {
 	return o
 }
 
+// numeric makes a field open the number keypad on a phone.
+var numeric = templ.Attributes{"inputmode": "numeric"}
+
 // SettingsFormView is the settings form and the PUT response body: 200 with a flash, or 422 with field errors.
+// All groups are in one form with one Save button, because the server saves and checks all settings together.
 templ SettingsFormView(p SettingsProps) {
-	@ui.FormCard(templ.Attributes{"id": "settings-form", "hx-put": "/admin/settings", "hx-target": "this", "hx-swap": "outerHTML"}) {
+	<form id="settings-form" class="l-flow" hx-put="/admin/settings" hx-target="this" hx-swap="outerHTML">
 		if p.Saved {
 			@ui.Flash("ok", "Settings saved.")
+		}
+		if len(p.Errors) > 0 {
+			@ui.NoticeTitled("error", "Not saved", "Fix "+plural(len(p.Errors), "field")+" and try again.")
 		}
 		if p.RestartNeeded {
 			@ui.Flash("warn", "Restart the server to apply the saved server settings (addresses and log options).")
 		}
-		@ui.Field(ui.FieldProps{Label: "Business name", Name: "business_name", Value: p.Form.BusinessName, Error: p.Errors["business_name"], Hint: "Shown on printed vouchers and in the admin header. Leave empty to hide."})
-		@ui.Select(ui.SelectProps{Label: "Time zone", Name: "timezone", Value: p.Form.Timezone, Options: timezoneOptions(p.Form.Timezone), Error: p.Errors["timezone"], Hint: "Dates are shown in this zone."})
-		@ui.FieldPair(ui.PairProps{Label: "RADIUS shared secret", For: "radius_shared_secret", Hint: "Letters and digits only. Use a long random one (20 or more characters). Must match the secret configured on the router. Changes apply immediately.", Errors: []ui.NamedError{{Name: "radius_shared_secret", Msg: p.Errors["radius_shared_secret"]}}}) {
-			@ui.InputControl(ui.FieldProps{Name: "radius_shared_secret", Type: "password", Value: p.Form.RadiusSharedSecret, Error: p.Errors["radius_shared_secret"], Attrs: templ.Attributes{"autocomplete": "off"}})
-			@ui.Button("secondary", "Reveal", templ.Attributes{"type": "button", "id": "reveal-secret", "data-reveal": "radius_shared_secret"})
+		@ui.SettingGroup("Business", "Shown on vouchers and in the admin header.") {
+			@ui.Field(ui.FieldProps{Label: "Business name", Name: "business_name", Value: p.Form.BusinessName, Error: p.Errors["business_name"], Hint: "Shown on printed vouchers and in the admin header. Leave empty to hide."})
+			@ui.Select(ui.SelectProps{Label: "Time zone", Name: "timezone", Value: p.Form.Timezone, Options: timezoneOptions(p.Form.Timezone), Error: p.Errors["timezone"], Hint: "Dates are shown in this zone."})
 		}
-		@ui.Field(ui.FieldProps{Label: "Disconnect (CoA) port", Name: "coa_port", Value: p.Form.CoaPort, Error: p.Errors["coa_port"], Hint: "1-65535. Router default: 3799."})
-		@ui.Field(ui.FieldProps{Label: "Accounting interval (seconds)", Name: "accounting_interval_seconds", Value: p.Form.AccountingIntervalSeconds, Error: p.Errors["accounting_interval_seconds"], Hint: "At least 10."})
-		@ui.Select(ui.SelectProps{Label: "Default plan", Name: "default_plan_id", Value: p.Form.DefaultPlanID, Options: planFilterOptions(p.Plans, "(none)"), Error: p.Errors["default_plan_id"], Hint: "Preselected on the new-member form; nothing is assigned silently."})
-		@ui.Field(ui.FieldProps{Label: "Voucher username prefix", Name: "batch_username_prefix", Value: p.Form.BatchUsernamePrefix, Error: p.Errors["batch_username_prefix"], Hint: "English letters and digits."})
-		@ui.Field(ui.FieldProps{Label: "Next voucher number", Name: "batch_counter", Value: p.Form.BatchCounter, Error: p.Errors["batch_counter"], Hint: "It can only go up."})
-		@ui.Field(ui.FieldProps{Label: "Maximum vouchers per batch", Name: "batch_max_count", Value: p.Form.BatchMaxCount, Error: p.Errors["batch_max_count"]})
-		@ui.Field(ui.FieldProps{Label: "Voucher password length", Name: "voucher_password_length", Value: p.Form.VoucherPasswordLength, Error: p.Errors["voucher_password_length"], Hint: "4-20 digits."})
-		@ui.Textarea(ui.TextareaProps{Label: "Voucher help text", Name: "voucher_help", Value: p.Form.VoucherHelp, Error: p.Errors["voucher_help"], Hint: "Printed on every voucher. Empty = the default English text."})
-		@ui.Field(ui.FieldProps{Label: "Keep finished sessions (days)", Name: "session_retention_days", Value: p.Form.SessionRetentionDays, Error: p.Errors["session_retention_days"], Hint: "0 = keep forever."})
-		<h2 class="c-section-title">Server</h2>
-		<p class="c-hint">These settings take effect after the server is restarted.</p>
-		@ui.Field(ui.FieldProps{Label: "Admin address", Name: "admin_addr", Value: p.Form.AdminAddr, Error: p.Errors["admin_addr"], Hint: "host:port or :port for the admin panel (e.g. :8081). Port 0 = OS-assigned."})
-		@ui.Field(ui.FieldProps{Label: "RADIUS auth address", Name: "radius_auth_addr", Value: p.Form.RadiusAuthAddr, Error: p.Errors["radius_auth_addr"], Hint: "host:port for RADIUS authentication (e.g. :1812)."})
-		@ui.Field(ui.FieldProps{Label: "RADIUS acct address", Name: "radius_acct_addr", Value: p.Form.RadiusAcctAddr, Error: p.Errors["radius_acct_addr"], Hint: "host:port for RADIUS accounting (e.g. :1813)."})
-		@ui.Select(ui.SelectProps{Label: "Log level", Name: "log_level", Value: p.Form.LogLevel, Options: []ui.Option{{Value: "debug", Label: "debug"}, {Value: "info", Label: "info"}, {Value: "warn", Label: "warn"}, {Value: "error", Label: "error"}}, Error: p.Errors["log_level"]})
-		@ui.Select(ui.SelectProps{Label: "Log format", Name: "log_format", Value: p.Form.LogFormat, Options: []ui.Option{{Value: "text", Label: "text (key=value)"}, {Value: "json", Label: "json"}}, Error: p.Errors["log_format"]})
-		@ui.Actions() {
-			@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
+		@ui.SettingGroup("RADIUS", "The secret and the Disconnect port must match the router.") {
+			@ui.FieldPair(ui.PairProps{Label: "RADIUS shared secret", For: "radius_shared_secret", Hint: "Letters and digits only. Use a long random one (20 or more characters). Must match the secret configured on the router. Changes apply immediately.", Errors: []ui.NamedError{{Name: "radius_shared_secret", Msg: p.Errors["radius_shared_secret"]}}}) {
+				@ui.InputControl(ui.FieldProps{Name: "radius_shared_secret", Type: "password", Value: p.Form.RadiusSharedSecret, Error: p.Errors["radius_shared_secret"], Attrs: templ.Attributes{"autocomplete": "off", "data-mono": true}})
+				@ui.RevealButton("radius_shared_secret")
+				@ui.ButtonIcon("secondary", "wand", "Generate", templ.Attributes{"type": "button", "data-size": "sm", "data-generate-alnum": "radius_shared_secret"})
+			}
+			<div class="c-form-grid">
+				@ui.Field(ui.FieldProps{Label: "Disconnect (CoA) port", Name: "coa_port", Value: p.Form.CoaPort, Error: p.Errors["coa_port"], Hint: "1-65535. Router default: 3799.", Attrs: numeric})
+				@ui.Field(ui.FieldProps{Label: "Accounting interval (seconds)", Name: "accounting_interval_seconds", Value: p.Form.AccountingIntervalSeconds, Error: p.Errors["accounting_interval_seconds"], Hint: "At least 10.", Attrs: numeric})
+			</div>
 		}
-	}
+		@ui.SettingGroup("Members", "Used on the new member form.") {
+			@ui.Select(ui.SelectProps{Label: "Default plan", Name: "default_plan_id", Value: p.Form.DefaultPlanID, Options: planFilterOptions(p.Plans, "(none)"), Error: p.Errors["default_plan_id"], Hint: "Preselected on the new-member form; nothing is assigned silently."})
+		}
+		@ui.SettingGroup("Voucher defaults", "Used when you create a new batch.") {
+			<div class="c-form-grid">
+				@ui.Field(ui.FieldProps{Label: "Voucher username prefix", Name: "batch_username_prefix", Value: p.Form.BatchUsernamePrefix, Error: p.Errors["batch_username_prefix"], Hint: "English letters and digits.", Attrs: templ.Attributes{"data-mono": true}})
+				@ui.Field(ui.FieldProps{Label: "Next voucher number", Name: "batch_counter", Value: p.Form.BatchCounter, Error: p.Errors["batch_counter"], Hint: "It can only go up.", Attrs: numeric})
+				@ui.Field(ui.FieldProps{Label: "Maximum vouchers per batch", Name: "batch_max_count", Value: p.Form.BatchMaxCount, Error: p.Errors["batch_max_count"], Attrs: numeric})
+				@ui.Field(ui.FieldProps{Label: "Voucher password length", Name: "voucher_password_length", Value: p.Form.VoucherPasswordLength, Error: p.Errors["voucher_password_length"], Hint: "4-20 digits.", Attrs: numeric})
+				<div data-span="2">
+					@ui.Textarea(ui.TextareaProps{Label: "Voucher help text", Name: "voucher_help", Value: p.Form.VoucherHelp, Error: p.Errors["voucher_help"], Hint: "Printed on every voucher. Empty = the default English text."})
+				</div>
+			</div>
+		}
+		@ui.SettingGroup("Server addresses", "Where this app listens. A change needs a restart.") {
+			@ui.Field(ui.FieldProps{Label: "Admin address", Name: "admin_addr", Value: p.Form.AdminAddr, Error: p.Errors["admin_addr"], Hint: "host:port or :port for the admin panel (e.g. :8081). Port 0 = OS-assigned."})
+			<div class="c-form-grid">
+				@ui.Field(ui.FieldProps{Label: "RADIUS auth address", Name: "radius_auth_addr", Value: p.Form.RadiusAuthAddr, Error: p.Errors["radius_auth_addr"], Hint: "host:port for RADIUS authentication (e.g. :1812)."})
+				@ui.Field(ui.FieldProps{Label: "RADIUS acct address", Name: "radius_acct_addr", Value: p.Form.RadiusAcctAddr, Error: p.Errors["radius_acct_addr"], Hint: "host:port for RADIUS accounting (e.g. :1813)."})
+			</div>
+		}
+		@ui.SettingGroup("Logs", "Old sessions are removed automatically. The log level and format need a restart.") {
+			@ui.Field(ui.FieldProps{Label: "Keep finished sessions (days)", Name: "session_retention_days", Value: p.Form.SessionRetentionDays, Error: p.Errors["session_retention_days"], Hint: "0 = keep forever.", Attrs: numeric})
+			<div class="c-form-grid">
+				@ui.Select(ui.SelectProps{Label: "Log level", Name: "log_level", Value: p.Form.LogLevel, Options: []ui.Option{{Value: "debug", Label: "debug"}, {Value: "info", Label: "info"}, {Value: "warn", Label: "warn"}, {Value: "error", Label: "error"}}, Error: p.Errors["log_level"]})
+				@ui.Select(ui.SelectProps{Label: "Log format", Name: "log_format", Value: p.Form.LogFormat, Options: []ui.Option{{Value: "text", Label: "text (key=value)"}, {Value: "json", Label: "json"}}, Error: p.Errors["log_format"]})
+			</div>
+		}
+		<div class="l-cluster" data-end>
+			@ui.Button("primary", "Save settings", templ.Attributes{"type": "submit"})
+		</div>
+	</form>
 }
 
-// PasswordProps holds what the admin password form shows.
+// PasswordProps holds what the admin password and username forms show.
 type PasswordProps struct {
 	Errors    domain.FieldErrors
-	Forced    bool // the first-start password admin/admin is still in use
+	Forced    bool   // the first-start password admin/admin is still in use
+	Username  string // the admin name shown in the username field
 	Throttled bool
 }
 
-// PasswordPage shows the change-password form. Forced is true until the first-start password is changed.
+// PasswordPage shows the password and username forms. Forced is true until the first-start password is changed.
+// Then the page is the sign-in card alone, because every other page is closed, and the username field is part of it.
 templ PasswordPage(l ui.LayoutData, p PasswordProps) {
-	@ui.Layout(l) {
-		@ui.PageHeader("Admin password")
-		@PasswordFormView(p)
+	if p.Forced {
+		@ui.Layout(ui.LayoutData{Title: "Set a new password", Bare: true, CSRF: l.CSRF}) {
+			@PasswordFormView(p)
+			@ui.Button("ghost", "Log out", templ.Attributes{"hx-post": l.LogoutURL, "data-size": "block"})
+		}
+	} else {
+		@ui.Layout(l) {
+			@ui.PageHeaderSub("Password and username", "Your own sign-in details for this admin page.")
+			<div class="l-flow">
+				@ui.SettingGroup("Username", "What you type to sign in.") {
+					@UsernameFormView(p)
+				}
+				@ui.SettingGroup("Password", "Pick something long. Generate makes one for you.") {
+					@PasswordFormView(PasswordProps{})
+				}
+			</div>
+		}
 	}
 }
 
+// passwordFormAttrs is the look of the password form: the sign-in card, or the inside of a setting card.
+func passwordFormAttrs(forced bool) templ.Attributes {
+	if forced {
+		return templ.Attributes{"class": "c-auth"}
+	}
+	return templ.Attributes{"class": "c-form", "data-flush": true}
+}
+
+// passwordSaveLabel is the text of the save button.
+func passwordSaveLabel(forced bool) string {
+	if forced {
+		return "Save and continue"
+	}
+	return "Save password"
+}
+
+// UsernameFormView is the change-username form and the PUT response body for 422 and 429.
+templ UsernameFormView(p PasswordProps) {
+	<form id="username-form" class="c-form" data-flush hx-put="/admin/password/username" hx-target="this" hx-swap="outerHTML">
+		if p.Throttled {
+			@ui.ErrorFragment("Too many failed attempts. Try again in a minute.")
+		}
+		@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: p.Username, Error: p.Errors["username"], Hint: "4 to 32 letters, numbers, dot or dash.", Attrs: templ.Attributes{"autocomplete": "username", "autocapitalize": "none", "spellcheck": "false"}})
+		@ui.Field(ui.FieldProps{Label: "Current password", Name: "username_current_password", Type: "password", Error: p.Errors["username_current_password"], Hint: "We ask for it to make sure it is you.", Attrs: templ.Attributes{"autocomplete": "current-password"}})
+		<div class="l-cluster" data-end>
+			@ui.Button("primary", "Save username", templ.Attributes{"type": "submit"})
+		</div>
+	</form>
+}
+
 // PasswordFormView is the password form and the PUT response body for 422 and 429.
+// password.js ticks the rules while the admin types. On the forced screen it also has the username field.
 templ PasswordFormView(p PasswordProps) {
-	@ui.FormCard(templ.Attributes{"id": "password-form", "hx-put": "/admin/password", "hx-target": "this", "hx-swap": "outerHTML"}) {
+	<form id="password-form" { passwordFormAttrs(p.Forced)... } hx-put="/admin/password" hx-target="this" hx-swap="outerHTML" data-rules-form data-min-length={ strconv.Itoa(domain.MinAdminPasswordLen) }>
 		if p.Forced {
-			@ui.Flash("warn", "This account still uses the default password. Set a new one to continue.")
+			@ui.AuthHead("Set a new password", "First time here. Choose your own password before you continue.")
+			@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: p.Username, Error: p.Errors["username"], Hint: "Keep “admin” or choose your own. 4 to 32 letters, numbers, dot or dash.", Attrs: templ.Attributes{"autocomplete": "username", "autocapitalize": "none", "spellcheck": "false"}})
 		}
 		if p.Throttled {
 			@ui.ErrorFragment("Too many failed attempts. Try again in a minute.")
 		}
 		@ui.Field(ui.FieldProps{Label: "Current password", Name: "current_password", Type: "password", Error: p.Errors["current_password"], Attrs: templ.Attributes{"autocomplete": "current-password"}})
-		@ui.FieldPair(ui.PairProps{Label: "New password", For: "new_password", Hint: "At least 10 characters. Not your username, not \"admin\", not a common password.", Errors: []ui.NamedError{{Name: "new_password", Msg: p.Errors["new_password"]}}}) {
-			@ui.InputControl(ui.FieldProps{Name: "new_password", Type: "password", Error: p.Errors["new_password"], Attrs: templ.Attributes{"autocomplete": "new-password"}})
-			@ui.Button("secondary", "Reveal", templ.Attributes{"type": "button", "data-reveal": "new_password"})
-			@ui.Button("secondary", "Generate", templ.Attributes{"type": "button", "data-generate": "new_password", "data-generate-also": "confirm_password"})
+		@ui.FieldPair(ui.PairProps{Label: "New password", For: "new_password", Hint: "Not \"admin\", not your username, not a common password.", Errors: []ui.NamedError{{Name: "new_password", Msg: p.Errors["new_password"]}}}) {
+			@ui.InputControl(ui.FieldProps{Name: "new_password", Type: "password", Error: p.Errors["new_password"], Attrs: templ.Attributes{"autocomplete": "new-password", "data-mono": true}})
+			@ui.RevealButton("new_password")
+			@ui.ButtonIcon("secondary", "wand", "Generate", templ.Attributes{"type": "button", "data-generate": "new_password", "data-generate-also": "confirm_password"})
 		}
-		@ui.Field(ui.FieldProps{Label: "Confirm new password", Name: "confirm_password", Type: "password", Error: p.Errors["confirm_password"], Attrs: templ.Attributes{"autocomplete": "new-password"}})
-		@ui.Actions() {
-			@ui.Button("primary", "Change password", templ.Attributes{"type": "submit"})
+		@ui.Field(ui.FieldProps{Label: "Repeat the password", Name: "confirm_password", Type: "password", Error: p.Errors["confirm_password"], Attrs: templ.Attributes{"autocomplete": "new-password", "data-mono": true, "placeholder": "Type it again"}})
+		<ul class="c-rules" aria-label="Password rules">
+			<li data-rule="length">
+				@ui.Icon("circle")
+				{ strconv.Itoa(domain.MinAdminPasswordLen) } or more characters
+			</li>
+			<li data-rule="match">
+				@ui.Icon("circle")
+				Both passwords match
+			</li>
+		</ul>
+		if p.Forced {
+			@ui.Button("primary", passwordSaveLabel(true), templ.Attributes{"type": "submit", "data-size": "block"})
+		} else {
+			<div class="l-cluster" data-end>
+				@ui.Button("primary", passwordSaveLabel(false), templ.Attributes{"type": "submit"})
+			</div>
 		}
-	}
+	</form>
 }

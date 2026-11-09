@@ -1,16 +1,31 @@
-/* Confirm dialog on a native <dialog>. Danger confirm uses a danger button. */
+/* Confirm dialog on a native <dialog>: round icon, title, text, buttons. On a phone the buttons stack. */
 @layer components {
   .c-modal {
-    inline-size: min(var(--w-modal), calc(100% - var(--s-8)));
-    padding: var(--s-5h);
+    inline-size: min(var(--w-dialog), calc(100% - var(--s-5)));
+    padding: var(--pad-dialog);
     border: 0;
-    border-radius: var(--r-sheet);
-    background: var(--panel);
-    color: var(--text);
-    box-shadow: var(--shadow-pop);
+    border-radius: var(--r-xl);
+    background: var(--c-surface);
+    color: var(--c-text);
+    box-shadow: var(--sh-3);
   }
-  .c-modal::backdrop { background: var(--scrim); backdrop-filter: blur(var(--blur-backdrop)); }
-  .c-modal__title { font-size: var(--fs-head); font-weight: var(--fw-semibold); margin-block-end: var(--s-1h); }
-  .c-modal__text { color: var(--muted); margin-block-end: var(--s-5); }
-  .c-modal__foot { display: flex; justify-content: flex-end; gap: var(--s-3); }
+  .c-modal[open] { display: grid; gap: var(--s-3); }
+  .c-modal::backdrop { background: var(--c-scrim); }
+  .c-modal__icon {
+    display: grid;
+    place-items: center;
+    inline-size: var(--size-icon-circle-lg);
+    block-size: var(--size-icon-circle-lg);
+    border-radius: 50%;
+    background: var(--st-bad-bg);
+    color: var(--st-bad-fg);
+  }
+  .c-modal__title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); letter-spacing: var(--ls-h3); }
+  .c-modal__text { color: var(--c-text-2); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+  .c-modal__foot { display: flex; justify-content: flex-end; gap: var(--s-2); margin-block-start: var(--s-3); }
+
+  @media (max-width: 699px) {
+    .c-modal__foot { flex-direction: column-reverse; }
+    .c-modal__foot .c-btn { inline-size: 100%; }
+  }
 }

@@ -2,17 +2,41 @@ package admin
 
 import (
 	"strconv"
+	"strings"
 
 	"hotspotpluslight/internal/voucher"
 	"hotspotpluslight/internal/web/ui"
 )
 
+// sheetHeading returns the big line at the top of every sheet: the business name, or a plain title without one.
+func sheetHeading(p voucher.Print) string {
+	if p.BusinessName != "" {
+		return p.BusinessName
+	}
+	return "Wi-Fi vouchers"
+}
+
+// sheetSub returns the small line under the heading. The default title "Vouchers" adds nothing, so it is left out.
+func sheetSub(p voucher.Print) string {
+	var parts []string
+	if p.BusinessName != "" {
+		parts = append(parts, "Wi-Fi vouchers")
+	}
+	if p.Title != "" && (p.BusinessName == "" || p.Title != "Vouchers") {
+		parts = append(parts, p.Title)
+	}
+	return strings.Join(parts, " · ")
+}
+
+// pageOf returns "Page 2 of 3".
+func pageOf(i, n int) string { return "Page " + strconv.Itoa(i+1) + " of " + strconv.Itoa(n) }
+
 func pageCount(p voucher.Print) string { return strconv.Itoa(len(p.Pages)) }
 
 // VoucherSheets is the print page (BR-16): a standalone left-to-right page with
 // its own print stylesheet and none of the admin chrome. Shared by the batch
-// print / reprint and the single-voucher print.
-templ VoucherSheets(p voucher.Print, backURL string) {
+// print / reprint and the single-voucher print. Each A4 sheet holds 18 vouchers, 3 across and 6 down.
+templ VoucherSheets(p voucher.Print, backURL, backLabel string) {
 	<!DOCTYPE html>
 	<html lang="en" dir="ltr">
 		<head>
@@ -23,25 +47,49 @@ templ VoucherSheets(p voucher.Print, backURL string) {
 			<script type="module" src={ ui.EnvFrom(ctx).Asset("js/print.js") }></script>
 		</head>
 		<body>
+			@ui.Sprite()
 			<div class="toolbar" data-page-count={ pageCount(p) }>
-				<button type="button" data-print>Print</button>
-				<a href={ templ.SafeURL(backURL) }>Back</a>
-				<span>{ plural(p.Total, "voucher") } on { plural(len(p.Pages), "page") }</span>
+				<a class="btn" href={ templ.SafeURL(backURL) }>
+					@ui.Icon("chevron-left")
+					{ backLabel }
+				</a>
+				<span class="count">{ plural(p.Total, "voucher") } on { plural(len(p.Pages), "page") }</span>
+				<button type="button" class="btn btn-primary" data-print>
+					@ui.Icon("printer")
+					Print
+				</button>
 			</div>
 			if p.Total == 0 {
 				<p class="empty">There are no vouchers to print.</p>
 			}
 			for i, page := range p.Pages {
-				<section class="sheet" data-page={ strconv.Itoa(i + 1) }>
-					for _, v := range page {
-						<div class="voucher" dir="ltr" data-voucher data-username={ v.Username } data-password={ v.Password }>
-							if p.BusinessName != "" {
-								<p class="title" data-business>{ p.BusinessName } &middot; Wi-Fi</p>
+				<section class="sheet" data-page={ strconv.Itoa(i + 1) } aria-label={ "Voucher sheet, " + strings.ToLower(pageOf(i, len(p.Pages))) }>
+					<div class="sheet-head">
+						<div>
+							<h1>{ sheetHeading(p) }</h1>
+							if sub := sheetSub(p); sub != "" {
+								<p>{ sub }</p>
 							}
-							<p class="help" data-help>{ p.Help }</p>
-							<p class="credentials">Username: <b>{ v.Username }</b> | Password: <b>{ v.Password }</b></p>
 						</div>
-					}
+						<p>{ pageOf(i, len(p.Pages)) }</p>
+					</div>
+					<div class="sheet-grid">
+						for _, v := range page {
+							<div class="voucher" dir="ltr" data-voucher data-username={ v.Username } data-password={ v.Password }>
+								<div class="voucher-top">
+									if p.BusinessName != "" {
+										<span data-business>{ p.BusinessName }</span>
+									}
+									<span>Wi-Fi</span>
+								</div>
+								<dl>
+									<div><dt>Username</dt><dd>{ v.Username }</dd></div>
+									<div><dt>Password</dt><dd>{ v.Password }</dd></div>
+								</dl>
+								<p class="help" data-help>{ p.Help }</p>
+							</div>
+						}
+					</div>
 				</section>
 			}
 		</body>

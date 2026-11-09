@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -55,8 +56,18 @@ func (f *fakeRepo) SetAdminPassword(_ context.Context, hash string, _ int64) err
 	return nil
 }
 
-func (f *fakeRepo) ChangeAdminPassword(_ context.Context, hash string, _ int64, keep string) error {
-	f.a.PasswordHash, f.a.MustChangePassword = hash, false
+func (f *fakeRepo) ChangeAdminUsername(_ context.Context, username string, _ int64, keep string) error {
+	f.a.Username = username
+	for h := range f.sessions {
+		if h != keep {
+			delete(f.sessions, h)
+		}
+	}
+	return nil
+}
+
+func (f *fakeRepo) ChangeAdminPassword(_ context.Context, hash, username string, _ int64, keep string) error {
+	f.a.PasswordHash, f.a.Username, f.a.MustChangePassword = hash, username, false
 	for h := range f.sessions {
 		if h != keep {
 			delete(f.sessions, h)
@@ -204,19 +215,19 @@ func TestChangePassword(t *testing.T) {
 	if len(r.sessions) != 2 {
 		t.Fatalf("sessions %d", len(r.sessions))
 	}
-	if errs, _ := s.ChangePassword(ctx, keep.Token, "ip", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345"); errs["current_password"] == "" {
+	if errs, _ := s.ChangePassword(ctx, keep.Token, "ip", "", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345"); errs["current_password"] == "" {
 		t.Fatal("wrong current accepted")
 	}
-	if errs, _ := s.ChangePassword(ctx, keep.Token, "ip", goodPW, "short", "short"); errs["new_password"] == "" {
+	if errs, _ := s.ChangePassword(ctx, keep.Token, "ip", "", goodPW, "short", "short"); errs["new_password"] == "" {
 		t.Fatal("short password accepted")
 	}
-	if errs, _ := s.ChangePassword(ctx, keep.Token, "ip", goodPW, "Fresh-Pass-12345", "different-one-1"); errs["confirm_password"] == "" {
+	if errs, _ := s.ChangePassword(ctx, keep.Token, "ip", "", goodPW, "Fresh-Pass-12345", "different-one-1"); errs["confirm_password"] == "" {
 		t.Fatal("mismatch accepted")
 	}
 	if !r.a.MustChangePassword || len(r.sessions) != 2 {
 		t.Fatal("a rejected change touched the state")
 	}
-	if errs, err := s.ChangePassword(ctx, keep.Token, "ip", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345"); err != nil || len(errs) > 0 {
+	if errs, err := s.ChangePassword(ctx, keep.Token, "ip", "", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345"); err != nil || len(errs) > 0 {
 		t.Fatalf("%v %v", errs, err)
 	}
 	if r.a.MustChangePassword || len(r.sessions) != 1 {
@@ -232,13 +243,13 @@ func TestChangePasswordInvalidNewKeepsCounter(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
 	for i := 0; i < loginMaxFailures-1; i++ {
-		s.ChangePassword(ctx, "t", "ip", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345")
+		s.ChangePassword(ctx, "t", "ip", "", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345")
 	}
-	if errs, _ := s.ChangePassword(ctx, "t", "ip", goodPW, "short", "short"); errs["new_password"] == "" {
+	if errs, _ := s.ChangePassword(ctx, "t", "ip", "", goodPW, "short", "short"); errs["new_password"] == "" {
 		t.Fatal("short password accepted")
 	}
-	s.ChangePassword(ctx, "t", "ip", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345") // the failure that locks
-	_, err := s.ChangePassword(ctx, "t", "ip", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345")
+	s.ChangePassword(ctx, "t", "ip", "", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345") // the failure that locks
+	_, err := s.ChangePassword(ctx, "t", "ip", "", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345")
 	var th *ThrottledError
 	if !errors.As(err, &th) {
 		t.Fatalf("counter was reset, want throttled, got %v", err)
@@ -249,9 +260,9 @@ func TestChangePasswordWrongCurrentIsThrottled(t *testing.T) {
 	s, _, _ := newSvc(t)
 	ctx := context.Background()
 	for i := 0; i < loginMaxFailures; i++ {
-		s.ChangePassword(ctx, "t", "ip", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345")
+		s.ChangePassword(ctx, "t", "ip", "", "wrong", "Fresh-Pass-12345", "Fresh-Pass-12345")
 	}
-	_, err := s.ChangePassword(ctx, "t", "ip", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345")
+	_, err := s.ChangePassword(ctx, "t", "ip", "", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345")
 	var th *ThrottledError
 	if !errors.As(err, &th) {
 		t.Fatalf("want throttled, got %v", err)
@@ -305,5 +316,52 @@ func TestGeneratedSecretIsLettersAndDigits(t *testing.T) {
 		if err != nil || len(v) != 24 || domain.SecretProblem(v) != "" {
 			t.Fatalf("%q %v", v, err)
 		}
+	}
+}
+
+func TestChangeUsername(t *testing.T) {
+	s, r, _ := newSvc(t)
+	ctx := context.Background()
+	keep, _ := s.Login(ctx, "admin", goodPW, "ip")
+	s.Login(ctx, "admin", goodPW, "ip2")
+	for name, want := range map[string]string{"abc": "username", "has space": "username", strings.Repeat("a", 33): "username", "bad/name": "username", strings.ToUpper(goodPW): "username"} {
+		if errs, _ := s.ChangeUsername(ctx, keep.Token, "ip", name, goodPW); errs[want] == "" {
+			t.Errorf("%q accepted", name)
+		}
+	}
+	if errs, _ := s.ChangeUsername(ctx, keep.Token, "ip", "owner.1", "wrong"); errs["username_current_password"] == "" {
+		t.Fatal("wrong current accepted")
+	}
+	if r.a.Username != "admin" || len(r.sessions) != 2 {
+		t.Fatal("a rejected rename touched the state")
+	}
+	if errs, err := s.ChangeUsername(ctx, keep.Token, "ip", " owner.1 ", goodPW); err != nil || len(errs) > 0 {
+		t.Fatalf("%v %v", errs, err)
+	}
+	if r.a.Username != "owner.1" || len(r.sessions) != 1 {
+		t.Fatalf("name %q sessions %d", r.a.Username, len(r.sessions))
+	}
+	if ok, _ := s.VerifyAdmin(ctx, "admin", goodPW); ok {
+		t.Fatal("old name still works")
+	}
+	if errs, err := s.ChangeUsername(ctx, keep.Token, "ip", "owner.1", goodPW); err != nil || len(errs) > 0 {
+		t.Fatalf("same name: %v %v", errs, err)
+	}
+}
+
+func TestChangePasswordWithUsername(t *testing.T) {
+	s, r, _ := newSvc(t)
+	ctx := context.Background()
+	if errs, _ := s.ChangePassword(ctx, "t", "ip", "no", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345"); errs["username"] == "" {
+		t.Fatal("short username accepted")
+	}
+	if r.a.Username != "admin" || r.a.PasswordHash == "" {
+		t.Fatal("rejected change touched the state")
+	}
+	if errs, err := s.ChangePassword(ctx, "t", "ip", "boss-man", goodPW, "Fresh-Pass-12345", "Fresh-Pass-12345"); err != nil || len(errs) > 0 {
+		t.Fatalf("%v %v", errs, err)
+	}
+	if r.a.Username != "boss-man" {
+		t.Fatalf("name %q", r.a.Username)
 	}
 }

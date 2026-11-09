@@ -171,11 +171,11 @@ func TestRename(t *testing.T) {
 
 func TestPrintBatchAndMember(t *testing.T) {
 	s, repo, _ := newSvc()
-	for i := range 15 {
+	for i := range 19 {
 		repo.creds = map[int64][]domain.BatchCredential{7: append(repo.creds[7], domain.BatchCredential{Username: "u" + string(rune('a'+i)), PasswordEnc: []byte("enc:p")})}
 	}
 	p, err := s.PrintBatch(context.Background(), 7)
-	if err != nil || p.Total != 15 || len(p.Pages) != 2 || len(p.Pages[0]) != 14 || p.Pages[1][0].Password != "p" || p.Help != domain.DefaultVoucherHelp {
+	if err != nil || p.Total != 19 || len(p.Pages) != 2 || len(p.Pages[0]) != 18 || p.Pages[1][0].Password != "p" || p.Help != domain.DefaultVoucherHelp {
 		t.Fatalf("%+v %v", p, err)
 	}
 	p, err = s.PrintMember(context.Background(), 4)

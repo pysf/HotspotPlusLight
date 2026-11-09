@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/plan"
 	"hotspotpluslight/internal/web/ui"
 )
 
@@ -49,7 +50,7 @@ func (h handlers) notFound(w http.ResponseWriter, r *http.Request, what string) 
 
 // plansList shows the plans, or only the list region when htmx asks for it.
 func (h handlers) plansList(w http.ResponseWriter, r *http.Request) {
-	plans, err := h.Plans.List(r.Context())
+	plans, err := h.Plans.Details(r.Context())
 	if err != nil {
 		h.serverError(w, r, err)
 		return
@@ -103,10 +104,10 @@ func (h handlers) planEdit(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		h.serverError(w, r, err)
 	case inSheet(r):
-		h.render(w, r, http.StatusOK, PlanFormView(PlanFormProps{Form: domain.FormFromPlan(d.Plan), Action: "put", URL: planURL(id), Members: d.Members, Sheet: true}))
+		h.render(w, r, http.StatusOK, PlanFormView(PlanFormProps{Form: domain.FormFromPlan(d.Plan), Action: "put", URL: planURL(id), Members: d.Members, Blocked: blockedReason(d), Sheet: true}))
 	default:
 		h.render(w, r, http.StatusOK, PlanEditPage(layout(r, "Edit plan", plansHome),
-			PlanFormProps{Form: domain.FormFromPlan(d.Plan), Action: "put", URL: planURL(id), Members: d.Members}))
+			PlanFormProps{Form: domain.FormFromPlan(d.Plan), Action: "put", URL: planURL(id), Members: d.Members, Blocked: blockedReason(d)}))
 	}
 }
 
@@ -130,7 +131,7 @@ func (h handlers) planUpdate(w http.ResponseWriter, r *http.Request) {
 			h.serverError(w, r, err)
 			return
 		}
-		h.render(w, r, http.StatusUnprocessableEntity, PlanFormView(PlanFormProps{Form: f, Errors: errs, Action: "put", URL: planURL(id), Members: d.Members, Sheet: inSheet(r)}))
+		h.render(w, r, http.StatusUnprocessableEntity, PlanFormView(PlanFormProps{Form: f, Errors: errs, Action: "put", URL: planURL(id), Members: d.Members, Blocked: blockedReason(d), Sheet: inSheet(r)}))
 	case inSheet(r):
 		h.appDone(w, r, http.StatusOK, plansChanged, "Plan saved.")
 	default:
@@ -173,4 +174,23 @@ func inUseMessage(e *domain.InUseError) string {
 		used = plural(e.Members, "member") + " and " + used
 	}
 	return fmt.Sprintf("This plan is used by %s and cannot be deleted. Delete the batches first.", used)
+}
+
+// blockedReason tells why a plan cannot be deleted, or "" if it can.
+func blockedReason(d plan.Detail) string {
+	switch {
+	case d.Default:
+		return "This is the default plan. Clear the default plan in Settings first."
+	case d.Members > 0 && d.Batches > 0:
+		return plural(d.Members, "member") + " and " + plural(d.Batches, "batch") + " use this plan. Move the members to another plan and delete the batches first."
+	case d.Members == 1:
+		return "1 member uses this plan. Move them to another plan first."
+	case d.Members > 0:
+		return plural(d.Members, "member") + " use this plan. Move them to another plan first."
+	case d.Batches == 1:
+		return "1 batch uses this plan. Delete the batches first."
+	case d.Batches > 0:
+		return plural(d.Batches, "batch") + " use this plan. Delete the batches first."
+	}
+	return ""
 }

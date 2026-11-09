@@ -82,6 +82,7 @@ type Session struct {
 	EndedAt                                       *time.Time
 	TerminateCause                                string
 	Cum                                           Counters // last cumulative values from the router
+	MemberName                                    string   // first and last name; filled only in the online list, empty if none
 }
 
 // AcctRecord is one Start/Interim/Stop packet reduced to what the rules need.

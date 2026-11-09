@@ -14,11 +14,14 @@ import (
 type fakeRepo struct {
 	plans   map[int64]domain.Plan
 	members map[int64]int
+	batches map[int64]int
 	def     int64
 	next    int64
 }
 
-func newFake() *fakeRepo { return &fakeRepo{plans: map[int64]domain.Plan{}, members: map[int64]int{}} }
+func newFake() *fakeRepo {
+	return &fakeRepo{plans: map[int64]domain.Plan{}, members: map[int64]int{}, batches: map[int64]int{}}
+}
 
 func (f *fakeRepo) ListPlans(context.Context) ([]domain.Plan, error) {
 	var out []domain.Plan
@@ -70,6 +73,16 @@ func (f *fakeRepo) DeletePlan(_ context.Context, id int64) error {
 }
 func (f *fakeRepo) CountMembersOnPlan(_ context.Context, id int64) (int, error) {
 	return f.members[id], nil
+}
+func (f *fakeRepo) PlanUsage(context.Context) (map[int64]domain.PlanUsage, error) {
+	out := map[int64]domain.PlanUsage{}
+	for id, n := range f.members {
+		out[id] = domain.PlanUsage{Members: n, Batches: f.batches[id]}
+	}
+	for id, n := range f.batches {
+		out[id] = domain.PlanUsage{Members: f.members[id], Batches: n}
+	}
+	return out, nil
 }
 func (f *fakeRepo) IsDefaultPlan(_ context.Context, id int64) (bool, error) { return f.def == id, nil }
 
@@ -142,5 +155,37 @@ func TestGetCountsMembers(t *testing.T) {
 	d, err := s.Get(context.Background(), id)
 	if err != nil || d.Members != 3 || d.Plan.Name != "Gold" {
 		t.Fatalf("%+v %v", d, err)
+	}
+}
+
+func TestDetailsCountsUsageAndBlocks(t *testing.T) {
+	s, r := svc()
+	ctx := context.Background()
+	free, _, _ := s.Create(ctx, form("Free"))
+	used, _, _ := s.Create(ctx, form("Used"))
+	batch, _, _ := s.Create(ctx, form("Batch"))
+	def, _, _ := s.Create(ctx, form("Def"))
+	r.members[used] = 3
+	r.batches[batch] = 2
+	r.def = def
+	list, err := s.Details(ctx)
+	if err != nil || len(list) != 4 {
+		t.Fatalf("%v %v", list, err)
+	}
+	got := map[int64]Detail{}
+	for _, d := range list {
+		got[d.Plan.ID] = d
+	}
+	if got[free].Blocked() || got[free].Members != 0 {
+		t.Errorf("free plan %+v", got[free])
+	}
+	if !got[used].Blocked() || got[used].Members != 3 {
+		t.Errorf("used plan %+v", got[used])
+	}
+	if !got[batch].Blocked() || got[batch].Batches != 2 {
+		t.Errorf("batch plan %+v", got[batch])
+	}
+	if !got[def].Blocked() || !got[def].Default {
+		t.Errorf("default plan %+v", got[def])
 	}
 }

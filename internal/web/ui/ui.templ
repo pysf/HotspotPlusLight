@@ -1,15 +1,20 @@
 package ui
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
 
-// NavItem is one sidebar link. Group is its heading; items of one group are listed together.
-type NavItem struct{ Label, Href, Group, Icon string }
+// NavItem is one link of the side bar. Tab is its label in the phone tab bar; an empty Tab puts the link
+// in the "More" menu. Live shows the number of online sessions as a badge.
+type NavItem struct {
+	Label, Href, Icon, Tab string
+	Live                   bool
+}
 
-// LayoutData configures the page shell. Bare is the logged-out shell (the login
-// page): a centered column with no nav, no logout and no hx-headers.
+// LayoutData configures the page shell. Bare is the shell without a side bar: a centered column
+// for the login page and the forced password change. It sends hx-headers only when CSRF is set.
 type LayoutData struct {
 	Title     string
 	Bare      bool
@@ -26,74 +31,87 @@ type LayoutData struct {
 const htmxConfig = `{"includeIndicatorStyles":false,"responseHandling":[{"code":"400|404|409|422|429|500|502","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
 
 // appScripts are the JS modules every page of the shell loads (after htmx).
-var appScripts = []string{"js/theme.js", "js/dialog.js", "js/clipboard.js", "js/toast.js", "js/shortcuts.js", "js/nav.js", "js/forms.js", "js/menu.js", "js/password.js"}
+var appScripts = []string{"js/theme.js", "js/dialog.js", "js/clipboard.js", "js/toast.js", "js/shortcuts.js", "js/forms.js", "js/swap.js", "js/menu.js", "js/password.js"}
 
-// bodyAttrs returns the attributes of <body>: the CSRF header that htmx sends. The bare shell has none.
+// bodyAttrs returns the attributes of <body>: the CSRF header that htmx sends. A page without a session token (the login page) has none.
 func bodyAttrs(d LayoutData) templ.Attributes {
-	if d.Bare {
+	if d.CSRF == "" {
 		return nil
 	}
 	h, _ := templ.JSONString(map[string]string{"X-CSRF-Token": d.CSRF}) //nolint: map of strings cannot fail
 	return templ.Attributes{"hx-headers": h}
 }
 
-// navGroup is a heading with its nav items.
-type navGroup struct {
-	Name  string
-	Items []NavItem
+// navAttrs marks the current item for assistive technology and for the active style. It is the one place
+// that decides what is current; the side bar, the tab bar and the More menu all use it.
+func navAttrs(href, active string) templ.Attributes {
+	if href == active {
+		return templ.Attributes{"aria-current": "page"}
+	}
+	return nil
 }
 
-// navGroups splits the items into runs of the same group, keeping their order.
-func navGroups(items []NavItem) []navGroup {
-	var out []navGroup
+// tabItems returns the links that have their own tab on a phone.
+func tabItems(items []NavItem) []NavItem {
+	var out []NavItem
 	for _, it := range items {
-		if n := len(out); n == 0 || out[n-1].Name != it.Group {
-			out = append(out, navGroup{Name: it.Group})
+		if it.Tab != "" {
+			out = append(out, it)
 		}
-		out[len(out)-1].Items = append(out[len(out)-1].Items, it)
 	}
 	return out
 }
 
-// navAttrs marks the current item for assistive technology and for the active style.
-func navAttrs(it NavItem, active string) templ.Attributes {
-	if it.Href == active {
-		return templ.Attributes{"aria-current": "page"}
-	}
-	return nil
-}
-
-// crumbs is the breadcrumb: the section of the nav, then the page title when it is a deeper page.
-func crumbs(d LayoutData) []string {
-	for _, it := range d.Nav {
-		if it.Href == d.Active {
-			if it.Label == d.Title {
-				return []string{it.Label}
-			}
-			return []string{it.Label, d.Title}
+// moreItems returns the links that sit in the phone "More" menu.
+func moreItems(items []NavItem) []NavItem {
+	var out []NavItem
+	for _, it := range items {
+		if it.Tab == "" {
+			out = append(out, it)
 		}
 	}
-	// When Active matches no nav item, or is empty, the crumb is the page title alone.
-	if d.Title == "" {
-		return nil
-	}
-	return []string{d.Title}
+	return out
 }
 
-// crumbAttrs marks the last breadcrumb as the current page.
-func crumbAttrs(last bool) templ.Attributes {
-	if last {
-		return templ.Attributes{"aria-current": "page"}
+// moreAttrs marks the More tab as current when one of its pages is open.
+func moreAttrs(d LayoutData) templ.Attributes {
+	for _, it := range moreItems(d.Nav) {
+		if it.Href == d.Active {
+			return templ.Attributes{"aria-current": "page"}
+		}
 	}
 	return nil
 }
 
-// themePressed returns the aria-pressed value of the dark theme toggle.
-func themePressed(theme string) string { return strconv.FormatBool(theme == "air-dark") }
+// brandName is the name shown in the top bar of a phone: the business name, or the product name.
+func brandName(env Env) string {
+	if env.BusinessName != "" {
+		return env.BusinessName
+	}
+	return "HotspotPlus Lite"
+}
 
-// Layout is the page shell: head, sidebar, top bar, the page content (children), the confirm dialog and the toast area.
+// themePressed returns the aria-pressed value of the theme button. Without a chosen theme (auto) theme.js sets it.
+func themePressed(theme string) string { return strconv.FormatBool(theme == "dark") }
+
+// routerLabel is the text of the side bar footer.
+func routerLabel(up bool) string {
+	if up {
+		return "Router connected"
+	}
+	return "No recent router packets"
+}
+
+// routerDot returns the attributes of the footer dot: filled when the router has been heard recently.
+func routerDot(up bool) templ.Attributes {
+	if up {
+		return templ.Attributes{"data-on": true}
+	}
+	return nil
+}
+
+// Layout is the page shell: head, side bar, top bar, the page content (children), the phone tab bar, the confirm dialog and the toast area.
 templ Layout(d LayoutData) {
-	{{ crumbList := crumbs(d) }}
 	{{ env := EnvFrom(ctx) }}
 	<!DOCTYPE html>
 	<html lang="en" dir="ltr" data-theme={ env.Theme }>
@@ -103,16 +121,15 @@ templ Layout(d LayoutData) {
 			<meta name="htmx-config" content={ htmxConfig }/>
 			<title>{ env.TabTitle(d.Title) }</title>
 			<link rel="stylesheet" href={ env.Asset("app.css") }/>
-			if !d.Bare {
-				<script src={ env.Asset("htmx.min.js") } defer></script>
-				for _, s := range appScripts {
-					<script type="module" src={ env.Asset(s) }></script>
-				}
+			<script src={ env.Asset("htmx.min.js") } defer></script>
+			for _, s := range appScripts {
+				<script type="module" src={ env.Asset(s) }></script>
 			}
 		</head>
 		<body { bodyAttrs(d)... }>
+			@Sprite()
 			if d.Bare {
-				<main class="l-center l-glow">
+				<main class="l-center">
 					<div class="l-login">
 						<div id="flash" aria-live="polite"></div>
 						{ children... }
@@ -122,69 +139,86 @@ templ Layout(d LayoutData) {
 				<div class="l-shell">
 					<aside id="sidebar" class="l-sidebar">
 						<a class="l-brand" href="/admin">
-							<span class="l-brand__mark" aria-hidden="true"></span>
-							HotspotPlus Lite
-							if env.BusinessName != "" {
-								<span class="l-brand__name">{ env.BusinessName }</span>
-							}
+							<span class="l-brand__mark" aria-hidden="true">
+								@Icon("wifi")
+							</span>
+							<span class="l-brand__text">
+								<b>HotspotPlus Lite</b>
+								if env.BusinessName != "" {
+									<span class="l-brand__name">{ env.BusinessName }</span>
+								}
+							</span>
 						</a>
 						<nav aria-label="Main" class="l-nav">
-							for _, g := range navGroups(d.Nav) {
-								<div>
-									<p class="l-nav__heading">{ g.Name }</p>
-									<ul class="l-nav__list">
-										for _, n := range g.Items {
-											<li>
-												<a href={ templ.SafeURL(n.Href) } class="l-nav__link" { navAttrs(n, d.Active)... }>
-													@Icon(n.Icon)
-													{ n.Label }
-												</a>
-											</li>
-										}
-									</ul>
-								</div>
+							for _, n := range d.Nav {
+								<a href={ templ.SafeURL(n.Href) } class="l-nav__link" { navAttrs(n.Href, d.Active)... }>
+									@Icon(n.Icon)
+									<span class="l-nav__text">{ n.Label }</span>
+									if n.Live {
+										@OnlineBadge(env.Online, false)
+									}
+								</a>
 							}
 						</nav>
+						<div class="l-side-foot" data-router-state>
+							<span class="c-dot" { routerDot(env.RouterUp)... } aria-hidden="true"></span>
+							<span class="l-side-foot__text">{ routerLabel(env.RouterUp) }</span>
+						</div>
 					</aside>
 					<div class="l-main">
 						<header class="l-topbar">
-							<button type="button" class="c-icon-btn l-topbar__menu" data-nav-toggle aria-controls="sidebar" aria-expanded="false" aria-label="Menu">
-								@Icon("menu")
+							<span class="l-topbar__brand">
+								<span class="l-brand__mark" aria-hidden="true">
+									@Icon("wifi")
+								</span>
+								<span class="l-topbar__name">{ brandName(env) }</span>
+							</span>
+							if env.Today != "" {
+								<span class="l-topbar__date">{ env.Today }</span>
+							}
+							<span class="l-topbar__spacer"></span>
+							if d.PasswordURL != "" {
+								<a class="c-btn" data-variant="ghost" href={ templ.SafeURL(d.PasswordURL) } aria-label="Password" { navAttrs(d.PasswordURL, d.Active)... }>
+									@Icon("key")
+									<span class="l-topbar__label">Password</span>
+								</a>
+							}
+							<button type="button" class="c-icon-btn" data-theme-toggle data-themes={ strings.Join(Themes, " ") } aria-pressed={ themePressed(env.Theme) } aria-label="Switch theme">
+								@IconAs("sun", "", "c-theme-sun")
+								@IconAs("moon", "", "c-theme-moon")
 							</button>
-							<nav aria-label="Breadcrumb" class="l-crumbs">
-								<ol>
-									for i, c := range crumbList {
-										if i > 0 {
-											<li aria-hidden="true">/</li>
-										}
-										<li { crumbAttrs(i == len(crumbList)-1)... }>{ c }</li>
-									}
-								</ol>
-							</nav>
-							<div class="l-tools">
-								<button type="button" class="c-btn" data-variant="ghost" data-theme-toggle data-themes={ strings.Join(Themes, " ") } aria-pressed={ themePressed(env.Theme) } aria-label="Switch theme">
-									@Icon("sun")
-									Theme
+							if d.LogoutURL != "" {
+								<button type="button" class="c-btn" hx-post={ d.LogoutURL } aria-label="Log out">
+									@Icon("logout")
+									<span class="l-topbar__label">Log out</span>
 								</button>
-								if d.PasswordURL != "" {
-									<a class="c-btn" data-variant="ghost" href={ templ.SafeURL(d.PasswordURL) }>
-										@Icon("key")
-										Password
-									</a>
-								}
-								if d.LogoutURL != "" {
-									<button type="button" class="c-btn" hx-post={ d.LogoutURL }>
-										@Icon("logout")
-										Log out
-									</button>
-								}
-							</div>
+							}
 						</header>
 						<main class="l-page">
 							<div id="flash" aria-live="polite"></div>
 							{ children... }
 						</main>
 					</div>
+					<nav class="l-tabbar" aria-label="Main tabs">
+						for _, n := range tabItems(d.Nav) {
+							<a href={ templ.SafeURL(n.Href) } class="l-tabbar__tab" { navAttrs(n.Href, d.Active)... }>
+								@IconAs(n.Icon, "l", "")
+								{ n.Tab }
+							</a>
+						}
+						<button type="button" class="l-tabbar__tab" popovertarget="more-menu" aria-haspopup="menu" { moreAttrs(d)... }>
+							@IconAs("more", "l", "")
+							More
+						</button>
+						<div id="more-menu" popover class="c-menu" role="menu">
+							for _, n := range moreItems(d.Nav) {
+								<a href={ templ.SafeURL(n.Href) } class="c-menu__item" role="menuitem" { navAttrs(n.Href, d.Active)... }>
+									@Icon(n.Icon)
+									{ n.Label }
+								</a>
+							}
+						</div>
+					</nav>
 				</div>
 				@ConfirmModal()
 				@Toast()
@@ -193,67 +227,86 @@ templ Layout(d LayoutData) {
 	</html>
 }
 
-// Icon is a small line icon (24x24 grid; size, stroke and color come from CSS).
-templ Icon(name string) {
-	<svg class="c-icon" viewBox="0 0 24 24" aria-hidden="true">
-		switch name {
-			case "home":
-				<path d="m3 11 9-8 9 8M5 10v10h14V10"></path>
-			case "users":
-				<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-				<circle cx="9" cy="7" r="4"></circle>
-				<path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path>
-			case "ticket":
-				<path d="M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 1 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"></path>
-				<path d="M13 5v2M13 11v2M13 17v2"></path>
-			case "wifi":
-				<path d="M5 12.5a10 10 0 0 1 14 0M2 9a15 15 0 0 1 20 0M8.5 16a5 5 0 0 1 7 0M12 20h.01"></path>
-			case "chart":
-				<path d="M3 3v18h18M8 17v-5M13 17V8M18 17v-9"></path>
-			case "layers":
-				<path d="m12 2 10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5"></path>
-			case "router":
-				<rect x="2" y="14" width="20" height="7" rx="2"></rect>
-				<path d="M6 17.5h.01M10 17.5h.01M12 14V9M8.5 6.5a5 5 0 0 1 7 0"></path>
-			case "settings":
-				<path d="M4 6h8M18 6h2M4 12h2M12 12h8M4 18h10M20 18h0"></path>
-				<circle cx="15" cy="6" r="2"></circle>
-				<circle cx="9" cy="12" r="2"></circle>
-				<circle cx="17" cy="18" r="2"></circle>
-			case "logout":
-				<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path>
-			case "key":
-				<path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"></path>
-				<circle cx="7.5" cy="15.5" r="5.5"></circle>
-			case "menu":
-				<path d="M4 6h16M4 12h16M4 18h16"></path>
-			case "search":
-				<circle cx="11" cy="11" r="7"></circle>
-				<path d="m20 20-3.5-3.5"></path>
-			case "plus":
-				<path d="M12 5v14M5 12h14"></path>
-			case "more":
-				<circle cx="5" cy="12" r="1"></circle>
-				<circle cx="12" cy="12" r="1"></circle>
-				<circle cx="19" cy="12" r="1"></circle>
-			case "sun":
-				<circle cx="12" cy="12" r="4"></circle>
-				<path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
-			case "close":
-				<path d="M18 6 6 18M6 6l12 12"></path>
-			case "copy":
-				<rect x="9" y="9" width="12" height="12" rx="2"></rect>
-				<path d="M5 15V5a2 2 0 0 1 2-2h10"></path>
-			case "check":
-				<path d="m5 12 5 5 9-10"></path>
-		}
+// AuthHead is the top of a sign-in card: the brand mark, the title (h1) and one line of text.
+templ AuthHead(title, sub string) {
+	<div class="c-auth__head">
+		<span class="c-auth__mark" aria-hidden="true">
+			@IconAs("wifi", "l", "")
+		</span>
+		<h1>{ title }</h1>
+		<p>{ sub }</p>
+	</div>
+}
+
+// RevealButton is the eye button that shows or hides the password in the input with id. forms.js switches it.
+templ RevealButton(id string) {
+	@RevealToggle(id, false)
+}
+
+// RevealToggle is the eye button for a field that is already shown (shown true) or hidden (false). forms.js switches it.
+templ RevealToggle(id string, shown bool) {
+	<button type="button" class="c-icon-btn" data-fill data-reveal={ id } aria-pressed={ strconv.FormatBool(shown) } aria-label={ revealLabel(shown) }>
+		@Icon("eye")
+	</button>
+}
+
+// revealLabel is the accessible name of the eye button: it names the action the next click does.
+func revealLabel(shown bool) string {
+	if shown {
+		return "Hide password"
+	}
+	return "Show password"
+}
+
+// Sprite is the inline SVG sprite with every icon, written once in the base layout.
+templ Sprite() {
+	<svg class="c-sprite" aria-hidden="true" focusable="false">
+		@templ.Raw(spriteSymbols)
 	</svg>
+}
+
+// iconClass returns the class list of an icon: c-icon plus extra.
+func iconClass(extra string) string {
+	if extra == "" {
+		return "c-icon"
+	}
+	return "c-icon " + extra
+}
+
+// iconSize returns the data-size of an icon ("s", "l" or "" for the normal size).
+func iconSize(size string) templ.Attributes {
+	if size == "" {
+		return nil
+	}
+	return templ.Attributes{"data-size": size}
+}
+
+// Icon is a line icon from the sprite, by name (see sprite.go). Size, stroke and color come from CSS.
+templ Icon(name string) {
+	@IconAs(name, "", "")
+}
+
+// IconAs is an Icon with a size ("s", "l" or "") and an extra CSS class.
+templ IconAs(name, size, extra string) {
+	<svg class={ iconClass(extra) } { iconSize(size)... } aria-hidden="true"><use href={ "#i-" + name }></use></svg>
 }
 
 // PageHeader is the page title; its children (buttons) sit on the right.
 templ PageHeader(title string) {
+	@PageHeaderSub(title, "") {
+		{ children... }
+	}
+}
+
+// PageHeaderSub is a PageHeader with a line of text under the title (empty = none).
+templ PageHeaderSub(title, sub string) {
 	<div class="l-page-head">
-		<h1>{ title }</h1>
+		<div>
+			<h1>{ title }</h1>
+			if sub != "" {
+				<p>{ sub }</p>
+			}
+		</div>
 		<div class="l-cluster">
 			{ children... }
 		</div>
@@ -271,7 +324,9 @@ templ Section(title string) {
 // Card is a panel with padding; use it for sections.
 templ Card() {
 	<div class="c-card" data-pad>
-		{ children... }
+		<div class="l-stack">
+			{ children... }
+		</div>
 	</div>
 }
 
@@ -282,14 +337,35 @@ templ FormCard(attrs templ.Attributes) {
 	</form>
 }
 
+// SettingGroup is one group of a settings page: the title and a line of help on the left, the fields in a card on the right.
+// On narrow screens the help sits above the card.
+templ SettingGroup(title, sub string) {
+	<section class="c-setting">
+		<header>
+			<h2>{ title }</h2>
+			<p>{ sub }</p>
+		</header>
+		@Card() {
+			{ children... }
+		}
+	</section>
+}
+
 // CardTitle is the heading of a Card.
 templ CardTitle(title string) {
 	<h2 class="c-card__title">{ title }</h2>
 }
 
-// EmptyState replaces a table when there is nothing to show; children may hold a link.
-templ EmptyState(msg string) {
-	<div class="c-card c-empty l-gap-bottom">
+// EmptyState replaces a table when there is nothing to show: an icon, an optional title (h3), a line of text,
+// and children (usually one button, such as a LinkButton).
+templ EmptyState(title, msg string) {
+	<div class="c-card c-empty">
+		<span class="c-empty__icon" aria-hidden="true">
+			@IconAs("search", "l", "")
+		</span>
+		if title != "" {
+			<h3>{ title }</h3>
+		}
 		<p>{ msg }</p>
 		{ children... }
 	</div>
@@ -297,15 +373,27 @@ templ EmptyState(msg string) {
 
 // Tiles is the row of Tile cards on the dashboard.
 templ Tiles() {
-	<div class="c-tiles l-gap-bottom">
+	<div class="c-tiles">
 		{ children... }
 	</div>
 }
 
 // Tile is a small card with one figure: label, then its children (TileValue and TileNote). attrs add data hooks.
 templ Tile(label string, attrs templ.Attributes) {
+	@TileIcon("", label, attrs) {
+		{ children... }
+	}
+}
+
+// TileIcon is a Tile with a small sprite icon in front of its label (empty icon = none).
+templ TileIcon(icon, label string, attrs templ.Attributes) {
 	<div class="c-card c-tile" { attrs... }>
-		<p class="c-tile__label">{ label }</p>
+		<p class="c-tile__label">
+			if icon != "" {
+				@IconAs(icon, "s", "")
+			}
+			{ label }
+		</p>
 		{ children... }
 	</div>
 }
@@ -313,6 +401,16 @@ templ Tile(label string, attrs templ.Attributes) {
 // TileValue is the big figure of a Tile.
 templ TileValue(value string, attrs templ.Attributes) {
 	<p class="c-tile__value u-nums" { attrs... }>{ value }</p>
+}
+
+// TileValueUnit is the big figure of a Tile with a small unit after it, such as "38.4" and "GB".
+templ TileValueUnit(value, unit string, attrs templ.Attributes) {
+	<p class="c-tile__value u-nums" { attrs... }>
+		{ value }
+		if unit != "" {
+			<small>{ unit }</small>
+		}
+	</p>
 }
 
 // TileNote is a small muted line under the figure of a Tile.
@@ -342,9 +440,66 @@ templ Refresher(url, event, target string) {
 	<div hidden hx-get={ url } hx-trigger={ event + " from:body" } hx-target={ target } hx-swap="innerHTML"></div>
 }
 
-// Pill is a status shown as coloured text. status is "active", "expiring", "expired" or "disabled".
+// Pill is a status with an icon, a word and a color. status is "active", "expiring", "expired" or "disabled"
+// (also "ok", "warn", "bad", "off" or "info").
 templ Pill(status, text string) {
-	<span class="c-pill" data-status={ status }>{ text }</span>
+	<span class="c-pill" data-status={ status } data-tone={ pillTone(status) }>
+		@Icon(pillIcon(pillTone(status)))
+		{ text }
+	</span>
+}
+
+// PillWith is a pill with a chosen tone ("ok", "warn", "bad", "off" or "info") and icon. attrs add data hooks.
+templ PillWith(tone, icon, text string, attrs templ.Attributes) {
+	<span class="c-pill" data-tone={ pillTone(tone) } { attrs... }>
+		@Icon(icon)
+		{ text }
+	</span>
+}
+
+// IconCircle is a round icon in the colour of a tone ("ok", "warn" or "bad"), the lead of a list row.
+templ IconCircle(tone, icon string) {
+	<span class="c-icon-circle" data-tone={ pillTone(tone) } aria-hidden="true">
+		@IconAs(icon, "s", "")
+	</span>
+}
+
+// pillTone maps a status to its color family: ok, warn, bad, off or info.
+func pillTone(status string) string {
+	switch status {
+	case "active", "ok":
+		return "ok"
+	case "expiring", "warn":
+		return "warn"
+	case "expired", "bad":
+		return "bad"
+	case "info":
+		return "info"
+	}
+	return "off"
+}
+
+// pillIcon returns the sprite icon of a tone.
+func pillIcon(tone string) string {
+	switch tone {
+	case "ok":
+		return "check-circle"
+	case "warn":
+		return "clock"
+	case "bad":
+		return "alert"
+	case "info":
+		return "info"
+	}
+	return "slash"
+}
+
+// LiveStatus is the small breathing dot with a text such as "Live, updated 4 s ago".
+templ LiveStatus(text string) {
+	<span class="c-live" role="status">
+		<span class="c-dot" data-on></span>
+		{ text }
+	</span>
 }
 
 // OnlineDot is the online/offline dot. It is not color-only: it has a role and a label.
@@ -379,15 +534,23 @@ func onlineTitle(on bool) string {
 // buttonVariant maps the kind names used by pages to the data-variant of c-btn.
 func buttonVariant(kind string) string {
 	switch kind {
-	case "primary", "danger", "ghost":
+	case "primary", "danger", "danger-solid", "ghost":
 		return kind
 	}
 	return "default"
 }
 
-// Button is a <button>; kind is "primary", "secondary", "danger" or "ghost". Attrs carry type, hx-* and data-*.
+// Button is a <button>; kind is "primary", "secondary", "ghost", "danger" (soft red) or "danger-solid". Attrs carry type, hx-* and data-*.
 templ Button(kind, label string, attrs templ.Attributes) {
 	<button class="c-btn" data-variant={ buttonVariant(kind) } { buttonAttrs(attrs)... }>{ label }</button>
+}
+
+// ButtonIcon is a Button with a small icon in front of its label.
+templ ButtonIcon(kind, icon, label string, attrs templ.Attributes) {
+	<button class="c-btn" data-variant={ buttonVariant(kind) } { buttonAttrs(attrs)... }>
+		@IconAs(icon, "s", "")
+		{ label }
+	</button>
 }
 
 // LinkButton is a link that looks like a button.
@@ -395,11 +558,42 @@ templ LinkButton(kind, href, label string, attrs templ.Attributes) {
 	<a class="c-btn" data-variant={ buttonVariant(kind) } href={ templ.SafeURL(href) } { linkAttrs(attrs)... }>{ label }</a>
 }
 
-// IconButton is a square button with an icon only; label is its accessible name.
+// LinkButtonIcon is a LinkButton with a small icon in front of its label.
+templ LinkButtonIcon(kind, icon, href, label string, attrs templ.Attributes) {
+	<a class="c-btn" data-variant={ buttonVariant(kind) } href={ templ.SafeURL(href) } { linkAttrs(attrs)... }>
+		@IconAs(icon, "s", "")
+		{ label }
+	</a>
+}
+
+// OnlineState is the online dot with the word next to it ("Online" or "Offline").
+templ OnlineState(on bool) {
+	<span class="c-online">
+		@OnlineDot(on)
+		{ onlineLabel(on) }
+	</span>
+}
+
+// IconButton is a round button with an icon only; label is its accessible name.
 templ IconButton(icon, label string, attrs templ.Attributes) {
 	<button class="c-icon-btn" aria-label={ label } { buttonAttrs(attrs)... }>
 		@Icon(icon)
 	</button>
+}
+
+// IconLink is IconButton as a link: a round icon-only link; label is its accessible name.
+templ IconLink(icon, href, label string, attrs templ.Attributes) {
+	<a class="c-icon-btn" href={ templ.SafeURL(href) } aria-label={ label } { linkAttrs(attrs)... }>
+		@Icon(icon)
+	</a>
+}
+
+// Disclose is a closed block with a short summary that opens when clicked (a native <details>).
+templ Disclose(summary string) {
+	<details class="c-disclose">
+		<summary>{ summary }</summary>
+		{ children... }
+	</details>
 }
 
 // linkAttrs drops "class" so callers cannot replace the button look.
@@ -429,29 +623,60 @@ func buttonAttrs(in templ.Attributes) templ.Attributes {
 	return out
 }
 
-// Flash is a message box; kind is "ok", "warn" or "error".
+// Flash is a message box; kind is "ok", "warn", "error" or "info".
 templ Flash(kind, msg string) {
-	<div class="c-notice" data-kind={ noticeKind(kind) }>{ msg }</div>
+	<div class="c-notice" data-kind={ noticeKind(kind) }>
+		@Icon(noticeIcon(kind))
+		<div>{ msg }</div>
+	</div>
 }
 
-// noticeKind returns kind when it is "ok" or "warn", else "error".
+// noticeKind returns kind when it is "ok", "warn" or "info", else "error".
 func noticeKind(kind string) string {
 	switch kind {
-	case "ok", "warn":
+	case "ok", "warn", "info":
 		return kind
 	}
 	return "error"
 }
 
+// noticeIcon returns the sprite icon of a message kind.
+func noticeIcon(kind string) string {
+	switch noticeKind(kind) {
+	case "ok":
+		return "check-circle"
+	case "info":
+		return "info"
+	}
+	return "alert"
+}
+
+// NoticeTitled is a Flash with a bold title line above the text.
+templ NoticeTitled(kind, title, msg string) {
+	<div class="c-notice" data-kind={ noticeKind(kind) } role="status">
+		@Icon(noticeIcon(kind))
+		<div>
+			<b>{ title }</b>
+			{ msg }
+		</div>
+	</div>
+}
+
 // ErrorFragment is the body of a 4xx htmx response that is swapped into #flash.
 templ ErrorFragment(msg string) {
-	<div class="c-notice" data-kind="error" role="alert">{ msg }</div>
+	<div class="c-notice" data-kind="error" role="alert">
+		@Icon("alert")
+		<div>{ msg }</div>
+	</div>
 }
 
 // FieldError is the error message of one field, as a response body.
 templ FieldError(name, msg string) {
 	if msg != "" {
-		<p class="c-field__error" id={ "err-" + name } data-error-for={ name }>{ msg }</p>
+		<p class="c-field__error" id={ "err-" + name } data-error-for={ name }>
+			@Icon("alert")
+			<span>{ msg }</span>
+		</p>
 	}
 }
 
@@ -524,12 +749,30 @@ templ FieldHint(h string) {
 }
 
 // Option is one entry of a select.
-type Option struct{ Value, Label string }
+type Option struct {
+	Value, Label string
+	// Summary, when set, is kept in data-summary; forms.js shows it in the element named by the select's data-summary-for.
+	Summary string
+}
+
+// summaryAttrs returns the data-summary attribute of an option, or nothing for an empty summary.
+func summaryAttrs(s string) templ.Attributes {
+	if s == "" {
+		return nil
+	}
+	return templ.Attributes{"data-summary": s}
+}
 
 // SelectProps describes a Select.
 type SelectProps struct {
 	Label, Name, Value, Error, Hint string
-	Options                         []Option
+	// AriaLabel names a select that has no visible label (a toolbar filter).
+	AriaLabel string
+	Options   []Option
+	// Attrs add attributes to the <select>.
+	Attrs templ.Attributes
+	// Auto sizes the select to its text (a toolbar filter) instead of the width of its field.
+	Auto bool
 }
 
 // Select is a labelled select with its error message.
@@ -542,13 +785,32 @@ templ Select(p SelectProps) {
 	</div>
 }
 
+// autoAttrs returns data-auto for a select that sizes itself.
+func autoAttrs(auto bool) templ.Attributes {
+	if auto {
+		return templ.Attributes{"data-auto": true}
+	}
+	return nil
+}
+
+// ariaLabelAttrs returns the aria-label attribute, or nothing for an empty label.
+func ariaLabelAttrs(label string) templ.Attributes {
+	if label == "" {
+		return nil
+	}
+	return templ.Attributes{"aria-label": label}
+}
+
 // SelectControl is the bare <select>, reused inside composite fields.
 templ SelectControl(p SelectProps) {
-	<select id={ p.Name } name={ p.Name } class="c-select" { invalidAttrs(p.Name, p.Error)... }>
-		for _, o := range p.Options {
-			<option value={ o.Value } selected?={ o.Value == p.Value }>{ o.Label }</option>
-		}
-	</select>
+	<span class="c-select-wrap" { autoAttrs(p.Auto)... }>
+		<select id={ p.Name } name={ p.Name } class="c-select" { invalidAttrs(p.Name, p.Error)... } { ariaLabelAttrs(p.AriaLabel)... } { p.Attrs... }>
+			for _, o := range p.Options {
+				<option value={ o.Value } selected?={ o.Value == p.Value } { summaryAttrs(o.Summary)... }>{ o.Label }</option>
+			}
+		</select>
+		@IconAs("chevron-down", "s", "c-select-wrap__icon")
+	</span>
 }
 
 // TextareaProps describes a Textarea.
@@ -568,16 +830,31 @@ templ Textarea(p TextareaProps) {
 type CheckboxProps struct {
 	Label, Name, Hint string
 	Checked           bool
+	// Attrs add attributes to the <input> (for example form, to tie it to a form elsewhere).
+	Attrs templ.Attributes
 }
 
 // Checkbox is a labelled checkbox.
 templ Checkbox(p CheckboxProps) {
 	<div class="c-field">
-		<label class="c-check" for={ "f-" + p.Name }>
-			<input type="checkbox" id={ "f-" + p.Name } name={ p.Name } value="on" checked?={ p.Checked }/>
+		<label class="c-choice" for={ "f-" + p.Name }>
+			<input type="checkbox" class="c-check" id={ "f-" + p.Name } name={ p.Name } value="on" checked?={ p.Checked }/>
 			{ p.Label }
 		</label>
 		@FieldHint(p.Hint)
+	</div>
+}
+
+// SwitchRow is a titled on/off switch with a hint, as a row: text on the left, the switch on the right.
+templ SwitchRow(p CheckboxProps) {
+	<div class="c-switch-row">
+		<label for={ "f-" + p.Name }>
+			<b>{ p.Label }</b>
+			if p.Hint != "" {
+				<span class="c-field__hint">{ p.Hint }</span>
+			}
+		</label>
+		<input type="checkbox" role="switch" class="c-switch" id={ "f-" + p.Name } name={ p.Name } value="on" checked?={ p.Checked } { p.Attrs... }/>
 	</div>
 }
 
@@ -627,29 +904,69 @@ templ Chip(p ChipProps) {
 	</a>
 }
 
-// Meter is a usage bar on a native <meter>: accent below 80 %, warning from 80 %, red when full.
+// Meter is a usage bar on a native <meter>: accent below 80 %, warning from 80 % (low sits just under 80 %, so 80 % itself is a warning), red when full.
 // It has no text inside: put the figures next to it.
 templ Meter(value, max float64, label string) {
-	<meter class="c-meter" value={ strconv.FormatFloat(value, 'f', -1, 64) } min="0" max={ strconv.FormatFloat(max, 'f', -1, 64) } low={ strconv.FormatFloat(max*0.8, 'f', -1, 64) } high={ strconv.FormatFloat(max*0.9999, 'f', -1, 64) } optimum="0" aria-label={ label }></meter>
+	<meter class="c-meter" value={ strconv.FormatFloat(value, 'f', -1, 64) } min="0" max={ strconv.FormatFloat(max, 'f', -1, 64) } low={ strconv.FormatFloat(math.Nextafter(max*0.8, 0), 'f', -1, 64) } high={ strconv.FormatFloat(max*0.9999, 'f', -1, 64) } optimum="0" aria-label={ label }></meter>
+}
+
+// MeterPlain is a bar on a native <meter> that never changes color: for a share of a whole (rank lists), not a quota.
+// It has no text inside either.
+templ MeterPlain(value, max float64, label string) {
+	<meter class="c-meter" value={ strconv.FormatFloat(value, 'f', -1, 64) } min="0" max={ strconv.FormatFloat(max, 'f', -1, 64) } aria-label={ label }></meter>
+}
+
+// Seg is a segmented control made of links (SegLink), such as the range switch of the usage page.
+templ Seg(label string) {
+	<nav class="c-seg" aria-label={ label }>
+		{ children... }
+	</nav>
+}
+
+// SegLink is one choice of a Seg. The current one has aria-current="true". attrs add data hooks.
+templ SegLink(label, href string, selected bool, attrs templ.Attributes) {
+	<a href={ templ.SafeURL(href) } aria-current?={ selected } { attrs... }>{ label }</a>
 }
 
 // Table is a card with a table: caption (for screen readers), header row, and your <tr> children in the body.
 // Give each <td> a data-label (shown on small screens) and data-slot="actions" for a button cell.
 templ Table(caption string, headers []string) {
-	<div class="c-card c-table-wrap">
-		<table class="c-table">
-			<caption class="u-sr-only">{ caption }</caption>
-			<thead>
-				<tr>
-					for _, h := range headers {
-						<th scope="col">{ h }</th>
-					}
-				</tr>
-			</thead>
-			<tbody>
-				{ children... }
-			</tbody>
-		</table>
+	@TablePaged(caption, headers, PageProps{}) {
+		{ children... }
+	}
+}
+
+// TablePaged is a Table with the pager inside the card, under the rows (nothing when p has one page or none).
+templ TablePaged(caption string, headers []string, p PageProps) {
+	@TablePagedHead(caption, plainHead(headers), p) {
+		{ children... }
+	}
+}
+
+// plainHead is a header row of text cells.
+templ plainHead(headers []string) {
+	for _, h := range headers {
+		<th scope="col">{ h }</th>
+	}
+}
+
+// TablePagedHead is a TablePaged whose header cells are given as head (th elements), so one can hold a checkbox.
+templ TablePagedHead(caption string, head templ.Component, p PageProps) {
+	<div class="c-card" data-flush>
+		<div class="c-table-wrap">
+			<table class="c-table">
+				<caption class="u-sr-only">{ caption }</caption>
+				<thead>
+					<tr>
+						@head
+					</tr>
+				</thead>
+				<tbody>
+					{ children... }
+				</tbody>
+			</table>
+		</div>
+		@Pagination(p)
 	</div>
 }
 
@@ -662,29 +979,36 @@ templ ConfirmDelete(label, url, confirm string) {
 // ConfirmAction is a button that asks for confirmation, then sends method (post|put|delete) to url.
 // Responses are swapped into #flash (errors and conflicts); a success answers HX-Redirect.
 templ ConfirmAction(label, method, url, confirm string) {
-	@Button("secondary", label, confirmAttrs(method, url, confirm))
+	@Button("secondary", label, ConfirmAttrs(method, url, confirm))
 }
 
-// confirmAttrs returns the htmx attributes of a button that asks for confirmation first.
-func confirmAttrs(method, url, confirm string) templ.Attributes {
+// ConfirmAttrs returns the htmx attributes of a button that asks for confirmation first.
+func ConfirmAttrs(method, url, confirm string) templ.Attributes {
 	return templ.Attributes{"type": "button", "hx-" + method: url, "hx-confirm": confirm, "hx-target": "#flash", "hx-swap": "innerHTML"}
 }
 
 // ConfirmModal is the one shared confirm dialog. dialog.js fills it with the hx-confirm text of a button.
+// A button may also set data-confirm-title, data-confirm-ok (the confirm button text) and data-confirm-icon (a sprite icon name).
 templ ConfirmModal() {
-	<dialog id="confirm-modal" class="c-modal" aria-labelledby="confirm-title">
+	<dialog id="confirm-modal" class="c-modal" role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+		<span class="c-modal__icon" aria-hidden="true" id="confirm-icon">
+			@IconAs("alert", "l", "")
+		</span>
 		<h2 class="c-modal__title" id="confirm-title">Please confirm</h2>
-		<p class="c-modal__text" data-confirm-text></p>
+		<p class="c-modal__text" id="confirm-text" data-confirm-text></p>
 		<div class="c-modal__foot">
-			<button type="button" class="c-btn" data-close value="cancel">Cancel</button>
-			<button type="button" class="c-btn" data-variant="danger" data-close value="ok" autofocus>Confirm</button>
+			<button type="button" class="c-btn" data-size="sm" data-close value="cancel">Cancel</button>
+			<button type="button" class="c-btn" data-size="sm" data-variant="danger-solid" data-close value="ok" autofocus id="confirm-ok">Confirm</button>
 		</div>
 	</dialog>
 }
 
 // Modal is a dialog with a title, text and your buttons as children (the gallery uses it; pages use ConfirmModal).
 templ Modal(id, title, text string) {
-	<dialog id={ id } class="c-modal" aria-labelledby={ id + "-title" }>
+	<dialog id={ id } class="c-modal" role="alertdialog" aria-labelledby={ id + "-title" }>
+		<span class="c-modal__icon" aria-hidden="true">
+			@IconAs("trash", "l", "")
+		</span>
 		<h2 class="c-modal__title" id={ id + "-title" }>{ title }</h2>
 		<p class="c-modal__text">{ text }</p>
 		<div class="c-modal__foot">
@@ -694,8 +1018,29 @@ templ Modal(id, title, text string) {
 }
 
 // Toast is the message area. toast.js fills it when a "toast" event arrives (HX-Trigger).
+// It holds one status icon; toast.js points it at the alert icon for an error.
 templ Toast() {
-	<div id="toast" class="c-toast" role="status" aria-live="polite"></div>
+	<div id="toast" class="c-toast" role="status" aria-live="polite">
+		@IconAs("check-circle", "", "c-toast__icon")
+		<span data-toast-text></span>
+		<button type="button" class="c-icon-btn c-toast__close" data-toast-close aria-label="Close">
+			@Icon("x")
+		</button>
+	</div>
+}
+
+// OnlineBadge is the count of online sessions on the Online now link. It is hidden at 0. With oob it is
+// sent out of band by the polled fragments, so the badge in the side bar stays current (also from 0 to more).
+templ OnlineBadge(n int, oob bool) {
+	<span id="online-badge" class="c-badge u-nums" data-online-count hidden?={ n == 0 } { oobAttrs(oob)... }>{ strconv.Itoa(n) }</span>
+}
+
+// oobAttrs returns the htmx attribute that swaps an element out of band.
+func oobAttrs(oob bool) templ.Attributes {
+	if oob {
+		return templ.Attributes{"hx-swap-oob": "true"}
+	}
+	return nil
 }
 
 // Menu is a row-actions button with a popover list. Children are MenuItem and MenuSep.
@@ -708,9 +1053,19 @@ templ Menu(id, label string) {
 	</div>
 }
 
-// MenuItem is one entry of a Menu. Attrs carry hx-* attributes or a href (then it is a link).
+// MenuItem is one entry of a Menu, without an icon. Attrs carry hx-* attributes.
 templ MenuItem(label string, danger bool, attrs templ.Attributes) {
-	<button class="c-menu__item" role="menuitem" { menuItemAttrs(danger, attrs)... }>{ label }</button>
+	@MenuItemIcon("", label, danger, attrs)
+}
+
+// MenuItemIcon is a MenuItem with a sprite icon in front (empty icon = none).
+templ MenuItemIcon(icon, label string, danger bool, attrs templ.Attributes) {
+	<button class="c-menu__item" role="menuitem" { menuItemAttrs(danger, attrs)... }>
+		if icon != "" {
+			@IconAs(icon, "s", "")
+		}
+		{ label }
+	</button>
 }
 
 // menuItemAttrs returns the attributes of a menu item.
@@ -733,7 +1088,7 @@ templ Sheet(id, title string) {
 		<div class="c-sheet__head">
 			<h2 class="c-sheet__title" id={ id + "-title" }>{ title }</h2>
 			<button type="button" class="c-icon-btn" data-close aria-label="Close">
-				@Icon("close")
+				@Icon("x")
 			</button>
 		</div>
 		{ children... }
@@ -746,13 +1101,40 @@ templ Sheet(id, title string) {
 templ SheetHost(id string) {
 	<dialog id={ id } class="c-sheet" data-sheet-host aria-labelledby={ id + "-title" }>
 		<div class="c-sheet__head">
-			<h2 class="c-sheet__title" id={ id + "-title" }></h2>
+			<div class="c-sheet__titles">
+				<h2 class="c-sheet__title" id={ id + "-title" }></h2>
+				<p class="c-sheet__sub" id={ id + "-sub" } hidden></p>
+			</div>
 			<button type="button" class="c-icon-btn" data-close aria-label="Close">
-				@Icon("close")
+				@Icon("x")
 			</button>
 		</div>
-		<div class="c-sheet__body" id={ id + "-body" }></div>
+		<div class="c-sheet__host" id={ id + "-body" }></div>
 	</dialog>
+}
+
+// More is a closed "More options" block (a native details element). open shows it at once, for a field with an error. attrs add data hooks.
+templ More(open bool, attrs templ.Attributes) {
+	<details class="c-more" open?={ open } { attrs... }>
+		<summary>
+			More options
+			@IconAs("chevron-down", "s", "")
+		</summary>
+		<div class="c-more__body">
+			{ children... }
+		</div>
+	</details>
+}
+
+// ActionRow is a bold title with a hint on the left and a button (the children) on the right.
+templ ActionRow(title, hint string) {
+	<div class="c-action-row">
+		<div>
+			<b>{ title }</b>
+			<span class="c-field__hint">{ hint }</span>
+		</div>
+		{ children... }
+	</div>
 }
 
 // SheetSection is a titled block inside a sheet body, set off by a line. attrs add data hooks.
@@ -768,6 +1150,20 @@ templ SheetForm(attrs templ.Attributes) {
 	<form class="c-form" data-flush { attrs... }>
 		{ children... }
 	</form>
+}
+
+// SheetFormPane is a form that fills the sheet: its children are a SheetBody that scrolls and a SheetFoot that stays at the bottom.
+templ SheetFormPane(attrs templ.Attributes) {
+	<form class="c-sheet__pane" { attrs... }>
+		{ children... }
+	</form>
+}
+
+// SheetPane is SheetFormPane without the form (the credentials card). attrs add data hooks.
+templ SheetPane(attrs templ.Attributes) {
+	<div class="c-sheet__pane" { attrs... }>
+		{ children... }
+	</div>
 }
 
 // SheetBody is the scrolling body of a Sheet.
@@ -795,17 +1191,31 @@ func credKey(k string) templ.Attributes {
 	return templ.Attributes{"data-key": k}
 }
 
-// Credentials is what staff hands to a guest: the rows and a Copy button. copyText is what the button copies.
-templ Credentials(rows []CredRow, copyText string) {
-	<dl class="c-credentials">
+// Credentials is what staff hands to a guest: one big monospace block per row, each with its own Copy button.
+templ Credentials(rows []CredRow) {
+	<div class="c-credentials">
 		for _, r := range rows {
 			<div class="c-credentials__row">
+				<div class="u-grow">
+					<small>{ r.Label }</small>
+					<span class="c-credentials__value" { credKey(r.Key)... }>{ r.Value }</span>
+				</div>
+				@ButtonIcon("default", "copy", "Copy", templ.Attributes{"data-size": "sm", "data-copy-text": r.Value, "aria-label": "Copy " + strings.ToLower(r.Label)})
+			</div>
+		}
+	</div>
+}
+
+// KeyValues is a list of label and value rows (the details under the credentials).
+templ KeyValues(rows []CredRow) {
+	<dl class="c-kv">
+		for _, r := range rows {
+			<div>
 				<dt>{ r.Label }</dt>
 				<dd { credKey(r.Key)... }>{ r.Value }</dd>
 			</div>
 		}
 	</dl>
-	@Button("secondary", "Copy details", templ.Attributes{"type": "button", "data-copy-text": copyText})
 }
 
 // PageProps describes a paginated list: the current page, the page count and a
@@ -816,6 +1226,18 @@ type PageProps struct {
 	// Target (a CSS selector such as "#member-list") makes the links update that region in place
 	// with hx-get and hx-push-url. The href stays, so the links also work without JavaScript.
 	Target string
+	// Total and Per, when both are set, add the summary "1-8 of 312" on the left.
+	Total, Per int
+}
+
+// pageSummary returns the range text of a pager, such as "11-20 of 312"; empty when Total or Per is not set.
+func pageSummary(p PageProps) string {
+	if p.Total <= 0 || p.Per <= 0 {
+		return ""
+	}
+	first := (p.Page-1)*p.Per + 1
+	last := min(p.Page*p.Per, p.Total)
+	return strconv.Itoa(first) + "\u2013" + strconv.Itoa(last) + " of " + strconv.Itoa(p.Total)
 }
 
 // pageLink adds the htmx attributes to a pager link when the pager updates a region.
@@ -860,66 +1282,99 @@ func stepAttrs(target, page, pages int) templ.Attributes {
 // stepTarget returns target limited to 1..pages.
 func stepTarget(target, pages int) int { return min(max(target, 1), pages) }
 
-// Pagination renders the pager (Previous, page links, Next); nothing for a single page.
+// Pagination renders the pager (summary, Previous, page links, Next); nothing for a single page.
 templ Pagination(p PageProps) {
 	if p.Pages > 1 {
-		<nav aria-label="Pages" class="c-pager">
-			<a class="c-pager__link" data-step="prev" href={ templ.SafeURL(p.Href(stepTarget(p.Page-1, p.Pages))) } { pageLink(p, p.Href(stepTarget(p.Page-1, p.Pages)), stepAttrs(p.Page-1, p.Page, p.Pages))... }>Previous</a>
-			for _, n := range pageNumbers(p.Page, p.Pages) {
-				<a class="c-pager__link" data-page={ strconv.Itoa(n) } href={ templ.SafeURL(p.Href(n)) } { pageLink(p, p.Href(n), pageAttrs(n, p.Page))... }>{ strconv.Itoa(n) }</a>
+		<div class="c-pager">
+			if sum := pageSummary(p); sum != "" {
+				<span class="u-nums" data-pager-summary>{ sum }</span>
 			}
-			<a class="c-pager__link" data-step="next" href={ templ.SafeURL(p.Href(stepTarget(p.Page+1, p.Pages))) } { pageLink(p, p.Href(stepTarget(p.Page+1, p.Pages)), stepAttrs(p.Page+1, p.Page, p.Pages))... }>Next</a>
-		</nav>
+			<nav aria-label="Pages" class="c-pager__nav">
+				<a class="c-pager__link" data-step="prev" aria-label="Previous" href={ templ.SafeURL(p.Href(stepTarget(p.Page-1, p.Pages))) } { pageLink(p, p.Href(stepTarget(p.Page-1, p.Pages)), stepAttrs(p.Page-1, p.Page, p.Pages))... }>
+					@IconAs("chevron-left", "s", "")
+				</a>
+				for _, n := range pageNumbers(p.Page, p.Pages) {
+					<a class="c-pager__link" data-page={ strconv.Itoa(n) } href={ templ.SafeURL(p.Href(n)) } { pageLink(p, p.Href(n), pageAttrs(n, p.Page))... }>{ strconv.Itoa(n) }</a>
+				}
+				<a class="c-pager__link" data-step="next" aria-label="Next" href={ templ.SafeURL(p.Href(stepTarget(p.Page+1, p.Pages))) } { pageLink(p, p.Href(stepTarget(p.Page+1, p.Pages)), stepAttrs(p.Page+1, p.Page, p.Pages))... }>
+					@IconAs("chevron-right", "s", "")
+				</a>
+			</nav>
+		</div>
 	}
 }
 
-// CodeBlock shows read-only text (a script) in a box with a Copy button; the
-// click is handled by clipboard.js (delegated on [data-copy-target]).
+// CodeBlock shows read-only text (a script) in a box. A Copy button elsewhere on the page
+// copies it with data-copy-target set to id; clipboard.js handles the click.
 templ CodeBlock(id, text string) {
 	<div class="c-code">
 		<textarea class="c-input c-code__text" id={ id } data-script rows="18" readonly spellcheck="false">{ text }</textarea>
-		<div>
-			@Button("secondary", "Copy", templ.Attributes{"type": "button", "data-copy-target": id})
-		</div>
 	</div>
 }
 
-// Bar is one column of BarChart. Attrs are extra attributes on its <rect> (data hooks).
+// Bar is one value of a Plot. Attrs are extra attributes on its shape (data hooks).
 type Bar struct {
-	Label string // shown under the first and last bar
+	Label string // shown under the bar when the axis labels it
 	Value int64
 	Tip   string // tooltip text
 	Attrs templ.Attributes
 }
 
-// BarChart is a dependency-free bar chart: one inline SVG, bars scaled to top (0 = all empty),
-// the first and last labels printed underneath. Bars use the accent color (currentColor).
-templ BarChart(bars []Bar, top int64, caption string) {
-	if len(bars) > 0 {
-		<figure class="c-card c-chart">
-			<svg class="c-chart__svg" viewBox={ barViewBox(len(bars)) } preserveAspectRatio="none" role="img" aria-label={ caption }>
-				for i, b := range bars {
-					<rect x={ strconv.Itoa(i*10 + 1) } y={ strconv.Itoa(100 - barHeight(b.Value, top)) } width="8" height={ strconv.Itoa(barHeight(b.Value, top)) } fill="currentColor" { b.Attrs... }>
-						<title>{ b.Tip }</title>
-					</rect>
-				}
-			</svg>
-			<figcaption class="c-chart__caption">
-				<span>{ bars[0].Label }</span>
-				<span>{ caption }</span>
-				<span>{ bars[len(bars)-1].Label }</span>
-			</figcaption>
-		</figure>
-	}
+// PlotProps describes a Plot. Top is the value of the highest grid line (0 = all empty, draw nothing).
+// YLabels and PeakLabel are for PlotWide only: the value texts next to its four grid lines, bottom to top,
+// and the text above the highest bar.
+type PlotProps struct {
+	Kind      string
+	Bars      []Bar
+	Top       int64
+	Label     string // accessible description
+	YLabels   []string
+	PeakLabel string
 }
 
-// barViewBox returns the SVG view box for n bars.
-func barViewBox(n int) string { return "0 0 " + strconv.Itoa(n*10) + " 100" }
+// Plot is a chart for a dashboard card: one inline SVG in the 320 x 114 view box of the design. kind is
+// PlotArea, PlotBars or PlotDots; the values are scaled to top (0 = all empty, draw nothing). label is the
+// accessible description. Every value keeps its tooltip and the data hooks in Bar.Attrs.
+templ Plot(kind string, bars []Bar, top int64, label string) {
+	@PlotWith(PlotProps{Kind: kind, Bars: bars, Top: top, Label: label})
+}
 
-// barHeight scales v to 0..100 against top; a non-zero value gets at least 1 so that it stays visible.
-func barHeight(v, top int64) int {
-	if v <= 0 || top <= 0 {
-		return 0
+// PlotWith is Plot with all options, such as the wide usage chart.
+templ PlotWith(p PlotProps) {
+	if len(p.Bars) > 0 {
+		<svg class="c-chart__plot" viewBox={ plotViewBox(p.Kind) } role="img" aria-label={ p.Label }>
+			<path class="c-chart__grid" d={ plotGrid(p.Kind) }></path>
+			if p.Kind == PlotArea {
+				<path class="c-chart__area" d={ plotArea(p.Kind, p.Bars, p.Top) }></path>
+			}
+			if p.Kind == PlotArea || p.Kind == PlotDots {
+				<path class="c-chart__line" d={ plotLine(p.Kind, p.Bars, p.Top) }></path>
+			}
+			for i, b := range p.Bars {
+				switch p.Kind {
+				case PlotBars, PlotWide:
+					<path class="c-chart__bar" d={ barPath(p.Kind, i, p.Bars, p.Top) } data-dim?={ dimmed(p.Kind, i, p.Bars) } { barSize(p.Kind, len(p.Bars))... } { b.Attrs... }>
+						<title>{ b.Tip }</title>
+					</path>
+				case PlotDots:
+					<circle class="c-chart__dot" cx={ num(plotX(p.Kind, i, len(p.Bars))) } cy={ num(plotY(p.Kind, b.Value, p.Top)) } r="3.5" { b.Attrs... }>
+						<title>{ b.Tip }</title>
+					</circle>
+				default:
+					<circle class="c-chart__hit" cx={ num(plotX(p.Kind, i, len(p.Bars))) } cy={ num(plotY(p.Kind, b.Value, p.Top)) } r="5" { b.Attrs... }>
+						<title>{ b.Tip }</title>
+					</circle>
+				}
+			}
+			for _, v := range valueLabels(p.Kind, p.YLabels) {
+				<text class="c-chart__axis" x={ num(geomWide.valueAxisX) } y={ v.Y } text-anchor="end">{ v.Text }</text>
+			}
+			if p.Kind == PlotWide && p.PeakLabel != "" && peakIndex(p.Bars) >= 0 {
+				<text class="c-chart__axis" x={ num(plotX(p.Kind, peakIndex(p.Bars), len(p.Bars))) } y={ peakY(p.Kind, p.Bars[peakIndex(p.Bars)].Value, p.Top) } text-anchor="middle">{ p.PeakLabel }</text>
+			}
+			for _, a := range axisLabels(p.Kind, p.Bars) {
+				<text class="c-chart__axis" x={ a.X } y={ axisY(p.Kind) } text-anchor={ a.Anchor }>{ a.Text }</text>
+			}
+		</svg>
 	}
-	return int(min(100, max(1, v*100/top)))
 }

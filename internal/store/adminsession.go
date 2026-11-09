@@ -71,15 +71,33 @@ func (s *Store) SetAdminPassword(ctx context.Context, hash string, now int64) er
 	return tx.Commit()
 }
 
-// ChangeAdminPassword is SetAdminPassword for the web page. It keeps the session
-// keepTokenHash and deletes the others.
-func (s *Store) ChangeAdminPassword(ctx context.Context, hash string, now int64, keepTokenHash string) error {
+// ChangeAdminUsername stores the new username and deletes every admin session
+// except keepTokenHash, atomically.
+func (s *Store) ChangeAdminUsername(ctx context.Context, username string, now int64, keepTokenHash string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `UPDATE admin SET password_hash=?, must_change_password=0, updated_at=? WHERE id=1`, hash, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE admin SET username=?, updated_at=? WHERE id=1`, username, now); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM admin_session WHERE token_hash<>?`, keepTokenHash); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ChangeAdminPassword is SetAdminPassword for the web page. It also stores username
+// (the same value when it does not change) and keeps the session keepTokenHash and
+// deletes the others, all in one transaction.
+func (s *Store) ChangeAdminPassword(ctx context.Context, hash, username string, now int64, keepTokenHash string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE admin SET password_hash=?, username=?, must_change_password=0, updated_at=? WHERE id=1`, hash, username, now); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM admin_session WHERE token_hash<>?`, keepTokenHash); err != nil {

@@ -1,0 +1,15 @@
+/* "More options": a native details block that keeps rare fields out of the way in a sheet. c-action-row is a text with a button on the right. */
+@layer components {
+  .c-more { border-block-start: 1px solid var(--c-line); padding-block-start: var(--s-2); }
+  .c-more > summary { display: flex; align-items: center; justify-content: space-between; min-block-size: var(--ctl); font-weight: var(--fw-semibold); cursor: pointer; list-style: none; }
+  .c-more > summary::-webkit-details-marker { display: none; }
+  .c-more[open] > summary .c-icon { transform: rotate(180deg); }
+  .c-more__body { display: grid; gap: var(--s-4); padding-block-start: var(--s-3); }
+  .c-action-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+  .c-action-row > div { display: grid; gap: 2px; min-inline-size: 0; }
+  .c-action-row b { font-weight: var(--fw-semibold); }
+  .c-sheet__form { display: grid; gap: var(--s-4); }
+  .c-sheet__titles { min-inline-size: 0; flex: 1; }
+  .c-sheet__sub { color: var(--c-text-3); font-size: var(--fs-sm); }
+  .c-between { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+}

@@ -626,6 +626,11 @@ func cell(row *goquery.Selection, col string) string {
 	return text(row.Find("td[data-col=" + col + "]"))
 }
 
+// part is the text of the element with data-col in a row, for cells that hold more than one value (the batch list).
+func part(row *goquery.Selection, col string) string {
+	return text(row.Find("[data-col=" + col + "]"))
+}
+
 // p8 is the Phase 8 fixture: the Phase 5 fixture (real Disconnect client against a fake router) with the
 // server log captured, so that tests can look at what was logged.
 type p8 struct {

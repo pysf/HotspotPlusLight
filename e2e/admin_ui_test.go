@@ -54,7 +54,7 @@ func TestE10_01_NoInlineCodeOrStyle(t *testing.T) {
 	}
 }
 
-// E10.02 the theme cookie sets data-theme on <html>; a bad value falls back to air.
+// E10.02 the theme cookie sets data-theme on <html> (light or dark); no cookie or a bad value gives "auto" (the OS decides).
 func TestE10_02_ThemeCookie(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	c := harness.LoginAsAdmin(t, s)
@@ -76,7 +76,7 @@ func TestE10_02_ThemeCookie(t *testing.T) {
 		return d.Find("html").AttrOr("data-theme", "")
 	}
 	for _, tc := range []struct{ cookie, want string }{
-		{"", "air"}, {"air", "air"}, {"air-dark", "air-dark"}, {"dark", "air"}, {"light", "air"}, {`"><script>`, "air"},
+		{"", "auto"}, {"light", "light"}, {"dark", "dark"}, {"air", "auto"}, {"air-dark", "auto"}, {`"><script>`, "auto"},
 	} {
 		if got := get("/admin/members", tc.cookie); got != tc.want {
 			t.Errorf("cookie %q: data-theme %q, want %q", tc.cookie, got, tc.want)
@@ -84,14 +84,14 @@ func TestE10_02_ThemeCookie(t *testing.T) {
 	}
 	// The login page honours the cookie too.
 	req, _ := http.NewRequest("GET", anon.Base+"/admin/login", nil)
-	req.AddCookie(&http.Cookie{Name: "theme", Value: "air-dark"})
+	req.AddCookie(&http.Cookie{Name: "theme", Value: "dark"})
 	resp, err := anon.HTTP.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 	d, _ := goquery.NewDocumentFromReader(resp.Body)
-	if d.Find("html").AttrOr("data-theme", "") != "air-dark" {
+	if d.Find("html").AttrOr("data-theme", "") != "dark" {
 		t.Error("login page ignores the theme cookie")
 	}
 }
@@ -129,13 +129,13 @@ func TestE10_03_AssetHashAndCache(t *testing.T) {
 			t.Errorf("%s: Cache-Control %q", u, cc)
 		}
 	}
-	// The stylesheet is one bundle: the @imports are inlined and the font URL is hashed.
+	// The stylesheet is one bundle: the @imports are inlined; there is no font file (system fonts).
 	css := c.Get(urls[0])
 	if strings.Contains(css.Body, "@import") || !strings.Contains(css.Body, ".c-btn") || !strings.Contains(css.Body, "@layer tokens, base, components, utilities") {
 		t.Error("app.css is not the inlined bundle")
 	}
-	if !regexp.MustCompile(`inter-latin-wght-normal\.woff2\?v=[0-9a-f]{12}`).MatchString(css.Body) {
-		t.Error("font URL in the bundle has no hash")
+	if strings.Contains(css.Body, "@font-face") || strings.Contains(css.Body, "woff2") {
+		t.Error("the bundle must use system fonts only")
 	}
 	// Unknown files are 404; the source css files are not served.
 	for _, u := range []string{"/admin/static/nothing.js", "/admin/static/css/tokens.css"} {
@@ -158,7 +158,7 @@ func TestE10_04_GalleryOnlyInDev(t *testing.T) {
 		t.Fatalf("with HSP_DEV=1: %d", r.StatusCode)
 	}
 	d := r.Doc(t)
-	for _, want := range []string{".c-btn", ".c-icon-btn", ".c-field", ".c-input", ".c-select", ".c-search", ".c-chip", ".c-card", ".c-table", ".c-meter", ".c-pill", ".c-pager", ".c-empty", ".c-menu", ".c-sheet", ".c-modal", ".c-credentials", ".c-code", ".c-chart"} {
+	for _, want := range []string{".c-btn", ".c-icon-btn", ".c-field", ".c-input", ".c-select", ".c-search", ".c-chip", ".c-card", ".c-table", ".c-meter", ".c-pill", ".c-pager", ".c-empty", ".c-menu", ".c-sheet", ".c-modal", ".c-credentials", ".c-code", ".c-chart__plot"} {
 		if d.Find(want).Length() == 0 {
 			t.Errorf("gallery lacks %s", want)
 		}
@@ -169,7 +169,7 @@ func TestE10_04_GalleryOnlyInDev(t *testing.T) {
 	}
 }
 
-// E10.05 the shell keeps the menu: 2 groups, 7 links, the theme button and Log out in the top bar.
+// E10.05 the shell keeps the menu: 8 links, the theme button and Log out in the top bar, and the phone tab bar with More.
 func TestE10_05_ShellKeepsMenu(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	c := harness.LoginAsAdmin(t, s)
@@ -180,8 +180,11 @@ func TestE10_05_ShellKeepsMenu(t *testing.T) {
 	if d.Find("header [data-theme-toggle]").Length() != 1 || d.Find(`header button[hx-post="/admin/logout"]`).Length() != 1 {
 		t.Error("theme button and Log out must be in the top bar")
 	}
-	if d.Find("header [data-nav-toggle]").Length() != 1 {
-		t.Error("no menu button for small screens")
+	if d.Find(`nav.l-tabbar > a.l-tabbar__tab`).Length() != 4 || d.Find(`nav.l-tabbar button[popovertarget="more-menu"]`).Length() != 1 || d.Find(`#more-menu a`).Length() != 4 {
+		t.Error("the phone tab bar needs 4 tabs and a More menu with 4 links")
+	}
+	if d.Find(`#more-menu a[href="/admin/plans"][aria-current="page"]`).Length() != 1 || d.Find(`nav.l-tabbar button[popovertarget="more-menu"][aria-current="page"]`).Length() != 1 {
+		t.Error("More is not marked current on a page that lives in it")
 	}
 	if d.Find("dialog#confirm-modal").Length() != 1 || d.Find("#toast[role=status]").Length() != 1 {
 		t.Error("shared confirm modal or toast area missing")
@@ -319,24 +322,16 @@ func TestE1_19_ResourceStyleRoutes(t *testing.T) {
 	}
 }
 
-// Sidebar: every group has a heading and every link an icon.
+// Sidebar: one flat list of 8 links and every link has an icon from the sprite.
 func TestE1_20_SidebarGroupsAndIcons(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	c := harness.LoginAsAdmin(t, s)
 	d := c.Get("/admin/members").Doc(t)
-	if d.Find("#sidebar .l-nav__heading").Length() != 2 {
-		t.Errorf("want 2 nav groups")
-	}
-	d.Find("#sidebar .l-nav__heading").Each(func(_ int, h *goquery.Selection) {
-		if strings.TrimSpace(h.Text()) == "" {
-			t.Errorf("empty nav group heading")
-		}
-	})
 	if d.Find("#sidebar a.l-nav__link").Length() != 8 {
 		t.Errorf("want 8 nav links")
 	}
 	d.Find("#sidebar a.l-nav__link").Each(func(_ int, a *goquery.Selection) {
-		if a.Find("svg > path, svg > rect, svg > circle").Length() == 0 {
+		if a.Find(`svg > use[href^="#i-"]`).Length() == 0 {
 			t.Errorf("nav link %q has no icon", strings.TrimSpace(a.Text()))
 		}
 	})

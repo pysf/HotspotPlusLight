@@ -18,7 +18,7 @@ func (s *Store) CountOnlineSessions(ctx context.Context, since time.Time) (int, 
 
 // ListOnlineSessions returns one page of online sessions (see onlineSession), newest first.
 func (s *Store) ListOnlineSessions(ctx context.Context, since time.Time, limit, offset int) ([]domain.Session, error) {
-	rows, err := s.r.QueryContext(ctx, `SELECT `+sessionCols+` FROM session s WHERE `+onlineSession+` ORDER BY s.started_at DESC, s.id DESC LIMIT ? OFFSET ?`,
+	rows, err := s.r.QueryContext(ctx, `SELECT `+sessionCols+`, (SELECT trim(first_name || ' ' || last_name) FROM member WHERE id = s.member_id) FROM session s WHERE `+onlineSession+` ORDER BY s.started_at DESC, s.id DESC LIMIT ? OFFSET ?`,
 		since.Unix(), limit, offset)
 	if err != nil {
 		return nil, err
@@ -26,14 +26,24 @@ func (s *Store) ListOnlineSessions(ctx context.Context, since time.Time, limit, 
 	defer rows.Close()
 	var out []domain.Session
 	for rows.Next() {
-		sess, err := scanSession(rows)
+		var name sql.NullString // null if the member row is gone
+		sess, err := scanSession(withExtra{rows, &name})
 		if err != nil {
 			return nil, err
 		}
+		sess.MemberName = name.String
 		out = append(out, sess)
 	}
 	return out, rows.Err()
 }
+
+// withExtra is a rowScanner that reads one more column after the ones scanSession asks for.
+type withExtra struct {
+	rowScanner
+	extra any
+}
+
+func (w withExtra) Scan(dest ...any) error { return w.rowScanner.Scan(append(dest, w.extra)...) }
 
 // SessionTargetByID returns what a Disconnect needs for one session row, and whether
 // the row is still open. It returns domain.ErrNotFound if there is no such row.

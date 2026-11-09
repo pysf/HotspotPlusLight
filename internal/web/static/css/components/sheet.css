@@ -1,4 +1,4 @@
-/* Right-side drawer on a native <dialog>. */
+/* Right-side drawer on a native <dialog>. On a phone it is a bottom sheet that fills most of the screen. */
 @layer components {
   .c-sheet {
     inset: 0 0 0 auto;
@@ -9,37 +9,56 @@
     margin: 0;
     padding: 0;
     border: 0;
-    border-start-start-radius: var(--r-sheet);
-    border-end-start-radius: var(--r-sheet);
-    background: var(--panel);
-    color: var(--text);
-    box-shadow: var(--shadow-pop);
+    border-start-start-radius: var(--r-xl);
+    border-end-start-radius: var(--r-xl);
+    background: var(--c-surface);
+    color: var(--c-text);
+    box-shadow: var(--sh-3);
     overflow: hidden;
   }
   .c-sheet[open] { display: flex; flex-direction: column; }
-  .c-sheet::backdrop { background: var(--scrim); backdrop-filter: blur(var(--blur-backdrop)); }
+  .c-sheet::backdrop { background: var(--c-scrim); }
   .c-sheet__head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--s-4) var(--s-5h);
-    border-block-end: 1px solid var(--line);
+    gap: var(--s-3);
+    padding: 20px 20px var(--s-3) var(--s-5);
   }
-  .c-sheet__title { font-size: var(--fs-head); font-weight: var(--fw-semibold); letter-spacing: var(--ls-head); }
-  .c-sheet__body { flex: 1; overflow: auto; padding: var(--s-5h); }
+  .c-sheet__title { font-size: var(--fs-xl); }
+  .c-sheet__host { flex: 1; min-block-size: 0; display: flex; flex-direction: column; overflow: auto; padding: var(--s-2) var(--s-5) var(--s-5); }
+  .c-sheet__host:has(> .c-sheet__pane) { padding: 0; overflow: hidden; }
+  .c-sheet__pane { flex: 1; min-block-size: 0; display: flex; flex-direction: column; }
+  .c-sheet__body { flex: 1; display: grid; gap: var(--s-4); align-content: start; overflow: auto; padding: var(--s-2) var(--s-5) var(--s-5); min-block-size: 0; }
   .c-sheet__foot {
     display: flex;
     justify-content: flex-end;
     gap: var(--s-3);
-    padding: var(--s-3) var(--s-5h);
-    border-block-start: 1px solid var(--line);
+    flex: none;
+    padding: var(--s-4) var(--s-5) var(--s-5);
+    border-block-start: 1px solid var(--c-line);
   }
-  .c-sheet__section { margin-block-start: var(--s-2); padding-block-start: var(--s-4); border-block-start: 1px solid var(--line); }
-  .c-sheet__section > h3 { margin-block-end: var(--s-3); color: var(--muted); font-size: var(--fs-small); font-weight: var(--fw-medium); }
+  .c-sheet__section { padding-block-start: var(--s-4); border-block-start: 1px solid var(--c-line); }
+  .c-sheet__section > h3 { margin-block-end: var(--s-3); color: var(--c-text-3); font-size: var(--fs-sm); font-weight: var(--fw-semibold); letter-spacing: 0; }
 
   @media (prefers-reduced-motion: no-preference) {
-    .c-sheet { transition: translate var(--dur-sheet) ease, display var(--dur-sheet) allow-discrete, overlay var(--dur-sheet) allow-discrete; translate: 100% 0; }
+    .c-sheet { transition: translate var(--dur-sheet) var(--ease), display var(--dur-sheet) allow-discrete, overlay var(--dur-sheet) allow-discrete; translate: 100% 0; }
     .c-sheet[open] { translate: 0 0; }
     @starting-style { .c-sheet[open] { translate: 100% 0; } }
+  }
+
+  @media (max-width: 699px) {
+    .c-sheet {
+      inset: 48px 0 0 0;
+      inline-size: 100%;
+      block-size: auto;
+      max-block-size: none;
+      border-radius: var(--r-xl) var(--r-xl) 0 0;
+    }
+  }
+  @media (max-width: 699px) and (prefers-reduced-motion: no-preference) {
+    .c-sheet { translate: 0 100%; }
+    .c-sheet[open] { translate: 0 0; }
+    @starting-style { .c-sheet[open] { translate: 0 100%; } }
   }
 }

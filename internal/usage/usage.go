@@ -1,5 +1,5 @@
 // Package usage is the read side of the daily usage history (PLAN D12, Phase 9):
-// the 30-day chart and the top-N members list. Writing happens in internal/session.
+// the daily chart, its summary and the top-N members list. Writing happens in internal/session.
 package usage
 
 import (
@@ -9,12 +9,8 @@ import (
 	"hotspotpluslight/internal/domain"
 )
 
-const (
-	// ChartDays is the length of the daily chart.
-	ChartDays = 30
-	// TopN is the length of the top members list.
-	TopN = 10
-)
+// TopN is the length of the top members list.
+const TopN = 10
 
 // Repo is what the report needs from the database. Days are domain.DayFormat keys, inclusive.
 type Repo interface {
@@ -34,15 +30,16 @@ func New(repo Repo, clk clock.Clock) *Service { return &Service{repo: repo, cloc
 
 // View is the data of the usage page.
 type View struct {
-	Days     []domain.UsageDay // ChartDays entries, oldest first, empty days as zeros
+	Days     []domain.UsageDay // one entry per day of the range, oldest first, empty days as zeros
 	MaxTotal int64             // largest daily total, for scaling the bars
+	Summary  domain.UsageSummary
+	Axis     domain.ChartAxis
 	Top      []domain.MemberUsage
-	Range    int // days covered by Top
+	Range    int // days covered by the chart, the summary and Top
 }
 
-// Report returns the usage page data. The chart covers the last ChartDays days and Top
-// the last rangeDays; an unknown rangeDays falls back to the default. Days are calendar
-// days in settings.timezone, today included.
+// Report returns the usage page data for the last rangeDays days; an unknown rangeDays
+// falls back to the default. Days are calendar days in settings.timezone, today included.
 func (s *Service) Report(ctx context.Context, rangeDays int) (View, error) {
 	st, err := s.repo.GetSettings(ctx)
 	if err != nil {
@@ -54,8 +51,8 @@ func (s *Service) Report(ctx context.Context, rangeDays int) (View, error) {
 	}
 	now := s.clock.Now()
 	rangeDays = domain.NormalizeUsageDays(rangeDays)
-	window := domain.DayWindow(now, loc, ChartDays)
-	rows, err := s.repo.DailyTotals(ctx, window[0], window[ChartDays-1])
+	window := domain.DayWindow(now, loc, rangeDays)
+	rows, err := s.repo.DailyTotals(ctx, window[0], window[rangeDays-1])
 	if err != nil {
 		return View{}, err
 	}
@@ -63,7 +60,8 @@ func (s *Service) Report(ctx context.Context, rangeDays int) (View, error) {
 	for _, d := range v.Days {
 		v.MaxTotal = max(v.MaxTotal, d.Total())
 	}
-	topWindow := domain.DayWindow(now, loc, rangeDays)
-	v.Top, err = s.repo.TopMembers(ctx, topWindow[0], topWindow[rangeDays-1], TopN)
+	v.Summary = domain.SummarizeUsage(v.Days)
+	v.Axis = domain.NewChartAxis(v.MaxTotal)
+	v.Top, err = s.repo.TopMembers(ctx, window[0], window[rangeDays-1], TopN)
 	return v, err
 }

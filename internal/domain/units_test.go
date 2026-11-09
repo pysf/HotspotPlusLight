@@ -35,7 +35,7 @@ func TestBulkBytes(t *testing.T) {
 }
 
 func TestFormatSizeAndDuration(t *testing.T) {
-	for in, want := range map[int64]string{0: "0 B", 1023: "1023 B", 1024: "1 KB", 1536 * 1024: "1.5 MB", 3 << 30: "3 GB"} {
+	for in, want := range map[int64]string{0: "0 B", 1023: "1023 B", 1024: "1 KB", 1536 * 1024: "1.5 MB", 3 << 30: "3 GB", 1 << 40: "1 TB", 3 << 39: "1.5 TB"} {
 		if got := FormatSize(in); got != want {
 			t.Errorf("FormatSize(%d) = %q, want %q", in, got, want)
 		}

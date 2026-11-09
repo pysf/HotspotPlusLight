@@ -105,8 +105,8 @@ sequenceDiagram
 
 The admin home page (`/admin`) shows:
 
-- three tiles: **Online now** (with today's peak), **Traffic today** and **Failed logins today**
-- the router status panel (last login request, accounting packet and Disconnect; moved here from the Router page)
+- four tiles: **Online now**, **Peak today**, **Traffic today** and **Failed logins today**
+- the router status panel on the Dashboard, called the Router link card (last login request, accounting packet and Disconnect; moved here from the Router page)
 - a short Needs attention list (members expiring in 3 days, members at 80% of their data)
 - three charts (traffic for 14 days, busy hours, active members per day)
 
@@ -151,7 +151,7 @@ The whole page refreshes by itself every 10 seconds.
 | Own CSS, no Tailwind, no build step | D24 |
 | Two layers of limits: router attributes plus server Disconnect | O3, O4, BR-10 |
 | Expiry is enforced at login | O7 |
-| First login: admin / admin, then a forced password change; the admin panel then opens on the Dashboard | O15, D25 |
+| First login: admin / admin, then a forced password change (with an optional new user name); the admin panel then opens on the Dashboard. The user name can be changed later on the Password and username page | O15, D25, BR-28 |
 | Failed logins are counted per day and reason, with counts only (no user names, no addresses), kept for the session retention days | D27 |
 | Deleting a plan that members use is blocked | O12 |
 | The AES-256 secret key is created automatically at the first start (only if `hsp.db` does not exist) and saved to `{DATA_DIR}/hsp.key`. Back up this file with `hsp.db` | -- |

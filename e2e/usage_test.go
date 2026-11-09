@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -166,7 +167,7 @@ func bars(d *goquery.Document) []bar {
 	return out
 }
 
-// E9.07 the usage page charts the last 30 days (today included), all members summed, empty days as zero.
+// E9.07 the usage page charts the last 30 days by default (today included), all members summed, empty days as zero; 7 and 90 days chart that many.
 func TestE9_07_DailyChart(t *testing.T) {
 	f := newP4(t)
 	p := f.plan("Basic")
@@ -207,7 +208,7 @@ func TestE9_08_TopMembers(t *testing.T) {
 			t.Fatalf("usage%s: %d", q, r.StatusCode)
 		}
 		d = r.Doc(t)
-		d.Find("tr[data-top]").Each(func(_ int, s *goquery.Selection) { users = append(users, s.AttrOr("data-username", "")) })
+		d.Find("li[data-top]").Each(func(_ int, s *goquery.Selection) { users = append(users, s.AttrOr("data-username", "")) })
 		return
 	}
 	u, d := top("")
@@ -215,11 +216,11 @@ func TestE9_08_TopMembers(t *testing.T) {
 	if fmt.Sprint(u) != fmt.Sprint(want) {
 		t.Fatalf("default range: %v", u)
 	}
-	if text(d.Find(`tr[data-top][data-username="user12"] td[data-col="total"]`)) == "" {
+	if text(d.Find(`li[data-top][data-username="user12"] [data-col="total"]`)) == "" {
 		t.Fatal("no total cell")
 	}
-	if text(d.Find(`tr[data-top][data-username="user12"] td[data-col="down"]`)) != "11.72 KB" {
-		t.Fatalf("download cell: %q", text(d.Find(`tr[data-top][data-username="user12"] td[data-col="down"]`)))
+	if text(d.Find(`li[data-top][data-username="user12"] [data-col="down"]`)) != "11.72 KB" {
+		t.Fatalf("download cell: %q", text(d.Find(`li[data-top][data-username="user12"] [data-col="down"]`)))
 	}
 	u, _ = top("?days=7")
 	if len(u) != 10 || u[0] != "user12" || u[9] != "user03" {
@@ -237,7 +238,7 @@ func TestE9_08_TopMembers(t *testing.T) {
 	empty := newP4(t)
 	if u, _ := func() (us []string, d *goquery.Document) {
 		d = empty.c.Get("/admin/usage").Doc(t)
-		d.Find("tr[data-top]").Each(func(_ int, s *goquery.Selection) { us = append(us, s.AttrOr("data-username", "")) })
+		d.Find("li[data-top]").Each(func(_ int, s *goquery.Selection) { us = append(us, s.AttrOr("data-username", "")) })
 		return
 	}(); len(u) != 0 {
 		t.Fatalf("empty install lists %v", u)
@@ -253,5 +254,42 @@ func TestE9_09_NavAndAuth(t *testing.T) {
 	anon := harness.NewAdminClient(t, f.s)
 	if r := anon.GetPage("/admin/usage"); r.StatusCode != 302 && r.StatusCode != 303 {
 		t.Fatalf("anonymous /admin/usage: %d", r.StatusCode)
+	}
+}
+
+// E9.10 the range switch (7, 30, 90 days) sets the chart, the three figures and the top list together; an empty install says so.
+func TestE9_10_RangeSwitchAndSummary(t *testing.T) {
+	f := newP4(t)
+	a := f.member(f.plan("Basic"), "alice")
+	f.seedDay(a, "2026-11-01", 100, 50, 5) // Sunday, today
+	f.seedDay(a, "2026-10-30", 300, 0, 5)  // Friday, the busiest day of the week
+	f.seedDay(a, "2026-10-20", 1000, 0, 5) // inside 30 days, outside 7
+
+	d := f.c.Get("/admin/usage?days=7").Doc(t)
+	if got := len(bars(d)); got != 7 {
+		t.Fatalf("7 days: %d bars", got)
+	}
+	if cur := d.Find(`a[data-range][aria-current]`).AttrOr("data-range", ""); cur != "7" || d.Find("a[data-range]").Length() != 3 {
+		t.Errorf("current range %q of %d links", cur, d.Find("a[data-range]").Length())
+	}
+	if got := text(d.Find(`[data-tile=total]`)); !strings.Contains(got, "450") || !strings.Contains(got, "26 Oct to 1 Nov") {
+		t.Errorf("total tile %q", got)
+	}
+	if got := text(d.Find(`[data-tile=average]`)); !strings.Contains(got, "64") {
+		t.Errorf("average tile %q", got)
+	}
+	if got := text(d.Find(`[data-tile=busiest]`)); !strings.Contains(got, "300") || !strings.Contains(got, "Friday 30 October") {
+		t.Errorf("busiest tile %q", got)
+	}
+	if got := len(bars(f.c.Get("/admin/usage?days=90").Doc(t))); got != 90 {
+		t.Errorf("90 days: %d bars", got)
+	}
+	if got := len(bars(f.c.Get("/admin/usage?days=45").Doc(t))); got != 30 {
+		t.Errorf("a bad range falls back to 30 days: %d bars", got)
+	}
+
+	empty := newP4(t).c.Get("/admin/usage").Doc(t)
+	if len(bars(empty)) != 0 || empty.Find("[data-empty]").Length() != 2 {
+		t.Errorf("empty install: %d bars, %d empty texts", len(bars(empty)), empty.Find("[data-empty]").Length())
 	}
 }

@@ -58,32 +58,32 @@ One component = one template partial + one CSS file + one entry on the dev galle
 
 ## 5. CSS best practices
 **Architecture**
-- Files: `tokens.css` (all variables, 3 themes, see DESIGN.md §3), `base.css` (minimal reset, typography, focus), `layout.css` (shell, page grid, responsive rules), `components/<name>.css`, and `app.css` which declares `@layer tokens, base, components, utilities;` and imports the others. No CSS in templates.
-- **Cascade layers** control order; do not fight specificity with `!important` (never allowed) or long selectors.
+- Files: `tokens.css` (all variables, light and dark, see DESIGN.md §3), `base.css` (minimal reset, typography, focus), `layout.css` (shell, page grid, responsive rules), `components/<name>.css`, and `app.css` which declares `@layer tokens, base, components, utilities;` and imports the others. No CSS in templates.
+- **Cascade layers** control order; do not fight specificity with `!important` (only in the reduced-motion block of `base.css`, where it is needed to beat the component layer) or long selectors.
 
 **Naming and selectors**
 - `c-<component>` for components, `c-<component>__<part>` for inner parts, `data-*` or `aria-*` attributes for variants and states (`[data-variant="primary"]`, `[aria-pressed="true"]`, `[aria-current="page"]`). No modifier-class soup.
 - Style with classes only (no ID selectors, no styling via tag selectors inside components). Max one class deep plus a state. Use `:where()` to keep base rules at zero specificity.
 
 **Tokens and values**
-- Components read **only** tokens: no hex colors, no magic numbers, no px values outside the scale. Themes change tokens, never component CSS (no `[data-theme]` selectors in components).
-- Sizes for type and spacing use `rem`/`em` so user font-size settings work (the px values in DESIGN.md assume a 16px root; 14px = `.875rem`). 1px hairlines stay `1px`.
+- Components read **only** tokens: no hex colors, no magic numbers, no px values outside the scale. Themes change tokens, never component CSS (the only `[data-theme]` selectors outside `tokens.css` are the sun and moon icon swap in `icon.css`). One-off numbers that come from the design and are used once (a 20 px shell padding, a 10 px gap) may stay in `layout.css`; any value used twice becomes a token.
+- Type and spacing tokens are in `px`, as in the design. 1px hairlines stay `1px`.
 - Use **logical properties** (`margin-inline`, `padding-block`, `inset-inline-start`, `border-start-start-radius`, `text-align: start`) instead of left/right, so RTL support later costs nothing even though the UI is LTR today.
 
 **Layout and responsiveness**
 - Mobile-friendly but desktop-first as specified. Use CSS Grid/Flex, `gap` for spacing (not margin hacks), `min()`/`clamp()` for fluid sizing, `dvh` for full-height sheets.
-- Breakpoints live in one place (`layout.css`): 980px and 820px, plus 560px for the sheet. Prefer container queries for components that must adapt to their container.
+- Breakpoints are `@media` queries with two numbers: `max-width: 999px` (icon rail) and `max-width: 699px` (phone). No container queries.
 - No horizontal scrolling at any width; test at 360px, 768px, 1280px, 1920px.
 
 **Quality**
 - Interactive states are complete: default, hover, `:focus-visible`, active, disabled, loading, error. Focus ring defined once in `base.css`.
 - Honor `prefers-reduced-motion` and `color-scheme`. Keep transitions on cheap properties (color, background, opacity, transform).
 - Remove unused CSS; keep each component file focused and short (a component file over ~120 lines is a smell).
-- Fonts: system stack by default. If Inter is used, self-host a subset `woff2` with `font-display: swap` (no Google Fonts).
+- Fonts: the system stack of the design. No font file is shipped.
 
 ## 6. JavaScript policy
 Progressive enhancement: pages stay navigable and forms submittable with JS disabled where reasonable. Vanilla ES modules, no globals, no dependencies, each file under ~80 lines, listening to HTMX/DOM events:
-- `theme.js` toggles `data-theme` and writes the `theme` cookie (server renders the right theme on first paint).
+- `theme.js` switches `data-theme` between `light` and `dark` and writes the `theme` cookie (the server renders the attribute on first paint; no cookie means `auto`, the OS decides).
 - `dialog.js` opens/closes sheet and modal on swap or server event; restores focus.
 - `clipboard.js` copies credentials ("Copy details").
 - `toast.js` shows/hides toasts.
@@ -119,7 +119,7 @@ Progressive enhancement: pages stay navigable and forms submittable with JS disa
 3. Layouts, Login page.
 4. Users: list + filters → new/edit sheet → created view → row actions + confirm modal.
 5. Plans: list + sheet + delete rule message.
-6. Polish: empty/loading/error states, responsive pass (≤820px), accessibility pass.
+6. Polish: empty/loading/error states, responsive pass (under 700 px), accessibility pass.
 Small commits; after each step run the checks above.
 
 ## 11. Definition of done

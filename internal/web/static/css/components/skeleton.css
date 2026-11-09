@@ -1,0 +1,15 @@
+/* Loading placeholder lines. data-w: 40 | 60 | 80; data-size="lg" is a big figure. */
+@layer components {
+  .c-skel {
+    block-size: var(--h-skel);
+    border-radius: 7px;
+    background: linear-gradient(90deg, var(--c-fill), var(--c-fill-2), var(--c-fill));
+    background-size: 200% 100%;
+    animation: c-shimmer 1.4s linear infinite;
+  }
+  .c-skel[data-w="40"] { inline-size: 40%; }
+  .c-skel[data-w="60"] { inline-size: 60%; }
+  .c-skel[data-w="80"] { inline-size: 80%; }
+  .c-skel[data-size="lg"] { block-size: var(--h-skel-lg); inline-size: 50%; }
+  @keyframes c-shimmer { to { background-position: -200% 0; } }
+}

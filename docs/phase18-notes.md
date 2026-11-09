@@ -4,7 +4,7 @@ Built: `GET /admin` is the Dashboard (it replaced the redirect to Members) and t
 
 ## Decisions
 - Page order: three tiles, router status, Needs attention (7-day expiry, 80% data), three charts (traffic 14 days, busy hours, active members per day). Only the online tile and the router status poll.
-- Charts reuse `ui.BarChart`. Busy hours are drawn in hundredths (a non-zero average always shows a bar); `data-avg` has two decimals; the caption peak comes from the averages.
+- Charts reuse `ui.Plot` (was `ui.BarChart` before 2026-11-09). Busy hours are drawn in hundredths (a non-zero average always shows a bar); `data-avg` has two decimals; the caption peak comes from the averages.
 - The 7-day list has no "see all" link (the Members chip looks only 3 days ahead); it shows "and N more".
 - E8.07 no longer re-baselines: a snapshot of every table proves that reading the panel writes nothing, that a reject changes only `login_failure_daily`, and that unanswered packets change nothing.
 

@@ -77,5 +77,6 @@ func (h handlers) settingsUpdate(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
+	setTrigger(w, map[string]any{"toast": "Settings saved"})
 	h.render(w, r, http.StatusOK, SettingsFormView(SettingsProps{Form: f, Plans: plans, Saved: true, RestartNeeded: h.restartNeeded(saved)}))
 }

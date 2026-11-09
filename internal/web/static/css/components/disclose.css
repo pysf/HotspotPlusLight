@@ -1,0 +1,15 @@
+/* A closed block with a small text summary (a native details element): for rarely used actions such as Rename. */
+@layer components {
+  .c-disclose { margin-block-start: var(--s-1); }
+  .c-disclose > summary {
+    display: inline-block;
+    color: var(--c-accent);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+  }
+  .c-disclose > summary:hover { text-decoration: underline; }
+  .c-disclose .c-input { inline-size: 100%; min-inline-size: 0; }
+  .c-disclose .l-stack { gap: var(--s-2); justify-items: start; }
+  .c-disclose[open] > summary { margin-block-end: var(--s-2); }
+}

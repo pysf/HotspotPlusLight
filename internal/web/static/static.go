@@ -1,6 +1,5 @@
-// Package static holds the admin panel's assets: our own CSS and JS, htmx and the
-// Inter font (vendored, pinned). There is no build tool. At startup New inlines the
-// @imports of css/app.css into one stylesheet, hashes every asset, and serves them
+// Package static holds the admin panel's assets: our own CSS and JS and htmx (vendored, pinned).
+// There is no build tool. At startup New inlines the @imports of css/app.css into one stylesheet, hashes every asset, and serves them
 // under /admin/static/ with the hash in the URL (?v=hash) and a long cache.
 package static
 
@@ -20,7 +19,7 @@ import (
 
 // files holds the embedded asset files.
 //
-//go:embed css js htmx.min.js voucher.css inter-latin-wght-normal.woff2
+//go:embed css js htmx.min.js voucher.css
 var files embed.FS
 
 // Prefix is where the assets are mounted.
@@ -36,19 +35,15 @@ type asset struct {
 // Assets is the set of served files. Build it once with New.
 type Assets struct{ items map[string]asset }
 
-// importRe matches an @import line of css/app.css; fontRe matches a font URL in the CSS.
-var (
-	importRe = regexp.MustCompile(`(?m)^@import "([^"]+)";[ \t]*\n?`)
-	fontRe   = regexp.MustCompile(`url\("` + regexp.QuoteMeta(Prefix) + `([^"]+)"\)`)
-)
+// importRe matches an @import line of css/app.css.
+var importRe = regexp.MustCompile(`(?m)^@import "([^"]+)";[ \t]*\n?`)
 
 // New returns the Assets built from the embedded files, with the CSS bundle.
 func New() (*Assets, error) {
 	a := &Assets{items: map[string]asset{}}
 	plain := map[string]string{
-		"htmx.min.js":                   "text/javascript; charset=utf-8",
-		"voucher.css":                   "text/css; charset=utf-8",
-		"inter-latin-wght-normal.woff2": "font/woff2",
+		"htmx.min.js": "text/javascript; charset=utf-8",
+		"voucher.css": "text/css; charset=utf-8",
 	}
 	for name, ctype := range plain {
 		b, err := files.ReadFile(name)
@@ -68,7 +63,7 @@ func New() (*Assets, error) {
 		}
 		a.add(name, b, "text/javascript; charset=utf-8")
 	}
-	bundle, err := a.bundleCSS(files)
+	bundle, err := bundleCSS(files)
 	if err != nil {
 		return nil, err
 	}
@@ -82,8 +77,8 @@ func (a *Assets) add(name string, body []byte, ctype string) {
 	a.items[name] = asset{body: body, ctype: ctype, hash: hex.EncodeToString(sum[:])[:12]}
 }
 
-// bundleCSS returns css/app.css with its @import lines inlined in order and font URLs hashed.
-func (a *Assets) bundleCSS(src fs.FS) ([]byte, error) {
+// bundleCSS returns css/app.css with its @import lines inlined in order.
+func bundleCSS(src fs.FS) ([]byte, error) {
 	root, err := fs.ReadFile(src, "css/app.css")
 	if err != nil {
 		return nil, err
@@ -101,16 +96,7 @@ func (a *Assets) bundleCSS(src fs.FS) ([]byte, error) {
 	if ierr != nil {
 		return nil, ierr
 	}
-	out = fontRe.ReplaceAllFunc(out, func(m []byte) []byte {
-		name := fontRe.FindSubmatch(m)[1]
-		it, ok := a.items[string(name)]
-		if !ok {
-			ierr = fmt.Errorf("css url %q: no such asset", name)
-			return m
-		}
-		return []byte(`url("` + Prefix + string(name) + `?v=` + it.hash + `")`)
-	})
-	return out, ierr
+	return out, nil
 }
 
 // URL returns the public URL of the asset name, with its hash. An unknown name gets no hash.

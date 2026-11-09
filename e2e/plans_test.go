@@ -13,36 +13,42 @@ import (
 	"hotspotpluslight/e2e/harness"
 )
 
-// E10.20 plans: list region, row menu, delete from the list, a blocked delete shows a clear toast.
+// E10.20 plans: list region, plan cards, delete from the card, a blocked delete shows a reason and a clear toast.
 func TestE10_20_PlansListAndMenu(t *testing.T) {
 	f := newP2(t)
 	used := f.plan("Used")
 	free := f.plan("Free")
 	f.member(used, "alice")
 	d := f.c.Get("/admin/plans").Doc(t)
-	if list := d.Find("#plan-list"); list.Length() != 1 || list.AttrOr("aria-live", "") != "polite" || list.Find("tbody tr").Length() != 2 {
+	if list := d.Find("#plan-list"); list.Length() != 1 || list.AttrOr("aria-live", "") != "polite" || list.Find("article[data-plan]").Length() != 2 {
 		t.Fatal("plans page lacks the list region")
 	}
-	menu := d.Find("tbody tr").Last().Find(".c-menu")
-	var items []string
-	menu.Find(".c-menu__item").Each(func(_ int, s *goquery.Selection) { items = append(items, text(s)) })
-	if strings.Join(items, "|") != "Edit|Delete" {
-		t.Errorf("plan menu %q", items)
+	card := func(id int64) *goquery.Selection {
+		return d.Find(`article[data-plan][data-id="` + strconv.FormatInt(id, 10) + `"]`)
 	}
-	if menu.Find(".c-menu__item").Last().AttrOr("data-danger", "x") == "x" || menu.Find("hr.c-menu__sep").Length() != 1 {
-		t.Error("Delete must be danger after a divider")
+	// A card shows the member count and the five limits.
+	if text(card(used).Find("[data-plan-members]")) != "1 member" || card(used).Find("dl > div").Length() != 5 {
+		t.Errorf("plan card: %s", text(card(used)))
 	}
-	del := d.Find(`.c-menu__item[hx-delete="/admin/plans/` + strconv.FormatInt(free, 10) + `"]`)
-	if del.AttrOr("hx-confirm", "") == "" || del.AttrOr("hx-target", "") != "#plan-list" {
-		t.Errorf("plan delete item: %v", del.Nodes)
+	// A free plan has Edit (opens the sheet) and a Delete that asks first.
+	del := card(free).Find(`button[hx-delete="/admin/plans/` + strconv.FormatInt(free, 10) + `"]`)
+	if del.AttrOr("hx-confirm", "") == "" || del.AttrOr("hx-target", "") != "#plan-list" || card(free).Find("[data-plan-why]").Length() != 0 {
+		t.Errorf("plan delete button: %v", del.Nodes)
 	}
-	edit := d.Find(`.c-menu__item[hx-get="/admin/plans/` + strconv.FormatInt(free, 10) + `"]`)
-	if edit.AttrOr("hx-target", "") != "#sheet-body" {
-		t.Errorf("plan edit item: %v", edit.Nodes)
+	edit := card(free).Find(`a[hx-get="/admin/plans/` + strconv.FormatInt(free, 10) + `"]`)
+	if edit.AttrOr("hx-target", "") != "#sheet-body" || edit.AttrOr("href", "") != "/admin/plans/"+strconv.FormatInt(free, 10) {
+		t.Errorf("plan edit link: %v", edit.Nodes)
+	}
+	// A plan in use has a disabled Delete that points to the reason.
+	blocked := card(used).Find(`button[aria-disabled="true"]`)
+	why := card(used).Find("[data-plan-why]")
+	if blocked.Length() != 1 || blocked.AttrOr("hx-delete", "x") != "x" || blocked.AttrOr("aria-describedby", "") != why.AttrOr("id", "none") ||
+		!strings.Contains(text(why), "Can’t delete: 1 member uses this plan. Move them to another plan first.") {
+		t.Errorf("blocked delete: %v / %q", blocked.Nodes, text(why))
 	}
 	// The fragment for the list region.
 	frag := f.c.GetHX("/admin/plans", planTarget)
-	if strings.Contains(frag.Body, "<html") || fragmentDoc(t, frag).Find("tbody tr").Length() != 2 {
+	if strings.Contains(frag.Body, "<html") || fragmentDoc(t, frag).Find("article[data-plan]").Length() != 2 {
 		t.Error("plan list fragment")
 	}
 	if rf := fragmentDoc(t, frag).Find(`[hx-trigger*="plans-changed"]`); rf.Length() != 1 || rf.AttrOr("hx-get", "") != "/admin/plans" {

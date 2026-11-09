@@ -67,9 +67,9 @@
 <li>You need <code>login-by=http-pap</code>, because the server accepts only PAP (the login method where the router sends the password to the server). With CHAP, every login fails.</li>
 <li>The accounting interval in the script is the value from the <strong>Settings</strong> page (60 seconds by default).</li>
 </ul>
-<p>Paste the script into a RouterOS terminal (WinBox or SSH). Or save it as <code>setup.rsc</code> and run <code>/import setup.rsc</code>. The script contains the shared secret, so do not share it.</p></section>
+<p>Choose <strong>Copy script</strong>, then paste the script into a RouterOS terminal (WinBox or SSH). Or save it as <code>setup.rsc</code> and run <code>/import setup.rsc</code>. The script contains the shared secret, so do not share it.</p></section>
 <section><h2 id="page"><a href="#page">Step 3: the login page</a></h2>
-<p>On the same <strong>Router</strong> page, choose a design and click <strong>Download</strong>. You get a zip file with a folder named <code>hotspot</code>. Unzip it. Then upload the <code>hotspot</code> folder to the router (with Files in WinBox, or with FTP) and replace the old one. On routers that keep files on flash storage, the folder is <code>flash/hotspot</code>.</p>
+<p>On the same <strong>Router</strong> page, under <strong>Sign-in pages</strong>, choose a design and click <strong>Download</strong> (<strong>Open preview</strong> shows it first). You get a zip file with a folder named <code>hotspot</code>. Unzip it. Then upload the <code>hotspot</code> folder to the router (with Files in WinBox, or with FTP) and replace the old one. On routers that keep files on flash storage, the folder is <code>flash/hotspot</code>.</p>
 <p>See <a href="../hotspot-login-pages/">Hotspot login pages</a> for the designs and how to edit them.</p></section>
 <section><h2 id="firewall"><a href="#firewall">Firewall</a></h2>
 <p>These ports must be open. The server never talks to members. It talks only to the router and to you:</p>
@@ -81,7 +81,7 @@ sudo ufw allow from ROUTER-IP to any port 1813 proto udp
 sudo ufw allow from ADMIN-PC-IP to any port 8081 proto tcp</code></pre>
 <p>On Windows, see the <code>netsh</code> commands in <a href="../running-as-a-service/#windows">Run as a service</a>. To keep the admin panel off the hotspot network, you can also bind it to one address. For example, set <code>HSP_ADMIN_ADDR=192.168.1.10:8081</code> for the first start, or change the address on the <strong>Settings</strong> page later.</p></section>
 <section><h2 id="test"><a href="#test">Test it</a></h2>
-<p>Create a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the <strong>Online</strong> page. The <a href="../dashboard/#router-status">Dashboard</a> has a <strong>Router status</strong> panel. It shows the time and source address of the last login request, the last accounting packet and the last Disconnect request. It also shows how many packets the server dropped because of a wrong shared secret. The panel updates every 10 seconds. It is kept in memory, so it is empty after a restart.</p>
+<p>Create a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the <strong>Online now</strong> page. The <a href="../dashboard/#router-status">Dashboard</a> has a <strong>Router link</strong> card. It shows the time and source address of the last login request, the last accounting packet and the last Disconnect request. It also shows how many packets the server dropped because of a wrong shared secret. The card updates every 10 seconds. It is kept in memory, so it is empty after a restart.</p>
 <p>If something fails, see <a href="../troubleshooting/">Troubleshooting</a>.</p></section>
 <nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../dashboard/"><small>Previous</small>Dashboard</a><a class="next" rel="next" href="../hotspot-login-pages/"><small>Next</small>Hotspot login pages</a></nav></article>
 </div></main>

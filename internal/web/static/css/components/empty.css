@@ -1,5 +1,17 @@
-/* Nothing to show. */
+/* Nothing to show: icon circle, title, one line, an optional button. */
 @layer components {
-  .c-empty { padding: var(--s-14) var(--s-5); color: var(--muted); text-align: center; }
-  .c-empty > * + * { margin-block-start: var(--s-2); }
+  .c-empty { display: grid; justify-items: center; gap: var(--s-2); padding: 56px var(--s-5); text-align: center; }
+  .c-empty__icon {
+    display: grid;
+    place-items: center;
+    inline-size: var(--size-empty-icon);
+    block-size: var(--size-empty-icon);
+    margin-block-end: var(--s-2);
+    border-radius: 50%;
+    background: var(--c-fill);
+    color: var(--c-text-3);
+  }
+  .c-empty__icon[data-tone="bad"] { background: var(--st-bad-bg); color: var(--st-bad-fg); }
+  .c-empty p { max-inline-size: 36ch; color: var(--c-text-2); }
+  .c-empty .c-btn { margin-block-start: var(--s-3); }
 }

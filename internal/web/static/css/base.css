@@ -5,34 +5,35 @@
   :where(ul, ol) { padding: 0; list-style: none; }
   :where(html) { -webkit-text-size-adjust: 100%; }
   :where(body) {
-    background: var(--bg);
-    color: var(--text);
-    font: var(--fs-base) / var(--lh-base) var(--font-sans);
+    background: var(--c-bg);
+    color: var(--c-text);
+    font: 400 var(--fs-md) / var(--lh-base) var(--font);
     -webkit-font-smoothing: antialiased;
   }
   :where(button, input, select, textarea) { font: inherit; color: inherit; }
   :where(button) { cursor: pointer; background: none; border: 0; padding: 0; }
-  :where(a) { color: var(--accent); text-decoration: none; }
+  :where(a) { color: var(--c-accent); text-decoration: none; }
   :where(a:hover) { text-decoration: underline; }
   :where(code, kbd, samp) { font-family: var(--font-mono); }
-  :where(h1) { font-size: var(--fs-title); font-weight: var(--fw-semibold); letter-spacing: var(--ls-title); }
-  :where(h2, h3) { font-size: var(--fs-head); font-weight: var(--fw-semibold); }
+  :where(h1) { font-size: var(--fs-2xl); line-height: 1.15; font-weight: var(--fw-bold); letter-spacing: var(--ls-h1); }
+  :where(h2) { font-size: var(--fs-xl); line-height: 1.25; font-weight: var(--fw-semibold); letter-spacing: var(--ls-h2); }
+  :where(h3) { font-size: var(--fs-lg); line-height: 1.3; font-weight: var(--fw-semibold); letter-spacing: var(--ls-h3); }
   :where(table) { border-collapse: collapse; }
-  :where(input[type="checkbox"]) { accent-color: var(--accent); }
   :where(img, svg) { max-inline-size: 100%; }
   :where([hidden]) { display: none; }
-  ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+  ::selection { background: var(--c-accent-soft); }
 
   :focus-visible {
-    outline: var(--ring-w) solid var(--accent);
+    outline: var(--ring-w) solid var(--c-focus);
     outline-offset: var(--ring-offset);
   }
 
+  /* !important is needed here: component rules sit in a later layer and would win otherwise. */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
-      transition: none;
-      animation: none;
-      scroll-behavior: auto;
+      transition: none !important;
+      animation: none !important;
+      scroll-behavior: auto !important;
     }
   }
 }

@@ -1,0 +1,78 @@
+/* Checkbox, switch, segmented control. The .c-hit wrapper makes a small control a 44 px tap area. */
+@layer components {
+  .c-choice { display: flex; align-items: center; gap: var(--s-3); }
+  .c-hit { display: inline-flex; align-items: center; justify-content: center; padding: 11px; cursor: pointer; }
+  .c-check {
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
+    inline-size: var(--size-check);
+    block-size: var(--size-check);
+    margin: 0;
+    border: 1.5px solid var(--c-input-line);
+    border-radius: 7px;
+    background: var(--c-surface);
+    cursor: pointer;
+    flex: none;
+  }
+  .c-check:checked, .c-check:indeterminate { background: var(--c-accent); border-color: var(--c-accent); }
+  .c-check:checked::after {
+    content: "";
+    inline-size: 6px;
+    block-size: 11px;
+    border: solid var(--c-accent-fg);
+    border-width: 0 2.5px 2.5px 0;
+    transform: translate(-.5px, -1px) rotate(45deg);
+  }
+  .c-check:indeterminate::after { content: ""; inline-size: 10px; block-size: 2.5px; border-radius: 2px; background: var(--c-accent-fg); }
+  .c-check:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
+
+  .c-switch {
+    appearance: none;
+    position: relative;
+    inline-size: var(--w-switch);
+    block-size: var(--h-switch);
+    margin: 0;
+    border: 1.5px solid var(--c-input-line);
+    border-radius: var(--r-pill);
+    background: var(--c-fill);
+    cursor: pointer;
+    flex: none;
+    transition: background var(--dur) var(--ease);
+  }
+  .c-switch::after {
+    content: "";
+    position: absolute;
+    inset-block-start: 2.5px;
+    inset-inline-start: 3px;
+    inline-size: var(--size-knob);
+    block-size: var(--size-knob);
+    border-radius: 50%;
+    background: var(--c-input-line);
+    transition: transform var(--dur) var(--ease);
+  }
+  .c-switch:checked { background: var(--c-accent); border-color: var(--c-accent); }
+  .c-switch:checked::after { transform: translateX(var(--size-knob)); background: var(--c-accent-fg); }
+  .c-switch:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
+
+  .c-switch-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+  .c-switch-row label { display: grid; gap: 2px; min-inline-size: 0; }
+  .c-switch-row b { font-weight: var(--fw-semibold); }
+
+  .c-seg { display: inline-flex; padding: 3px; border-radius: var(--r-pill); background: var(--c-fill); }
+  .c-seg > * {
+    min-block-size: calc(var(--ctl) - 6px);
+    min-inline-size: 64px;
+    padding-inline: var(--s-4);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-pill);
+    color: var(--c-text-2);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-semibold);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .c-seg > [aria-checked="true"], .c-seg > [aria-current] { background: var(--c-surface); color: var(--c-text); box-shadow: var(--sh-1); text-decoration: none; }
+}

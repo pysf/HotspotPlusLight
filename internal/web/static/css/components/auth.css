@@ -1,0 +1,26 @@
+/* The sign-in card: the login page and the forced password change. It is a form with a head (mark, title, line). */
+@layer components {
+  .c-auth {
+    inline-size: 100%;
+    display: grid;
+    gap: var(--s-5);
+    padding: var(--auth-pad);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-xl);
+    background: var(--c-surface);
+    box-shadow: var(--sh-2);
+  }
+  .c-auth__head { display: grid; gap: var(--s-2); }
+  .c-auth__mark {
+    display: grid;
+    place-items: center;
+    inline-size: var(--size-brand-lg);
+    block-size: var(--size-brand-lg);
+    border-radius: var(--r-mark-lg);
+    background: var(--c-accent);
+    color: var(--c-accent-fg);
+  }
+  .c-auth__head h1 { font-size: var(--fs-2xl); line-height: 1.15; letter-spacing: var(--ls-h1); }
+  .c-auth__head p { color: var(--c-text-2); }
+  .c-auth__foot { justify-self: center; }
+}

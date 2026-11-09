@@ -1,12 +1,37 @@
 // One shared confirm modal. htmx asks before it sends a request that has hx-confirm;
 // we show the server-rendered text in <dialog id="confirm-modal"> instead of window.confirm.
 // Also: close buttons ([data-close]) and sheets that open and close on server events.
+// fillConfirm sets the text, title, icon and confirm button of the shared dialog from the asking element.
+// Without data-confirm-* attributes the dialog shows its defaults.
+function fillConfirm(modal, question, elt) {
+  const ok = document.getElementById("confirm-ok");
+  const icon = elt.getAttribute("data-confirm-icon") || "alert";
+  modal.querySelector("[data-confirm-text]").textContent = question;
+  document.getElementById("confirm-title").textContent = elt.getAttribute("data-confirm-title") || "Please confirm";
+  document.getElementById("confirm-icon").replaceChildren(spriteIcon(icon, "l"));
+  const label = elt.getAttribute("data-confirm-ok") || "Confirm";
+  ok.replaceChildren(...(icon === "alert" ? [] : [spriteIcon(icon, "s")]), label);
+}
+
+// spriteIcon returns an <svg> that uses an icon of the page sprite.
+function spriteIcon(name, size) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("class", "c-icon");
+  svg.setAttribute("data-size", size);
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS(ns, "use");
+  use.setAttribute("href", "#i-" + name);
+  svg.append(use);
+  return svg;
+}
+
 document.addEventListener("htmx:confirm", (e) => {
   const question = e.detail.question;
   const modal = document.getElementById("confirm-modal");
   if (!question || !modal) { return; }
   e.preventDefault();
-  modal.querySelector("[data-confirm-text]").textContent = question;
+  fillConfirm(modal, question, e.detail.elt);
   modal.returnValue = "";
   modal.showModal();
   modal.addEventListener("close", () => {
@@ -34,7 +59,7 @@ document.addEventListener("click", (e) => {
 });
 
 // The sheet: pages load a form into <dialog id="sheet"> by targeting #sheet-body. When that swap
-// brings content, set the title from its data-sheet-title and open the dialog. A fragment is one
+// brings content, set the title from its data-sheet-title (and the line under it from data-sheet-sub) and open the dialog. A fragment is one
 // root with data-sheet-title; an empty answer (a saved form) leaves the sheet as it is.
 document.body.addEventListener("htmx:afterSwap", (e) => {
   const body = e.detail.target;
@@ -44,6 +69,9 @@ document.body.addEventListener("htmx:afterSwap", (e) => {
   const title = body.querySelector("[data-sheet-title]");
   const head = document.getElementById(dlg.id + "-title");
   if (head) { head.textContent = title ? title.getAttribute("data-sheet-title") : "Details"; }
+  const sub = document.getElementById(dlg.id + "-sub");
+  const subText = title ? title.getAttribute("data-sheet-sub") || "" : "";
+  if (sub) { sub.textContent = subText; sub.hidden = subText === ""; }
   if (!dlg.open) { dlg.showModal(); }
 });
 
@@ -63,11 +91,15 @@ for (const name of ["htmx:afterSwap", "htmx:afterRequest"]) {
 // When the page's sheet host closes, empty its body, so old input never shows again.
 document.addEventListener("close", (e) => {
   if (e.target instanceof HTMLDialogElement && e.target.hasAttribute("data-sheet-host")) {
-    e.target.querySelector(".c-sheet__body")?.replaceChildren();
+    e.target.querySelector(".c-sheet__host")?.replaceChildren();
   }
 }, true);
 
 // Server events: HX-Trigger "close-sheet" closes every open sheet.
 document.body.addEventListener("close-sheet", () => {
-  for (const d of document.querySelectorAll("dialog.c-sheet[open]")) { d.close(); }
+  for (const d of document.querySelectorAll("dialog.c-sheet[open]")) {
+    // The answer is swapped in after this event; an old form left in the host would reopen the sheet.
+    d.querySelector(".c-sheet__host")?.replaceChildren();
+    d.close();
+  }
 });

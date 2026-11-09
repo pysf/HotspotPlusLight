@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Dashboard - HotspotPlus Lite</title>
-<meta name="description" content="What the Dashboard shows: who is online, traffic, failed logins, the router status, members that need attention and 3 charts.">
+<meta name="description" content="What the Dashboard shows: who is online, traffic, failed logins, the Router link card, members that need attention and 3 charts.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#09090b">
 <link rel="canonical" href="https://pysf.github.io/HotspotPlusLight/docs/dashboard/">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="HotspotPlus Lite">
 <meta property="og:title" content="Dashboard - HotspotPlus Lite">
-<meta property="og:description" content="What the Dashboard shows: who is online, traffic, failed logins, the router status, members that need attention and 3 charts.">
+<meta property="og:description" content="What the Dashboard shows: who is online, traffic, failed logins, the Router link card, members that need attention and 3 charts.">
 <meta property="og:url" content="https://pysf.github.io/HotspotPlusLight/docs/dashboard/">
 <meta property="og:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -21,7 +21,7 @@
 <meta property="og:image:alt" content="HotspotPlus Lite: Wi-Fi accounts for your MikroTik hotspot, on your own network.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Dashboard - HotspotPlus Lite">
-<meta name="twitter:description" content="What the Dashboard shows: who is online, traffic, failed logins, the router status, members that need attention and 3 charts.">
+<meta name="twitter:description" content="What the Dashboard shows: who is online, traffic, failed logins, the Router link card, members that need attention and 3 charts.">
 <meta name="twitter:image" content="https://pysf.github.io/HotspotPlusLight/assets/img/og-image.png">
 <link rel="stylesheet" href="../../assets/css/tokens.css">
 <link rel="stylesheet" href="../../assets/css/site.css">
@@ -45,25 +45,25 @@
   <a class="btn primary sm" href="../installation/">Get started</a>
 </div></header>
 <main id="main" class="docs"><div class="wrap">
-<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="./" aria-current="page">Dashboard</a><ul class="sub"><li><a href="#open">Open the Dashboard</a></li><li><a href="#tiles">The three tiles</a></li><li><a href="#router-status">Router status</a></li><li><a href="#attention">Needs attention</a></li><li><a href="#charts">The three charts</a></li><li><a href="#failed-logins">How failed logins are counted</a></li></ul></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
-<article class="doc"><span class="kick">Documentation</span><h1>Dashboard</h1><p class="intro">What the Dashboard shows: who is online, traffic, failed logins, the router status, members that need attention and 3 charts.</p>
+<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="./" aria-current="page">Dashboard</a><ul class="sub"><li><a href="#open">Open the Dashboard</a></li><li><a href="#tiles">The four tiles</a></li><li><a href="#router-status">Router link</a></li><li><a href="#attention">Needs attention</a></li><li><a href="#charts">The three charts</a></li><li><a href="#failed-logins">How failed logins are counted</a></li></ul></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
+<article class="doc"><span class="kick">Documentation</span><h1>Dashboard</h1><p class="intro">What the Dashboard shows: who is online, traffic, failed logins, the Router link card, members that need attention and 3 charts.</p>
 <section><h2 id="open"><a href="#open">Open the Dashboard</a></h2>
 <p>After you log in, the <strong>Dashboard</strong> is the first page you see. It is also the first item in the sidebar. The brand name in the top bar takes you back to it.</p>
 <p>The whole page refreshes by itself every 10 seconds, so you can leave it open. All times and days follow the <strong>Time zone</strong> setting on the <strong>Settings</strong> page. A new install has no data yet, so the lists and charts show a short message instead.</p></section>
-<section><h2 id="tiles"><a href="#tiles">The three tiles</a></h2>
-<div class="tbl" tabindex="0" role="region" aria-label="Dashboard tiles"><table><thead><tr><th scope="col">Tile</th><th scope="col">What it shows</th></tr></thead><tbody><tr><td><strong>Online now</strong></td><td>The open sessions that the router still reports. This is the same number as on the <strong>Online</strong> page, so one member on 2 devices counts twice. The tile also shows the <em>peak today</em>: the most sessions online at one moment since midnight.</td></tr><tr><td><strong>Traffic today</strong></td><td>Download plus upload since midnight. The tile compares it with yesterday and with the same weekday last week, as a percent. When the day it is compared with has no traffic, the tile shows <em>no data</em> and no percent.</td></tr><tr><td><strong>Failed logins today</strong></td><td>How many logins failed today, and the most common reason. See <a href="#failed-logins">How failed logins are counted</a>.</td></tr></tbody></table></div></section>
-<section><h2 id="router-status"><a href="#router-status">Router status</a></h2>
-<p>The <strong>Router status</strong> panel shows what the MikroTik router last sent to the server: the time and source address of the last login request, the last accounting packet and the last Disconnect result. It also shows how many packets had a wrong shared secret.</p>
-<p>The panel is kept in memory and is empty after the server restarts. Every row shows <em>never</em> until the router sends something. It used to be on the <strong>Router</strong> page. The <strong>Router</strong> page now has only the login page designs and the setup script. If the rows stay empty after a login, see <a href="../troubleshooting/#login-problems">Troubleshooting</a>.</p></section>
+<section><h2 id="tiles"><a href="#tiles">The four tiles</a></h2>
+<div class="tbl" tabindex="0" role="region" aria-label="Dashboard tiles"><table><thead><tr><th scope="col">Tile</th><th scope="col">What it shows</th></tr></thead><tbody><tr><td><strong>Online now</strong></td><td>The open sessions that the router still reports. This is the same number as on the <strong>Online now</strong> page, so one member on 2 devices counts twice.</td></tr><tr><td><strong>Peak today</strong></td><td>The most sessions online at one moment since midnight.</td></tr><tr><td><strong>Traffic today</strong></td><td>Download plus upload since midnight, so far. The tile compares it with yesterday and with the same weekday last week, as a percent. When the day it is compared with has no traffic, the tile shows <em>no data</em> and no percent.</td></tr><tr><td><strong>Failed logins today</strong></td><td>How many logins failed today, and the most common reason. See <a href="#failed-logins">How failed logins are counted</a>.</td></tr></tbody></table></div></section>
+<section><h2 id="router-status"><a href="#router-status">Router link</a></h2>
+<p>The <strong>Router link</strong> card shows what the MikroTik router last sent to the server: the time and source address of the last login request, the last accounting packet and the last Disconnect result. It also shows how many packets had a wrong shared secret. The label next to the title says <em>Healthy</em> when a login or accounting packet came in the last 5 minutes, <em>No recent packets</em> when none did, and <em>Wrong secret</em> when a packet had a wrong shared secret.</p>
+<p>The card is kept in memory and is empty after the server restarts. Every row shows <em>never</em> until the router sends something. It used to be on the <strong>Router</strong> page. The <strong>Router</strong> page now has only the login page designs and the setup script. If the rows stay empty after a login, see <a href="../troubleshooting/#login-problems">Troubleshooting</a>.</p></section>
 <section><h2 id="attention"><a href="#attention">Needs attention</a></h2>
-<p>This section has 2 short lists. Each heading shows the full count, and each list shows at most 5 members:</p>
+<p>This is one card with 2 short lists. Each list shows the full count in its title and at most 5 members. The label next to the card title shows the number of items, or <em>All clear</em>:</p>
 <ul>
 <li><strong>Expiring in 3 days</strong>: active members whose expiry time is in the next 3 days. You may want to renew them. The list uses the same rule as the <strong>Expiring soon</strong> filter on the <strong>Members</strong> page.</li>
 <li><strong>Near the data limit</strong>: members who have used 80% or more of their data in the current period. A member whose period has already ended is not listed.</li>
 </ul></section>
 <section><h2 id="charts"><a href="#charts">The three charts</a></h2>
 <ul>
-<li><strong>Traffic, last 14 days</strong>: download plus upload for all members, one bar per day. The <strong>Usage</strong> page has longer ranges and the top members.</li>
+<li><strong>Traffic, last 14 days</strong>: download plus upload for all members, one bar per day. The <strong>Usage</strong> page has 7, 30 and 90 day ranges and the top members.</li>
 <li><strong>Busy hours</strong>: for each hour of the day, the average number of people online over the last 14 days. Use it to see when the Wi-Fi is busiest. The current hour counts only for the part that has passed.</li>
 <li><strong>Active members per day</strong>: how many different members used any data on each of the last 14 days. A login with no traffic does not count.</li>
 </ul></section>
@@ -72,7 +72,7 @@
 <ul>
 <li><strong>No personal data.</strong> Only the day, the reason code and the count are stored. No user names and no addresses.</li>
 <li><strong>A retry counts once.</strong> The router repeats a request every few seconds when it gets no answer. The server remembers the last 1024 requests for 60 seconds, so it does not count a repeat of the same request again.</li>
-<li><strong>Not counted:</strong> accepted logins, and packets the server does not answer (for example, a packet with a wrong shared secret). The <a href="#router-status">Router status</a> panel counts the packets with a wrong shared secret.</li>
+<li><strong>Not counted:</strong> accepted logins, and packets the server does not answer (for example, a packet with a wrong shared secret). The <a href="#router-status">Router link</a> card counts the packets with a wrong shared secret.</li>
 <li><strong>How long it is kept.</strong> The counts are kept as long as the sessions: the <strong>Session retention (days)</strong> setting (<strong>Keep finished sessions (days)</strong> on the <strong>Settings</strong> page), 90 by default. Older counts are deleted with the old sessions. With 0 they are kept forever.</li>
 </ul></section>
 <nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../first-login/"><small>Previous</small>First login</a><a class="next" rel="next" href="../router-setup/"><small>Next</small>Router setup</a></nav></article>

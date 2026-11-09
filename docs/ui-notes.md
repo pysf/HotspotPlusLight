@@ -7,7 +7,7 @@ No Tailwind, no Node, no build step, no UI kit. The look is in `docs/DESIGN.md`.
 ## Where things are
 - `internal/web/static/css/`: `app.css` (layer order and the `@import` list), `tokens.css`, `base.css`, `layout.css`,
   `components/<name>.css`, `utilities.css`.
-- `internal/web/static/js/`: one small ES module per job (`theme`, `dialog`, `clipboard`, `toast`, `shortcuts`, `nav`, `forms`, `menu`, `print`).
+- `internal/web/static/js/`: one small ES module per job (`theme`, `dialog`, `clipboard`, `toast`, `shortcuts`, `forms`, `menu`, `password`, `print`).
 - `internal/web/static/static.go`: at startup it inlines the `@import`s of `css/app.css` into one stylesheet, hashes every asset,
   and serves them under `/admin/static/` as `name?v=hash` with `Cache-Control: public, max-age=31536000, immutable`.
   A URL without the right hash gets `no-cache`. Pages stay `no-store`.
@@ -19,7 +19,7 @@ No Tailwind, no Node, no build step, no UI kit. The look is in `docs/DESIGN.md`.
 - **Fragments by `HX-Target` only.** The list regions are `#member-list` and `#plan-list`; the one sheet is `<dialog id="sheet">` with the body `#sheet-body`.
   A GET with that `HX-Target` returns only the fragment. Anything else returns the full page. Changes (`POST`/`PUT`/`DELETE`) from the list or sheet
   answer with `HX-Trigger` (`members-changed` / `plans-changed`, `toast`, `close-sheet`) and `HX-Reswap: none`. Without the target nothing changed: redirects as before.
-- **The edit sheet is `GET /admin/members/{id}`** with `HX-Target: sheet-body` (no extra route). The member page stays for the usage summary, extra data and password.
+- **The edit sheet is `GET /admin/members/{id}`** with `HX-Target: sheet-body` (no extra route). The user name link in the list opens the same sheet (it keeps a plain `href` to the member page for no-JS). The member page stays for the usage summary, extra data and password.
 - **Lists refresh themselves.** Each list fragment holds `ui.Refresher`: a hidden element with `hx-get` (the list's current address) and
   `hx-trigger="members-changed from:body"`. No JavaScript.
 - **Search and chips.** The toolbar form has `hx-get`, `hx-push-url`, `hx-trigger="input delay:300ms, submit"`, `hx-sync="this:replace"`. The status is a hidden
@@ -30,14 +30,13 @@ No Tailwind, no Node, no build step, no UI kit. The look is in `docs/DESIGN.md`.
 - `ui.Meter` has no text inside; the figures are printed next to it. `ui.Chip` uses `aria-current="true"` (it is a link). A submit button gets `hx-disabled-elt="this"`.
 
 ## Themes
-Two themes, chosen by `data-theme` on `<html>`: `air` (default) and `air-dark` (the Dark colors with Air's shape tokens).
-The server reads the `theme` cookie (a bad value means `air`) and renders the attribute, so there is no flash.
-`theme.js` toggles it and writes the cookie. Components never name a theme; only `tokens.css` does.
+`data-theme` on `<html>` is `light`, `dark` or `auto`. The server reads the `theme` cookie (`light` or `dark`; anything else means `auto`) and renders the attribute,
+so there is no flash. With `auto` the OS decides. `theme.js` switches to the other mode and writes the cookie. Components never name a theme; only `tokens.css` does.
 
 ## Shell
-Same menu as before the redesign: Manage (Members, Batches, Online, Usage) and Setup (Plans, Router, Settings), each with an icon
-and an active state (`aria-current="page"`). The top bar has the breadcrumb, the Theme button and Log out.
-Up to 820px the sidebar is a drawer behind the menu button (`data-nav-toggle`).
+Side bar with 8 links (Dashboard, Members, Online now, Plans, Vouchers, Usage, Router, Settings), no groups. Top bar: date, Password, theme button, Log out.
+Under 1000 px the side bar is an icon rail; under 700 px a bottom tab bar (4 tabs + More menu) replaces it. See `DESIGN.md` section 5.
+Layout rule: the children of `.l-page` are spaced by its grid gap. A block that holds several children and needs the same spacing uses `.l-flow` (24 px) or `.l-stack` (16 px); do not use margins.
 
 ## Deviations from DESIGN.md and FRONTEND.md
 - **templ, not `html/template`** (O1). One templ func per component in `internal/web/ui`.
@@ -46,18 +45,17 @@ Up to 820px the sidebar is a drawer behind the menu button (`data-nav-toggle`).
   `HX-Request` on every request.
 - **Confirm modal:** the server still renders `hx-confirm` text. `dialog.js` catches `htmx:confirm` and shows one shared `<dialog>`.
   No new routes, no `window.confirm`.
-- **Two themes only:** Air and Air dark. No Light or plain Dark.
-- **The current menu is kept** (the design has two items; this app has seven).
-- **Layout classes `l-`** (shell, stack, cluster) next to the `c-` components. Responsive table-to-card rules are in `layout.css`
-  with the other breakpoints (980, 820, 560), because breakpoints may live only there.
+- **Two modes:** light and dark (plus auto), see Themes.
+- **The menu is the design's list of 8 places**, mapped to our routes (Vouchers = `/admin/batches`).
+- **Layout classes `l-`** (shell, flow, stack, cluster) next to the `c-` components. Breakpoints are 999 and 699 px, in the files of the components they change.
 - **Row menu** needs `menu.js` to place the popover next to its button (CSS anchor positioning is not wide enough yet).
 - **Pager** keeps numbered links (tests and filters use them) and adds Previous and Next.
-- Component sizes are rem tokens; px only in theme shape tokens (radii, heights) as in DESIGN.md.
+- Tokens are in px, as in the design.
 
 ## How to add a component
 1. Add a templ func in `internal/web/ui/ui.templ` (props struct if it has more than two inputs). Variants are `data-*` attributes.
 2. Add `static/css/components/<name>.css` with a `@layer components { .c-<name> ... }` block. Tokens only: no hex, no magic
-   numbers, logical properties, no `!important`, no `[data-theme]`. Add its `@import` line to `css/app.css`.
+   numbers, logical properties, no `!important`, no `[data-theme]`; sizes and colors from `tokens.css`. Add its `@import` line to `css/app.css`.
 3. Add it, in every variant and state, to `internal/web/admin/dev.templ`.
 4. Run `make generate`, then look at it with `HSP_DEV=1 make run` in both themes.
 
@@ -67,9 +65,42 @@ route in `admin.go`. Give every `<td>` a `data-label` so rows become cards on ph
 (E10.01 checks this).
 
 ## Font
-`internal/web/static/inter-latin-wght-normal.woff2` is the Latin subset, variable weight, of Inter 4 (SIL OFL 1.1, `OFL-Inter.txt`).
-`font-display: swap`; system fonts are the fallback.
+System stack only (`--font` in `tokens.css`). No font file is shipped (the Inter file was removed in design v2).
+
+## Design v2 (2026-11-09)
+The source is a design canvas, copied to `docs/design/` (`hp.css`, boards, `README.md`). Step 1 ported the foundations, the shell and every shared component.
+- **Kept from our code:** the `c-` / `l-` class names with `data-*` variants, the native `<meter>` for usage bars (no `pct-N` classes), `@media` queries instead of container queries,
+  our markup and test hooks (ids, `data-*`, aria), the `theme` cookie (values are now `light` and `dark`; none means `auto`).
+- **Renamed:** the design's status tokens `--s-ok-fg` and friends are `--st-ok-fg`, `--st-ok-bg`, `--st-ok-dot` (and warn, bad, off), because `--s-N` is our spacing scale
+  (re-mapped to the design's 4 to 64 px). `ui.Pill` now draws icon + word; `kind` "danger" of `ui.Button` is the soft red button, "danger-solid" the solid one.
+- **Product wins over the design:** brand text is "HotspotPlus Lite" (the public name); "Over quota" is not a member status; the Router page has the MikroTik default plus 7 themes.
+- **Live facts in the shell:** the date, the Online badge (open online sessions) and the router footer are filled by `pageEnv` for logged-in full pages only.
+- **Not ported:** the voucher sheet rules (`.a4`, `.vch`; ported in step 5 into `voucher.css`), the board-only helpers (`.board`, `.u-*` swatches, `.scrim`/`.layer`/`.toast-pos`
+  that only place static demos; native `<dialog>` and the fixed toast do that job), and the "Needs attention" / "Router link" screen content (later steps).
+- **Defined in CSS but not used yet** (later steps use them): `c-kv`, `c-li`, `c-group-title`, `c-icon-circle`, `c-steps`, `c-rank`, `c-rules` (list.css); the design chart classes `c-chart__grid/line/area/bar/dot/axis` (the usage and dashboard charts);
+  `c-plan`, `c-thumb`, `c-setting` (plans, router, settings); `c-bulk` (members bulk bar, step 3); `c-usage` (usage cell); `c-seg`, `c-switch` (usage range, settings); `c-form-grid`;
+  the `data-pos="top"` toast. They are shown on the dev gallery where a component exists.
+- **Review fixes (2026-11-09):** the toast has one status icon (toast.js sets the alert icon for an error); `ui.EmptyState(title, text)` has a title (h3) and children for a button; `ui.TileIcon` adds an icon to a tile label;
+  `ui.TablePaged` puts the pager inside the card; `swap.js` skips polls while hidden or with an open dialog or menu and fades only changed regions; the router footer uses the injected clock (`Deps.Clock`);
+  the meter turns warning at exactly 80 %; a submit button shows its spinner while its form request runs; `static.go` no longer rewrites `url()` in CSS (there is no font file).
+- **Step 2 (login, password, dashboard):** `c-auth` is the sign-in card (`ui.AuthHead`); the login page and the forced password change use it in the bare layout, which now loads htmx and the scripts too.
+  The forced page keeps a "Current password" field and a Log out button (the server needs the first; the shell with its Log out is gone). The rules list (`c-rules`) is `10 or more characters` and `Both passwords match`,
+  ticked live by `password.js`; the design's "a letter and a number" is not a product rule (BR-20), so it is not shown. The eye button (`ui.RevealButton`) keeps its icon (`forms.js`).
+  The dashboard has four tiles (the design's "Members" tile is not in `dashboard.Overview`; "Peak today" is its own tile), Needs attention as one card with two groups (expiring, near the data limit; no plan name, the overview has none),
+  the Router link card (`c-kv`; keeps the time, address and result of each event, the state pill is Healthy / No recent packets / Wrong secret) and three charts (`ui.Plot`: area = busy hours, bars = traffic, dots = active members; the design's
+  devices-online-24h and logins-per-day are not in the overview). Every value keeps its tooltip and `data-bar` hooks. The title, the Live line and the summary line are inside the polled fragment (region `head`).
+  The fade runs only on htmx swaps and only for regions whose content changed (`swap.js`); the first load has none.
+- **Step 3 (members):** the list has a toolbar (search, two unlabeled selects, chips), a bulk bar (`c-bulk`, hidden until a row is ticked; `forms.js` `syncBulk` sets the count and the header checkbox), and the table (`ui.TablePagedHead` takes the header cells so the first can hold the select-all checkbox).
+  Cells wrap their value in `.c-table__v`; on a phone that makes a flex row. The usage cell is `c-usage` (figures, bar, "left"). `ui.OnlineState` is the dot with its word. The row menu has icons.
+  The sheet host body is `.c-sheet__host`; a fragment that is a `ui.SheetFormPane` (form) or `ui.SheetPane` (div) with a `SheetBody` (scrolls) and a `SheetFoot` (stays at the bottom) fills it. A plain fragment (the plan form, an empty state) still scrolls inside the host with padding.
+  The add form has a mono username, a password with the eye (`ui.RevealToggle`) and Generate (`data-generate-digits`, 6 digits), plan options with limit and days, and the "Account enabled" switch row (`ui.SwitchRow`). The credentials card is `ui.NoticeTitled`, `ui.Credentials` (a Copy button per row), `ui.KeyValues` and "Copy all details"; the footer is Add another and Done (Print login details is a block button in the body since 2026-11-09).
+- **Step 4 (plans, online sessions):** a plan is a `c-card c-plan` (`PlanCard`, in `l-grid`): head with name and member count, `dl` of limits, Edit and Delete. A plan that cannot be deleted (`plan.Detail.Blocked`: members, batches or default) has an `aria-disabled` Delete and a `c-plan__why` line (`blockedReason`). The edit form is `SheetFormPane`; it shows the same reason in a warning. `Service.Details` gives every plan with its usage.
+  The online table uses `ui.TablePagedHead` and the row has a soft-danger Kick button (`ui.ConfirmAttrs` + `data-confirm-title/ok/icon`, read by `fillConfirm` in `dialog.js`). The member name comes from `ListOnlineSessions` (`Session.MemberName`). Deviations: `docs/design-plan.md` item 9.
+- **Step 5 (vouchers, usage):** the vouchers page is `BatchesPage`: `l-cols` `data-cols="1-1.5"` with the form card (`BatchFormView`) and the batch table (`ui.TablePagedHead`, `ui.IconLink`, `ui.IconButton`, `ui.Disclose` for Rename). The print page (`VoucherSheets`) stays standalone with `voucher.css` (A4, 3 x 6, `@media print`). Usage is `UsagePage`: `ui.Seg` and `ui.SegLink` (range links), three `ui.Tile`s, `UsageChartCard` (`ui.PlotWith` with `PlotWide`, `ui.PlotProps`) and `TopMembersCard` (`c-li`, `c-rank`, `ui.MeterPlain`). New CSS: `components/disclose.css`, `data-cols` "2-1" and "1-1.5" in `layout.css`, `data-wide` actions and `data-words` cells in `table.css`, `data-compact` in `meter.css`. Deviations: `docs/design-plan.md` item 10.
+- **Member sheets (design 4 and 4b, 2026-11-09):** `ui.More` and `ui.ActionRow` (`more.css`), sheet sub line (`data-sheet-sub`), plan summary line (`data-summary` / `data-summary-for`), `ui.SwitchRow` and `ui.Select` take `Attrs`. The edit sheet is `MemberEditSheet` (state card, form, More options; inputs outside the form use `form="member-form"`). Deviations: `docs/design-plan.md` item 11.
+- **Step 6 (router, settings):** `RouterPage` (cards in `l-cols` `data-cols="4"`, setup script card, upload steps with `c-steps`) and `SettingsFormView` (one form of `ui.SettingGroup` blocks). Deviations: `docs/design-plan.md` item 12.
+- **Next steps:** screens are redesigned one by one (dashboard, members, sessions, plans, vouchers, usage, router, settings, login) on top of these components.
 
 ## Not verified
-Only checked with headless Chrome screenshots (gallery, members, plan form, login) at 1280px and 500px. Nobody has used it in a
-normal browser yet. Check: keyboard (Esc closes the modal, focus returns), the nav drawer, Safari and Firefox, and the print page.
+Only checked with headless Chrome screenshots (gallery, members, plans, dashboard, router) at 1280, 900 and 390 px, light and dark. Nobody has used it in a
+normal browser yet. Check: keyboard (Esc closes the modal, focus returns), the More menu, Safari and Firefox, and the print page.

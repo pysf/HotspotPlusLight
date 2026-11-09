@@ -170,3 +170,22 @@ func (s *Store) PlanExists(ctx context.Context, id int64) (bool, error) {
 	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM plan WHERE id=?`, id).Scan(&n)
 	return n > 0, err
 }
+
+// PlanUsage returns, per plan id, how many members and batches use it. Plans without use are absent.
+func (s *Store) PlanUsage(ctx context.Context) (map[int64]domain.PlanUsage, error) {
+	rows, err := s.r.QueryContext(ctx, `SELECT id, (SELECT count(*) FROM member WHERE plan_id=plan.id), (SELECT count(*) FROM batch WHERE plan_id=plan.id) FROM plan`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]domain.PlanUsage{}
+	for rows.Next() {
+		var id int64
+		var u domain.PlanUsage
+		if err := rows.Scan(&id, &u.Members, &u.Batches); err != nil {
+			return nil, err
+		}
+		out[id] = u
+	}
+	return out, rows.Err()
+}

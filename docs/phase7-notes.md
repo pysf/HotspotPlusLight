@@ -29,3 +29,5 @@ CSV, QR codes, logo upload, PDF generation, per-batch activate/deactivate (dropp
 - **`BatchExpiry` and DST (real bug fixed).** When a DST jump skips local midnight (e.g. America/Sao_Paulo 2018-11-04, Asia/Beirut), `time.Date` returned 23:00 of the previous day. `BatchExpiry` now steps forward to the first valid instant of the target day. Table test `domain.TestBatchExpiryAcrossDST` (Berlin, New York, Sao Paulo, Tehran, Beirut).
 - **Print CSS.** Math checked: A4 with `@page margin 0`, sheet padding 10 mm, 7 rows of 1fr = about 39.6 mm each, 2 columns, 14 per sheet; `break-after: page` on every sheet but the last (`.sheet:last-of-type`, sheets are the only `section`s). Fixed: the printed sheet was exactly 297 mm high, so rounding could spill a blank trailing page; it is now 296 mm with `overflow: hidden` in `@media print`.
 - **Emptied batches persist** (documented only): kept, see `docs/open-questions.md` row 35.
+
+Note (2026-11-09): vouchers are now 18 per page, see BR-16.

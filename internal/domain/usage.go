@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 // DayFormat is the layout of a usage day key; keys sort chronologically as text.
 const DayFormat = "2006-01-02"
@@ -69,4 +72,63 @@ func FillDays(days []string, rows []UsageDay) []UsageDay {
 		out[i] = u
 	}
 	return out
+}
+
+// UsageSummary is the three figures above the usage chart.
+type UsageSummary struct {
+	Total, Average, PeakBytes int64
+	PeakDay                   string // empty when there is no traffic
+}
+
+// SummarizeUsage adds up days. The average counts every day of the range, quiet ones too. On a tie the earlier day is the peak.
+func SummarizeUsage(days []UsageDay) UsageSummary {
+	var s UsageSummary
+	for _, d := range days {
+		s.Total += d.Total()
+		if d.Total() > s.PeakBytes {
+			s.PeakBytes, s.PeakDay = d.Total(), d.Day
+		}
+	}
+	if len(days) > 0 {
+		s.Average = s.Total / int64(len(days))
+	}
+	return s
+}
+
+// ChartAxis is the vertical axis of the usage chart: three equal steps up to a round Top, in Unit.
+type ChartAxis struct {
+	Top    int64    // bytes at the top grid line; 0 when there is no traffic
+	Unit   string   // B, KB, MB, GB or TB
+	Labels []string // the four grid lines, bottom (0) to top, as numbers in Unit
+}
+
+// NewChartAxis returns a round axis for a chart whose tallest value is max (the top is never below it).
+func NewChartAxis(max int64) ChartAxis {
+	if max <= 0 {
+		return ChartAxis{Unit: "B"}
+	}
+	unit, div := "B", int64(1)
+	for _, u := range []string{"KB", "MB", "GB", "TB"} {
+		if max < div*1024 {
+			break
+		}
+		unit, div = u, div*1024
+	}
+	step := niceStep(float64(max) / float64(div) / 3)
+	a := ChartAxis{Top: int64(math.Round(step * 3 * float64(div))), Unit: unit}
+	for i := range 4 {
+		a.Labels = append(a.Labels, FormatNumber(step*float64(i)))
+	}
+	return a
+}
+
+// niceStep returns the smallest of 1, 2, 2.5 and 5 times a power of ten that is at least want.
+func niceStep(want float64) float64 {
+	for p := 0.001; ; p *= 10 {
+		for _, m := range []float64{1, 2, 2.5, 5} {
+			if m*p >= want {
+				return m * p
+			}
+		}
+	}
 }

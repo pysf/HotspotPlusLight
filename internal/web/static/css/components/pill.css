@@ -1,26 +1,55 @@
-/* Status: coloured text. data-status: active | expiring | expired | disabled. Also the online dot. */
+/* Status: icon + word + color (never color alone). data-tone: ok | warn | bad | off | info.
+   Also the online dot (filled = online, hollow ring = offline), the live indicator and the count badge. */
 @layer components {
   .c-pill {
     display: inline-flex;
     align-items: center;
-    gap: var(--s-2);
-    color: var(--muted);
-    font-size: var(--fs-small);
-    font-weight: var(--fw-medium);
+    gap: 6px;
+    block-size: var(--h-pill);
+    padding-inline: 8px 11px;
+    border-radius: var(--r-pill);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-semibold);
     white-space: nowrap;
   }
-  .c-pill[data-status="active"] { color: var(--ok); }
-  .c-pill[data-status="expiring"] { color: var(--warn); }
-  .c-pill[data-status="expired"] { color: var(--bad); }
-  .c-pill[data-status="disabled"] { color: var(--faint); }
+  .c-pill .c-icon { inline-size: var(--size-ic-pill); block-size: var(--size-ic-pill); }
+  .c-pill[data-tone="ok"], .c-icon-circle[data-tone="ok"] { background: var(--st-ok-bg); color: var(--st-ok-fg); }
+  .c-pill[data-tone="warn"], .c-icon-circle[data-tone="warn"] { background: var(--st-warn-bg); color: var(--st-warn-fg); }
+  .c-pill[data-tone="bad"], .c-icon-circle[data-tone="bad"] { background: var(--st-bad-bg); color: var(--st-bad-fg); }
+  .c-pill[data-tone="off"] { background: var(--st-off-bg); color: var(--st-off-fg); }
+  .c-pill[data-tone="info"] { background: var(--c-accent-soft); color: var(--c-accent); }
+
+  .c-icon-circle { display: grid; place-items: center; flex: none; inline-size: var(--size-icon-circle); block-size: var(--size-icon-circle); border-radius: 50%; background: var(--c-fill); }
 
   .c-dot {
     display: inline-block;
+    flex: none;
     inline-size: var(--size-dot);
     block-size: var(--size-dot);
-    border-radius: var(--r-dot);
-    box-shadow: inset 0 0 0 1px var(--faint);
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 2px var(--st-off-dot);
   }
+  .c-dot[data-on] { background: var(--st-ok-dot); box-shadow: 0 0 0 3px var(--st-ok-bg); }
+  .c-dot[data-tone="warn"] { background: var(--st-warn-dot); box-shadow: none; }
+  .c-dot[data-tone="bad"] { background: var(--st-bad-dot); box-shadow: none; }
   .c-pill + .c-dot { margin-inline-start: var(--s-3); }
-  .c-dot[data-on] { background: var(--ok); box-shadow: none; }
+
+  .c-live { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--c-text-3); font-size: var(--fs-sm); }
+  .c-live .c-dot[data-on] { animation: c-breathe 2.6s ease-in-out infinite; }
+  @keyframes c-breathe { 50% { box-shadow: 0 0 0 5px transparent; } }
+
+  .c-badge {
+    display: inline-grid;
+    place-items: center;
+    min-inline-size: var(--size-badge);
+    block-size: var(--size-badge);
+    padding-inline: 7px;
+    border-radius: var(--r-pill);
+    background: var(--c-fill-2);
+    color: var(--c-text);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-semibold);
+    font-variant-numeric: tabular-nums;
+  }
+  .c-badge[hidden] { display: none; }
 }

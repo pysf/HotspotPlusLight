@@ -1,25 +1,29 @@
-/* Input with a leading search icon and a "/" hint. */
+/* Pill input with a leading search icon and a "/" key hint. */
 @layer components {
   .c-search { position: relative; flex: 1 1 var(--w-select); max-inline-size: var(--w-search); }
-  .c-search .c-input { padding-inline: var(--s-9) var(--s-9); }
+  .c-search .c-input { padding-inline-start: 42px; padding-inline-end: var(--s-7); border-radius: var(--r-pill); }
   .c-search__icon {
     position: absolute;
     inset-block-start: 50%;
-    inset-inline-start: var(--s-3);
+    inset-inline-start: var(--input-pad-x);
     translate: 0 -50%;
-    color: var(--faint);
+    color: var(--c-text-3);
     pointer-events: none;
   }
   .c-search__hint {
     position: absolute;
     inset-block-start: 50%;
-    inset-inline-end: var(--s-3);
+    inset-inline-end: var(--input-pad-x);
     translate: 0 -50%;
-    padding: 0 var(--s-1h);
-    border: 1px solid var(--line-strong);
+    padding: 0 6px;
+    border: 1px solid var(--c-line-strong);
     border-radius: var(--s-1);
-    color: var(--faint);
-    font-size: var(--fs-small);
+    color: var(--c-text-3);
+    font-size: var(--fs-xs);
     pointer-events: none;
+  }
+  @media (max-width: 699px) {
+    .c-search { flex-basis: 100%; max-inline-size: none; }
+    .c-search__hint { display: none; }
   }
 }

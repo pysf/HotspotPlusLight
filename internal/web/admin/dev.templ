@@ -19,9 +19,12 @@ templ DevComponentsPage(l ui.LayoutData) {
 		@galleryItem("Button") {
 			@ui.Button("secondary", "Default", nil)
 			@ui.Button("primary", "Primary", nil)
-			@ui.Button("danger", "Danger", nil)
+			@ui.Button("danger", "Delete (soft)", nil)
+			@ui.Button("danger-solid", "Kick device", nil)
 			@ui.Button("ghost", "Ghost", nil)
 			@ui.Button("secondary", "Disabled", templ.Attributes{"disabled": true})
+			@ui.Button("primary", "Loading", templ.Attributes{"data-loading": true})
+			@ui.Button("secondary", "Small", templ.Attributes{"data-size": "sm"})
 			@ui.LinkButton("secondary", "#", "Link button", nil)
 		}
 		@galleryItem("Button, block") {
@@ -31,8 +34,9 @@ templ DevComponentsPage(l ui.LayoutData) {
 		}
 		@galleryItem("Icon button") {
 			@ui.IconButton("plus", "Add", nil)
-			@ui.IconButton("close", "Close", nil)
+			@ui.IconButton("x", "Close", nil)
 			@ui.IconButton("copy", "Copy", nil)
+			@ui.IconButton("more", "Disabled", templ.Attributes{"disabled": true})
 		}
 		@galleryItem("Field, input, select") {
 			<div class="l-stack l-narrow">
@@ -40,6 +44,30 @@ templ DevComponentsPage(l ui.LayoutData) {
 				@ui.Field(ui.FieldProps{Label: "With error", Name: "g_err", Value: "x", Error: "This value is not valid."})
 				@ui.Select(ui.SelectProps{Label: "Plan", Name: "g_plan", Value: "b", Options: []ui.Option{{Value: "a", Label: "Basic"}, {Value: "b", Label: "Premium"}}})
 				@ui.Checkbox(ui.CheckboxProps{Label: "Active", Name: "g_active", Checked: true})
+			</div>
+		}
+		@galleryItem("Checkbox, switch, segmented control") {
+			<label class="c-choice"><span class="c-hit"><input type="checkbox" class="c-check"/></span> Off</label>
+			<label class="c-choice"><span class="c-hit"><input type="checkbox" class="c-check" checked/></span> On</label>
+			<label class="c-choice"><span class="c-hit"><input type="checkbox" class="c-check" checked disabled/></span> Disabled</label>
+			<label class="c-choice"><input type="checkbox" class="c-switch" role="switch"/> Off</label>
+			<label class="c-choice"><input type="checkbox" class="c-switch" role="switch" checked/> On</label>
+			<label class="c-choice"><input type="checkbox" class="c-switch" role="switch" disabled/> Disabled</label>
+			<div class="l-narrow">
+				@ui.SwitchRow(ui.CheckboxProps{Label: "Account enabled", Name: "g_enabled", Checked: true, Hint: "Turning it off disconnects the member's open sessions."})
+			</div>
+			@ui.Seg("Range") {
+				@ui.SegLink("7 days", "#", false, nil)
+				@ui.SegLink("30 days", "#", true, nil)
+				@ui.SegLink("90 days", "#", false, nil)
+			}
+		}
+		@galleryItem("Input states") {
+			<div class="l-stack l-narrow">
+				<input class="c-input is-hover" value="Hover" aria-label="Hover"/>
+				<input class="c-input is-focus" value="Focus" aria-label="Focus"/>
+				<input class="c-input" value="Disabled" aria-label="Disabled" disabled/>
+				<input class="c-input" value="Error" aria-label="Error" aria-invalid="true"/>
 			</div>
 		}
 		@galleryItem("Search") {
@@ -57,14 +85,25 @@ templ DevComponentsPage(l ui.LayoutData) {
 			@ui.Flash("ok", "Saved.")
 			@ui.Flash("warn", "Check this.")
 			@ui.Flash("error", "Something failed.")
+			@ui.Flash("info", "Good to know.")
 		}
 		@galleryItem("Pill and online dot") {
 			@ui.Pill("active", "Active")
 			@ui.Pill("expiring", "Expiring")
 			@ui.Pill("expired", "Expired")
 			@ui.Pill("disabled", "Disabled")
+			@ui.Pill("info", "Info")
 			@ui.OnlineDot(true)
 			@ui.OnlineDot(false)
+			@ui.LiveStatus("Live, updated 4 s ago")
+			<span class="c-badge u-nums">24</span>
+		}
+		@galleryItem("Meter (plain, for rank lists)") {
+			<div class="l-narrow l-stack">
+				@ui.MeterPlain(100, 100, "First")
+				@ui.MeterPlain(60, 100, "Second")
+				@ui.MeterPlain(15, 100, "Tenth")
+			</div>
 		}
 		@galleryItem("Meter") {
 			<div class="l-narrow">
@@ -120,40 +159,97 @@ templ DevComponentsPage(l ui.LayoutData) {
 				</tr>
 			}
 		}
-		@galleryItem("Pager") {
-			@ui.Pagination(ui.PageProps{Page: 2, Pages: 5, Href: galleryHref})
+		@galleryItem("Table with pager") {
+			@ui.TablePaged("Pager sample", []string{"Name"}, ui.PageProps{Page: 2, Pages: 5, Href: galleryHref, Total: 48, Per: 10}) {
+				<tr><td data-label="Name">alice</td></tr>
+			}
 		}
-		@galleryItem("Empty") {
-			@ui.EmptyState("Nothing here yet.")
+		@galleryItem("Empty, skeleton") {
+			@ui.EmptyState("Nothing here yet", "Things you add will show up here.") {
+				@ui.Button("secondary", "Add one", nil)
+			}
+			<div class="c-card l-stack u-grow" data-pad aria-busy="true">
+				<div class="c-skel" data-w="40"></div>
+				<div class="c-skel"></div>
+				<div class="c-skel" data-w="80"></div>
+				<div class="c-skel" data-size="lg"></div>
+			</div>
+		}
+		@galleryItem("List rows, key and value, steps") {
+			<div class="c-card l-narrow" data-pad>
+				<h3 class="c-group-title">Expiring soon</h3>
+				<div class="c-li">
+					<span class="c-icon-circle" data-tone="warn">
+						@ui.IconAs("clock", "s", "")
+					</span>
+					<div class="u-grow">
+						<b>room204</b>
+						<small>Premium 10 GB</small>
+					</div>
+					@ui.Pill("expiring", "2 days left")
+				</div>
+				<dl class="c-kv">
+					<div><dt>Last login request</dt><dd>12 s ago</dd></div>
+					<div><dt>Last accounting packet</dt><dd>8 s ago</dd></div>
+				</dl>
+				<ol class="c-steps">
+					<li>Download the pages.</li>
+					<li>Upload them to the router.</li>
+				</ol>
+			</div>
 		}
 		@galleryItem("Menu, sheet, modal, toast") {
 			@ui.Menu("g-menu", "More") {
-				@ui.MenuItem("Edit", false, nil)
-				@ui.MenuItem("Renew", false, nil)
+				@ui.MenuItemIcon("edit", "Edit", false, nil)
+				@ui.MenuItemIcon("clock", "Renew", false, nil)
 				@ui.MenuSep()
-				@ui.MenuItem("Delete", true, nil)
+				@ui.MenuItemIcon("trash", "Delete", true, nil)
 			}
 			@ui.Button("secondary", "Open sheet", templ.Attributes{"data-open-dialog": "g-sheet"})
 			@ui.Button("secondary", "Open modal", templ.Attributes{"data-open-dialog": "g-modal"})
 			@ui.Button("secondary", "Confirm (hx-confirm)", templ.Attributes{"hx-get": "/admin/dev/components", "hx-confirm": "Do the thing?", "hx-swap": "none"})
 			@ui.Button("secondary", "Show toast", templ.Attributes{"data-toast": "Saved."})
+			@ui.Button("secondary", "Show error toast", templ.Attributes{"data-toast": "Could not save. Try again.", "data-toast-kind": "error"})
+		}
+		@galleryItem("Notice with a title") {
+			<div class="l-narrow">
+				@ui.NoticeTitled("ok", "alice is ready", "Give these details to the guest.")
+			</div>
 		}
 		@galleryItem("Credentials") {
 			<div class="l-narrow">
-				@ui.Credentials([]ui.CredRow{{Label: "Username", Value: "alice"}, {Label: "Password", Value: "493021"}, {Label: "Plan", Value: "Premium"}}, "Username: alice\nPassword: 493021")
+				@ui.Credentials([]ui.CredRow{{Label: "Username", Value: "alice"}, {Label: "Password", Value: "493021"}})
+				@ui.KeyValues([]ui.CredRow{{Label: "Plan", Value: "Premium"}, {Label: "Valid until", Value: "No expiry"}})
 			</div>
 		}
 		@galleryItem("Credentials in a sheet (after a member is created)") {
 			@ui.Button("secondary", "Open sheet", templ.Attributes{"data-open-dialog": "g-cred-sheet"})
 		}
 		@galleryItem("Code block") {
-			<div class="l-narrow">
+			<div class="l-narrow l-stack">
+				@ui.ButtonIcon("secondary", "copy", "Copy script", templ.Attributes{"type": "button", "data-size": "sm", "data-copy-target": "g-code"})
 				@ui.CodeBlock("g-code", "/ip hotspot print")
 			</div>
 		}
-		@galleryItem("Bar chart") {
-			<div class="l-narrow">
-				@ui.BarChart([]ui.Bar{{Label: "Mon", Value: 3}, {Label: "Tue", Value: 8}, {Label: "Wed", Value: 5}, {Label: "Thu", Value: 10}}, 10, "sample")
+		@galleryItem("Wide plot (usage chart)") {
+			<div class="c-card" data-pad>
+				@ui.PlotWith(ui.PlotProps{Kind: ui.PlotWide, Bars: galleryBars(30, "1 Nov"), Top: 12, Label: "Wide sample", YLabels: []string{"0", "4", "8", "12"}, PeakLabel: "10 GB"})
+			</div>
+		}
+		@galleryItem("Plots (dashboard charts)") {
+			<div class="l-cols" data-cols="3">
+				<div class="c-card" data-pad>
+					<div class="c-card__head"><h2 class="c-card__title">Area</h2></div>
+					@ui.Plot(ui.PlotArea, galleryBars(24, "00:00"), 10, "Area sample")
+				</div>
+				<div class="c-card" data-pad>
+					<div class="c-card__head"><h2 class="c-card__title">Bars</h2></div>
+					@ui.Plot(ui.PlotBars, galleryBars(7, "Mon"), 10, "Bar sample")
+				</div>
+				<div class="c-card" data-pad>
+					<div class="c-card__head"><h2 class="c-card__title">Dots</h2></div>
+					@ui.Plot(ui.PlotDots, galleryBars(7, "Mon"), 10, "Dot sample")
+				</div>
 			</div>
 		}
 		@galleryItem("Tiles") {
@@ -169,7 +265,7 @@ templ DevComponentsPage(l ui.LayoutData) {
 			}
 		}
 		@galleryItem("Icons") {
-			for _, n := range []string{"home", "users", "ticket", "wifi", "chart", "layers", "router", "settings", "logout", "menu", "search", "plus", "more", "sun", "close", "copy", "check"} {
+			for _, n := range []string{"home", "users", "wifi", "layers", "ticket", "chart", "router", "settings", "key", "sun", "moon", "logout", "more", "check-circle", "clock", "alert", "arrow-down", "arrow-up", "chevron-right", "chevron-left", "chevron-down", "printer", "plus", "eye", "wand", "trash", "copy", "x", "slash", "search", "power", "info", "edit", "download", "circle"} {
 				@ui.Icon(n)
 			}
 		}
@@ -193,9 +289,7 @@ templ DevComponentsPage(l ui.LayoutData) {
 			}
 		}
 		@ui.Sheet("g-cred-sheet", "Member created") {
-			@ui.SheetBody() {
-				@MemberCreated(createdVM{Username: "alice", Password: "493021", Plan: "Premium", Expires: "No expiry"})
-			}
+			@MemberCreated(createdVM{ID: 1, Username: "alice", Password: "493021", Plan: "Premium", Expires: "No expiry", Devices: "2"})
 		}
 		@ui.Modal("g-modal", "Delete member?", "This cannot be undone.") {
 			@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
@@ -206,3 +300,12 @@ templ DevComponentsPage(l ui.LayoutData) {
 
 // galleryHref returns the anchor link to gallery page n.
 func galleryHref(n int) string { return "#page-" + string(rune('0'+n)) }
+
+// galleryBars returns n sample values for the plot samples of the gallery.
+func galleryBars(n int, label string) []ui.Bar {
+	out := make([]ui.Bar, n)
+	for i := range out {
+		out[i] = ui.Bar{Label: label, Value: int64(2 + (i*7)%9), Tip: "sample"}
+	}
+	return out
+}

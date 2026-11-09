@@ -57,7 +57,7 @@ func (q Quota) TimeText() string {
 	return FormatMinutes(q.UsedSeconds) + " / " + FormatMinutes(q.AllowedSeconds) + " (" + FormatMinutes(q.RemainingSecs) + " left)"
 }
 
-// FormatSize prints a byte count in the unit that fits it: B, KB, MB or GB (online list).
+// FormatSize prints a byte count in the unit that fits it: B, KB, MB, GB or TB.
 func FormatSize(b int64) string {
 	switch {
 	case b < 1024:
@@ -66,8 +66,10 @@ func FormatSize(b int64) string {
 		return FormatBytes(b, "KB")
 	case b < 1024*1024*1024:
 		return FormatBytes(b, "MB")
+	case b < 1<<40:
+		return FormatBytes(b, "GB")
 	}
-	return FormatBytes(b, "GB")
+	return FormatNumber(float64(b)/(1<<40)) + " TB"
 }
 
 // FormatDuration prints seconds as "30 s", "5 min 03 s" or "2 h 05 min".

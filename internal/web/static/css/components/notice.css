@@ -1,13 +1,17 @@
-/* Message box. data-kind: ok | warn | error. */
+/* Inline message with an icon. data-kind: ok | warn | error | info. */
 @layer components {
   .c-notice {
-    margin-block-end: var(--s-4);
-    padding: var(--s-3) var(--s-4);
-    border-radius: var(--r-ctl);
-    background: var(--elev);
-    box-shadow: inset 0 0 0 1px var(--line-strong);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    padding: 14px var(--s-4);
+    border-radius: var(--r-md);
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
   }
-  .c-notice[data-kind="ok"] { box-shadow: inset 0 0 0 1px var(--ok); }
-  .c-notice[data-kind="warn"] { box-shadow: inset 0 0 0 1px var(--warn); }
-  .c-notice[data-kind="error"] { box-shadow: inset 0 0 0 1px var(--bad); color: var(--bad); }
+  .c-notice > .c-icon { margin-block-start: 1px; }
+  .c-notice b { display: block; font-weight: var(--fw-semibold); }
+  .c-notice[data-kind="ok"] { background: var(--st-ok-bg); color: var(--st-ok-fg); }
+  .c-notice[data-kind="warn"] { background: var(--st-warn-bg); color: var(--st-warn-fg); }
+  .c-notice[data-kind="error"] { background: var(--st-bad-bg); color: var(--st-bad-fg); }
 }

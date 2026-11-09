@@ -1,23 +1,31 @@
-/* Usage bar on a native <meter>. Accent below 80%, warn from 80%, bad at 100%. */
+/* Usage bar on a native <meter>: accent below 80%, warning from 80%, red when full (low and high are set by ui.Meter). */
 @layer components {
   .c-meter {
     appearance: none;
     display: block;
-    margin-block-end: var(--s-1);
     inline-size: 100%;
     min-inline-size: var(--w-meter);
     block-size: var(--h-meter);
+    margin-block-end: 6px;
     border: 0;
     border-radius: var(--r-pill);
-    background: var(--line-strong);
+    background: var(--c-fill-2);
     overflow: hidden;
   }
-  .c-meter::-webkit-meter-bar { background: var(--line-strong); border: 0; block-size: var(--h-meter); }
-  .c-meter::-webkit-meter-optimum-value { background: var(--accent); border-radius: var(--r-pill); }
-  .c-meter::-webkit-meter-suboptimum-value { background: var(--warn); border-radius: var(--r-pill); }
-  .c-meter::-webkit-meter-even-less-good-value { background: var(--bad); border-radius: var(--r-pill); }
-  .c-meter::-moz-meter-bar { background: var(--accent); border-radius: var(--r-pill); }
-  .c-meter:-moz-meter-sub-optimum::-moz-meter-bar { background: var(--warn); }
-  .c-meter:-moz-meter-sub-sub-optimum::-moz-meter-bar { background: var(--bad); }
-  .c-meter-label { margin-block-end: var(--s-1h); color: var(--muted); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+  .c-meter::-webkit-meter-bar { background: var(--c-fill-2); border: 0; border-radius: var(--r-pill); block-size: var(--h-meter); }
+  .c-meter::-webkit-meter-optimum-value { background: var(--c-accent); border-radius: var(--r-pill); }
+  .c-meter::-webkit-meter-suboptimum-value { background: var(--st-warn-dot); border-radius: var(--r-pill); }
+  .c-meter::-webkit-meter-even-less-good-value { background: var(--st-bad-dot); border-radius: var(--r-pill); }
+  .c-meter::-moz-meter-bar { background: var(--c-accent); border-radius: var(--r-pill); }
+  .c-meter:-moz-meter-sub-optimum::-moz-meter-bar { background: var(--st-warn-dot); }
+  .c-meter:-moz-meter-sub-sub-optimum::-moz-meter-bar { background: var(--st-bad-dot); }
+
+  .c-usage { display: grid; gap: 6px; min-inline-size: var(--w-usage); max-inline-size: var(--w-usage-max); color: var(--c-text-2); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+  .c-usage[data-compact] { min-inline-size: var(--w-usage-s); }
+  .c-usage .c-meter { margin-block-end: 0; }
+  .c-usage strong { color: var(--c-text); font-weight: var(--fw-semibold); }
+
+  @media (max-width: 699px) {
+    .c-usage { min-inline-size: 0; inline-size: 60%; }
+  }
 }

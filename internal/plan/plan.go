@@ -21,6 +21,7 @@ type Repo interface {
 	UpdatePlan(ctx context.Context, p domain.Plan, now time.Time) error
 	DeletePlan(ctx context.Context, id int64) error
 	CountMembersOnPlan(ctx context.Context, id int64) (int, error)
+	PlanUsage(ctx context.Context) (map[int64]domain.PlanUsage, error)
 	IsDefaultPlan(ctx context.Context, id int64) (bool, error)
 }
 
@@ -33,23 +34,57 @@ type Service struct {
 // New returns a Service.
 func New(repo Repo, c clock.Clock) *Service { return &Service{repo: repo, clock: c} }
 
-// Detail is a plan with the number of members using it.
+// Detail is a plan with the number of members using it. Details also fills Batches and Default.
 type Detail struct {
 	Plan    domain.Plan
 	Members int
+	Batches int  // batches that hold the plan
+	Default bool // the plan is the default plan
 }
+
+// Blocked reports whether the plan cannot be deleted.
+func (d Detail) Blocked() bool { return d.Members > 0 || d.Batches > 0 || d.Default }
 
 // List returns all plans.
 func (s *Service) List(ctx context.Context) ([]domain.Plan, error) { return s.repo.ListPlans(ctx) }
 
-// Get returns the plan and its member count, or domain.ErrNotFound.
+// Details returns all plans with their usage, for the plan cards.
+func (s *Service) Details(ctx context.Context) ([]Detail, error) {
+	plans, err := s.repo.ListPlans(ctx)
+	if err != nil {
+		return nil, err
+	}
+	use, err := s.repo.PlanUsage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Detail, len(plans))
+	for i, p := range plans {
+		def, err := s.repo.IsDefaultPlan(ctx, p.ID)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = Detail{Plan: p, Members: use[p.ID].Members, Batches: use[p.ID].Batches, Default: def}
+	}
+	return out, nil
+}
+
+// Get returns the plan with its usage, or domain.ErrNotFound.
 func (s *Service) Get(ctx context.Context, id int64) (Detail, error) {
 	p, err := s.repo.GetPlan(ctx, id)
 	if err != nil {
 		return Detail{}, err
 	}
 	n, err := s.repo.CountMembersOnPlan(ctx, id)
-	return Detail{Plan: p, Members: n}, err
+	if err != nil {
+		return Detail{}, err
+	}
+	use, err := s.repo.PlanUsage(ctx)
+	if err != nil {
+		return Detail{}, err
+	}
+	def, err := s.repo.IsDefaultPlan(ctx, id)
+	return Detail{Plan: p, Members: n, Batches: use[id].Batches, Default: def}, err
 }
 
 // Create validates and stores a plan and returns its id. A non-empty FieldErrors means nothing was stored.
