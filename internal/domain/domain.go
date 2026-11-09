@@ -4,6 +4,7 @@ package domain
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 )
@@ -35,6 +36,23 @@ const (
 	MinAdminPasswordLen   = 10 // characters
 	MaxAdminPasswordBytes = 72 // the bcrypt limit
 )
+
+// Admin username limits.
+const (
+	MinAdminUsernameLen = 4
+	MaxAdminUsernameLen = 32
+)
+
+var adminUsernameRE = regexp.MustCompile(`^[A-Za-z0-9.-]+$`)
+
+// ValidateAdminUsername checks an admin username: 4 to 32 letters, numbers, dots or dashes.
+// The caller trims the input first.
+func ValidateAdminUsername(username string) error {
+	if len(username) < MinAdminUsernameLen || len(username) > MaxAdminUsernameLen || !adminUsernameRE.MatchString(username) {
+		return errors.New("username must be 4 to 32 letters, numbers, dots or dashes")
+	}
+	return nil
+}
 
 // ValidateAdminPassword enforces BR-20: at least 10 characters, at most 72 bytes,
 // not the username, not "admin", not a common password. No character-class rules.

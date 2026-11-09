@@ -208,7 +208,7 @@ templ MemberRow(m memberVM) {
 	<tr data-member data-id={ strconv.FormatInt(m.ID, 10) } data-username={ m.Username } data-status={ m.Status } data-verdict={ m.VerdictCode } data-online={ strconv.FormatBool(m.Online) }>
 		<td data-slot="select"><label class="c-hit"><input type="checkbox" class="c-check" aria-label={ "Select " + m.Username } name="id" value={ strconv.FormatInt(m.ID, 10) }/></label></td>
 		<td data-label="Username">
-			<a class="c-table__main" href={ templ.SafeURL(memberURL(m.ID)) }>{ m.Username }</a>
+			<a class="c-table__main" href={ templ.SafeURL(memberURL(m.ID)) } { sheetOpen(memberURL(m.ID))... }>{ m.Username }</a>
 			if sub := m.Sub(); sub != "" {
 				<div class="c-table__sub">{ sub }</div>
 			}

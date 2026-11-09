@@ -36,7 +36,9 @@ type AuthService interface {
 	Authenticate(ctx context.Context, token string) (csrf string, found bool, err error)
 	Logout(ctx context.Context, token string) error
 	MustChangePassword(ctx context.Context) (bool, error)
-	ChangePassword(ctx context.Context, token, clientKey, current, next, confirm string) (domain.FieldErrors, error)
+	AdminUsername(ctx context.Context) (string, error)
+	ChangePassword(ctx context.Context, token, clientKey, username, current, next, confirm string) (domain.FieldErrors, error)
+	ChangeUsername(ctx context.Context, token, clientKey, username, current string) (domain.FieldErrors, error)
 }
 
 // PlanService is the plan part of internal/plan.
@@ -137,6 +139,7 @@ func Handler(d Deps) http.Handler {
 				r.Post("/logout", h.logout)
 				r.Get("/password", h.passwordPage)
 				r.Put("/password", h.passwordChange)
+				r.Put("/password/username", h.usernameChange)
 				r.Route("/members", func(r chi.Router) {
 					r.Get("/", h.members)
 					r.Post("/", h.memberCreate)

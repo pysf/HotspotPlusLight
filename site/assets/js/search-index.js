@@ -130,19 +130,19 @@ export default [
   "page": "First login",
   "heading": "Log in",
   "url": "docs/first-login/#login",
-  "keywords": "Open . Once your password is set, the admin panel opens on the Dashboard . On the first start the account is admin with the password admin (you can change the user name with HSP_ADMIN_USERNAME before the first start). The first-start block printed by the serve"
+  "keywords": "Open . Once your password is set, the admin panel opens on the Dashboard . On the first start the account is admin with the password admin (you can set another user name with HSP_ADMIN_USERNAME before the first start, or change it later on the Password and use"
  },
  {
   "page": "First login",
   "heading": "Set a new password",
   "url": "docs/first-login/#password",
-  "keywords": "After you log in you are sent to the password page. No other page opens until you set a new password. The rules: At least 10 characters, and at most 72 bytes. Not your user name, not admin , and not a very common password. No other rules, so a long phrase is f"
+  "keywords": "After you log in you are sent to the password page. No other page opens until you set a new password. The page also has a Username field with the current name. Keep admin or type your own: 4 to 32 letters, numbers, dots or dashes. The server saves the new name"
  },
  {
   "page": "First login",
   "heading": "If you forget it",
   "url": "docs/first-login/#forgot",
-  "keywords": "Reset it from the command line of the server. It asks twice without echo, uses the same rules as the page, and ends every open admin session: hotspotpluslight admin set-password With the source code, make set-password does the same for the ./data database. Use"
+  "keywords": "Reset it from the command line of the server. It asks twice without echo, uses the same rules as the page, and ends every open admin session. It does not change the user name: hotspotpluslight admin set-password With the source code, make set-password does the"
  },
  {
   "page": "First login",

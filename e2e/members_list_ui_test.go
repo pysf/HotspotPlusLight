@@ -269,6 +269,10 @@ func TestE10_13_RowsAndMenu(t *testing.T) {
 	}
 	chk("Edit", "hx-get", "/admin/members/"+id)
 	chk("Edit", "hx-target", "#sheet-body")
+	// The username opens the same edit sheet. The link still goes to the detail page without JavaScript.
+	if name := row.Find("a.c-table__main"); name.AttrOr("hx-get", "") != "/admin/members/"+id || name.AttrOr("hx-target", "") != "#sheet-body" || name.AttrOr("href", "") != "/admin/members/"+id {
+		t.Errorf("the username link must open the edit sheet: hx-get %q, hx-target %q", name.AttrOr("hx-get", ""), name.AttrOr("hx-target", ""))
+	}
 	chk("Renew", "hx-post", "/admin/members/"+id+"/renewals")
 	chk("Disable", "hx-post", "/admin/members/"+id+"/toggle")
 	chk("Disconnect", "hx-post", "/admin/members/"+id+"/disconnections")

@@ -19,7 +19,7 @@ No Tailwind, no Node, no build step, no UI kit. The look is in `docs/DESIGN.md`.
 - **Fragments by `HX-Target` only.** The list regions are `#member-list` and `#plan-list`; the one sheet is `<dialog id="sheet">` with the body `#sheet-body`.
   A GET with that `HX-Target` returns only the fragment. Anything else returns the full page. Changes (`POST`/`PUT`/`DELETE`) from the list or sheet
   answer with `HX-Trigger` (`members-changed` / `plans-changed`, `toast`, `close-sheet`) and `HX-Reswap: none`. Without the target nothing changed: redirects as before.
-- **The edit sheet is `GET /admin/members/{id}`** with `HX-Target: sheet-body` (no extra route). The member page stays for the usage summary, extra data and password.
+- **The edit sheet is `GET /admin/members/{id}`** with `HX-Target: sheet-body` (no extra route). The user name link in the list opens the same sheet (it keeps a plain `href` to the member page for no-JS). The member page stays for the usage summary, extra data and password.
 - **Lists refresh themselves.** Each list fragment holds `ui.Refresher`: a hidden element with `hx-get` (the list's current address) and
   `hx-trigger="members-changed from:body"`. No JavaScript.
 - **Search and chips.** The toolbar form has `hx-get`, `hx-push-url`, `hx-trigger="input delay:300ms, submit"`, `hx-sync="this:replace"`. The status is a hidden

@@ -109,8 +109,11 @@ func TestAdminSessions(t *testing.T) {
 	}
 	s.InsertAdminSession(ctx, "k1", "c", 100, 1000)
 	s.InsertAdminSession(ctx, "k2", "c", 100, 1000)
-	if err := s.ChangeAdminPassword(ctx, "h3", 700, "k1"); err != nil {
+	if err := s.ChangeAdminPassword(ctx, "h3", "boss1", 700, "k1"); err != nil {
 		t.Fatal(err)
+	}
+	if a, _ := s.GetAdmin(ctx); a.Username != "boss1" {
+		t.Fatal("username not stored")
 	}
 	if _, ok, _ := s.TouchAdminSession(ctx, "k1", 701, 800); !ok {
 		t.Fatal("kept session was deleted")

@@ -17,7 +17,7 @@ templ LoginPage(username, errMsg string) {
 			if errMsg != "" {
 				@ui.ErrorFragment(errMsg)
 			}
-			@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: username, Attrs: templ.Attributes{"autocomplete": "username", "autofocus": true}})
+			@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: username, Attrs: templ.Attributes{"autocomplete": "username", "autofocus": true, "autocapitalize": "none", "spellcheck": "false"}})
 			@ui.FieldPair(ui.PairProps{Label: "Password", For: "password"}) {
 				@ui.InputControl(ui.FieldProps{Name: "password", Type: "password", Attrs: templ.Attributes{"autocomplete": "current-password"}})
 				@ui.RevealButton("password")
@@ -358,15 +358,16 @@ templ SettingsFormView(p SettingsProps) {
 	</form>
 }
 
-// PasswordProps holds what the admin password form shows.
+// PasswordProps holds what the admin password and username forms show.
 type PasswordProps struct {
 	Errors    domain.FieldErrors
-	Forced    bool // the first-start password admin/admin is still in use
+	Forced    bool   // the first-start password admin/admin is still in use
+	Username  string // the admin name shown in the username field
 	Throttled bool
 }
 
-// PasswordPage shows the change-password form. Forced is true until the first-start password is changed.
-// Then the page is the sign-in card alone, because every other page is closed.
+// PasswordPage shows the password and username forms. Forced is true until the first-start password is changed.
+// Then the page is the sign-in card alone, because every other page is closed, and the username field is part of it.
 templ PasswordPage(l ui.LayoutData, p PasswordProps) {
 	if p.Forced {
 		@ui.Layout(ui.LayoutData{Title: "Set a new password", Bare: true, CSRF: l.CSRF}) {
@@ -375,18 +376,25 @@ templ PasswordPage(l ui.LayoutData, p PasswordProps) {
 		}
 	} else {
 		@ui.Layout(l) {
-			@ui.PageHeader("Admin password")
-			@PasswordFormView(p)
+			@ui.PageHeaderSub("Password and username", "Your own sign-in details for this admin page.")
+			<div class="l-flow">
+				@ui.SettingGroup("Username", "What you type to sign in.") {
+					@UsernameFormView(p)
+				}
+				@ui.SettingGroup("Password", "Pick something long. Generate makes one for you.") {
+					@PasswordFormView(PasswordProps{})
+				}
+			</div>
 		}
 	}
 }
 
-// passwordFormClass is the look of the password form: the sign-in card, or a normal form card.
-func passwordFormClass(forced bool) string {
+// passwordFormAttrs is the look of the password form: the sign-in card, or the inside of a setting card.
+func passwordFormAttrs(forced bool) templ.Attributes {
 	if forced {
-		return "c-auth"
+		return templ.Attributes{"class": "c-auth"}
 	}
-	return "c-card c-form l-narrow"
+	return templ.Attributes{"class": "c-form", "data-flush": true}
 }
 
 // passwordSaveLabel is the text of the save button.
@@ -394,15 +402,30 @@ func passwordSaveLabel(forced bool) string {
 	if forced {
 		return "Save and continue"
 	}
-	return "Change password"
+	return "Save password"
+}
+
+// UsernameFormView is the change-username form and the PUT response body for 422 and 429.
+templ UsernameFormView(p PasswordProps) {
+	<form id="username-form" class="c-form" data-flush hx-put="/admin/password/username" hx-target="this" hx-swap="outerHTML">
+		if p.Throttled {
+			@ui.ErrorFragment("Too many failed attempts. Try again in a minute.")
+		}
+		@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: p.Username, Error: p.Errors["username"], Hint: "4 to 32 letters, numbers, dot or dash.", Attrs: templ.Attributes{"autocomplete": "username", "autocapitalize": "none", "spellcheck": "false"}})
+		@ui.Field(ui.FieldProps{Label: "Current password", Name: "username_current_password", Type: "password", Error: p.Errors["username_current_password"], Hint: "We ask for it to make sure it is you.", Attrs: templ.Attributes{"autocomplete": "current-password"}})
+		<div class="l-cluster" data-end>
+			@ui.Button("primary", "Save username", templ.Attributes{"type": "submit"})
+		</div>
+	</form>
 }
 
 // PasswordFormView is the password form and the PUT response body for 422 and 429.
-// password.js ticks the rules while the admin types.
+// password.js ticks the rules while the admin types. On the forced screen it also has the username field.
 templ PasswordFormView(p PasswordProps) {
-	<form id="password-form" class={ passwordFormClass(p.Forced) } hx-put="/admin/password" hx-target="this" hx-swap="outerHTML" data-rules-form data-min-length={ strconv.Itoa(domain.MinAdminPasswordLen) }>
+	<form id="password-form" { passwordFormAttrs(p.Forced)... } hx-put="/admin/password" hx-target="this" hx-swap="outerHTML" data-rules-form data-min-length={ strconv.Itoa(domain.MinAdminPasswordLen) }>
 		if p.Forced {
 			@ui.AuthHead("Set a new password", "First time here. Choose your own password before you continue.")
+			@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: p.Username, Error: p.Errors["username"], Hint: "Keep “admin” or choose your own. 4 to 32 letters, numbers, dot or dash.", Attrs: templ.Attributes{"autocomplete": "username", "autocapitalize": "none", "spellcheck": "false"}})
 		}
 		if p.Throttled {
 			@ui.ErrorFragment("Too many failed attempts. Try again in a minute.")
@@ -424,6 +447,12 @@ templ PasswordFormView(p PasswordProps) {
 				Both passwords match
 			</li>
 		</ul>
-		@ui.Button("primary", passwordSaveLabel(p.Forced), templ.Attributes{"type": "submit", "data-size": "block"})
+		if p.Forced {
+			@ui.Button("primary", passwordSaveLabel(true), templ.Attributes{"type": "submit", "data-size": "block"})
+		} else {
+			<div class="l-cluster" data-end>
+				@ui.Button("primary", passwordSaveLabel(false), templ.Attributes{"type": "submit"})
+			</div>
+		}
 	</form>
 }

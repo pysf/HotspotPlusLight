@@ -65,6 +65,13 @@ details, unless the design is wrong for the product.
    - The restart-needed banner stays at the top of the form. Server addresses and Logs say that a change needs a restart.
    - The secret field has the eye button and a new "Generate" button (24 letters and digits, `data-generate-alnum`, `forms.js`). The old "Reveal" text button with `id="reveal-secret"` is gone; E1.10 now looks for `button[data-reveal]` and `button[data-generate-alnum]`.
    - Saving shows the inline "Settings saved." note (E16.04 reads it) and also a toast. A failed save shows a "Not saved. Fix N fields and try again." notice above the field errors.
+13. Change the admin username (step 7), where the product differs from the boards:
+   - The route is `PUT /admin/password/username` on the existing page `/admin/password`, not a new `/admin/account` page (E1.05 keeps `/admin/account*` at 404). The page title is "Password and username"; the top bar link keeps the label "Password" (board 1b).
+   - Rules list: only the two product rules ("10 or more characters", and "Both passwords match" on the forced screen), not "A letter and a number" (BR-20 has no character classes). The Password card on the page is the existing form with the same fields (current, new with Generate and the eye button, repeat).
+   - The Username card's password input is named `username_current_password` so the page still has one `current_password` input (E1.05). Its hint is "4 to 32 letters, numbers, dot or dash." (`domain.ValidateAdminUsername`, BR-28). Saving the same name is a no-op success.
+   - The Set new password screen keeps its Current password field (the first-start password `admin`; the board omits it). The Username field comes first, pre-filled, with the hint "Keep “admin” or choose your own. 4 to 32 letters, numbers, dot or dash." (the second sentence is added for the rule).
+   - "Taken" does not apply: there is one admin account. A name equal to the password is refused (BR-20 says the password must not equal the username).
+   - The Username card and the Password card each have their own form and Save button, as in the board. The cards use `ui.SettingGroup` (`c-setting`).
 
 ## Steps
 Each step: a sonnet agent builds it (tests first where logic changes), a separate sonnet agent
@@ -82,7 +89,7 @@ it, and keep each test's intent. No inline style or script (CSP).
 | 4 | Plans (cards + edit form, delete-blocked reason), Online sessions (kick + confirm) | DONE |
 | 5 | Vouchers/batches (form, list, A4 print sheet 3x6), Usage (7/30/90 switch, chart, top 10) | DONE |
 | 6 | Router (8 download cards, script, upload steps) and Settings (grouped form) | DONE |
-| 7 | Change the admin username (added 2026-11-09, owner request). Design: board `docs/design/Account.dc.html` ("1b Password and username", the page behind the Password link: a Username card and a Password card, each with its own Save button, current password required) and the Set new password screen in `Login.dc.html` (new Username field, pre-filled with the current name, hint "Keep admin or choose your own."). Server: username rules as for other usernames, other admin sessions end, e2e tests, README and site first-login page | todo |
+| 7 | Change the admin username (added 2026-11-09, owner request). Design: board `docs/design/Account.dc.html` ("1b Password and username", the page behind the Password link: a Username card and a Password card, each with its own Save button, current password required) and the Set new password screen in `Login.dc.html` (new Username field, pre-filled with the current name, hint "Keep admin or choose your own."). Server: username rules as for other usernames, other admin sessions end, e2e tests, README and site first-login page | DONE |
 
 ## How to continue from another machine
 1. Get the branch:
