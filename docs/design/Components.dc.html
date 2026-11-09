@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Component sheet</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<svg class="sprite" aria-hidden="true" focusable="false">
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z"/></symbol>
+<symbol id="i-slash" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+<symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 9V4h10v5M7 17H5a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="7" y="14" width="10" height="6" rx="1"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19zM12 10v4.5M12 17.5v.01"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/></symbol>
+<symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v8M6.6 6.6a8 8 0 1 0 10.8 0"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M5 9l7 7 7-7"/></symbol>
+<symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c2 .6 3.2 2.3 3.5 5.2"/></symbol>
+<symbol id="i-router" viewBox="0 0 24 24"><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 17h.01M11 17h.01M8 14l-2-5M16 14l2-5"/></symbol>
+</svg>
+
+<div class="board">
+<sc-for list="{{variants}}" as="v" hint-placeholder-count="2">
+<section class="vwrap">
+<p class="vlabel">{{v.label}}</p>
+<div class="{{v.cls}}">
+
+<div class="comp-sec">
+<h2 class="sec-h">Buttons · default, hover, focus, disabled, loading</h2>
+<div class="state-grid">
+<span></span><span class="state-h">Default</span><span class="state-h">Hover</span><span class="state-h">Focus</span><span class="state-h">Disabled</span><span class="state-h">Loading</span>
+<span class="state-h">Primary</span>
+<div><button class="btn btn-primary" type="button">Add member</button></div>
+<div><button class="btn btn-primary is-hover" type="button">Add member</button></div>
+<div><button class="btn btn-primary is-focus" type="button">Add member</button></div>
+<div><button class="btn btn-primary" type="button" disabled>Add member</button></div>
+<div><button class="btn btn-primary is-loading" type="button">Saving…</button></div>
+<span class="state-h">Secondary</span>
+<div><button class="btn" type="button">Cancel</button></div>
+<div><button class="btn is-hover" type="button">Cancel</button></div>
+<div><button class="btn is-focus" type="button">Cancel</button></div>
+<div><button class="btn" type="button" disabled>Cancel</button></div>
+<div><button class="btn is-loading" type="button">Working…</button></div>
+<span class="state-h">Quiet</span>
+<div><button class="btn btn-ghost" type="button">Clear</button></div>
+<div><button class="btn btn-ghost is-hover" type="button">Clear</button></div>
+<div><button class="btn btn-ghost is-focus" type="button">Clear</button></div>
+<div><button class="btn btn-ghost" type="button" disabled>Clear</button></div>
+<span></span>
+<span class="state-h">Danger</span>
+<div><button class="btn btn-danger-s" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button></div>
+<div><button class="btn btn-danger-s is-hover" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button></div>
+<div><button class="btn btn-danger-s is-focus" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button></div>
+<div><button class="btn btn-danger-s" type="button" aria-disabled="true"><svg class="ic ic-s" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button></div>
+<span></span>
+<span class="state-h">Danger, solid</span>
+<div><button class="btn btn-danger" type="button">Kick device</button></div>
+<div><button class="btn btn-danger is-hover" type="button">Kick device</button></div>
+<div><button class="btn btn-danger is-focus" type="button">Kick device</button></div>
+<div><button class="btn btn-danger" type="button" disabled>Kick device</button></div>
+<div><button class="btn btn-danger is-loading" type="button">Kicking…</button></div>
+<span class="state-h">Icon button</span>
+<div><button class="ibtn" type="button" aria-label="More"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button></div>
+<div><button class="ibtn is-hover" type="button" aria-label="More"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button></div>
+<div><button class="ibtn is-focus" type="button" aria-label="More"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button></div>
+<div><button class="ibtn" type="button" disabled aria-label="More"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button></div>
+<span></span>
+</div>
+</div>
+
+<div class="comp-sec">
+<h2 class="sec-h">Inputs · default, hover, focus, disabled, error</h2>
+<div class="state-grid">
+<span></span><span class="state-h">Default</span><span class="state-h">Hover</span><span class="state-h">Focus</span><span class="state-h">Disabled</span><span class="state-h">Error</span>
+<span class="state-h">Input</span>
+<div class="field"><input class="input" type="text" value="room204" aria-label="Default"></div>
+<div class="field"><input class="input is-hover" type="text" value="room204" aria-label="Hover"></div>
+<div class="field"><input class="input is-focus" type="text" value="room204" aria-label="Focus"></div>
+<div class="field"><input class="input" type="text" value="room204" disabled aria-label="Disabled"></div>
+<div class="field"><input class="input" type="text" value="ro" aria-invalid="true" aria-label="Error"></div>
+<span class="state-h">Select</span>
+<div class="select-w"><select class="select" aria-label="Plan"><option>Premium</option></select><svg class="ic ic-s select-ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></div>
+<div class="select-w"><select class="select" aria-label="Plan hover"><option>Premium</option></select><svg class="ic ic-s select-ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></div>
+<div class="select-w"><select class="select is-focus" aria-label="Plan focus"><option>Premium</option></select><svg class="ic ic-s select-ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></div>
+<div class="select-w"><select class="select" disabled aria-label="Plan disabled"><option>Premium</option></select><svg class="ic ic-s select-ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></div>
+<div class="select-w"><select class="select is-error" aria-invalid="true" aria-label="Plan error"><option>Choose a plan</option></select><svg class="ic ic-s select-ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></div>
+<span class="state-h">Search</span>
+<div class="search"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><input class="input" type="search" placeholder="Search" aria-label="Search"></div>
+<div class="search"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><input class="input is-hover" type="search" placeholder="Search" aria-label="Search hover"></div>
+<div class="search"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><input class="input is-focus" type="search" value="anna" aria-label="Search focus"></div>
+<div class="search"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><input class="input" type="search" placeholder="Search" disabled aria-label="Search disabled"></div>
+<span></span>
+</div>
+<div class="g2 mt-4">
+<div class="field"><label for="c-err">Field with error and hint</label><input class="input" id="c-err" type="text" value="192.168.88" aria-invalid="true" aria-describedby="c-err-m"><span class="field-err" id="c-err-m"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Enter a full address, like 192.168.88.1.</span></div>
+<div class="field"><label for="c-pw">Password with show / generate</label><div class="ig"><input class="input input-mono" id="c-pw" type="text" value="harbour-4Q7m"><button class="ibtn ibtn-fill" type="button" aria-label="Hide password"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg></button><button class="btn btn-sm" type="button">Generate</button></div><span class="field-hint">Hint text sits under the field.</span></div>
+</div>
+</div>
+
+<div class="comp-sec">
+<h2 class="sec-h">Choices · checkbox, switch, chips, segmented</h2>
+<div class="row-w">
+<label class="row"><input class="check" type="checkbox"> Off</label>
+<label class="row"><input class="check" type="checkbox" checked> On</label>
+<label class="row"><input class="check" type="checkbox" checked disabled> Disabled</label>
+<label class="row"><input class="switch" type="checkbox" role="switch"> Off</label>
+<label class="row"><input class="switch" type="checkbox" role="switch" checked> On</label>
+<label class="row"><input class="switch" type="checkbox" role="switch" disabled> Disabled</label>
+</div>
+<div class="chips mt-4">
+<button class="chip" type="button" aria-pressed="true">All <span class="chip-n">312</span></button>
+<button class="chip" type="button" aria-pressed="false">Active <span class="chip-n">241</span></button>
+<button class="chip" type="button" aria-pressed="false">Expiring <span class="chip-n">18</span></button>
+<button class="chip" type="button" aria-pressed="false">Expired <span class="chip-n">41</span></button>
+<button class="chip" type="button" aria-pressed="false">Disabled <span class="chip-n">12</span></button>
+<span class="seg" role="radiogroup" aria-label="Range"><button type="button" role="radio" aria-checked="false">7</button><button type="button" role="radio" aria-checked="true">30</button><button type="button" role="radio" aria-checked="false">90</button></span>
+</div>
+</div>
+
+<div class="comp-sec">
+<h2 class="sec-h">Status · pill (icon + word), online dot, meter</h2>
+<div class="row-w">
+<span class="pill pill-ok"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>Active</span>
+<span class="pill pill-warn"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>Expiring · 2 days</span>
+<span class="pill pill-bad"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Expired</span>
+<span class="pill pill-bad"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Over quota</span>
+<span class="pill pill-off"><svg class="ic" aria-hidden="true"><use href="#i-slash"/></svg>Disabled</span>
+<span class="pill pill-info"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>Info</span>
+<span class="row"><span class="dot dot-on"></span>Online</span>
+<span class="row"><span class="dot dot-off"></span>Offline</span>
+</div>
+<div class="g3 mt-4">
+<div class="usage"><span><span class="tx-b">2.5</span> of 10 GB</span><div class="meter pct-25" role="progressbar" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100" aria-label="25% used"><i></i></div></div>
+<div class="usage"><span><span class="tx-b">8.5</span> of 10 GB · nearly full</span><div class="meter meter-warn pct-85" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100" aria-label="85% used"><i></i></div></div>
+<div class="usage"><span><span class="tx-b">10.4</span> of 10 GB · over quota</span><div class="meter meter-bad pct-100" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="100% used, over quota"><i></i></div></div>
+</div>
+</div>
+
+<div class="comp-sec">
+<h2 class="sec-h">Card, tile, table row, pager</h2>
+<div class="g3">
+<div class="tile"><div class="tile-l"><svg class="ic ic-s" aria-hidden="true"><use href="#i-users"/></svg>Tile</div><div class="tile-v">24</div><div class="tile-s">Helper line</div></div>
+<div class="card"><div class="card-h"><h2>Card</h2><span class="pill pill-ok"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>Healthy</span></div><p class="tx-2">Surface, 20 px radius, thin line, soft shadow.</p></div>
+<div class="tile"><div class="tile-l">Loading</div><div class="skel skel-lg"></div><div class="skel skel-w60"></div></div>
+</div>
+<div class="card card-flush tbl-card mt-4">
+<table class="table table-plain">
+<caption class="sr">Row states</caption>
+<tbody>
+<tr><td class="cell-main"><b>Default row</b><small>room101</small></td><td><span class="pill pill-ok"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>Active</span></td><td class="col-act"><button class="ibtn" type="button" aria-label="Actions"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button></td></tr>
+<tr class="is-hover"><td class="cell-main"><b>Hover row</b><small>room115</small></td><td><span class="pill pill-off"><svg class="ic" aria-hidden="true"><use href="#i-slash"/></svg>Disabled</span></td><td class="col-act"><button class="ibtn" type="button" aria-label="Actions"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button></td></tr>
+<tr aria-selected="true"><td class="cell-main"><b>Selected row</b><small>room204</small></td><td><span class="pill pill-warn"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>Expiring</span></td><td class="col-act"><button class="ibtn" type="button" aria-label="Actions"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button></td></tr>
+</tbody>
+</table>
+<div class="pager"><span>1–8 of 312</span><nav aria-label="Pages"><button class="pg" type="button" disabled aria-label="Previous"><svg class="ic ic-s" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><button class="pg" type="button" aria-current="page">1</button><button class="pg" type="button">2</button><button class="pg" type="button">3</button><button class="pg" type="button" aria-label="Next"><svg class="ic ic-s" aria-hidden="true"><use href="#i-chevron-right"/></svg></button></nav></div>
+</div>
+</div>
+
+<div class="comp-sec">
+<h2 class="sec-h">Menu, dialog, toast</h2>
+<div class="g3">
+<div class="demo-rel">
+<div class="layer"><div class="menu" role="menu">
+<button type="button" role="menuitem"><svg class="ic ic-s" aria-hidden="true"><use href="#i-edit"/></svg>Edit</button>
+<button type="button" role="menuitem" class="is-hover"><svg class="ic ic-s" aria-hidden="true"><use href="#i-printer"/></svg>Print login details</button>
+<button type="button" role="menuitem"><svg class="ic ic-s" aria-hidden="true"><use href="#i-slash"/></svg>Disable</button>
+<hr>
+<button type="button" role="menuitem" class="danger"><svg class="ic ic-s" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button>
+</div></div>
+</div>
+<div class="demo-rel">
+<div class="scrim"></div>
+<div class="layer"><div class="dialog" role="alertdialog" aria-label="Delete members">
+<span class="dialog-ic"><svg class="ic ic-l" aria-hidden="true"><use href="#i-trash"/></svg></span>
+<h2 class="tx-h3">Delete 2 members?</h2>
+<p class="tx-sm">Their logins stop working and their usage history is removed.</p>
+<div class="dialog-actions"><button class="btn btn-sm" type="button">Cancel</button><button class="btn btn-sm btn-danger" type="button">Delete</button></div>
+</div></div>
+</div>
+<div class="stack">
+<div class="toast" role="status"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>Business details saved</div>
+<div class="toast toast-bad" role="alert"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Couldn’t save. Try again.</div>
+<div class="alert alert-info"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg><div><b>Note</b>Inline message with icon and text.</div></div>
+</div>
+</div>
+</div>
+
+<div class="comp-sec">
+<h2 class="sec-h">Empty, error, loading</h2>
+<div class="g3">
+<div class="card"><div class="empty"><span class="empty-ic"><svg class="ic ic-l" aria-hidden="true"><use href="#i-search"/></svg></span><h3 class="tx-h3">No members found</h3><p>Nothing matches “zorro”. Try another name, or clear the filters.</p><button class="btn" type="button">Clear filters</button></div></div>
+<div class="card"><div class="empty"><span class="empty-ic pill-bad"><svg class="ic ic-l" aria-hidden="true"><use href="#i-router"/></svg></span><h3 class="tx-h3">Can’t reach the router</h3><p>No login requests for 5 minutes. Check the cable and the RADIUS secret.</p><button class="btn btn-primary" type="button">Try again</button></div></div>
+<div class="card stack" aria-busy="true"><div class="skel skel-w40"></div><div class="skel"></div><div class="skel skel-w80"></div><div class="skel skel-w60"></div><div class="skel"></div></div>
+</div>
+</div>
+
+</div>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2736,"height":3600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      variants: [
+        { cls: 'hp t-light vw-d', label: 'Light · all components and states' },
+        { cls: 'hp t-dark vw-d', label: 'Dark · all components and states' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

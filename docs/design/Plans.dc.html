@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plans</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<svg class="sprite" aria-hidden="true" focusable="false">
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c2 .6 3.2 2.3 3.5 5.2"/></symbol>
+<symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.2" r=".9"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
+<symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9V7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a3 3 0 0 0 0 6v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a3 3 0 0 0 0-6zM14 6v12"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20v-6M12 20V5M19 20v-9"/></symbol>
+<symbol id="i-router" viewBox="0 0 24 24"><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 17h.01M11 17h.01M8 14l-2-5M16 14l2-5"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+<symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M16 8l4 4-4 4M20 12H9"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20l1-4L16.500 4.500a2 2 0 0 1 3 3L8 19z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19zM12 10v4.5M12 17.5v.01"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M5 9l7 7 7-7"/></symbol>
+</svg>
+
+<div class="board">
+<sc-for list="{{variants}}" as="v" hint-placeholder-count="4">
+<section class="vwrap">
+<p class="vlabel">{{v.label}}</p>
+<div class="{{v.cls}}">
+<div class="app">
+
+<aside class="side">
+<div class="brand"><span class="brand-mark"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg></span><div><b>HotspotPlus</b><small>Harbour Café</small></div></div>
+<nav class="nav" aria-label="Main">
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg><span class="nav-t">Dashboard</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span class="nav-t">Members</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg><span class="nav-t">Online now</span><span class="badge">24</span></a>
+<a href="#" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg><span class="nav-t">Plans</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-ticket"/></svg><span class="nav-t">Vouchers</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg><span class="nav-t">Usage</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-router"/></svg><span class="nav-t">Router</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span class="nav-t">Settings</span></a>
+</nav>
+<div class="side-foot"><span class="dot dot-on"></span><span class="nav-t">Router connected</span></div>
+</aside>
+
+<div class="main">
+<header class="top">
+<span class="top-brand"><span class="brand-mark"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg></span>Harbour Café</span>
+<span class="top-date tx-sm tx-3">Monday 9 November</span>
+<span class="grow"></span>
+<a class="btn btn-ghost" href="#" aria-label="Password"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg><span class="lbl">Password</span></a>
+<button class="ibtn" type="button" aria-label="Switch theme"><svg class="ic ic-sun" aria-hidden="true"><use href="#i-sun"/></svg><svg class="ic ic-moon" aria-hidden="true"><use href="#i-moon"/></svg></button>
+<button class="btn" type="button" aria-label="Log out"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg><span class="lbl">Log out</span></button>
+</header>
+
+<main class="page">
+<div class="ph">
+<div><h1 class="tx-h1">Plans</h1><p>What each kind of guest gets.</p></div>
+<button class="btn btn-primary" type="button"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add plan</button>
+</div>
+
+<div class="g21">
+<div class="g2">
+<sc-for list="{{plans}}" as="p" hint-placeholder-count="5">
+<article class="card plan" aria-current="{{p.cur}}">
+<div class="row between"><h2 class="tx-h3">{{p.name}}</h2><span class="tx-sm tx-3 num">{{p.members}} members</span></div>
+<dl>
+<div><dt>Data limit</dt><dd>{{p.data}}</dd></div>
+<div><dt>Time limit</dt><dd>{{p.time}}</dd></div>
+<div><dt>Valid for</dt><dd>{{p.valid}}</dd></div>
+<div><dt>Speed down / up</dt><dd>{{p.speed}}</dd></div>
+<div><dt>Devices</dt><dd>{{p.devices}}</dd></div>
+</dl>
+<div class="plan-f">
+<div class="row">
+<button class="btn btn-sm grow" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-edit"/></svg>Edit</button>
+<sc-if value="{{p.blocked}}" hint-placeholder-val="{{true}}">
+<button class="btn btn-sm btn-danger-s grow" type="button" aria-disabled="true" aria-describedby="why-{{p.id}}"><svg class="ic ic-s" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button>
+</sc-if>
+<sc-if value="{{p.free}}" hint-placeholder-val="{{false}}">
+<button class="btn btn-sm btn-danger-s grow" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button>
+</sc-if>
+</div>
+<sc-if value="{{p.blocked}}" hint-placeholder-val="{{true}}">
+<p class="field-hint row" id="why-{{p.id}}"><svg class="ic ic-s" aria-hidden="true"><use href="#i-info"/></svg><span>Can’t delete: {{p.members}} members use this plan. Move them to another plan first.</span></p>
+</sc-if>
+</div>
+</article>
+</sc-for>
+</div>
+
+<form class="card stack" aria-labelledby="pf-h">
+<div class="card-h"><h2 id="pf-h">Edit plan · Premium</h2></div>
+<div class="field"><label for="p-name">Name</label><input class="input" id="p-name" type="text" value="Premium"></div>
+<div class="field"><label for="p-data">Data limit</label><div class="ig"><input class="input num" id="p-data" type="text" inputmode="numeric" value="10"><div class="select-w"><select class="select" aria-label="Data unit"><option>GB</option></select><svg class="ic ic-s select-ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></div></div><span class="field-hint">Leave empty for no limit.</span></div>
+<div class="field"><label for="p-time">Time limit</label><div class="ig"><input class="input num" id="p-time" type="text" inputmode="numeric" placeholder="No limit"><div class="select-w"><select class="select" aria-label="Time unit"><option>hours</option></select><svg class="ic ic-s select-ic" aria-hidden="true"><use href="#i-chevron-down"/></svg></div></div></div>
+<div class="field"><label for="p-days">Valid for (days)</label><input class="input num" id="p-days" type="text" inputmode="numeric" value="30"></div>
+<div class="form-grid">
+<div class="field"><label for="p-down">Download (Mbps)</label><input class="input num" id="p-down" type="text" inputmode="numeric" value="10"></div>
+<div class="field"><label for="p-up">Upload (Mbps)</label><input class="input num" id="p-up" type="text" inputmode="numeric" value="5"></div>
+</div>
+<div class="field"><label for="p-dev">Devices at the same time</label><input class="input num" id="p-dev" type="text" inputmode="numeric" value="3"></div>
+<div class="alert alert-warn" role="note"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg><div><b>This plan can’t be deleted</b>37 members use it. Move them to another plan first.</div></div>
+<div class="row between"><button class="btn" type="button">Cancel</button><button class="btn btn-primary" type="button">Save plan</button></div>
+</form>
+</div>
+</main>
+</div>
+
+<nav class="tabbar" aria-label="Main">
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-home"/></svg>Home</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-users"/></svg>Members</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-wifi"/></svg>Online</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-ticket"/></svg>Vouchers</a>
+<a href="#" aria-current="page"><svg class="ic ic-l" aria-hidden="true"><use href="#i-more"/></svg>More</a>
+</nav>
+</div>
+</div>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2736,"height":4200}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      variants: [
+        { cls: 'hp t-light vw-d', label: 'Light · Desktop 1280' },
+        { cls: 'hp t-dark vw-d', label: 'Dark · Desktop 1280' },
+        { cls: 'hp t-light vw-p', label: 'Light · Phone 390' },
+        { cls: 'hp t-dark vw-p', label: 'Dark · Phone 390' }
+      ],
+      plans: [
+        { id: 'day', name: 'Day pass', members: 64, data: '1 GB', time: '8 hours', valid: '1 day', speed: '2 / 1 Mbps', devices: '1', blocked: true, free: false, cur: 'false' },
+        { id: 'std', name: 'Standard', members: 118, data: '5 GB', time: 'No limit', valid: '7 days', speed: '5 / 2 Mbps', devices: '2', blocked: true, free: false, cur: 'false' },
+        { id: 'prem', name: 'Premium', members: 37, data: '10 GB', time: 'No limit', valid: '30 days', speed: '10 / 5 Mbps', devices: '3', blocked: true, free: false, cur: 'true' },
+        { id: 'staff', name: 'Staff', members: 6, data: 'No limit', time: 'No limit', valid: 'No expiry', speed: '20 / 10 Mbps', devices: '5', blocked: true, free: false, cur: 'false' },
+        { id: 'trial', name: 'Trial', members: 0, data: '500 MB', time: '1 hour', valid: '1 day', speed: '1 / 1 Mbps', devices: '1', blocked: false, free: true, cur: 'false' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Developer notes</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="hp doc-board t-light">
+<p class="tx-cap tx-3">Handoff</p>
+<h1>Developer notes</h1>
+<p>Everything is in one file, <code>hp.css</code>. Sections 1–18 ship. Sections 19–20 (<code>.board</code>, <code>.vwrap</code>, <code>.doc-board</code>, <code>.sw</code>, <code>.u-*</code>, <code>.print-board</code>…) are only for these design boards and are not shipped.</p>
+
+<h2>Spacing rules</h2>
+<table>
+<thead><tr><th>Where</th><th>Rule</th><th>Token</th></tr></thead>
+<tbody>
+<tr><td>Page padding</td><td>32 px on laptop, 16 px on phone (set by <code>--pad</code> on <code>.app</code>)</td><td><code>--sp-6</code> / <code>--sp-4</code></td></tr>
+<tr><td>Between page sections and cards</td><td>24 px vertical, 16 px between cards in a grid</td><td><code>--sp-5</code> / <code>--sp-4</code></td></tr>
+<tr><td>Card padding</td><td>24 px (16 for small cards, 12 on phone)</td><td><code>--sp-5</code></td></tr>
+<tr><td>Form</td><td>16 px between fields, 6 px label to input, hint or error directly under the input</td><td><code>--sp-4</code></td></tr>
+<tr><td>Inline groups</td><td>8 px between buttons, 12 px between icon and text blocks</td><td><code>--sp-2</code> / <code>--sp-3</code></td></tr>
+<tr><td>Table cell</td><td>12 × 16 px. Row height is about 64 px with two text lines</td><td></td></tr>
+<tr><td>Controls</td><td>40 px high on laptop, 44 px on phone (<code>--ctl</code>). Icon buttons are square at the same size. Checkboxes sit in a <code>.hit</code> wrapper so the tap area is 44 px</td><td><code>--ctl</code></td></tr>
+<tr><td>Radius</td><td>Buttons, chips, pills: full. Inputs, menus, alerts: 12. Cards, tiles: 20. Sheets, dialogs, login card: 28</td><td><code>--r-*</code></td></tr>
+</tbody>
+</table>
+<p>Never write a one-off pixel value in a component. If a value is missing, add a token.</p>
+
+<h2>Shared components (define once, reuse)</h2>
+<table>
+<thead><tr><th>Class</th><th>Used by</th></tr></thead>
+<tbody>
+<tr><td><code>.app .side .top .page .ph .tabbar</code></td><td>Every screen except login. Same markup each time; only <code>aria-current="page"</code> moves. Put it in one server template (base layout)</td></tr>
+<tr><td><code>.btn .btn-primary .btn-danger .btn-danger-s .btn-ghost .btn-sm .ibtn</code></td><td>All</td></tr>
+<tr><td><code>.field .input .select .search .check .switch .seg .ig</code></td><td>Login, sheet, plans, vouchers, settings, usage</td></tr>
+<tr><td><code>.chip .pill .dot .badge .meter</code></td><td>Members, dashboard, sessions, vouchers, usage</td></tr>
+<tr><td><code>.card .tile .kv .li .group-h</code></td><td>Dashboard, plans, router, settings</td></tr>
+<tr><td><code>.table .pager .bulk</code></td><td>Members, sessions, vouchers</td></tr>
+<tr><td><code>.menu .sheet .scrim .dialog .toast .alert .empty .skel</code></td><td>Overlays and states, all screens</td></tr>
+<tr><td><code>.chart .ch-*</code></td><td>Dashboard, usage</td></tr>
+</tbody>
+</table>
+<p>Page-specific: <code>.plan</code>, <code>.thumb</code>, <code>.code</code>, <code>.steps</code> (plans, router), <code>.set-g</code> (settings), <code>.auth</code> (login), <code>.a4 .vch</code> (voucher print).</p>
+
+<h2>Hard parts in plain CSS</h2>
+<h3>1. Stacked cards on phone</h3>
+<p>Each <code>&lt;td&gt;</code> carries <code>data-label="Plan"</code>. Under 700 px, <code>tr</code> becomes a grid and <code>td::before</code> prints the label. The <code>thead</code> is hidden by clipping, not <code>display:none</code>, so screen readers keep the column names. Tables with a checkbox use the default 3-column card, without one use <code>.table-plain</code>.</p>
+<h3>2. One markup, two widths</h3>
+<p>The boards use container queries (<code>@container hp (max-width: 699px)</code>) so 1280 and 390 can sit side by side. In production you can keep them (all current browsers) or replace with <code>@media (max-width: 699px)</code>, same numbers: 999 px = icon rail, 699 px = phone.</p>
+<h3>3. Meter width without inline style</h3>
+<p>Width comes from classes <code>pct-0 … pct-100</code> in steps of 5. The server rounds the real percent to the nearest 5 and puts the exact value in <code>aria-valuenow</code> and in the text beside it. Colour class by rule: under 80% normal, 80–99% <code>.meter-warn</code>, 100% <code>.meter-bad</code>.</p>
+<h3>4. Charts</h3>
+<p>Draw them on the server as inline SVG. Geometry goes in attributes (<code>d</code>, <code>cx</code>), looks go in classes (<code>.ch-line</code>, <code>.ch-bar</code>). Bars are one <code>&lt;path&gt;</code> of vertical strokes with round caps: short, and one element per series. Give every chart <code>role="img"</code> and an <code>aria-label</code> that says the main fact in words.</p>
+<h3>5. Light / dark</h3>
+<p>Set <code>data-theme</code> on <code>&lt;html&gt;</code>. Without it the OS decides. A tiny external <code>theme.js</code> in <code>&lt;head&gt;</code> (not inline) reads <code>localStorage</code> before paint to avoid a flash. The theme button swaps its own icon with CSS (<code>.ic-sun</code> / <code>.ic-moon</code>).</p>
+<h3>6. Sheet, dialog, menu</h3>
+<p>Prefer native <code>&lt;dialog&gt;</code> with <code>showModal()</code>: free focus trap, Esc, and <code>::backdrop</code> for the scrim. Style <code>dialog.sheet</code> and <code>dialog.dialog</code> with the same classes. Row menus: a <code>popover</code> or ten lines of JS (arrow keys, Esc, return focus to the button). On phone the sheet becomes a nearly full-height bottom sheet.</p>
+<h3>7. Blur</h3>
+<p><code>backdrop-filter</code> is only polish. Add <code>@supports not (backdrop-filter: blur(1px))</code> and set <code>--c-glass</code> to the solid surface colour.</p>
+<h3>8. Phone “More”</h3>
+<p>The 5th tab opens a small list (Plans, Usage, Router, Settings). It can be a plain <code>&lt;details&gt;</code> or a menu. The tab shows as current when any of those pages is open.</p>
+
+<h2>htmx notes</h2>
+<ul>
+<li><b>Dashboard refresh:</b> <code>hx-get="/dashboard/live" hx-trigger="every 10s [!document.hidden]" hx-swap="innerHTML settle:300ms"</code> on the tiles, attention list, router card and charts (one region each). Tiles have a min-height, numbers use <code>tabular-nums</code>, charts keep a fixed viewBox: nothing resizes, so nothing jumps.</li>
+<li>Swapped content gets <code>.swap-in</code> (55% to 100% opacity, 0.4 s). Do not animate unchanged values. Do not put <code>aria-live</code> on the refreshed regions.</li>
+<li>Skip the swap while a menu or dialog is open (<code>hx-trigger</code> filter on a body class).</li>
+<li>Same pattern for Online now (10 s) and the “Updated 4 s ago” text (tiny JS timer).</li>
+<li><b>Toast:</b> send <code>HX-Trigger: {"toast":{"text":"Business details saved"}}</code>. Small JS appends <code>.toast</code> with <code>role="status"</code> and removes it after 4 s. Errors use <code>.toast-bad</code> with <code>role="alert"</code> and stay until closed.</li>
+<li><b>Field errors:</b> return the form fragment with <code>aria-invalid="true"</code> and <code>.field-err</code>; use <code>hx-swap="outerHTML"</code> on the form so focus can move to the first error.</li>
+<li><b>Bulk actions:</b> checkboxes inside the table form; <code>.bulk</code> appears when one or more are checked. Delete asks in a dialog first.</li>
+<li><b>Usage range:</b> the 7 / 30 / 90 buttons use <code>hx-get="/usage?days=30"</code> with <code>hx-target</code> on the chart and list; keep <code>aria-checked</code> in sync.</li>
+</ul>
+
+<h2>Accessibility checklist</h2>
+<ul>
+<li>Text contrast 4.5:1 or more in both themes (checked on every token pair). Borders on inputs 3:1 (<code>--c-input-line</code>).</li>
+<li>Focus: <code>:focus-visible</code> 3 px outline in <code>--c-focus</code>, offset 2 px. Never remove it.</li>
+<li>Status = icon + word + colour. Online = filled dot vs hollow ring, plus the word.</li>
+<li>Delete-blocked button uses <code>aria-disabled="true"</code> (stays focusable) and <code>aria-describedby</code> pointing at the visible reason.</li>
+<li>Reduced motion switches off all animation. Touch targets 44 px under 700 px.</li>
+<li>No sideways scroll from 360 px: all grids are <code>minmax(0, 1fr)</code>, long values use <code>overflow-wrap:anywhere</code>.</li>
+</ul>
+
+<h2>Icons</h2>
+<p>One inline SVG sprite in the base layout (24 px grid, stroke 1.75, <code>stroke="currentColor"</code>). Use <code>&lt;svg class="ic" aria-hidden="true"&gt;&lt;use href="#i-name"/&gt;&lt;/svg&gt;</code>. Icon-only buttons need <code>aria-label</code>. The sprite on these boards is repeated per file only because each board is separate.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":3000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

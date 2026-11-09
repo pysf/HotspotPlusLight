@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashboard</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<svg class="sprite" aria-hidden="true" focusable="false">
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.200-5.500 6.500-5.500s5.900 1.900 6.500 5.500M16 4.800a3.500 3.500 0 0 1 0 6.400M18 14.800c2 .6 3.200 2.300 3.500 5.200"/></symbol>
+<symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.500 9a14 14 0 0 1 19 0M5.500 12.500a9.500 9.500 0 0 1 13 0M8.600 16a5 5 0 0 1 6.800 0"/><circle cx="12" cy="19.200" r=".9"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
+<symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9V7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a3 3 0 0 0 0 6v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a3 3 0 0 0 0-6zM14 6v12"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20v-6M12 20V5M19 20v-9"/></symbol>
+<symbol id="i-router" viewBox="0 0 24 24"><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 17h.01M11 17h.01M8 14l-2-5M16 14l2-5"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.900 4.900l1.400 1.400M17.700 17.700l1.400 1.400M2 12h2M20 12h2M4.900 19.100l1.400-1.400M17.700 6.300l1.400-1.400"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.500A8 8 0 0 1 9.500 4a8 8 0 1 0 10.500 10.500z"/></symbol>
+<symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M16 8l4 4-4 4M20 12H9"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.200"/><circle cx="12" cy="12" r="1.200"/><circle cx="19" cy="12" r="1.200"/></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.500l3 3 5-6"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.500l9.500 16.500h-19zM12 10v4.500M12 17.500v.01"/></symbol>
+<symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+<symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+</svg>
+
+<div class="board">
+<sc-for list="{{variants}}" as="v" hint-placeholder-count="4">
+<section class="vwrap">
+<p class="vlabel">{{v.label}}</p>
+<div class="{{v.cls}}">
+<div class="app">
+
+<aside class="side">
+<div class="brand"><span class="brand-mark"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg></span><div><b>HotspotPlus</b><small>Harbour Café</small></div></div>
+<nav class="nav" aria-label="Main">
+<a href="#" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg><span class="nav-t">Dashboard</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span class="nav-t">Members</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg><span class="nav-t">Online now</span><span class="badge">24</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg><span class="nav-t">Plans</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-ticket"/></svg><span class="nav-t">Vouchers</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg><span class="nav-t">Usage</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-router"/></svg><span class="nav-t">Router</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span class="nav-t">Settings</span></a>
+</nav>
+<div class="side-foot"><span class="dot dot-on"></span><span class="nav-t">Router connected</span></div>
+</aside>
+
+<div class="main">
+<header class="top">
+<span class="top-brand"><span class="brand-mark"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg></span>Harbour Café</span>
+<span class="top-date tx-sm tx-3">Monday 9 November</span>
+<span class="grow"></span>
+<a class="btn btn-ghost" href="#" aria-label="Password"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg><span class="lbl">Password</span></a>
+<button class="ibtn" type="button" aria-label="Switch theme"><svg class="ic ic-sun" aria-hidden="true"><use href="#i-sun"/></svg><svg class="ic ic-moon" aria-hidden="true"><use href="#i-moon"/></svg></button>
+<button class="btn" type="button" aria-label="Log out"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg><span class="lbl">Log out</span></button>
+</header>
+
+<main class="page">
+<div class="ph">
+<div><h1 class="tx-h1">Dashboard</h1><p>Everything is running normally.</p></div>
+<span class="live" role="status"><span class="dot dot-on"></span>Live · updated 4 s ago</span>
+</div>
+
+<section class="g4 swap-in" aria-label="Today at a glance">
+<div class="tile"><div class="tile-l"><svg class="ic ic-s" aria-hidden="true"><use href="#i-wifi"/></svg>Online now</div><div class="tile-v">24</div><div class="tile-s">3 more than an hour ago</div></div>
+<div class="tile"><div class="tile-l"><svg class="ic ic-s" aria-hidden="true"><use href="#i-chart"/></svg>Peak today</div><div class="tile-v">41</div><div class="tile-s">at 8:15 pm</div></div>
+<div class="tile"><div class="tile-l"><svg class="ic ic-s" aria-hidden="true"><use href="#i-arrow-down"/></svg>Traffic today</div><div class="tile-v">38.4 <small>GB</small></div><div class="tile-s">31.2 GB down · 7.2 GB up</div></div>
+<div class="tile"><div class="tile-l"><svg class="ic ic-s" aria-hidden="true"><use href="#i-users"/></svg>Members</div><div class="tile-v">312</div><div class="tile-s">241 active · 12 disabled</div></div>
+</section>
+
+<div class="g2">
+<section class="card" aria-labelledby="att-h">
+<div class="card-h"><h2 id="att-h">Needs attention</h2><span class="pill pill-warn"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>9 items</span></div>
+<h3 class="group-h">Expiring soon · 3</h3>
+<div class="li"><span class="li-ic pill-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-clock"/></svg></span><div class="grow"><b>room204</b><small>Premium 10 GB</small></div><span class="pill pill-warn"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>2 days left</span></div>
+<div class="li"><span class="li-ic pill-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-clock"/></svg></span><div class="grow"><b>anna.k</b><small>Standard 5 GB</small></div><span class="pill pill-warn"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>Tomorrow</span></div>
+<div class="li"><span class="li-ic pill-warn"><svg class="ic ic-s" aria-hidden="true"><use href="#i-clock"/></svg></span><div class="grow"><b>cafe-guest-17</b><small>Day pass</small></div><span class="pill pill-warn"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>5 h left</span></div>
+<h3 class="group-h">Over quota · 2</h3>
+<div class="li"><span class="li-ic pill-bad"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"/></svg></span><div class="grow"><b>room310</b><small>10.4 of 10 GB used</small></div><span class="pill pill-bad"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Over quota</span></div>
+<div class="li"><span class="li-ic pill-bad"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"/></svg></span><div class="grow"><b>marta.l</b><small>2.1 of 2 GB used</small></div><span class="pill pill-bad"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Over quota</span></div>
+<h3 class="group-h">Failed logins · 4 today</h3>
+<div class="li"><span class="li-ic pill-bad"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"/></svg></span><div class="grow"><b>guest-88</b><small>3 wrong passwords, last 18 min ago</small></div><a href="#">Open</a></div>
+<div class="li"><span class="li-ic pill-bad"><svg class="ic ic-s" aria-hidden="true"><use href="#i-alert"/></svg></span><div class="grow"><b>hotel1</b><small>Unknown username, 1 try</small></div><a href="#">Open</a></div>
+</section>
+
+<section class="card" aria-labelledby="rt-h">
+<div class="card-h"><h2 id="rt-h">Router link</h2><span class="pill pill-ok"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>Healthy</span></div>
+<dl class="kv">
+<div><dt>Last login request</dt><dd>12 s ago</dd></div>
+<div><dt>Last accounting packet</dt><dd>8 s ago</dd></div>
+<div><dt>Last disconnect</dt><dd>3 min ago</dd></div>
+<div><dt>Wrong-secret count</dt><dd>0 <span class="pill pill-ok"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>None</span></dd></div>
+</dl>
+<p class="tx-sm tx-3 mt-4">A wrong secret means the RADIUS secret on the router and in Settings do not match.</p>
+</section>
+</div>
+
+<section class="g3" aria-label="Charts">
+<div class="card"><div class="card-h"><h2>Devices online</h2><span class="tx-sm tx-3">Last 24 h</span></div>
+<svg class="chart" viewBox="0 0 320 114" role="img" aria-label="Devices online over the last 24 hours. Rising from 18 in the evening to a peak of 41 at 8 pm, now 24.">
+<path class="ch-grid" d="M8 92H312M8 56H312M8 20H312"/>
+<path class="ch-area" d="M8 80L33 76L59 82L84 70L110 60L135 64L160 48L186 38L211 30L236 22L262 34L287 28L312 40L312 92L8 92Z"/>
+<path class="ch-line" d="M8 80L33 76L59 82L84 70L110 60L135 64L160 48L186 38L211 30L236 22L262 34L287 28L312 40"/>
+<text class="ch-ax" x="8" y="110">9 pm</text><text class="ch-ax" x="110" y="110" text-anchor="middle">3 am</text><text class="ch-ax" x="211" y="110" text-anchor="middle">3 pm</text><text class="ch-ax" x="312" y="110" text-anchor="end">now</text>
+</svg></div>
+<div class="card"><div class="card-h"><h2>Traffic</h2><span class="tx-sm tx-3">GB per day</span></div>
+<svg class="chart" viewBox="0 0 320 114" role="img" aria-label="Traffic per day in GB over the last 7 days: 28, 34, 31, 42, 47, 36, and 38 today.">
+<path class="ch-grid" d="M8 88H312M8 52H312M8 16H312"/>
+<path class="ch-bar ch-bar-dim" d="M30 88V48M75 88V39M120 88V43M165 88V28M210 88V20M255 88V36"/>
+<path class="ch-bar" d="M300 88V33"/>
+<text class="ch-ax" x="30" y="108" text-anchor="middle">Tue</text><text class="ch-ax" x="75" y="108" text-anchor="middle">Wed</text><text class="ch-ax" x="120" y="108" text-anchor="middle">Thu</text><text class="ch-ax" x="165" y="108" text-anchor="middle">Fri</text><text class="ch-ax" x="210" y="108" text-anchor="middle">Sat</text><text class="ch-ax" x="255" y="108" text-anchor="middle">Sun</text><text class="ch-ax" x="300" y="108" text-anchor="middle">Today</text>
+</svg></div>
+<div class="card"><div class="card-h"><h2>Logins</h2><span class="tx-sm tx-3">Per day</span></div>
+<svg class="chart" viewBox="0 0 320 114" role="img" aria-label="Logins per day over the last 7 days: 61, 74, 58, 90, 102, 84, and 67 today.">
+<path class="ch-grid" d="M8 88H312M8 52H312M8 16H312"/>
+<path class="ch-line" d="M30 48L75 40L120 50L165 30L210 22L255 33L300 45"/>
+<circle class="ch-dot" cx="30" cy="48" r="3.500"/><circle class="ch-dot" cx="75" cy="40" r="3.500"/><circle class="ch-dot" cx="120" cy="50" r="3.500"/><circle class="ch-dot" cx="165" cy="30" r="3.500"/><circle class="ch-dot" cx="210" cy="22" r="3.500"/><circle class="ch-dot" cx="255" cy="33" r="3.500"/><circle class="ch-dot" cx="300" cy="45" r="3.500"/>
+<text class="ch-ax" x="30" y="108" text-anchor="middle">Tue</text><text class="ch-ax" x="120" y="108" text-anchor="middle">Thu</text><text class="ch-ax" x="210" y="108" text-anchor="middle">Sat</text><text class="ch-ax" x="300" y="108" text-anchor="middle">Today</text>
+</svg></div>
+</section>
+</main>
+</div>
+
+<nav class="tabbar" aria-label="Main">
+<a href="#" aria-current="page"><svg class="ic ic-l" aria-hidden="true"><use href="#i-home"/></svg>Home</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-users"/></svg>Members</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-wifi"/></svg>Online</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-ticket"/></svg>Vouchers</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-more"/></svg>More</a>
+</nav>
+</div>
+</div>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2736,"height":3800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      variants: [
+        { cls: 'hp t-light vw-d', label: 'Light · Desktop 1280' },
+        { cls: 'hp t-dark vw-d', label: 'Dark · Desktop 1280' },
+        { cls: 'hp t-light vw-p', label: 'Light · Phone 390' },
+        { cls: 'hp t-dark vw-p', label: 'Dark · Phone 390' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

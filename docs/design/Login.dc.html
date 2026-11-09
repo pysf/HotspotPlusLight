@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Login and new password</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<svg class="sprite" aria-hidden="true" focusable="false">
+<symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.2" r=".9"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-wand" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16v4M17 18h4"/></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
+<symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></symbol>
+</svg>
+
+<div class="board">
+<sc-for list="{{variants}}" as="v" hint-placeholder-count="8">
+<section class="vwrap">
+<p class="vlabel">{{v.label}}</p>
+<div class="{{v.cls}}">
+<main class="auth">
+
+<sc-if value="{{v.login}}" hint-placeholder-val="{{true}}">
+<form class="auth-card">
+<div class="stack-s">
+<span class="brand-mark"><svg class="ic ic-l" aria-hidden="true"><use href="#i-wifi"/></svg></span>
+<h1 class="tx-h1">Sign in</h1>
+<p class="tx-2">HotspotPlus Lite · Harbour Café</p>
+</div>
+<div class="field"><label for="l-user">Username</label><input class="input" id="l-user" type="text" value="admin" autocomplete="username"></div>
+<div class="field"><label for="l-pass">Password</label><div class="ig"><input class="input" id="l-pass" type="password" value="••••••••••" autocomplete="current-password"><button class="ibtn ibtn-fill" type="button" aria-label="Show password" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg></button></div></div>
+<button class="btn btn-primary btn-block" type="submit">Sign in</button>
+</form>
+</sc-if>
+
+<sc-if value="{{v.setpw}}" hint-placeholder-val="{{false}}">
+<form class="auth-card">
+<div class="stack-s">
+<span class="brand-mark"><svg class="ic ic-l" aria-hidden="true"><use href="#i-wifi"/></svg></span>
+<h1 class="tx-h1">Set a new password</h1>
+<p class="tx-2">First time here. Choose your own password before you continue.</p>
+</div>
+<div class="field"><label for="n-pass">New password</label><div class="ig"><input class="input input-mono" id="n-pass" type="text" value="Harbour-Mist-48" autocomplete="new-password"><button class="ibtn ibtn-fill" type="button" aria-label="Hide password" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg></button><button class="btn btn-sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-wand"/></svg>Generate</button></div></div>
+<div class="field"><label for="n-pass2">Repeat the password</label><input class="input input-mono" id="n-pass2" type="text" value="" placeholder="Type it again" autocomplete="new-password"></div>
+<ul class="rules" aria-label="Password rules">
+<li class="ok"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>10 or more characters</li>
+<li class="ok"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>A letter and a number</li>
+<li><svg class="ic" aria-hidden="true"><use href="#i-circle"/></svg>Both passwords match</li>
+</ul>
+<button class="btn btn-primary btn-block" type="submit">Save and continue</button>
+</form>
+</sc-if>
+
+</main>
+</div>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2736,"height":2900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      variants: [
+        { cls: 'hp t-light vw-d', label: 'Light · Desktop · Sign in', login: true, setpw: false },
+        { cls: 'hp t-dark vw-d', label: 'Dark · Desktop · Sign in', login: true, setpw: false },
+        { cls: 'hp t-light vw-d', label: 'Light · Desktop · Set new password', login: false, setpw: true },
+        { cls: 'hp t-dark vw-d', label: 'Dark · Desktop · Set new password', login: false, setpw: true },
+        { cls: 'hp t-light vw-p', label: 'Light · Phone · Sign in', login: true, setpw: false },
+        { cls: 'hp t-dark vw-p', label: 'Dark · Phone · Sign in', login: true, setpw: false },
+        { cls: 'hp t-light vw-p', label: 'Light · Phone · Set new password', login: false, setpw: true },
+        { cls: 'hp t-dark vw-p', label: 'Dark · Phone · Set new password', login: false, setpw: true }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

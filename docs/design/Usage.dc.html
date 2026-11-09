@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Usage</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<svg class="sprite" aria-hidden="true" focusable="false">
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c2 .6 3.2 2.3 3.5 5.2"/></symbol>
+<symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.2" r=".9"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
+<symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9V7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a3 3 0 0 0 0 6v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a3 3 0 0 0 0-6zM14 6v12"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20v-6M12 20V5M19 20v-9"/></symbol>
+<symbol id="i-router" viewBox="0 0 24 24"><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 17h.01M11 17h.01M8 14l-2-5M16 14l2-5"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+<symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M16 8l4 4-4 4M20 12H9"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+</svg>
+
+<div class="board">
+<sc-for list="{{variants}}" as="v" hint-placeholder-count="4">
+<section class="vwrap">
+<p class="vlabel">{{v.label}}</p>
+<div class="{{v.cls}}">
+<div class="app">
+
+<aside class="side">
+<div class="brand"><span class="brand-mark"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg></span><div><b>HotspotPlus</b><small>Harbour Café</small></div></div>
+<nav class="nav" aria-label="Main">
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg><span class="nav-t">Dashboard</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span class="nav-t">Members</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg><span class="nav-t">Online now</span><span class="badge">24</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg><span class="nav-t">Plans</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-ticket"/></svg><span class="nav-t">Vouchers</span></a>
+<a href="#" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg><span class="nav-t">Usage</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-router"/></svg><span class="nav-t">Router</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span class="nav-t">Settings</span></a>
+</nav>
+<div class="side-foot"><span class="dot dot-on"></span><span class="nav-t">Router connected</span></div>
+</aside>
+
+<div class="main">
+<header class="top">
+<span class="top-brand"><span class="brand-mark"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg></span>Harbour Café</span>
+<span class="top-date tx-sm tx-3">Monday 9 November</span>
+<span class="grow"></span>
+<a class="btn btn-ghost" href="#" aria-label="Password"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg><span class="lbl">Password</span></a>
+<button class="ibtn" type="button" aria-label="Switch theme"><svg class="ic ic-sun" aria-hidden="true"><use href="#i-sun"/></svg><svg class="ic ic-moon" aria-hidden="true"><use href="#i-moon"/></svg></button>
+<button class="btn" type="button" aria-label="Log out"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg><span class="lbl">Log out</span></button>
+</header>
+
+<main class="page">
+<div class="ph">
+<div><h1 class="tx-h1">Usage</h1><p>How much data your guests used.</p></div>
+<div class="seg" role="radiogroup" aria-label="Time range">
+<button type="button" role="radio" aria-checked="false">7 days</button>
+<button type="button" role="radio" aria-checked="true">30 days</button>
+<button type="button" role="radio" aria-checked="false">90 days</button>
+</div>
+</div>
+
+<section class="g3" aria-label="Summary">
+<div class="tile"><div class="tile-l">Total traffic</div><div class="tile-v">1.27 <small>TB</small></div><div class="tile-s">11 Oct to 9 Nov</div></div>
+<div class="tile"><div class="tile-l">Daily average</div><div class="tile-v">42.4 <small>GB</small></div><div class="tile-s">per day</div></div>
+<div class="tile"><div class="tile-l">Busiest day</div><div class="tile-v">62 <small>GB</small></div><div class="tile-s">Friday 6 November</div></div>
+</section>
+
+<div class="g21">
+<section class="card" aria-labelledby="us-h">
+<div class="card-h"><h2 id="us-h">Traffic per day</h2><span class="tx-sm tx-3">Last 30 days, GB</span></div>
+<svg class="chart" viewBox="0 0 920 230" role="img" aria-label="Traffic per day over the last 30 days. Average 42 GB. Weekends are the busiest; the peak was 62 GB on Friday 6 November.">
+<path class="ch-grid" d="M10 190H905M10 132.5H905M10 75H905M10 17.5H905"/>
+<text class="ch-ax" x="915" y="194" text-anchor="end">0</text><text class="ch-ax" x="915" y="136" text-anchor="end">25</text><text class="ch-ax" x="915" y="79" text-anchor="end">50</text><text class="ch-ax" x="915" y="21" text-anchor="end">75</text>
+<path class="ch-bar ch-bar-dim" d="M20 186V119M49 186V110M78 186V126M107 186V98M136 186V70M165 186V57M194 186V107M223 186V114M252 186V105M281 186V121M310 186V93M339 186V64M368 186V50M397 186V100M426 186V112M455 186V107M484 186V119M513 186V89M542 186V59M571 186V52M600 186V96M629 186V110M658 186V114M687 186V103M716 186V84M745 186V54M803 186V89M832 186V105M861 186V103"/>
+<path class="ch-bar" d="M774 186V47"/>
+<text class="ch-ax" x="774" y="30" text-anchor="middle">62 GB</text>
+<text class="ch-ax" x="20" y="212" text-anchor="middle">11 Oct</text><text class="ch-ax" x="165" y="212" text-anchor="middle">16 Oct</text><text class="ch-ax" x="310" y="212" text-anchor="middle">21 Oct</text><text class="ch-ax" x="455" y="212" text-anchor="middle">26 Oct</text><text class="ch-ax" x="600" y="212" text-anchor="middle">31 Oct</text><text class="ch-ax" x="745" y="212" text-anchor="middle">5 Nov</text><text class="ch-ax" x="861" y="212" text-anchor="middle">9 Nov</text>
+</svg>
+<p class="tx-sm tx-3 mt-2">The darker bar is the busiest day.</p>
+</section>
+
+<section class="card" aria-labelledby="top-h">
+<div class="card-h"><h2 id="top-h">Top 10 members</h2><span class="tx-sm tx-3">GB used</span></div>
+<ol>
+<li class="li"><span class="rank">1</span><div class="grow"><b>staff-wifi</b><div class="meter pct-100" role="presentation"><i></i></div></div><span class="tx-b num">142.0</span></li>
+<li class="li"><span class="rank">2</span><div class="grow"><b>room310</b><div class="meter pct-60" role="presentation"><i></i></div></div><span class="tx-b num">88.4</span></li>
+<li class="li"><span class="rank">3</span><div class="grow"><b>room204</b><div class="meter pct-45" role="presentation"><i></i></div></div><span class="tx-b num">61.2</span></li>
+<li class="li"><span class="rank">4</span><div class="grow"><b>room118</b><div class="meter pct-40" role="presentation"><i></i></div></div><span class="tx-b num">54.7</span></li>
+<li class="li"><span class="rank">5</span><div class="grow"><b>room222</b><div class="meter pct-35" role="presentation"><i></i></div></div><span class="tx-b num">47.3</span></li>
+<li class="li"><span class="rank">6</span><div class="grow"><b>marta.l</b><div class="meter pct-30" role="presentation"><i></i></div></div><span class="tx-b num">41.0</span></li>
+<li class="li"><span class="rank">7</span><div class="grow"><b>room101</b><div class="meter pct-25" role="presentation"><i></i></div></div><span class="tx-b num">36.8</span></li>
+<li class="li"><span class="rank">8</span><div class="grow"><b>room115</b><div class="meter pct-25" role="presentation"><i></i></div></div><span class="tx-b num">33.5</span></li>
+<li class="li"><span class="rank">9</span><div class="grow"><b>cafe-guest-17</b><div class="meter pct-20" role="presentation"><i></i></div></div><span class="tx-b num">28.1</span></li>
+<li class="li"><span class="rank">10</span><div class="grow"><b>guest-52</b><div class="meter pct-15" role="presentation"><i></i></div></div><span class="tx-b num">24.6</span></li>
+</ol>
+</section>
+</div>
+</main>
+</div>
+
+<nav class="tabbar" aria-label="Main">
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-home"/></svg>Home</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-users"/></svg>Members</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-wifi"/></svg>Online</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-ticket"/></svg>Vouchers</a>
+<a href="#" aria-current="page"><svg class="ic ic-l" aria-hidden="true"><use href="#i-more"/></svg>More</a>
+</nav>
+</div>
+</div>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2736,"height":3600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      variants: [
+        { cls: 'hp t-light vw-d', label: 'Light · Desktop 1280' },
+        { cls: 'hp t-dark vw-d', label: 'Dark · Desktop 1280' },
+        { cls: 'hp t-light vw-p', label: 'Light · Phone 390' },
+        { cls: 'hp t-dark vw-p', label: 'Dark · Phone 390' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
