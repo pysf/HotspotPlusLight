@@ -31,6 +31,31 @@ it, and keep each test's intent. No inline style or script (CSP).
 | 5 | Vouchers/batches (form, list, A4 print sheet 3x6), Usage (7/30/90 switch, chart, top 10) | todo |
 | 6 | Router (8 download cards, script, link status) and Settings (grouped form) | todo |
 
+## How to continue from another machine
+1. Get the branch:
+   ```
+   git clone git@github.com-personal:pysf/HotspotPlusLight.git   # or: git fetch
+   cd HotspotPlusLight && git checkout design-v2 && git pull
+   ```
+   Use the GitHub account `pysf` only. Commits use `payam.ysfi@gmail.com`.
+   Ignore the untracked file `docs/mikrotik_hotspot_setup_guide.md` (never stage it).
+2. Needs Go 1.26. No Node. templ runs with `go run github.com/a-h/templ/cmd/templ@v0.3.1100 generate`
+   (the generated `*_templ.go` files are committed, so run it after every `.templ` change).
+3. Check that all is green before you start: `make ci` (vet + all tests incl. e2e, about 1-6 min).
+   Look at the app: `make run`, then open http://localhost:8081/admin (admin / admin on a new
+   database; `make reset-db` for a fresh one). `HSP_DEV=1 make run` adds the component gallery at
+   `/admin/dev/components`.
+4. Read, in this order: `CLAUDE.md`, this file, `docs/design/README.md`, `docs/ui-notes.md`
+   ("Design v2"), `docs/DESIGN.md`.
+5. Start the next step in the table above (first one that is not done). Open the matching boards
+   in `docs/design/` (for example step 2: `Login.dc.html`, `Dashboard.dc.html`) and read them with
+   `hp.css`. Port every detail. Work in small commits on `design-v2`.
+6. Tell Claude Code, for example:
+   > Continue the design work. Read docs/design-plan.md and do step 2. Use a sonnet agent to build
+   > it and a separate sonnet agent to review it, as in CLAUDE.md. Do not push until I ask.
+7. Finish a step: update the State column above, commit `Design vN: ...`, and push `design-v2`.
+   Merge `design-v2` into `main` only when all six steps are done and the e2e suite passes.
+
 ## Known notes from step 1
 - No max page width in the design: check tables at 1920 px.
 - Phone table cells: the Usage cell layout is awkward; redo in step 3.
