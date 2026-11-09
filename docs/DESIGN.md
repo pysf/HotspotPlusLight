@@ -60,7 +60,8 @@ Written once in the base layout:
 | `c-table`, `c-pager`, `c-bulk` | Cell 12 x 16. The pager sits inside the table card (`ui.TablePaged`) under the rows, with a 1 px top line. A card that holds a table is `data-flush` (the only card that clips). Under 700 px rows are cards from `data-label`; `thead` is hidden by clipping, not `display: none`. |
 | `c-menu`, `c-menu__item` | Popover, glass, `--sh-3`; items 40 px, optional icon, danger in red after a divider. |
 | `c-sheet`, `c-modal`, `c-toast`, `c-notice`, `c-empty`, `c-skel` | Native `<dialog>` sheet (right drawer, bottom sheet on phone) and modal (icon, title, text, buttons); toast pill (errors stay until closed); notice with icon (ok, warn, error, info); empty state with icon circle; skeleton lines. |
-| `c-credentials`, `c-code`, `c-chart` | Credential blocks in big monospace; code box; charts are inline SVG with classes (`c-chart__line`, `__bar`, ...). |
+| `c-credentials`, `c-code`, `c-chart` | Credential blocks in big monospace, each with a Copy button; code box; charts are inline SVG with classes (`c-chart__line`, `__bar`, ...). |
+| `c-switch-row`, `c-bulk` | A titled on/off switch row; the bulk bar (count, actions), shown only while rows are ticked. |
 
 ## 7. Interaction rules (htmx)
 - Filtering, searching and paging update only the list region and push the URL. Forms submit with htmx; errors (422) re-render the form fragment in place.

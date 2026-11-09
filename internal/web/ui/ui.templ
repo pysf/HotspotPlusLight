@@ -240,9 +240,22 @@ templ AuthHead(title, sub string) {
 
 // RevealButton is the eye button that shows or hides the password in the input with id. forms.js switches it.
 templ RevealButton(id string) {
-	<button type="button" class="c-icon-btn" data-fill data-reveal={ id } aria-pressed="false" aria-label="Show password">
+	@RevealToggle(id, false)
+}
+
+// RevealToggle is the eye button for a field that is already shown (shown true) or hidden (false). forms.js switches it.
+templ RevealToggle(id string, shown bool) {
+	<button type="button" class="c-icon-btn" data-fill data-reveal={ id } aria-pressed={ strconv.FormatBool(shown) } aria-label={ revealLabel(shown) }>
 		@Icon("eye")
 	</button>
+}
+
+// revealLabel is the accessible name of the eye button: it names the action the next click does.
+func revealLabel(shown bool) string {
+	if shown {
+		return "Hide password"
+	}
+	return "Show password"
 }
 
 // Sprite is the inline SVG sprite with every icon, written once in the base layout.
@@ -531,6 +544,22 @@ templ LinkButton(kind, href, label string, attrs templ.Attributes) {
 	<a class="c-btn" data-variant={ buttonVariant(kind) } href={ templ.SafeURL(href) } { linkAttrs(attrs)... }>{ label }</a>
 }
 
+// LinkButtonIcon is a LinkButton with a small icon in front of its label.
+templ LinkButtonIcon(kind, icon, href, label string, attrs templ.Attributes) {
+	<a class="c-btn" data-variant={ buttonVariant(kind) } href={ templ.SafeURL(href) } { linkAttrs(attrs)... }>
+		@IconAs(icon, "s", "")
+		{ label }
+	</a>
+}
+
+// OnlineState is the online dot with the word next to it ("Online" or "Offline").
+templ OnlineState(on bool) {
+	<span class="c-online">
+		@OnlineDot(on)
+		{ onlineLabel(on) }
+	</span>
+}
+
 // IconButton is a round button with an icon only; label is its accessible name.
 templ IconButton(icon, label string, attrs templ.Attributes) {
 	<button class="c-icon-btn" aria-label={ label } { buttonAttrs(attrs)... }>
@@ -591,6 +620,17 @@ func noticeIcon(kind string) string {
 		return "info"
 	}
 	return "alert"
+}
+
+// NoticeTitled is a Flash with a bold title line above the text.
+templ NoticeTitled(kind, title, msg string) {
+	<div class="c-notice" data-kind={ noticeKind(kind) } role="status">
+		@Icon(noticeIcon(kind))
+		<div>
+			<b>{ title }</b>
+			{ msg }
+		</div>
+	</div>
 }
 
 // ErrorFragment is the body of a 4xx htmx response that is swapped into #flash.
@@ -685,7 +725,11 @@ type Option struct{ Value, Label string }
 // SelectProps describes a Select.
 type SelectProps struct {
 	Label, Name, Value, Error, Hint string
-	Options                         []Option
+	// AriaLabel names a select that has no visible label (a toolbar filter).
+	AriaLabel string
+	Options   []Option
+	// Auto sizes the select to its text (a toolbar filter) instead of the width of its field.
+	Auto bool
 }
 
 // Select is a labelled select with its error message.
@@ -698,10 +742,26 @@ templ Select(p SelectProps) {
 	</div>
 }
 
+// autoAttrs returns data-auto for a select that sizes itself.
+func autoAttrs(auto bool) templ.Attributes {
+	if auto {
+		return templ.Attributes{"data-auto": true}
+	}
+	return nil
+}
+
+// ariaLabelAttrs returns the aria-label attribute, or nothing for an empty label.
+func ariaLabelAttrs(label string) templ.Attributes {
+	if label == "" {
+		return nil
+	}
+	return templ.Attributes{"aria-label": label}
+}
+
 // SelectControl is the bare <select>, reused inside composite fields.
 templ SelectControl(p SelectProps) {
-	<span class="c-select-wrap">
-		<select id={ p.Name } name={ p.Name } class="c-select" { invalidAttrs(p.Name, p.Error)... }>
+	<span class="c-select-wrap" { autoAttrs(p.Auto)... }>
+		<select id={ p.Name } name={ p.Name } class="c-select" { invalidAttrs(p.Name, p.Error)... } { ariaLabelAttrs(p.AriaLabel)... }>
 			for _, o := range p.Options {
 				<option value={ o.Value } selected?={ o.Value == p.Value }>{ o.Label }</option>
 			}
@@ -737,6 +797,19 @@ templ Checkbox(p CheckboxProps) {
 			{ p.Label }
 		</label>
 		@FieldHint(p.Hint)
+	</div>
+}
+
+// SwitchRow is a titled on/off switch with a hint, as a row: text on the left, the switch on the right.
+templ SwitchRow(p CheckboxProps) {
+	<div class="c-switch-row">
+		<label for={ "f-" + p.Name }>
+			<b>{ p.Label }</b>
+			if p.Hint != "" {
+				<span class="c-field__hint">{ p.Hint }</span>
+			}
+		</label>
+		<input type="checkbox" role="switch" class="c-switch" id={ "f-" + p.Name } name={ p.Name } value="on" checked?={ p.Checked }/>
 	</div>
 }
 
@@ -802,15 +875,27 @@ templ Table(caption string, headers []string) {
 
 // TablePaged is a Table with the pager inside the card, under the rows (nothing when p has one page or none).
 templ TablePaged(caption string, headers []string, p PageProps) {
+	@TablePagedHead(caption, plainHead(headers), p) {
+		{ children... }
+	}
+}
+
+// plainHead is a header row of text cells.
+templ plainHead(headers []string) {
+	for _, h := range headers {
+		<th scope="col">{ h }</th>
+	}
+}
+
+// TablePagedHead is a TablePaged whose header cells are given as head (th elements), so one can hold a checkbox.
+templ TablePagedHead(caption string, head templ.Component, p PageProps) {
 	<div class="c-card" data-flush>
 		<div class="c-table-wrap">
 			<table class="c-table">
 				<caption class="u-sr-only">{ caption }</caption>
 				<thead>
 					<tr>
-						for _, h := range headers {
-							<th scope="col">{ h }</th>
-						}
+						@head
 					</tr>
 				</thead>
 				<tbody>
@@ -957,7 +1042,7 @@ templ SheetHost(id string) {
 				@Icon("x")
 			</button>
 		</div>
-		<div class="c-sheet__body" id={ id + "-body" }></div>
+		<div class="c-sheet__host" id={ id + "-body" }></div>
 	</dialog>
 }
 
@@ -974,6 +1059,20 @@ templ SheetForm(attrs templ.Attributes) {
 	<form class="c-form" data-flush { attrs... }>
 		{ children... }
 	</form>
+}
+
+// SheetFormPane is a form that fills the sheet: its children are a SheetBody that scrolls and a SheetFoot that stays at the bottom.
+templ SheetFormPane(attrs templ.Attributes) {
+	<form class="c-sheet__pane" { attrs... }>
+		{ children... }
+	</form>
+}
+
+// SheetPane is SheetFormPane without the form (the credentials card). attrs add data hooks.
+templ SheetPane(attrs templ.Attributes) {
+	<div class="c-sheet__pane" { attrs... }>
+		{ children... }
+	</div>
 }
 
 // SheetBody is the scrolling body of a Sheet.
@@ -1001,17 +1100,31 @@ func credKey(k string) templ.Attributes {
 	return templ.Attributes{"data-key": k}
 }
 
-// Credentials is what staff hands to a guest: the rows and a Copy button. copyText is what the button copies.
-templ Credentials(rows []CredRow, copyText string) {
-	<dl class="c-credentials">
+// Credentials is what staff hands to a guest: one big monospace block per row, each with its own Copy button.
+templ Credentials(rows []CredRow) {
+	<div class="c-credentials">
 		for _, r := range rows {
 			<div class="c-credentials__row">
+				<div class="u-grow">
+					<small>{ r.Label }</small>
+					<span class="c-credentials__value" { credKey(r.Key)... }>{ r.Value }</span>
+				</div>
+				@ButtonIcon("default", "copy", "Copy", templ.Attributes{"data-size": "sm", "data-copy-text": r.Value, "aria-label": "Copy " + strings.ToLower(r.Label)})
+			</div>
+		}
+	</div>
+}
+
+// KeyValues is a list of label and value rows (the details under the credentials).
+templ KeyValues(rows []CredRow) {
+	<dl class="c-kv">
+		for _, r := range rows {
+			<div>
 				<dt>{ r.Label }</dt>
 				<dd { credKey(r.Key)... }>{ r.Value }</dd>
 			</div>
 		}
 	</dl>
-	@Button("secondary", "Copy details", templ.Attributes{"type": "button", "data-copy-text": copyText})
 }
 
 // PageProps describes a paginated list: the current page, the page count and a

@@ -90,6 +90,10 @@ The source is a design canvas, copied to `docs/design/` (`hp.css`, boards, `READ
   the Router link card (`c-kv`; keeps the time, address and result of each event, the state pill is Healthy / No recent packets / Wrong secret) and three charts (`ui.Plot`: area = busy hours, bars = traffic, dots = active members; the design's
   devices-online-24h and logins-per-day are not in the overview). Every value keeps its tooltip and `data-bar` hooks. The title, the Live line and the summary line are inside the polled fragment (region `head`).
   The fade runs only on htmx swaps and only for regions whose content changed (`swap.js`); the first load has none.
+- **Step 3 (members):** the list has a toolbar (search, two unlabeled selects, chips), a bulk bar (`c-bulk`, hidden until a row is ticked; `forms.js` `syncBulk` sets the count and the header checkbox), and the table (`ui.TablePagedHead` takes the header cells so the first can hold the select-all checkbox).
+  Cells wrap their value in `.c-table__v`; on a phone that makes a flex row. The usage cell is `c-usage` (figures, bar, "left"). `ui.OnlineState` is the dot with its word. The row menu has icons.
+  The sheet host body is `.c-sheet__host`; a fragment that is a `ui.SheetFormPane` (form) or `ui.SheetPane` (div) with a `SheetBody` (scrolls) and a `SheetFoot` (stays at the bottom) fills it. A plain fragment (the plan form, an empty state) still scrolls inside the host with padding.
+  The add form has a mono username, a password with the eye (`ui.RevealToggle`) and Generate (`data-generate-digits`, 6 digits), plan options with limit and days, and the "Account enabled" switch row (`ui.SwitchRow`). The credentials card is `ui.NoticeTitled`, `ui.Credentials` (a Copy button per row), `ui.KeyValues` and "Copy all details"; the footer is Add another, Print (the voucher), Done.
 - **Next steps:** screens are redesigned one by one (dashboard, members, sessions, plans, vouchers, usage, router, settings, login) on top of these components.
 
 ## Not verified

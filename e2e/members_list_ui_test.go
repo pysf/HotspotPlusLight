@@ -212,18 +212,18 @@ func TestE10_13_RowsAndMenu(t *testing.T) {
 	d := f.c.Get("/admin/members").Doc(t)
 	var heads []string
 	d.Find("table thead th").Each(func(_ int, s *goquery.Selection) { heads = append(heads, text(s)) })
-	if strings.Join(heads, "|") != "|User|Plan|Usage|Expires|Status|" {
+	if strings.Join(heads, "|") != "|Username|Plan|Data used|Expires|Status|Online|Actions" {
 		t.Errorf("headers %q", heads)
 	}
 	row := d.Find(`tr[data-member][data-username="alice"]`)
 	cell := func(label string) *goquery.Selection { return row.Find(`td[data-label="` + label + `"]`) }
-	if !strings.Contains(text(cell("User")), "alice") || !strings.Contains(text(cell("User")), "9123456789") || cell("User").Find("a[href]").Length() != 1 {
-		t.Errorf("user cell %q", text(cell("User")))
+	if !strings.Contains(text(cell("Username")), "alice") || !strings.Contains(text(cell("Username")), "9123456789") || cell("Username").Find("a[href]").Length() != 1 {
+		t.Errorf("user cell %q", text(cell("Username")))
 	}
 	if !strings.HasPrefix(text(cell("Plan")), "Fast") || text(cell("Plan").Find(".c-table__sub")) != "5 Mbps" {
 		t.Errorf("plan cell %q", text(cell("Plan")))
 	}
-	m := cell("Usage").Find("meter.c-meter")
+	m := cell("Data used").Find("meter.c-meter")
 	if m.Length() != 1 || m.AttrOr("value", "") == "" || m.AttrOr("max", "") == "" || m.AttrOr("aria-label", "") == "" || m.Text() != "" {
 		t.Errorf("usage meter: %v", m.Nodes)
 	}
@@ -233,8 +233,8 @@ func TestE10_13_RowsAndMenu(t *testing.T) {
 	if got := text(cell("Expires")); !strings.Contains(got, "2026-11-03") || !strings.Contains(got, "in 2 days") {
 		t.Errorf("expires cell %q", got)
 	}
-	if row.Find(`[data-col="status"] .c-pill[data-status="expiring"]`).Length() != 1 || row.Find(`[data-col="status"] .c-dot[role=img]`).AttrOr("aria-label", "") != "Offline" {
-		t.Error("status cell lacks the pill or the online dot")
+	if row.Find(`[data-col="status"] .c-pill[data-status="expiring"]`).Length() != 1 || row.Find(`[data-col="online"] .c-dot[role=img]`).AttrOr("aria-label", "") != "Offline" || text(row.Find(`[data-col="online"]`)) != "Offline" {
+		t.Error("status cell lacks the pill, or the online cell lacks the dot and the word")
 	}
 	// Unlimited plan: no meter, "unlimited" text; no expiry: a dash.
 	brow := d.Find(`tr[data-username="bob"]`)
@@ -329,7 +329,7 @@ func TestE10_15_SheetFragments(t *testing.T) {
 	if form.AttrOr("hx-post", "") != "/admin/members" || form.AttrOr("hx-target", "") != "#sheet-body" || form.Find("input[name=username]").Length() != 1 {
 		t.Errorf("new member form: %v", form.Nodes)
 	}
-	if d.Find("[data-sheet-title]").AttrOr("data-sheet-title", "") != "New member" && form.AttrOr("data-sheet-title", "") != "New member" {
+	if d.Find("[data-sheet-title]").AttrOr("data-sheet-title", "") != "Add member" && form.AttrOr("data-sheet-title", "") != "Add member" {
 		t.Error("the sheet title is missing")
 	}
 	if form.Find(`button[type=submit][hx-disabled-elt="this"]`).Length() != 1 {
@@ -454,21 +454,25 @@ func TestE10_17_SheetSuccess(t *testing.T) {
 	}
 	d := fragmentDoc(t, r)
 	id := f.idOf("erin")
-	row := func(k string) string { return text(d.Find(`.c-credentials [data-key="` + k + `"]`)) }
+	row := func(k string) string { return text(d.Find(`[data-key="` + k + `"]`)) }
 	revealed := text(f.c.Get(mpath(id) + "/password").Doc(t).Find("[data-password]"))
 	if row("username") != "erin" || row("plan") != "Basic" || !strings.Contains(row("expires"), "2026-12-31") || len(row("password")) != 6 || row("password") != revealed {
 		t.Errorf("credentials: user %q pass %q (member has %q) plan %q expires %q", row("username"), row("password"), revealed, row("plan"), row("expires"))
 	}
-	if d.Find(".c-credentials dd[data-key=password]").Length() != 1 {
+	if d.Find(".c-credentials [data-key=password]").Length() != 1 {
 		t.Error("password row needs its hook")
 	}
-	copyText := d.Find(`button[data-copy-text]`).AttrOr("data-copy-text", "")
+	// Each credential has its own Copy button; "Copy all details" copies the lot.
+	if d.Find(`.c-credentials__row button[data-copy-text]`).Length() != 2 || d.Find(`.c-credentials__row button[data-copy-text="`+revealed+`"]`).Length() != 1 {
+		t.Error("username and password each need a Copy button with their value")
+	}
+	copyText := d.Find(`button[data-copy-all]`).AttrOr("data-copy-text", "")
 	for _, want := range []string{"erin", revealed, "Basic"} {
 		if !strings.Contains(copyText, want) {
 			t.Errorf("copy text %q lacks %q", copyText, want)
 		}
 	}
-	if d.Find(`[hx-get="/admin/members/new"][hx-target="#sheet-body"]`).Length() != 1 || text(d.Find(`[hx-get="/admin/members/new"]`)) != "Create another" {
+	if d.Find(`[hx-get="/admin/members/new"][hx-target="#sheet-body"]`).Length() != 1 || text(d.Find(`[hx-get="/admin/members/new"]`)) != "Add another" {
 		t.Error("no Create another button")
 	}
 	if done := d.Find("button[data-close]"); text(done) != "Done" {
@@ -476,6 +480,12 @@ func TestE10_17_SheetSuccess(t *testing.T) {
 	}
 	if d.Find("[data-sheet-title]").Length() == 0 {
 		t.Error("the card needs a sheet title")
+	}
+	if p := d.Find(`a[href="` + mpath(id) + `/voucher"]`); text(p) != "Print" || p.AttrOr("target", "") != "_blank" {
+		t.Error("the card needs a Print link to the voucher")
+	}
+	if got := text(d.Find(`[data-key="devices"]`)); got == "" {
+		t.Error("the card shows the device count")
 	}
 	// A password typed by the admin is shown as typed; no expiry says so.
 	r = f.c.SendHX("POST", "/admin/members", harness.MemberForm(p, "frank", "password", "s3cret-pw"), sheetTarget)

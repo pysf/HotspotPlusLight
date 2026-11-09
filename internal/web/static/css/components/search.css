@@ -23,6 +23,7 @@
     pointer-events: none;
   }
   @media (max-width: 699px) {
+    .c-search { flex-basis: 100%; max-inline-size: none; }
     .c-search__hint { display: none; }
   }
 }

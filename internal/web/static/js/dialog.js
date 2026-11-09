@@ -63,7 +63,7 @@ for (const name of ["htmx:afterSwap", "htmx:afterRequest"]) {
 // When the page's sheet host closes, empty its body, so old input never shows again.
 document.addEventListener("close", (e) => {
   if (e.target instanceof HTMLDialogElement && e.target.hasAttribute("data-sheet-host")) {
-    e.target.querySelector(".c-sheet__body")?.replaceChildren();
+    e.target.querySelector(".c-sheet__host")?.replaceChildren();
   }
 }, true);
 

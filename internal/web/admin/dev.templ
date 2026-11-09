@@ -53,6 +53,9 @@ templ DevComponentsPage(l ui.LayoutData) {
 			<label class="c-choice"><input type="checkbox" class="c-switch" role="switch"/> Off</label>
 			<label class="c-choice"><input type="checkbox" class="c-switch" role="switch" checked/> On</label>
 			<label class="c-choice"><input type="checkbox" class="c-switch" role="switch" disabled/> Disabled</label>
+			<div class="l-narrow">
+				@ui.SwitchRow(ui.CheckboxProps{Label: "Account enabled", Name: "g_enabled", Checked: true, Hint: "Turning it off disconnects the member's open sessions."})
+			</div>
 			<span class="c-seg" role="radiogroup" aria-label="Range">
 				<button type="button" role="radio" aria-checked="false">7</button>
 				<button type="button" role="radio" aria-checked="true">30</button>
@@ -201,9 +204,15 @@ templ DevComponentsPage(l ui.LayoutData) {
 			@ui.Button("secondary", "Show toast", templ.Attributes{"data-toast": "Saved."})
 			@ui.Button("secondary", "Show error toast", templ.Attributes{"data-toast": "Could not save. Try again.", "data-toast-kind": "error"})
 		}
+		@galleryItem("Notice with a title") {
+			<div class="l-narrow">
+				@ui.NoticeTitled("ok", "alice is ready", "Give these details to the guest.")
+			</div>
+		}
 		@galleryItem("Credentials") {
 			<div class="l-narrow">
-				@ui.Credentials([]ui.CredRow{{Label: "Username", Value: "alice"}, {Label: "Password", Value: "493021"}, {Label: "Plan", Value: "Premium"}}, "Username: alice\nPassword: 493021")
+				@ui.Credentials([]ui.CredRow{{Label: "Username", Value: "alice"}, {Label: "Password", Value: "493021"}})
+				@ui.KeyValues([]ui.CredRow{{Label: "Plan", Value: "Premium"}, {Label: "Valid until", Value: "No expiry"}})
 			</div>
 		}
 		@galleryItem("Credentials in a sheet (after a member is created)") {
@@ -272,9 +281,7 @@ templ DevComponentsPage(l ui.LayoutData) {
 			}
 		}
 		@ui.Sheet("g-cred-sheet", "Member created") {
-			@ui.SheetBody() {
-				@MemberCreated(createdVM{Username: "alice", Password: "493021", Plan: "Premium", Expires: "No expiry"})
-			}
+			@MemberCreated(createdVM{ID: 1, Username: "alice", Password: "493021", Plan: "Premium", Expires: "No expiry", Devices: "2"})
 		}
 		@ui.Modal("g-modal", "Delete member?", "This cannot be undone.") {
 			@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})

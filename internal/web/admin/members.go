@@ -147,7 +147,7 @@ func (h handlers) createdCard(r *http.Request, id int64) (createdVM, error) {
 		return createdVM{}, err
 	}
 	vm := newVM(v)
-	return createdVM{Username: vm.Username, Password: pw, Plan: vm.PlanName, Expires: vm.ExpiresFull}, nil
+	return createdVM{ID: id, Username: vm.Username, Password: pw, Plan: vm.PlanName, Expires: vm.ExpiresFull, Devices: strconv.Itoa(v.Row.Plan.MaxSessions)}, nil
 }
 
 // memberPage shows one member, in the sheet or as a page.
@@ -552,6 +552,17 @@ func newVM(v member.View) memberVM {
 		vm.RenewalText = fmt.Sprintf("Renewed %d %s%s (%s)", m.RenewalCount, times, last, kind)
 	}
 	return vm
+}
+
+// Sub is the small line under the username: the name and the mobile number, whichever exist.
+func (m memberVM) Sub() string {
+	if m.Name == "" {
+		return m.Mobile
+	}
+	if m.Mobile == "" {
+		return m.Name
+	}
+	return m.Name + " · " + m.Mobile
 }
 
 // trimJoin returns a and b joined by a space, leaving out an empty one.

@@ -46,19 +46,19 @@ export default [
   "page": "Installation",
   "heading": "Linux",
   "url": "docs/installation/#linux",
-  "keywords": "Download, unpack and install the program: curl -LO  tar -xzf hotspotpluslight-linux-amd64.tar.gz sudo install -m 755 hotspotpluslight /usr/local/bin/ hotspotpluslight version Start the server from the same folder. It creates the secret key and the database on "
+  "keywords": "Download, unpack and install the program: curl -LO tar -xzf hotspotpluslight-linux-amd64.tar.gz sudo install -m 755 hotspotpluslight /usr/local/bin/ hotspotpluslight version Start the server from the same folder. It creates the secret key and the database on f"
  },
  {
   "page": "Installation",
   "heading": "macOS",
   "url": "docs/installation/#macos",
-  "keywords": "Use darwin-arm64 on Apple silicon or darwin-amd64 on an Intel Mac: curl -LO  tar -xzf hotspotpluslight-darwin-arm64.tar.gz ./hotspotpluslight version Then create hsp.env and start the server as shown for Linux. If macOS blocks a file you downloaded in a browse"
+  "keywords": "Use darwin-arm64 on Apple silicon or darwin-amd64 on an Intel Mac: curl -LO tar -xzf hotspotpluslight-darwin-arm64.tar.gz ./hotspotpluslight version Then create hsp.env and start the server as shown for Linux. If macOS blocks a file you downloaded in a browser"
  },
  {
   "page": "Installation",
   "heading": "Windows",
   "url": "docs/installation/#windows",
-  "keywords": "Open PowerShell, then download and unpack the zip: curl.exe -LO  Expand-Archive hotspotpluslight-windows-amd64.zip -DestinationPath C:\\hotspotpluslight cd C:\\hotspotpluslight .\\hotspotpluslight.exe version To try it in the window, start it: .\\hotspotpluslight."
+  "keywords": "Open PowerShell, then download and unpack the zip: curl.exe -LO Expand-Archive hotspotpluslight-windows-amd64.zip -DestinationPath C:\\hotspotpluslight cd C:\\hotspotpluslight .\\hotspotpluslight.exe version To try it in the window, start it: .\\hotspotpluslight.e"
  },
  {
   "page": "Installation",
@@ -70,7 +70,7 @@ export default [
   "page": "Installation",
   "heading": "Build from source",
   "url": "docs/installation/#build",
-  "keywords": "You need Go 1.26 (see go.mod ) and make. The build has no cgo and no Node step. git clone  cd HotspotPlusLight make build make build writes bin/hotspotpluslight . For a 64-bit Windows program use make build-windows , which writes bin/hotspotpluslight.exe . mak"
+  "keywords": "You need Go 1.26 (see go.mod ) and make. The build has no cgo and no Node step. git clone cd HotspotPlusLight make build make build writes bin/hotspotpluslight . For a 64-bit Windows program use make build-windows , which writes bin/hotspotpluslight.exe . make"
  },
  {
   "page": "Installation",
@@ -100,7 +100,7 @@ export default [
   "page": "Run as a service",
   "heading": "Check that it runs",
   "url": "docs/running-as-a-service/#check",
-  "keywords": "On the server, curl  prints ok . In a browser,  shows the login page. Then continue with First login ."
+  "keywords": "On the server, curl prints ok . In a browser, shows the login page. Then continue with First login ."
  },
  {
   "page": "Configuration",
@@ -130,7 +130,7 @@ export default [
   "page": "First login",
   "heading": "Log in",
   "url": "docs/first-login/#login",
-  "keywords": "Open  . Once your password is set, the admin panel opens on the Dashboard . On the first start the account is admin with the password admin (you can change the user name with HSP_ADMIN_USERNAME before the first start). The first-start block printed by the serv"
+  "keywords": "Open . Once your password is set, the admin panel opens on the Dashboard . On the first start the account is admin with the password admin (you can change the user name with HSP_ADMIN_USERNAME before the first start). The first-start block printed by the serve"
  },
  {
   "page": "First login",
@@ -154,7 +154,7 @@ export default [
   "page": "First login",
   "heading": "Create a member",
   "url": "docs/first-login/#member",
-  "keywords": "Open Members and choose New member . Pick a plan. A user name has English letters and digits only (up to 64) and is not case-sensitive; if you leave it empty, the mobile number is used. If you leave the password empty, a random 6-digit number is made. You can "
+  "keywords": "Open Members and choose Add member . A side panel opens. Pick a plan. The Generate button puts a random 6-digit password in the field. A user name has English letters and digits only (up to 64) and is not case-sensitive; if you leave it empty, the mobile numbe"
  },
  {
   "page": "First login",

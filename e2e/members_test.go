@@ -119,7 +119,7 @@ func TestE2_01b_MemberPageShowsFields(t *testing.T) {
 	if got := scalar[int64](t, f.db, `SELECT expires_at FROM member WHERE id=?`, id); got != want {
 		t.Errorf("expires_at %d, want %d", got, want)
 	}
-	if got := d.Find(`#member-form select[name="plan_id"] option[selected]`).Text(); strings.TrimSpace(got) != "Basic" {
+	if got := d.Find(`#member-form select[name="plan_id"] option[selected]`).Text(); !strings.HasPrefix(strings.TrimSpace(got), "Basic") {
 		t.Errorf("member page plan %q", got)
 	}
 	st := text(d.Find("#member-status"))

@@ -26,11 +26,15 @@
     padding: 20px 20px var(--s-3) var(--s-5);
   }
   .c-sheet__title { font-size: var(--fs-xl); }
-  .c-sheet__body { flex: 1; display: grid; gap: var(--s-4); align-content: start; overflow: auto; padding: var(--s-2) var(--s-5) var(--s-5); }
+  .c-sheet__host { flex: 1; min-block-size: 0; display: flex; flex-direction: column; overflow: auto; padding: var(--s-2) var(--s-5) var(--s-5); }
+  .c-sheet__host:has(> .c-sheet__pane) { padding: 0; overflow: hidden; }
+  .c-sheet__pane { flex: 1; min-block-size: 0; display: flex; flex-direction: column; }
+  .c-sheet__body { flex: 1; display: grid; gap: var(--s-4); align-content: start; overflow: auto; padding: var(--s-2) var(--s-5) var(--s-5); min-block-size: 0; }
   .c-sheet__foot {
     display: flex;
     justify-content: flex-end;
     gap: var(--s-3);
+    flex: none;
     padding: var(--s-4) var(--s-5) var(--s-5);
     border-block-start: 1px solid var(--c-line);
   }

@@ -22,8 +22,12 @@
   .c-table tbody tr:last-child td { border-block-end: 0; }
   .c-table tbody tr:hover, .c-table tbody tr.is-hover { background: var(--c-surface-2); }
   .c-table tbody tr[aria-selected="true"], .c-table tbody tr:has(.c-check:checked) { background: var(--c-accent-soft); }
-  .c-table td[data-slot="select"] { inline-size: var(--w-chk); padding-inline-end: 0; }
-  .c-table td[data-slot="actions"] { inline-size: var(--w-act); text-align: end; }
+  .c-table :is(th, td)[data-slot="select"] { inline-size: var(--w-chk); padding-inline-end: 0; }
+  .c-table :is(th, td)[data-slot="actions"] { inline-size: var(--w-act); text-align: end; }
+  .c-table__main { display: block; color: var(--c-text); font-weight: var(--fw-semibold); }
+  .c-table__v { display: block; }
+  .c-online { display: inline-flex; align-items: center; gap: var(--s-3); }
+  .c-table td[data-nowrap] { white-space: nowrap; }
   .c-table__sub { display: block; margin-block-start: 1px; color: var(--c-text-3); font-size: var(--fs-sm); font-weight: 400; }
   .c-table td, .c-table__sub { overflow-wrap: anywhere; }
 
@@ -39,6 +43,7 @@
     box-shadow: var(--sh-2);
   }
   .c-bulk > b { margin-inline-end: auto; }
+  .c-bulk[hidden] { display: none; }
 
   @media (max-width: 699px) {
     .c-table thead { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -55,7 +60,12 @@
     .c-table tbody tr:last-child { border-block-end: 0; }
     .c-table td { display: block; grid-column: 1 / -1; padding: 0 var(--s-1); border: 0; }
     .c-table td[data-label]::before { content: attr(data-label); display: inline-block; inline-size: var(--w-label); color: var(--c-text-3); font-size: var(--fs-sm); font-weight: 400; }
-    .c-table .c-meter { display: inline-block; inline-size: 40%; min-inline-size: var(--w-meter); margin-inline-end: var(--s-2); vertical-align: middle; }
+    /* A cell that wraps its value in .c-table__v is a flex row: label on the left, value on the right. */
+    .c-table td[data-label]:has(> .c-table__v) { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+    .c-table td[data-label]:has(> .c-table__v)::before { inline-size: auto; }
+    .c-table .c-table__v { text-align: end; }
+    .c-table .c-table__v:has(> .c-usage) { flex: 0 0 60%; }
+    .c-table .c-usage { inline-size: 100%; }
     .c-table__sub { display: inline; margin-inline-start: var(--s-2); }
     .c-table td[data-slot="select"] { grid-column: 1; grid-row: 1; inline-size: auto; padding: 0; }
     .c-table td[data-slot="actions"] { grid-column: -2; grid-row: 1; inline-size: auto; padding: 0; justify-self: end; }
