@@ -724,7 +724,7 @@ Exit: `gofmt -l .`, `go vet ./...` clean; review agent on the whole phase; the o
 ---
 
 ## 12. Definition of done (whole project)
-All E2E tests green on a clean checkout with no external services; hardware checklist (§13) executed on one real MikroTik and results recorded in `docs/lab-results.md`; every row in §4 either implemented or explicitly signed off as Dropped; README lets a new person install and connect a router in under 30 minutes.
+All E2E tests green on a clean checkout with no external services; hardware checklist (§13) executed on one real MikroTik, done by the owner on 2026-11-09; every row in §4 either implemented or explicitly signed off as Dropped; README lets a new person install and connect a router in under 30 minutes.
 
 ---
 
