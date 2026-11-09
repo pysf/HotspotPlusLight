@@ -246,12 +246,7 @@ func (h handlers) shellStatus(r *http.Request, env *ui.Env) {
 		}
 	}
 	if h.Link != nil {
-		snap := h.Link.Snapshot()
-		last := snap.AccessRequest.At
-		if snap.Accounting.At.After(last) {
-			last = snap.Accounting.At
-		}
-		env.RouterUp = !last.IsZero() && h.now().Sub(last) < routerRecent
+		env.RouterUp = routerUp(h.Link.Snapshot(), h.now())
 	}
 }
 

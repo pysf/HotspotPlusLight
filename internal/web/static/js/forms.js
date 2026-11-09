@@ -1,5 +1,6 @@
 // Small form helpers, all driven by data attributes (no inline handlers):
-//   [data-reveal="id"]       toggles the password field #id between hidden and visible
+//   [data-reveal="id"]       toggles the password field #id between hidden and visible (an eye button with
+//                            aria-pressed keeps its icon and changes aria-pressed and aria-label; a text button changes its text)
 //   [data-select-all="sel"]  a checkbox that ticks every checkbox matching sel
 //   [data-clear="id"]        a button that empties the element #id
 //   [data-bulk-guard]        a form: htmx does not send it when nothing is ticked
@@ -10,7 +11,13 @@ document.addEventListener("click", (e) => {
     const input = document.getElementById(reveal.getAttribute("data-reveal"));
     if (!input) { return; }
     input.type = input.type === "password" ? "text" : "password";
-    reveal.textContent = input.type === "password" ? "Reveal" : "Hide";
+    const shown = input.type !== "password";
+    if (reveal.hasAttribute("aria-pressed")) {
+      reveal.setAttribute("aria-pressed", String(shown));
+      reveal.setAttribute("aria-label", shown ? "Hide password" : "Show password");
+    } else {
+      reveal.textContent = shown ? "Hide" : "Reveal";
+    }
     return;
   }
   const clear = e.target.closest("[data-clear]");

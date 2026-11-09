@@ -159,6 +159,7 @@
     --size-step: 26px;
     --w-act: 64px;
     --w-chk: 52px;
+    --auth-pad: 40px 36px 32px;   /* padding of the sign-in card; the phone value is below */
 
     /* Motion and layers. */
     --ease: cubic-bezier(.2, .8, .2, 1);
@@ -185,6 +186,7 @@
       --h-topbar: 60px;
       --h-btn-sm: 44px;
       --fs-tile: 28px;
+      --auth-pad: 32px 22px 24px;
     }
   }
 }

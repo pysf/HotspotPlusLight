@@ -50,7 +50,7 @@
 <section><h2 id="login-problems"><a href="#login-problems">Logins fail</a></h2><div class="faq"><details><summary>Nobody can log in, and the login page waits or fails</summary>
 <p>Check in this order:</p>
 <ol>
-<li>Open the <strong>Dashboard</strong> and look at the <strong>Router status</strong> panel. If no login request arrived, the router does not reach the server: check <code>&lt;SERVER-IP&gt;</code> in <code>/radius</code> and that UDP 1812 and 1813 are open on the server.</li>
+<li>Open the <strong>Dashboard</strong> and look at the <strong>Router link</strong> card. If no login request arrived, the router does not reach the server: check <code>&lt;SERVER-IP&gt;</code> in <code>/radius</code> and that UDP 1812 and 1813 are open on the server.</li>
 <li>If the panel counts packets with a bad shared secret, the secret on the router differs from the one on the <strong>Settings</strong> page. The server drops such packets without an answer. Make them equal.</li>
 <li>If the router log says <em>RADIUS server is not responding</em> but the server log shows replies being sent, the router is ignoring them. A common cause is a server on the hotspot network. See <a href="../router-setup/#firewall">Router setup</a>.</li>
 <li>Check that the profile has <code>use-radius=yes</code> and <code>login-by=http-pap</code>.</li>
@@ -65,10 +65,10 @@
 <li>On the router, run <code>/radius incoming set accept=yes port=3799</code>, with the same port as <strong>Disconnect (CoA) port</strong> on the Settings page.</li>
 <li>Check that the router accepts UDP 3799 from the server in its firewall.</li>
 <li>The server sends the Disconnect to the address the router used for accounting. If that was an address on the router's uplink side, the router's default firewall drops the packet, and the result is <em>no answer</em>. Make sure the router talks to the server from an address that its firewall accepts.</li>
-<li>The <strong>Router status</strong> panel on the Dashboard shows the result of the last Disconnect. The server log has a <code>disconnect</code> line for each one, with the address, user, session and result.</li>
+<li>The <strong>Router link</strong> card on the Dashboard shows the result of the last Disconnect. The server log has a <code>disconnect</code> line for each one, with the address, user, session and result.</li>
 </ul>
 <p>If the router answers that it has no such session, the server treats it as done and ends the session in its list.</p></details><details><summary>Usage is not counted</summary>
-<p>The router must send accounting. Check <code>radius-accounting=yes</code> on the profile and that the Router status panel on the Dashboard shows accounting packets. The usage updates arrive every accounting interval.</p></details></div></section>
+<p>The router must send accounting. Check <code>radius-accounting=yes</code> on the profile and that the Router link card on the Dashboard shows accounting packets. The usage updates arrive every accounting interval.</p></details></div></section>
 <section><h2 id="admin-problems"><a href="#admin-problems">Admin panel, server and settings</a></h2><div class="faq"><details><summary>The times are wrong, or vouchers expire at the wrong hour</summary>
 <p>The default time zone is <code>UTC</code>. Set yours on the Settings page, for example <code>Europe/London</code>. Dates, daily usage and voucher expiry follow it.</p></details><details><summary>I forgot the admin password</summary>
 <p>Run <code>hotspotpluslight admin set-password</code> on the server (add <code>--env-file</code> if you use one). See <a href="../first-login/#forgot">First login</a>.</p></details><details><summary>The server does not start</summary>

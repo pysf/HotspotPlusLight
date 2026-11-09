@@ -166,7 +166,7 @@ export default [
   "page": "First login",
   "heading": "See who is online",
   "url": "docs/first-login/#online",
-  "keywords": "The Dashboard shows how many are online now, today's traffic and the router status. The Online page lists the open sessions and refreshes every 10 seconds. Disconnect sends a RADIUS Disconnect request to the router. The Usage page shows traffic per day for 30 "
+  "keywords": "The Dashboard shows how many are online now, today's traffic and the router link. The Online page lists the open sessions and refreshes every 10 seconds. Disconnect sends a RADIUS Disconnect request to the router. The Usage page shows traffic per day for 30 da"
  },
  {
   "page": "Dashboard",
@@ -176,21 +176,21 @@ export default [
  },
  {
   "page": "Dashboard",
-  "heading": "The three tiles",
+  "heading": "The four tiles",
   "url": "docs/dashboard/#tiles",
-  "keywords": "Tile What it shows Online now The open sessions that the router still reports. It is the same number as on the Online page, so one member on two devices counts twice. The note shows the peak today : the most sessions online at one moment since midnight. Traffi"
+  "keywords": "Tile What it shows Online now The open sessions that the router still reports. It is the same number as on the Online page, so one member on two devices counts twice. Peak today The most sessions online at one moment since midnight. Traffic today Download plus"
  },
  {
   "page": "Dashboard",
-  "heading": "Router status",
+  "heading": "Router link",
   "url": "docs/dashboard/#router-status",
-  "keywords": "This panel shows what the router last sent to the server: the time and source address of the last login request, the last accounting packet and the last Disconnect result, and how many packets had a wrong shared secret. It lives in memory and starts empty afte"
+  "keywords": "This card shows what the router last sent to the server: the time and source address of the last login request, the last accounting packet and the last Disconnect result, and how many packets had a wrong shared secret. The label next to the title says Healthy "
  },
  {
   "page": "Dashboard",
   "heading": "Needs attention",
   "url": "docs/dashboard/#attention",
-  "keywords": "Two short lists, with the full count in the heading and at most five members shown: Expiring in 3 days : active members whose expiry date is in the next 3 days. They are good people to renew. It is the same rule as the Expiring filter on the Members page. Near"
+  "keywords": "One card with two short lists. Each list has the full count in its title and at most five members. The label next to the card title shows the number of items, or All clear : Expiring in 3 days : active members whose expiry date is in the next 3 days. They are "
  },
  {
   "page": "Dashboard",
@@ -238,7 +238,7 @@ export default [
   "page": "Router setup",
   "heading": "Test it",
   "url": "docs/router-setup/#test",
-  "keywords": "Make a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the Online page. The Dashboard has a Router status panel: the time and source address of the last login request, the last accounting packet and the l"
+  "keywords": "Make a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the Online page. The Dashboard has a Router link card: the time and source address of the last login request, the last accounting packet and the last"
  },
  {
   "page": "Hotspot login pages",
@@ -376,7 +376,7 @@ export default [
   "page": "Troubleshooting",
   "heading": "Logins fail",
   "url": "docs/troubleshooting/#login-problems",
-  "keywords": "Nobody can log in, and the login page waits or fails Check in this order: Open the Dashboard and look at the Router status panel. If no login request arrived, the router does not reach the server: check <SERVER-IP> in /radius and that UDP 1812 and 1813 are ope"
+  "keywords": "Nobody can log in, and the login page waits or fails Check in this order: Open the Dashboard and look at the Router link card. If no login request arrived, the router does not reach the server: check <SERVER-IP> in /radius and that UDP 1812 and 1813 are open o"
  },
  {
   "page": "Troubleshooting",

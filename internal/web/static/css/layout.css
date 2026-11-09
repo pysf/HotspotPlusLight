@@ -118,22 +118,13 @@
   .l-split { display: flex; gap: var(--s-2); }
   .l-split > :first-child { flex: 1; min-inline-size: 0; }
   .l-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-3); }
+  .l-cols { display: grid; gap: var(--s-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .l-cols[data-cols="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .l-grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(var(--w-grid), 1fr)); }
 
-  /* Login. */
+  /* Login and the forced password change: one centered column. */
   .l-center { display: grid; place-items: center; min-block-size: 100dvh; padding: var(--s-6) var(--s-4); background: var(--c-bg); }
   .l-login { inline-size: 100%; max-inline-size: var(--w-auth); display: grid; gap: var(--s-5); }
-  .l-logo {
-    justify-self: center;
-    display: grid;
-    place-items: center;
-    inline-size: var(--size-brand-lg);
-    block-size: var(--size-brand-lg);
-    border-radius: var(--r-mark-lg);
-    background: var(--c-accent);
-    color: var(--c-accent-fg);
-  }
-  .l-login__title { font-size: var(--fs-3xl); line-height: 1.12; text-align: center; letter-spacing: -.022em; }
 
   /* Tab bar (phone only). */
   .l-tabbar { display: none; }
@@ -155,6 +146,7 @@
   /* Icon rail. */
   @media (max-width: 999px) {
     :root { --nav-w: var(--nav-w-rail); }
+    .l-cols[data-cols="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .l-brand__text, .l-side-foot__text, .l-nav__link .c-badge { display: none; }
     .l-brand, .l-side-foot { justify-content: center; padding-inline: 0; }
     .l-nav__link { justify-content: center; padding: 0; }
@@ -170,6 +162,7 @@
 
   /* Phone. */
   @media (max-width: 699px) {
+    .l-cols, .l-cols[data-cols="3"] { grid-template-columns: minmax(0, 1fr); }
     .l-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr auto; }
     .l-sidebar { display: none; }
     .l-topbar__brand { display: flex; }
@@ -197,7 +190,6 @@
       border-block-start: 1px solid var(--c-line);
     }
     .l-center { place-items: start center; padding: var(--s-5) var(--s-3); }
-    .l-login__title { font-size: var(--fs-3xl); }
   }
 
   @media print {

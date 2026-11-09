@@ -49,6 +49,14 @@ func (e Env) TabTitle(page string) string {
 	return page + " - " + product
 }
 
+// BrandLine is the product name, followed by the business name when it is set.
+func (e Env) BrandLine() string {
+	if e.BusinessName == "" {
+		return "HotspotPlus Lite"
+	}
+	return "HotspotPlus Lite \u00b7 " + e.BusinessName
+}
+
 // envKey is the context key of the page environment.
 type envKey struct{}
 

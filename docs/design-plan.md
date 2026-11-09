@@ -13,6 +13,8 @@ details, unless the design is wrong for the product.
    - the Router page has the MikroTik default plus 7 themes (not "eight pages: login, alogin, ...");
    - "over quota" is not a member status (it is a Needs attention item on the dashboard);
    - brand text is "HotspotPlus Lite".
+6. The password rules list has two rules (10 or more characters, both match). "A letter and a number" is not a product rule (BR-20).
+7. The Live line says "Live · updates every 10 s", because the whole page is replaced every 10 s and there is no timer.
 
 ## Steps
 Each step: a sonnet agent builds it (tests first where logic changes), a separate sonnet agent
@@ -25,7 +27,7 @@ it, and keep each test's intent. No inline style or script (CSP).
 | Step | Scope | State |
 |---|---|---|
 | 1 | Tokens, system fonts, shared components, app shell (side bar, top bar, phone tab bar with More), icon sprite, theme (cookie `light`/`dark`/auto), component gallery, review fixes | DONE (commit "Design v2 step 1") |
-| 2 | Login, Set new password (rules list), Dashboard (tiles, Needs attention, Router link, 3 charts, Live dot, 10 s refresh without jumps) | todo |
+| 2 | Login, Set new password (rules list), Dashboard (tiles, Needs attention, Router link, 3 charts, Live dot, 10 s refresh without jumps) | DONE (commit "Design v2 step 2") |
 | 3 | Members list (chips, bulk bar, stacked cards on phone), Add/edit sheet, credentials card, row menus | todo |
 | 4 | Plans (cards + edit form, delete-blocked reason), Online sessions (kick + confirm) | todo |
 | 5 | Vouchers/batches (form, list, A4 print sheet 3x6), Usage (7/30/90 switch, chart, top 10) | todo |
@@ -59,7 +61,7 @@ it, and keep each test's intent. No inline style or script (CSP).
 ## Known notes from step 1
 - No max page width in the design: check tables at 1920 px.
 - Phone table cells: the Usage cell layout is awkward; redo in step 3.
-- The dashboard fade (`swap-in`) also plays on the first load; limit it to htmx swaps.
+- The dashboard fade is done: `swap.js` adds `u-swap-in` only after an htmx swap, to changed regions (step 2 added no `swap-in` class to the markup).
 - The Online badge shows only when the count is above 0; the router footer says "Router connected"
   only if a packet came in the last 5 minutes.
 - Not looked at in a browser yet: the More menu, sheets, filled member rows.

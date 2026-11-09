@@ -103,7 +103,7 @@ sequenceDiagram
 
 ### Dashboard
 
-The admin home page (`/admin`) shows three tiles (online now with today's peak, traffic today, failed logins today), the router status panel (last login request, accounting packet and Disconnect; moved here from the Router page), a short Needs attention list (members expiring in 3 days, members at 80% of their data) and three charts (traffic for 14 days, busy hours, active members per day). The whole page refreshes by itself every 10 seconds.
+The admin home page (`/admin`) shows four tiles (online now, peak today, traffic today, failed logins today), the Router link card (last login request, accounting packet and Disconnect; moved here from the Router page), a short Needs attention list (members expiring in 3 days, members at 80% of their data) and three charts (traffic for 14 days, busy hours, active members per day). The whole page refreshes by itself every 10 seconds.
 
 **Failed logins** are counted per day and reason code, one count for every Access-Reject the server sends. No user names and no addresses are stored. A router retry of the same request counts once. Packets the server does not answer (for example a wrong shared secret) are not counted here; the router status panel counts those. The counts are kept for the *session retention* days of the Settings page (90 by default, 0 = forever) and deleted with the old sessions. See the site page "Dashboard" for what each number means.
 

@@ -219,6 +219,22 @@ templ DevComponentsPage(l ui.LayoutData) {
 				@ui.BarChart([]ui.Bar{{Label: "Mon", Value: 3}, {Label: "Tue", Value: 8}, {Label: "Wed", Value: 5}, {Label: "Thu", Value: 10}}, 10, "sample")
 			</div>
 		}
+		@galleryItem("Plots (dashboard charts)") {
+			<div class="l-cols" data-cols="3">
+				<div class="c-card" data-pad>
+					<div class="c-card__head"><h2 class="c-card__title">Area</h2></div>
+					@ui.Plot(ui.PlotArea, galleryBars(24, "00:00"), 10, "Area sample")
+				</div>
+				<div class="c-card" data-pad>
+					<div class="c-card__head"><h2 class="c-card__title">Bars</h2></div>
+					@ui.Plot(ui.PlotBars, galleryBars(7, "Mon"), 10, "Bar sample")
+				</div>
+				<div class="c-card" data-pad>
+					<div class="c-card__head"><h2 class="c-card__title">Dots</h2></div>
+					@ui.Plot(ui.PlotDots, galleryBars(7, "Mon"), 10, "Dot sample")
+				</div>
+			</div>
+		}
 		@galleryItem("Tiles") {
 			@ui.Tiles() {
 				@ui.Tile("Online now", nil) {
@@ -269,3 +285,12 @@ templ DevComponentsPage(l ui.LayoutData) {
 
 // galleryHref returns the anchor link to gallery page n.
 func galleryHref(n int) string { return "#page-" + string(rune('0'+n)) }
+
+// galleryBars returns n sample values for the plot samples of the gallery.
+func galleryBars(n int, label string) []ui.Bar {
+	out := make([]ui.Bar, n)
+	for i := range out {
+		out[i] = ui.Bar{Label: label, Value: int64(2 + (i*7)%9), Tip: "sample"}
+	}
+	return out
+}

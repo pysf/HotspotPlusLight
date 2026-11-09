@@ -83,6 +83,13 @@ The source is a design canvas, copied to `docs/design/` (`hp.css`, boards, `READ
 - **Review fixes (2026-11-09):** the toast has one status icon (toast.js sets the alert icon for an error); `ui.EmptyState(title, text)` has a title (h3) and children for a button; `ui.TileIcon` adds an icon to a tile label;
   `ui.TablePaged` puts the pager inside the card; `swap.js` skips polls while hidden or with an open dialog or menu and fades only changed regions; the router footer uses the injected clock (`Deps.Clock`);
   the meter turns warning at exactly 80 %; a submit button shows its spinner while its form request runs; `static.go` no longer rewrites `url()` in CSS (there is no font file).
+- **Step 2 (login, password, dashboard):** `c-auth` is the sign-in card (`ui.AuthHead`); the login page and the forced password change use it in the bare layout, which now loads htmx and the scripts too.
+  The forced page keeps a "Current password" field and a Log out button (the server needs the first; the shell with its Log out is gone). The rules list (`c-rules`) is `10 or more characters` and `Both passwords match`,
+  ticked live by `password.js`; the design's "a letter and a number" is not a product rule (BR-20), so it is not shown. The eye button (`ui.RevealButton`) keeps its icon (`forms.js`).
+  The dashboard has four tiles (the design's "Members" tile is not in `dashboard.Overview`; "Peak today" is its own tile), Needs attention as one card with two groups (expiring, near the data limit; no plan name, the overview has none),
+  the Router link card (`c-kv`; keeps the time, address and result of each event, the state pill is Healthy / No recent packets / Wrong secret) and three charts (`ui.Plot`: area = busy hours, bars = traffic, dots = active members; the design's
+  devices-online-24h and logins-per-day are not in the overview). Every value keeps its tooltip and `data-bar` hooks. The title, the Live line and the summary line are inside the polled fragment (region `head`).
+  The fade runs only on htmx swaps and only for regions whose content changed (`swap.js`); the first load has none.
 - **Next steps:** screens are redesigned one by one (dashboard, members, sessions, plans, vouchers, usage, router, settings, login) on top of these components.
 
 ## Not verified

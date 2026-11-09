@@ -8,21 +8,21 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
-// LoginPage is the admin login form. errMsg is shown above the form when it is not empty.
+// LoginPage is the admin login form. errMsg is shown in the card when it is not empty.
 templ LoginPage(username, errMsg string) {
-	@ui.Layout(ui.LayoutData{Title: "Log in", Bare: true}) {
-		<div class="l-stack">
-			<span class="l-logo" aria-hidden="true"></span>
-			<h1 class="l-login__title">Admin login</h1>
+	@ui.Layout(ui.LayoutData{Title: "Sign in", Bare: true}) {
+		<form class="c-auth" method="post" action="/admin/login">
+			@ui.AuthHead("Sign in", ui.EnvFrom(ctx).BrandLine())
 			if errMsg != "" {
 				@ui.ErrorFragment(errMsg)
 			}
-			<form class="l-stack" method="post" action="/admin/login">
-				@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: username, Attrs: templ.Attributes{"autocomplete": "username", "autofocus": true}})
-				@ui.Field(ui.FieldProps{Label: "Password", Name: "password", Type: "password", Attrs: templ.Attributes{"autocomplete": "current-password"}})
-				@ui.Button("primary", "Log in", templ.Attributes{"type": "submit", "data-size": "block"})
-			</form>
-		</div>
+			@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: username, Attrs: templ.Attributes{"autocomplete": "username", "autofocus": true}})
+			@ui.FieldPair(ui.PairProps{Label: "Password", For: "password"}) {
+				@ui.InputControl(ui.FieldProps{Name: "password", Type: "password", Attrs: templ.Attributes{"autocomplete": "current-password"}})
+				@ui.RevealButton("password")
+			}
+			@ui.Button("primary", "Sign in", templ.Attributes{"type": "submit", "data-size": "block"})
+		</form>
 	}
 }
 
@@ -277,31 +277,64 @@ type PasswordProps struct {
 }
 
 // PasswordPage shows the change-password form. Forced is true until the first-start password is changed.
+// Then the page is the sign-in card alone, because every other page is closed.
 templ PasswordPage(l ui.LayoutData, p PasswordProps) {
-	@ui.Layout(l) {
-		@ui.PageHeader("Admin password")
-		@PasswordFormView(p)
+	if p.Forced {
+		@ui.Layout(ui.LayoutData{Title: "Set a new password", Bare: true, CSRF: l.CSRF}) {
+			@PasswordFormView(p)
+			@ui.Button("ghost", "Log out", templ.Attributes{"hx-post": l.LogoutURL, "data-size": "block"})
+		}
+	} else {
+		@ui.Layout(l) {
+			@ui.PageHeader("Admin password")
+			@PasswordFormView(p)
+		}
 	}
 }
 
+// passwordFormClass is the look of the password form: the sign-in card, or a normal form card.
+func passwordFormClass(forced bool) string {
+	if forced {
+		return "c-auth"
+	}
+	return "c-card c-form l-narrow"
+}
+
+// passwordSaveLabel is the text of the save button.
+func passwordSaveLabel(forced bool) string {
+	if forced {
+		return "Save and continue"
+	}
+	return "Change password"
+}
+
 // PasswordFormView is the password form and the PUT response body for 422 and 429.
+// password.js ticks the rules while the admin types.
 templ PasswordFormView(p PasswordProps) {
-	@ui.FormCard(templ.Attributes{"id": "password-form", "hx-put": "/admin/password", "hx-target": "this", "hx-swap": "outerHTML"}) {
+	<form id="password-form" class={ passwordFormClass(p.Forced) } hx-put="/admin/password" hx-target="this" hx-swap="outerHTML" data-rules-form data-min-length={ strconv.Itoa(domain.MinAdminPasswordLen) }>
 		if p.Forced {
-			@ui.Flash("warn", "This account still uses the default password. Set a new one to continue.")
+			@ui.AuthHead("Set a new password", "First time here. Choose your own password before you continue.")
 		}
 		if p.Throttled {
 			@ui.ErrorFragment("Too many failed attempts. Try again in a minute.")
 		}
 		@ui.Field(ui.FieldProps{Label: "Current password", Name: "current_password", Type: "password", Error: p.Errors["current_password"], Attrs: templ.Attributes{"autocomplete": "current-password"}})
-		@ui.FieldPair(ui.PairProps{Label: "New password", For: "new_password", Hint: "At least 10 characters. Not your username, not \"admin\", not a common password.", Errors: []ui.NamedError{{Name: "new_password", Msg: p.Errors["new_password"]}}}) {
-			@ui.InputControl(ui.FieldProps{Name: "new_password", Type: "password", Error: p.Errors["new_password"], Attrs: templ.Attributes{"autocomplete": "new-password"}})
-			@ui.Button("secondary", "Reveal", templ.Attributes{"type": "button", "data-reveal": "new_password"})
-			@ui.Button("secondary", "Generate", templ.Attributes{"type": "button", "data-generate": "new_password", "data-generate-also": "confirm_password"})
+		@ui.FieldPair(ui.PairProps{Label: "New password", For: "new_password", Hint: "Not \"admin\", not your username, not a common password.", Errors: []ui.NamedError{{Name: "new_password", Msg: p.Errors["new_password"]}}}) {
+			@ui.InputControl(ui.FieldProps{Name: "new_password", Type: "password", Error: p.Errors["new_password"], Attrs: templ.Attributes{"autocomplete": "new-password", "data-mono": true}})
+			@ui.RevealButton("new_password")
+			@ui.ButtonIcon("secondary", "wand", "Generate", templ.Attributes{"type": "button", "data-generate": "new_password", "data-generate-also": "confirm_password"})
 		}
-		@ui.Field(ui.FieldProps{Label: "Confirm new password", Name: "confirm_password", Type: "password", Error: p.Errors["confirm_password"], Attrs: templ.Attributes{"autocomplete": "new-password"}})
-		@ui.Actions() {
-			@ui.Button("primary", "Change password", templ.Attributes{"type": "submit"})
-		}
-	}
+		@ui.Field(ui.FieldProps{Label: "Repeat the password", Name: "confirm_password", Type: "password", Error: p.Errors["confirm_password"], Attrs: templ.Attributes{"autocomplete": "new-password", "data-mono": true, "placeholder": "Type it again"}})
+		<ul class="c-rules" aria-label="Password rules">
+			<li data-rule="length">
+				@ui.Icon("circle")
+				{ strconv.Itoa(domain.MinAdminPasswordLen) } or more characters
+			</li>
+			<li data-rule="match">
+				@ui.Icon("circle")
+				Both passwords match
+			</li>
+		</ul>
+		@ui.Button("primary", passwordSaveLabel(p.Forced), templ.Attributes{"type": "submit", "data-size": "block"})
+	</form>
 }

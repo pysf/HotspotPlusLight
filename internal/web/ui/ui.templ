@@ -13,8 +13,8 @@ type NavItem struct {
 	Live                   bool
 }
 
-// LayoutData configures the page shell. Bare is the logged-out shell (the login
-// page): a centered column with no nav, no logout and no hx-headers.
+// LayoutData configures the page shell. Bare is the shell without a side bar: a centered column
+// for the login page and the forced password change. It sends hx-headers only when CSRF is set.
 type LayoutData struct {
 	Title     string
 	Bare      bool
@@ -33,9 +33,9 @@ const htmxConfig = `{"includeIndicatorStyles":false,"responseHandling":[{"code":
 // appScripts are the JS modules every page of the shell loads (after htmx).
 var appScripts = []string{"js/theme.js", "js/dialog.js", "js/clipboard.js", "js/toast.js", "js/shortcuts.js", "js/forms.js", "js/swap.js", "js/menu.js", "js/password.js"}
 
-// bodyAttrs returns the attributes of <body>: the CSRF header that htmx sends. The bare shell has none.
+// bodyAttrs returns the attributes of <body>: the CSRF header that htmx sends. A page without a session token (the login page) has none.
 func bodyAttrs(d LayoutData) templ.Attributes {
-	if d.Bare {
+	if d.CSRF == "" {
 		return nil
 	}
 	h, _ := templ.JSONString(map[string]string{"X-CSRF-Token": d.CSRF}) //nolint: map of strings cannot fail
@@ -121,11 +121,9 @@ templ Layout(d LayoutData) {
 			<meta name="htmx-config" content={ htmxConfig }/>
 			<title>{ env.TabTitle(d.Title) }</title>
 			<link rel="stylesheet" href={ env.Asset("app.css") }/>
-			if !d.Bare {
-				<script src={ env.Asset("htmx.min.js") } defer></script>
-				for _, s := range appScripts {
-					<script type="module" src={ env.Asset(s) }></script>
-				}
+			<script src={ env.Asset("htmx.min.js") } defer></script>
+			for _, s := range appScripts {
+				<script type="module" src={ env.Asset(s) }></script>
 			}
 		</head>
 		<body { bodyAttrs(d)... }>
@@ -227,6 +225,24 @@ templ Layout(d LayoutData) {
 			}
 		</body>
 	</html>
+}
+
+// AuthHead is the top of a sign-in card: the brand mark, the title (h1) and one line of text.
+templ AuthHead(title, sub string) {
+	<div class="c-auth__head">
+		<span class="c-auth__mark" aria-hidden="true">
+			@IconAs("wifi", "l", "")
+		</span>
+		<h1>{ title }</h1>
+		<p>{ sub }</p>
+	</div>
+}
+
+// RevealButton is the eye button that shows or hides the password in the input with id. forms.js switches it.
+templ RevealButton(id string) {
+	<button type="button" class="c-icon-btn" data-fill data-reveal={ id } aria-pressed="false" aria-label="Show password">
+		@Icon("eye")
+	</button>
 }
 
 // Sprite is the inline SVG sprite with every icon, written once in the base layout.
@@ -360,6 +376,16 @@ templ TileValue(value string, attrs templ.Attributes) {
 	<p class="c-tile__value u-nums" { attrs... }>{ value }</p>
 }
 
+// TileValueUnit is the big figure of a Tile with a small unit after it, such as "38.4" and "GB".
+templ TileValueUnit(value, unit string, attrs templ.Attributes) {
+	<p class="c-tile__value u-nums" { attrs... }>
+		{ value }
+		if unit != "" {
+			<small>{ unit }</small>
+		}
+	</p>
+}
+
 // TileNote is a small muted line under the figure of a Tile.
 templ TileNote(note string, attrs templ.Attributes) {
 	<p class="c-tile__note u-muted" { attrs... }>{ note }</p>
@@ -393,6 +419,21 @@ templ Pill(status, text string) {
 	<span class="c-pill" data-status={ status } data-tone={ pillTone(status) }>
 		@Icon(pillIcon(pillTone(status)))
 		{ text }
+	</span>
+}
+
+// PillWith is a pill with a chosen tone ("ok", "warn", "bad", "off" or "info") and icon. attrs add data hooks.
+templ PillWith(tone, icon, text string, attrs templ.Attributes) {
+	<span class="c-pill" data-tone={ pillTone(tone) } { attrs... }>
+		@Icon(icon)
+		{ text }
+	</span>
+}
+
+// IconCircle is a round icon in the colour of a tone ("ok", "warn" or "bad"), the lead of a list row.
+templ IconCircle(tone, icon string) {
+	<span class="c-icon-circle" data-tone={ pillTone(tone) } aria-hidden="true">
+		@IconAs(icon, "s", "")
 	</span>
 }
 
@@ -475,6 +516,14 @@ func buttonVariant(kind string) string {
 // Button is a <button>; kind is "primary", "secondary", "ghost", "danger" (soft red) or "danger-solid". Attrs carry type, hx-* and data-*.
 templ Button(kind, label string, attrs templ.Attributes) {
 	<button class="c-btn" data-variant={ buttonVariant(kind) } { buttonAttrs(attrs)... }>{ label }</button>
+}
+
+// ButtonIcon is a Button with a small icon in front of its label.
+templ ButtonIcon(kind, icon, label string, attrs templ.Attributes) {
+	<button class="c-btn" data-variant={ buttonVariant(kind) } { buttonAttrs(attrs)... }>
+		@IconAs(icon, "s", "")
+		{ label }
+	</button>
 }
 
 // LinkButton is a link that looks like a button.
@@ -1100,4 +1149,40 @@ func barHeight(v, top int64) int {
 		return 0
 	}
 	return int(min(100, max(1, v*100/top)))
+}
+
+// Plot is a chart for a dashboard card: one inline SVG in the 320 x 114 view box of the design. kind is
+// PlotArea, PlotBars or PlotDots; the values are scaled to top (0 = all empty, draw nothing). label is the
+// accessible description. Every value keeps its tooltip and the data hooks in Bar.Attrs.
+templ Plot(kind string, bars []Bar, top int64, label string) {
+	if len(bars) > 0 {
+		<svg class="c-chart__plot" viewBox={ plotViewBox() } role="img" aria-label={ label }>
+			<path class="c-chart__grid" d={ plotGrid(kind) }></path>
+			if kind == PlotArea {
+				<path class="c-chart__area" d={ plotArea(kind, bars, top) }></path>
+			}
+			if kind != PlotBars {
+				<path class="c-chart__line" d={ plotLine(kind, bars, top) }></path>
+			}
+			for i, b := range bars {
+				switch kind {
+				case PlotBars:
+					<path class="c-chart__bar" d={ barPath(kind, i, bars, top) } data-dim?={ i < len(bars)-1 } { b.Attrs... }>
+						<title>{ b.Tip }</title>
+					</path>
+				case PlotDots:
+					<circle class="c-chart__dot" cx={ num(plotX(kind, i, len(bars))) } cy={ num(plotY(kind, b.Value, top)) } r="3.5" { b.Attrs... }>
+						<title>{ b.Tip }</title>
+					</circle>
+				default:
+					<circle class="c-chart__hit" cx={ num(plotX(kind, i, len(bars))) } cy={ num(plotY(kind, b.Value, top)) } r="5" { b.Attrs... }>
+						<title>{ b.Tip }</title>
+					</circle>
+				}
+			}
+			for _, a := range axisLabels(kind, bars) {
+				<text class="c-chart__axis" x={ a.X } y={ axisY(kind) } text-anchor={ a.Anchor }>{ a.Text }</text>
+			}
+		</svg>
+	}
 }

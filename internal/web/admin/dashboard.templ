@@ -2,32 +2,41 @@ package admin
 
 import (
 	"strconv"
+	"strings"
 
 	"hotspotpluslight/internal/dashboard"
 	"hotspotpluslight/internal/web/ui"
 )
 
-// DashboardPage is the home page: three tiles, the router status, what needs attention and three charts.
+// DashboardPage is the home page: the title with the live line, four tiles, Needs attention, the Router link and three charts.
 templ DashboardPage(l ui.LayoutData, v dashboardView) {
 	@ui.Layout(l) {
-		@ui.PageHeader("Dashboard")
-		<p class="u-muted">Updates every 10 seconds.</p>
 		@DashboardContent(v, false)
 	}
 }
 
-// DashboardContent is everything under the page title. It is the polled fragment: it re-fetches itself every 10 s (htmx), keeping the page.
+// DashboardContent is the whole page under the top bar, title included. It is the polled fragment: it re-fetches itself
+// every 10 s (htmx). Only the regions whose content changed fade (swap.js), and every block keeps its size, so nothing jumps.
 templ DashboardContent(v dashboardView, oob bool) {
 	<div class="l-flow" data-dashboard data-poll data-swap-fade hx-get={ dashboardContentURL } hx-trigger="every 10s" hx-swap="outerHTML">
+		<div data-region="head">
+			@ui.PageHeaderSub("Dashboard", v.Summary) {
+				@ui.LiveStatus("Live · updates every 10 s")
+			}
+		</div>
 		<div data-region="tiles">
 			@ui.Tiles() {
 				@OnlineTile(v.Online)
-				@ui.Tile("Traffic today (so far)", templ.Attributes{"data-tile": "traffic"}) {
-					@ui.TileValue(v.Traffic.Today, templ.Attributes{"data-traffic-today": strconv.FormatInt(v.Traffic.TodayBytes, 10)})
+				@ui.TileIcon("chart", "Peak today", templ.Attributes{"data-tile": "peak"}) {
+					@ui.TileValue(strconv.Itoa(v.Online.PeakToday), templ.Attributes{"data-peak-today": strconv.Itoa(v.Online.PeakToday)})
+					@ui.TileNote("Most online at one time", nil)
+				}
+				@ui.TileIcon("arrow-down", "Traffic today", templ.Attributes{"data-tile": "traffic"}) {
+					@ui.TileValueUnit(sizeNumber(v.Traffic.Today), sizeUnit(v.Traffic.Today), templ.Attributes{"data-traffic-today": strconv.FormatInt(v.Traffic.TodayBytes, 10)})
 					@ui.TileNote("Yesterday "+v.Traffic.Yesterday+": "+v.Traffic.VsYesterday, templ.Attributes{"data-vs-yesterday": v.Traffic.VsYesterday})
 					@ui.TileNote("Same day last week "+v.Traffic.LastWeek+": "+v.Traffic.VsLastWeek, templ.Attributes{"data-vs-lastweek": v.Traffic.VsLastWeek})
 				}
-				@ui.Tile("Failed logins today", templ.Attributes{"data-tile": "failed"}) {
+				@ui.TileIcon("alert", "Failed logins today", templ.Attributes{"data-tile": "failed"}) {
 					@ui.TileValue(strconv.FormatInt(v.Failed.Total, 10), templ.Attributes{"data-failed-total": strconv.FormatInt(v.Failed.Total, 10)})
 					if v.Failed.HasTop {
 						@ui.TileNote("Most common: "+v.Failed.Text+" ("+strconv.FormatInt(v.Failed.Count, 10)+")", templ.Attributes{"data-failed-top": v.Failed.Code})
@@ -37,46 +46,74 @@ templ DashboardContent(v dashboardView, oob bool) {
 				}
 			}
 		</div>
-		<div data-region="link">
+		<div class="l-cols">
+			<section class="c-card" data-pad data-region="attention" aria-labelledby="attention-title">
+				<div class="c-card__head">
+					<h2 class="c-card__title" id="attention-title">Needs attention</h2>
+					@ui.PillWith(v.ItemsTone, itemsIcon(v.ItemsTone), v.Items, nil)
+				</div>
+				@AttentionGroup(v.Expiring)
+				@AttentionGroup(v.NearLimit)
+			</section>
 			@LinkStatusPanel(v.Link)
 		</div>
-		<section class="l-flow" data-region="attention" aria-label="Needs attention">
-			@AttentionSection(v.Expiring)
-			@AttentionSection(v.NearLimit)
-		</section>
-		for _, c := range v.Charts {
-			@ChartSection(c)
-		}
+		<div class="l-cols" data-cols="3">
+			for _, c := range v.Charts {
+				@ChartCard(c)
+			}
+		</div>
 	</div>
 	if oob {
 		@ui.OnlineBadge(v.Online.Now, true)
 	}
 }
 
+// sizeNumber returns the number of a size such as "38.4 GB".
+func sizeNumber(size string) string {
+	n, _, _ := strings.Cut(size, " ")
+	return n
+}
+
+// sizeUnit returns the unit of a size such as "38.4 GB".
+func sizeUnit(size string) string {
+	_, u, _ := strings.Cut(size, " ")
+	return u
+}
+
+// itemsIcon returns the icon of the Needs attention pill.
+func itemsIcon(tone string) string {
+	if tone == "ok" {
+		return "check-circle"
+	}
+	return "alert"
+}
+
 // OnlineTile is the Online now tile.
 templ OnlineTile(o dashboard.OnlineNow) {
-	@ui.Tile("Online now", templ.Attributes{"data-tile": "online"}) {
+	@ui.TileIcon("wifi", "Online now", templ.Attributes{"data-tile": "online"}) {
 		@ui.TileValue(strconv.Itoa(o.Now), templ.Attributes{"data-online-now": strconv.Itoa(o.Now)})
-		@ui.TileNote("Peak today: "+strconv.Itoa(o.PeakToday), templ.Attributes{"data-peak-today": strconv.Itoa(o.PeakToday)})
+		@ui.TileNote("Open sessions right now", nil)
 	}
 }
 
-// AttentionSection is one Needs attention list: a heading with the full count, at most five members, or an empty text.
-templ AttentionSection(a attentionView) {
-	<div class="l-stack" data-attention={ a.Key } data-count={ strconv.Itoa(a.Count) }>
-		<h2>{ a.Title } ({ strconv.Itoa(a.Count) })</h2>
+// AttentionGroup is one Needs attention list: a title with the full count, at most five members, or an empty text.
+templ AttentionGroup(a attentionView) {
+	<div class="c-group" data-attention={ a.Key } data-count={ strconv.Itoa(a.Count) }>
+		<h3 class="c-group-title">{ a.Title } &middot; { strconv.Itoa(a.Count) }</h3>
 		if len(a.Rows) == 0 {
-			<div data-empty>
-				@ui.EmptyState("", a.Empty)
-			</div>
+			<p class="u-muted" data-empty>{ a.Empty }</p>
 		} else {
-			@ui.Table(a.Title, []string{"Member", a.Column}) {
-				for _, r := range a.Rows {
-					<tr data-attention-row data-member-id={ strconv.FormatInt(r.ID, 10) } data-username={ r.Username }>
-						<td data-label="Member"><a href={ templ.SafeURL(memberURL(r.ID)) }>{ r.Username }</a></td>
-						<td data-detail data-label={ a.Column }>{ r.Detail }</td>
-					</tr>
-				}
+			for _, r := range a.Rows {
+				<div class="c-li" data-attention-row data-member-id={ strconv.FormatInt(r.ID, 10) } data-username={ r.Username }>
+					@ui.IconCircle(r.Tone, r.Icon)
+					<div class="u-grow">
+						<b><a href={ templ.SafeURL(memberURL(r.ID)) }>{ r.Username }</a></b>
+						if r.Sub != "" {
+							<small>{ r.Sub }</small>
+						}
+					</div>
+					@ui.PillWith(r.Tone, r.Icon, r.Detail, templ.Attributes{"data-detail": true})
+				</div>
 			}
 			if a.Count > len(a.Rows) {
 				<p class="u-muted" data-more>and { strconv.Itoa(a.Count - len(a.Rows)) } more</p>
@@ -85,16 +122,18 @@ templ AttentionSection(a attentionView) {
 	</div>
 }
 
-// ChartSection is one chart with its heading. When every bar is 0 it shows the empty text instead.
-templ ChartSection(c chartView) {
-	<section class="l-stack" data-region={ "chart-" + c.Key } data-chart={ c.Key } aria-label={ c.Title }>
-		<h2>{ c.Title }</h2>
+// ChartCard is one chart in a card. When every value is 0 it shows the empty text instead.
+templ ChartCard(c chartView) {
+	<section class="c-card" data-pad data-region={ "chart-" + c.Key } data-chart={ c.Key } aria-label={ c.Title }>
+		<div class="c-card__head">
+			<h2 class="c-card__title">{ c.Title }</h2>
+			<span class="u-small u-muted">{ c.Sub }</span>
+		</div>
 		if c.Top == 0 {
-			<div data-empty>
-				@ui.EmptyState("", c.Empty)
-			</div>
+			<p class="u-muted" data-empty>{ c.Empty }</p>
 		} else {
-			@ui.BarChart(c.Bars, c.Top, c.Caption)
+			@ui.Plot(c.Kind, c.Bars, c.Top, c.Title+": "+c.Caption)
+			<p class="c-chart__caption">{ c.Caption }</p>
 		}
 		if c.More != "" {
 			<p><a href={ templ.SafeURL(c.MoreHref) }>{ c.More }</a></p>
@@ -102,22 +141,40 @@ templ ChartSection(c chartView) {
 	</section>
 }
 
-// LinkStatusPanel shows what the router last sent. It lives in memory and starts empty after a restart.
+// LinkStatusPanel is the Router link card: what the router last sent. It lives in memory and starts empty after a restart.
 templ LinkStatusPanel(v linkView) {
-	<div class="l-stack" data-link-status>
-		<h2>Router status</h2>
-		<p class="u-muted">Since the server started. A wrong shared secret on the router shows up as bad-secret packets.</p>
-		@ui.Table("Router status", []string{"", "When", "Router address", "Result"}) {
+	<section class="c-card" data-pad data-region="link" data-link-status aria-labelledby="link-title">
+		<div class="c-card__head">
+			<h2 class="c-card__title" id="link-title">Router link</h2>
+			@ui.PillWith(v.Tone, v.Icon, v.State, templ.Attributes{"data-link-state": v.Tone})
+		</div>
+		<dl class="c-kv">
 			for _, e := range v.Events {
-				<tr data-link={ e.Key }>
-					<td data-label="Event">{ e.Label }</td>
-					<td data-at data-label="When" class="u-nums">{ e.At }</td>
-					<td data-from data-label="Router address">{ e.From }</td>
-					<td data-detail data-label="Result">{ e.Detail }</td>
-				</tr>
+				<div data-link={ e.Key }>
+					<dt>{ e.Label }</dt>
+					<dd>
+						<span data-at class="u-nums">{ e.At }</span>
+						if e.From != "" {
+							<small data-from>{ e.From }</small>
+						}
+						if e.Detail != "" {
+							<small data-detail>{ e.Detail }</small>
+						}
+					</dd>
+				</div>
 			}
-		}
-		<p>Packets with a wrong shared secret: <strong class="u-nums" data-bad-secret-count>{ v.BadTotal }</strong></p>
+			<div>
+				<dt>Wrong-secret packets</dt>
+				<dd>
+					<span class="u-nums" data-bad-secret-count>{ v.BadTotal }</span>
+					if v.BadNone {
+						@ui.PillWith("ok", "check-circle", "None", nil)
+					} else {
+						@ui.PillWith("bad", "alert", "Check the secret", nil)
+					}
+				</dd>
+			</div>
+		</dl>
 		if len(v.BadSources) > 0 {
 			<div data-bad-secret-sources>
 				@ui.Table("Wrong shared secret sources", []string{"Source address", "Packets", "Last seen"}) {
@@ -131,5 +188,6 @@ templ LinkStatusPanel(v linkView) {
 				}
 			</div>
 		}
-	</div>
+		<p class="u-small u-muted">Since the server started. A wrong secret means the RADIUS secret on the router and in Settings do not match.</p>
+	</section>
 }

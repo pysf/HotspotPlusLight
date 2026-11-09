@@ -1,9 +1,10 @@
 /* Lists inside cards: key/value rows, titled groups with icon rows, numbered steps, rank numbers, password rules. */
 @layer components {
-  .c-kv > div { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); min-block-size: var(--w-chk); border-block-start: 1px solid var(--c-line); }
+  .c-kv > div { display: flex; align-items: center; padding-block: var(--s-2); justify-content: space-between; gap: var(--s-3); min-block-size: var(--w-chk); border-block-start: 1px solid var(--c-line); }
   .c-kv > div:first-child { border-block-start: 0; }
   .c-kv dt { color: var(--c-text-2); }
-  .c-kv dd { display: flex; align-items: center; gap: 10px; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; text-align: end; }
+  .c-kv dd small { color: var(--c-text-3); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+  .c-kv dd { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 2px 10px; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; text-align: end; }
 
   .c-group-title {
     display: flex;
@@ -17,6 +18,7 @@
     text-transform: uppercase;
   }
   .c-group-title:first-child { margin-block-start: 0; }
+  .c-group + .c-group { margin-block-start: var(--s-4); }
 
   .c-li { display: flex; align-items: center; gap: var(--s-3); min-block-size: var(--h-row); padding-block: var(--s-2); border-block-start: 1px solid var(--c-line); }
   .c-group-title + .c-li { border-block-start: 0; }
@@ -44,4 +46,5 @@
   .c-rules li { display: flex; align-items: center; gap: var(--s-2); }
   .c-rules .c-icon { inline-size: var(--size-ic-s); block-size: var(--size-ic-s); }
   .c-rules [data-ok] { color: var(--st-ok-fg); }
+  .c-li .u-grow { min-inline-size: 0; overflow-wrap: anywhere; }
 }

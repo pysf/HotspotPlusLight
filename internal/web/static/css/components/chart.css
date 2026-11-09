@@ -4,6 +4,10 @@
   .c-chart__svg { display: block; inline-size: 100%; block-size: var(--h-chart); border-block-end: 1px solid var(--c-line); color: var(--c-accent); }
   .c-chart__caption { display: flex; justify-content: space-between; gap: var(--s-2); margin-block-start: var(--s-2); color: var(--c-text-3); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 
+  /* The plot of a dashboard card: the view box sets the height, so a refresh never changes the size. */
+  .c-chart__plot { display: block; inline-size: 100%; block-size: auto; }
+  .c-chart__hit { fill: transparent; }
+
   .c-chart__grid { stroke: var(--c-line); stroke-width: 1; fill: none; }
   .c-chart__line { fill: none; stroke: var(--c-accent); stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
   .c-chart__area { fill: var(--c-accent); opacity: .12; }
