@@ -51,4 +51,5 @@
     font-weight: var(--fw-semibold);
     font-variant-numeric: tabular-nums;
   }
+  .c-badge[hidden] { display: none; }
 }

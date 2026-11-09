@@ -1,5 +1,5 @@
 /* Button or link-button. data-variant: default | primary | ghost | danger (soft) | danger-solid.
-   data-size: sm | block. A running htmx request or data-loading shows a spinner and blocks clicks. */
+   data-size: sm | block. A running htmx request (on the button, or on its form for a submit button) or data-loading shows a spinner and blocks clicks. */
 @layer components {
   .c-btn {
     display: inline-flex;
@@ -39,8 +39,8 @@
   .c-btn[data-size="block"] { inline-size: 100%; }
 
   .c-btn:disabled, .c-btn[aria-disabled="true"] { opacity: var(--opacity-disabled); cursor: not-allowed; transform: none; }
-  .c-btn.htmx-request, .c-btn[data-loading] { pointer-events: none; }
-  .c-btn.htmx-request::before, .c-btn[data-loading]::before {
+  .c-btn.htmx-request, .c-btn[data-loading], .htmx-request .c-btn[type="submit"] { pointer-events: none; }
+  .c-btn.htmx-request::before, .c-btn[data-loading]::before, .htmx-request .c-btn[type="submit"]::before {
     content: "";
     inline-size: var(--size-ic-pill);
     block-size: var(--size-ic-pill);

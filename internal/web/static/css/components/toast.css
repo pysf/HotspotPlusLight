@@ -24,10 +24,12 @@
   }
   .c-toast[data-open] { opacity: 1; translate: 0 0; pointer-events: auto; }
   .c-toast[data-kind="error"] { background: var(--c-surface); color: var(--st-bad-fg); box-shadow: var(--sh-3), inset 0 0 0 1.5px var(--st-bad-dot); }
+  .c-toast[data-pos="top"] { inset-block: 84px auto; }
   .c-toast__close { display: none; margin-inline-start: var(--s-1); color: inherit; }
   .c-toast[data-kind="error"] .c-toast__close { display: inline-grid; }
 
   @media (max-width: 699px) {
     .c-toast { inset-block-end: 96px; }
+    .c-toast[data-pos="top"] { inset-block: 76px auto; }
   }
 }

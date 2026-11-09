@@ -9,6 +9,7 @@ function show(text, kind) {
   const isError = kind === "error";
   el.querySelector("[data-toast-text]").textContent = text;
   el.setAttribute("role", isError ? "alert" : "status");
+  el.querySelector(".c-toast__icon use")?.setAttribute("href", isError ? "#i-alert" : "#i-check-circle");
   if (isError) { el.setAttribute("data-kind", "error"); } else { el.removeAttribute("data-kind"); }
   el.setAttribute("data-open", "");
   clearTimeout(timer);

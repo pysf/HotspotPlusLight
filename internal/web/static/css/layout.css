@@ -15,7 +15,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--s-1);
-    padding: 20px 14px;
+    padding: var(--side-pad-y) var(--side-pad-x);
     overflow-y: auto;
     background: var(--c-glass);
     backdrop-filter: var(--blur-glass);
@@ -24,8 +24,8 @@
   .l-brand {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 10px 20px;
+    gap: var(--brand-gap);
+    padding: var(--brand-pad-y) var(--brand-gap) var(--brand-pad-b);
     color: var(--c-text);
     min-inline-size: 0;
   }
@@ -36,7 +36,7 @@
     flex: none;
     inline-size: var(--size-brand);
     block-size: var(--size-brand);
-    border-radius: 10px;
+    border-radius: var(--r-mark);
     background: var(--c-accent);
     color: var(--c-accent-fg);
   }
@@ -50,7 +50,7 @@
     color: var(--c-text-3);
     font-size: var(--fs-xs);
   }
-  .l-nav { display: grid; gap: 2px; }
+  .l-nav { display: grid; gap: var(--s-hair); }
   .l-nav__link {
     display: flex;
     align-items: center;
@@ -69,7 +69,7 @@
   .l-side-foot {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--brand-gap);
     margin-block-start: auto;
     padding: var(--s-3);
     color: var(--c-text-2);
@@ -92,8 +92,8 @@
     border-block-end: 1px solid var(--c-line);
   }
   .l-topbar .c-btn { padding-inline: var(--btn-pad-x-sm); }
-  .l-topbar__brand { display: none; align-items: center; gap: 10px; min-inline-size: 0; font-weight: var(--fw-semibold); }
-  .l-topbar__brand .l-brand__mark { inline-size: var(--size-brand-sm); block-size: var(--size-brand-sm); border-radius: 9px; }
+  .l-topbar__brand { display: none; align-items: center; gap: var(--brand-gap); min-inline-size: 0; font-weight: var(--fw-semibold); }
+  .l-topbar__brand .l-brand__mark { inline-size: var(--size-brand-sm); block-size: var(--size-brand-sm); border-radius: var(--r-mark-sm); }
   .l-topbar__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .l-topbar__date { color: var(--c-text-3); font-size: var(--fs-sm); }
   .l-topbar__spacer { flex: 1; min-inline-size: 0; }
@@ -129,7 +129,7 @@
     place-items: center;
     inline-size: var(--size-brand-lg);
     block-size: var(--size-brand-lg);
-    border-radius: 15px;
+    border-radius: var(--r-mark-lg);
     background: var(--c-accent);
     color: var(--c-accent-fg);
   }
@@ -154,14 +154,14 @@
 
   /* Icon rail. */
   @media (max-width: 999px) {
-    :root { --nav-w: 76px; }
+    :root { --nav-w: var(--nav-w-rail); }
     .l-brand__text, .l-side-foot__text, .l-nav__link .c-badge { display: none; }
     .l-brand, .l-side-foot { justify-content: center; padding-inline: 0; }
     .l-nav__link { justify-content: center; padding: 0; }
     .l-nav__text {
       position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
+      inline-size: var(--size-clip);
+      block-size: var(--size-clip);
       overflow: hidden;
       clip: rect(0 0 0 0);
       white-space: nowrap;
@@ -177,8 +177,8 @@
     .l-topbar .c-btn { inline-size: var(--ctl); padding: 0; }
     .l-topbar__label {
       position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
+      inline-size: var(--size-clip);
+      block-size: var(--size-clip);
       overflow: hidden;
       clip: rect(0 0 0 0);
       white-space: nowrap;
@@ -191,7 +191,7 @@
       position: sticky;
       inset-block-end: 0;
       z-index: var(--z-tabbar);
-      padding: 6px var(--s-1) 14px;
+      padding: var(--tab-pad-t) var(--s-1) var(--tab-pad-b);
       background: var(--c-glass);
       backdrop-filter: var(--blur-glass);
       border-block-start: 1px solid var(--c-line);

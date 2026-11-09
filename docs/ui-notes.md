@@ -77,6 +77,12 @@ The source is a design canvas, copied to `docs/design/` (`hp.css`, boards, `READ
 - **Live facts in the shell:** the date, the Online badge (open online sessions) and the router footer are filled by `pageEnv` for logged-in full pages only.
 - **Not ported:** the voucher sheet rules (`.a4`, `.vch`; the print page keeps `voucher.css` until its own step), the board-only helpers (`.board`, `.u-*` swatches, `.scrim`/`.layer`/`.toast-pos`
   that only place static demos; native `<dialog>` and the fixed toast do that job), and the "Needs attention" / "Router link" screen content (later steps).
+- **Defined in CSS but not used yet** (later steps use them): `c-kv`, `c-li`, `c-group-title`, `c-icon-circle`, `c-steps`, `c-rank`, `c-rules` (list.css); the design chart classes `c-chart__grid/line/area/bar/dot/axis` (the usage and dashboard charts);
+  `c-plan`, `c-thumb`, `c-setting` (plans, router, settings); `c-bulk` (members bulk bar, step 3); `c-usage` (usage cell); `c-seg`, `c-switch` (usage range, settings); `c-form-grid`;
+  the `data-pos="top"` toast. They are shown on the dev gallery where a component exists.
+- **Review fixes (2026-11-09):** the toast has one status icon (toast.js sets the alert icon for an error); `ui.EmptyState(title, text)` has a title (h3) and children for a button; `ui.TileIcon` adds an icon to a tile label;
+  `ui.TablePaged` puts the pager inside the card; `swap.js` skips polls while hidden or with an open dialog or menu and fades only changed regions; the router footer uses the injected clock (`Deps.Clock`);
+  the meter turns warning at exactly 80 %; a submit button shows its spinner while its form request runs; `static.go` no longer rewrites `url()` in CSS (there is no font file).
 - **Next steps:** screens are redesigned one by one (dashboard, members, sessions, plans, vouchers, usage, router, settings, login) on top of these components.
 
 ## Not verified

@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"hotspotpluslight/internal/auth"
+	"hotspotpluslight/internal/clock"
 	"hotspotpluslight/internal/domain"
 	"hotspotpluslight/internal/linkstatus"
 	"hotspotpluslight/internal/member"
@@ -94,6 +95,8 @@ type Deps struct {
 	RunningServer func() domain.ServerSettings
 	// Assets serves the CSS, JS, font and htmx files under /admin/static/ (built once at startup).
 	Assets *static.Assets
+	// Clock gives the time for the shell (router state). Nil means the real clock.
+	Clock clock.Clock
 	// Dev turns on /admin/dev/components (HSP_DEV=1). Off = 404.
 	Dev bool
 	Log *slog.Logger
@@ -191,6 +194,14 @@ func Handler(d Deps) http.Handler {
 	return r
 }
 
+// now returns the current time from the injected clock (the real one when none is set).
+func (h handlers) now() time.Time {
+	if h.Clock == nil {
+		return time.Now()
+	}
+	return h.Clock.Now()
+}
+
 // routerRecent is how long after its last packet the router still counts as connected.
 const routerRecent = 5 * time.Minute
 
@@ -240,7 +251,7 @@ func (h handlers) shellStatus(r *http.Request, env *ui.Env) {
 		if snap.Accounting.At.After(last) {
 			last = snap.Accounting.At
 		}
-		env.RouterUp = !last.IsZero() && time.Since(last) < routerRecent
+		env.RouterUp = !last.IsZero() && h.now().Sub(last) < routerRecent
 	}
 }
 

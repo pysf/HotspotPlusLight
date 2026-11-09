@@ -112,7 +112,7 @@ templ MembersPage(l ui.LayoutData, p MembersProps) {
 			@ui.Select(ui.SelectProps{Label: "Page size", Name: "per", Value: strconv.Itoa(p.Result.Per), Options: pageSizeOptions()})
 			@MemberChips(p, false)
 		}
-		<div id="member-list" class="l-flow" aria-live="polite" aria-busy="false">
+		<div id="member-list" class="l-flow" aria-live="polite" aria-busy="false" aria-busy="false">
 			@MemberListBody(p)
 		</div>
 		@ui.SheetHost("sheet")
@@ -128,7 +128,7 @@ templ MemberListFragment(p MembersProps) {
 // MemberListBody is the inside of the list region: bulk bar, table, pager, and the refresher.
 templ MemberListBody(p MembersProps) {
 	if p.Result.Total == 0 {
-		@ui.EmptyState("No members match.")
+		@ui.EmptyState("No members found", "No members match.")
 	} else {
 		<form id="bulk-form" class="l-flow" data-bulk-guard hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML">
 			<input type="hidden" name="q" value={ p.Filter.Query }/>
@@ -143,13 +143,12 @@ templ MemberListBody(p MembersProps) {
 			<template id="no-selection-notice">
 				@ui.ErrorFragment("No member selected.")
 			</template>
-			@ui.Table("Members", []string{"", "User", "Plan", "Usage", "Expires", "Status", ""}) {
+			@ui.TablePaged("Members", []string{"", "User", "Plan", "Usage", "Expires", "Status", ""}, ui.PageProps{Page: p.Result.Page, Pages: p.Result.Pages, Href: listHref(p.Filter, p.Result.Per), Target: "#" + listID, Total: p.Result.Total, Per: p.Result.Per}) {
 				for _, v := range p.Result.Rows {
 					@MemberRow(newVM(v))
 				}
 			}
 		</form>
-		@ui.Pagination(ui.PageProps{Page: p.Result.Page, Pages: p.Result.Pages, Href: listHref(p.Filter, p.Result.Per), Target: "#" + listID, Total: p.Result.Total, Per: p.Result.Per})
 	}
 	@ui.Refresher(p.URL, membersChanged, "#"+listID)
 }
@@ -272,8 +271,8 @@ templ MemberNewPage(l ui.LayoutData, p MemberFormProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("New member")
 		if len(p.Plans) == 0 {
-			@ui.EmptyState("No plans exist yet. Create a plan first, then add members.") {
-				<p><a href="/admin/plans/new">New plan</a></p>
+			@ui.EmptyState("No plans yet", "No plans exist yet. Create a plan first, then add members.") {
+				@ui.LinkButton("primary", "/admin/plans/new", "New plan", nil)
 			}
 		} else {
 			@MemberFormView(p)
@@ -355,8 +354,8 @@ templ memberFields(p MemberFormProps) {
 templ MemberNewSheet(p MemberFormProps) {
 	if len(p.Plans) == 0 {
 		<div data-sheet-title="New member">
-			@ui.EmptyState("No plans exist yet. Create a plan first, then add members.") {
-				<p><a href="/admin/plans/new">New plan</a></p>
+			@ui.EmptyState("No plans yet", "No plans exist yet. Create a plan first, then add members.") {
+				@ui.LinkButton("primary", "/admin/plans/new", "New plan", nil)
 			}
 		</div>
 	} else {

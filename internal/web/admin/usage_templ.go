@@ -51,14 +51,14 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<h2>Daily traffic, last ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"l-stack\"><h2>Daily traffic, last ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(len(v.Days)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 15, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 16, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -72,7 +72,7 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h2>Top members</h2><nav class=\"l-toolbar\" aria-label=\"Range\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</section><section class=\"l-stack\"><h2>Top members</h2><nav class=\"l-toolbar\" aria-label=\"Range\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -87,7 +87,7 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if len(v.Top) == 0 {
-				templ_7745c5c3_Err = ui.EmptyState("No traffic recorded in the last "+strconv.Itoa(v.Range)+" days.").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.EmptyState("No traffic yet", "No traffic recorded in the last "+strconv.Itoa(v.Range)+" days.").Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -112,7 +112,7 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 						var templ_7745c5c3_Var5 string
 						templ_7745c5c3_Var5, templ_7745c5c3_Err = templruntime.NewAttributeExpression(u.Username).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 28, Col: 44}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 31, Col: 45}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 						if templ_7745c5c3_Err != nil {
@@ -125,7 +125,7 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 						var templ_7745c5c3_Var6 string
 						templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(memberURL(u.MemberID))).ResolveURL(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 29, Col: 98}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 32, Col: 99}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 						if templ_7745c5c3_Err != nil {
@@ -138,7 +138,7 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 						var templ_7745c5c3_Var7 string
 						templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(u.Username)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 29, Col: 113}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 32, Col: 114}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 						if templ_7745c5c3_Err != nil {
@@ -151,7 +151,7 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 						var templ_7745c5c3_Var8 string
 						templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(domain.FormatSize(u.Total()))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 30, Col: 91}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 33, Col: 92}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 						if templ_7745c5c3_Err != nil {
@@ -164,7 +164,7 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 						var templ_7745c5c3_Var9 string
 						templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(domain.FormatSize(u.Down))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 31, Col: 90}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 34, Col: 91}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 						if templ_7745c5c3_Err != nil {
@@ -177,7 +177,7 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 						var templ_7745c5c3_Var10 string
 						templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(domain.FormatSize(u.Up))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 32, Col: 84}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 35, Col: 85}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 						if templ_7745c5c3_Err != nil {
@@ -190,7 +190,7 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 						var templ_7745c5c3_Var11 string
 						templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(domain.FormatDuration(u.Seconds))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 33, Col: 93}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/usage.templ`, Line: 36, Col: 94}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 						if templ_7745c5c3_Err != nil {
@@ -207,6 +207,10 @@ func UsagePage(l ui.LayoutData, v usage.View) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</section>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
 			}
 			return nil
 		})

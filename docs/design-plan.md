@@ -24,7 +24,7 @@ it, and keep each test's intent. No inline style or script (CSP).
 
 | Step | Scope | State |
 |---|---|---|
-| 1 | Tokens, system fonts, shared components, app shell (side bar, top bar, phone tab bar with More), icon sprite, theme (cookie `light`/`dark`/auto), component gallery | built, review pending (branch `design-v2`) |
+| 1 | Tokens, system fonts, shared components, app shell (side bar, top bar, phone tab bar with More), icon sprite, theme (cookie `light`/`dark`/auto), component gallery, review fixes | DONE (commit "Design v2 step 1") |
 | 2 | Login, Set new password (rules list), Dashboard (tiles, Needs attention, Router link, 3 charts, Live dot, 10 s refresh without jumps) | todo |
 | 3 | Members list (chips, bulk bar, stacked cards on phone), Add/edit sheet, credentials card, row menus | todo |
 | 4 | Plans (cards + edit form, delete-blocked reason), Online sessions (kick + confirm) | todo |

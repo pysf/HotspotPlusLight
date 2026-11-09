@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -30,7 +31,7 @@ type LayoutData struct {
 const htmxConfig = `{"includeIndicatorStyles":false,"responseHandling":[{"code":"400|404|409|422|429|500|502","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
 
 // appScripts are the JS modules every page of the shell loads (after htmx).
-var appScripts = []string{"js/theme.js", "js/dialog.js", "js/clipboard.js", "js/toast.js", "js/shortcuts.js", "js/forms.js", "js/menu.js", "js/password.js"}
+var appScripts = []string{"js/theme.js", "js/dialog.js", "js/clipboard.js", "js/toast.js", "js/shortcuts.js", "js/forms.js", "js/swap.js", "js/menu.js", "js/password.js"}
 
 // bodyAttrs returns the attributes of <body>: the CSRF header that htmx sends. The bare shell has none.
 func bodyAttrs(d LayoutData) templ.Attributes {
@@ -155,8 +156,8 @@ templ Layout(d LayoutData) {
 								<a href={ templ.SafeURL(n.Href) } class="l-nav__link" { navAttrs(n.Href, d.Active)... }>
 									@Icon(n.Icon)
 									<span class="l-nav__text">{ n.Label }</span>
-									if n.Live && env.Online > 0 {
-										<span class="c-badge u-nums" data-online-count>{ strconv.Itoa(env.Online) }</span>
+									if n.Live {
+										@OnlineBadge(env.Online, false)
 									}
 								</a>
 							}
@@ -179,7 +180,7 @@ templ Layout(d LayoutData) {
 							}
 							<span class="l-topbar__spacer"></span>
 							if d.PasswordURL != "" {
-								<a class="c-btn" data-variant="ghost" href={ templ.SafeURL(d.PasswordURL) } aria-label="Password">
+								<a class="c-btn" data-variant="ghost" href={ templ.SafeURL(d.PasswordURL) } aria-label="Password" { navAttrs(d.PasswordURL, d.Active)... }>
 									@Icon("key")
 									<span class="l-topbar__label">Password</span>
 								</a>
@@ -294,7 +295,9 @@ templ Section(title string) {
 // Card is a panel with padding; use it for sections.
 templ Card() {
 	<div class="c-card" data-pad>
-		{ children... }
+		<div class="l-stack">
+			{ children... }
+		</div>
 	</div>
 }
 
@@ -310,12 +313,16 @@ templ CardTitle(title string) {
 	<h2 class="c-card__title">{ title }</h2>
 }
 
-// EmptyState replaces a table when there is nothing to show; children may hold a link.
-templ EmptyState(msg string) {
+// EmptyState replaces a table when there is nothing to show: an icon, an optional title (h3), a line of text,
+// and children (usually one button, such as a LinkButton).
+templ EmptyState(title, msg string) {
 	<div class="c-card c-empty">
 		<span class="c-empty__icon" aria-hidden="true">
 			@IconAs("search", "l", "")
 		</span>
+		if title != "" {
+			<h3>{ title }</h3>
+		}
 		<p>{ msg }</p>
 		{ children... }
 	</div>
@@ -330,8 +337,20 @@ templ Tiles() {
 
 // Tile is a small card with one figure: label, then its children (TileValue and TileNote). attrs add data hooks.
 templ Tile(label string, attrs templ.Attributes) {
+	@TileIcon("", label, attrs) {
+		{ children... }
+	}
+}
+
+// TileIcon is a Tile with a small sprite icon in front of its label (empty icon = none).
+templ TileIcon(icon, label string, attrs templ.Attributes) {
 	<div class="c-card c-tile" { attrs... }>
-		<p class="c-tile__label">{ label }</p>
+		<p class="c-tile__label">
+			if icon != "" {
+				@IconAs(icon, "s", "")
+			}
+			{ label }
+		</p>
 		{ children... }
 	</div>
 }
@@ -718,29 +737,39 @@ templ Chip(p ChipProps) {
 	</a>
 }
 
-// Meter is a usage bar on a native <meter>: accent below 80 %, warning from 80 %, red when full.
+// Meter is a usage bar on a native <meter>: accent below 80 %, warning from 80 % (low sits just under 80 %, so 80 % itself is a warning), red when full.
 // It has no text inside: put the figures next to it.
 templ Meter(value, max float64, label string) {
-	<meter class="c-meter" value={ strconv.FormatFloat(value, 'f', -1, 64) } min="0" max={ strconv.FormatFloat(max, 'f', -1, 64) } low={ strconv.FormatFloat(max*0.8, 'f', -1, 64) } high={ strconv.FormatFloat(max*0.9999, 'f', -1, 64) } optimum="0" aria-label={ label }></meter>
+	<meter class="c-meter" value={ strconv.FormatFloat(value, 'f', -1, 64) } min="0" max={ strconv.FormatFloat(max, 'f', -1, 64) } low={ strconv.FormatFloat(math.Nextafter(max*0.8, 0), 'f', -1, 64) } high={ strconv.FormatFloat(max*0.9999, 'f', -1, 64) } optimum="0" aria-label={ label }></meter>
 }
 
 // Table is a card with a table: caption (for screen readers), header row, and your <tr> children in the body.
 // Give each <td> a data-label (shown on small screens) and data-slot="actions" for a button cell.
 templ Table(caption string, headers []string) {
-	<div class="c-card c-table-wrap">
-		<table class="c-table">
-			<caption class="u-sr-only">{ caption }</caption>
-			<thead>
-				<tr>
-					for _, h := range headers {
-						<th scope="col">{ h }</th>
-					}
-				</tr>
-			</thead>
-			<tbody>
-				{ children... }
-			</tbody>
-		</table>
+	@TablePaged(caption, headers, PageProps{}) {
+		{ children... }
+	}
+}
+
+// TablePaged is a Table with the pager inside the card, under the rows (nothing when p has one page or none).
+templ TablePaged(caption string, headers []string, p PageProps) {
+	<div class="c-card" data-flush>
+		<div class="c-table-wrap">
+			<table class="c-table">
+				<caption class="u-sr-only">{ caption }</caption>
+				<thead>
+					<tr>
+						for _, h := range headers {
+							<th scope="col">{ h }</th>
+						}
+					</tr>
+				</thead>
+				<tbody>
+					{ children... }
+				</tbody>
+			</table>
+		</div>
+		@Pagination(p)
 	</div>
 }
 
@@ -791,16 +820,29 @@ templ Modal(id, title, text string) {
 }
 
 // Toast is the message area. toast.js fills it when a "toast" event arrives (HX-Trigger).
-// Both icons are here; the CSS shows one by data-kind.
+// It holds one status icon; toast.js points it at the alert icon for an error.
 templ Toast() {
 	<div id="toast" class="c-toast" role="status" aria-live="polite">
-		@IconAs("check-circle", "", "c-toast__ok")
-		@IconAs("alert", "", "c-toast__bad")
-		<span class="c-toast__text" data-toast-text></span>
+		@IconAs("check-circle", "", "c-toast__icon")
+		<span data-toast-text></span>
 		<button type="button" class="c-icon-btn c-toast__close" data-toast-close aria-label="Close">
 			@Icon("x")
 		</button>
 	</div>
+}
+
+// OnlineBadge is the count of online sessions on the Online now link. It is hidden at 0. With oob it is
+// sent out of band by the polled fragments, so the badge in the side bar stays current (also from 0 to more).
+templ OnlineBadge(n int, oob bool) {
+	<span id="online-badge" class="c-badge u-nums" data-online-count hidden?={ n == 0 } { oobAttrs(oob)... }>{ strconv.Itoa(n) }</span>
+}
+
+// oobAttrs returns the htmx attribute that swaps an element out of band.
+func oobAttrs(oob bool) templ.Attributes {
+	if oob {
+		return templ.Attributes{"hx-swap-oob": "true"}
+	}
+	return nil
 }
 
 // Menu is a row-actions button with a popover list. Children are MenuItem and MenuSep.

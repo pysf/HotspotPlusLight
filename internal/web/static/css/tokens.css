@@ -118,7 +118,8 @@
     /* Layout. */
     --ctl: 40px;           /* control height; 44 px on a phone */
     --pad: 32px;           /* page padding; 16 px on a phone */
-    --nav-w: 240px;        /* 76 px as an icon rail */
+    --nav-w: 240px;        /* the rail width below */
+    --nav-w-rail: 76px;
     --h-topbar: 64px;
     --w-form: 576px;
     --w-sheet: 440px;
@@ -141,6 +142,10 @@
     --h-btn-sm: 34px;
     --btn-pad-x: 18px; --btn-pad-x-sm: 14px; --input-pad-x: 14px;
     --pad-dialog: 28px;
+    --side-pad-y: 20px; --side-pad-x: 14px; --brand-gap: 10px; --brand-pad-y: 6px; --brand-pad-b: 20px;
+    --r-mark: 10px; --r-mark-sm: 9px; --r-mark-lg: 15px;
+    --tab-pad-t: 6px; --tab-pad-b: 14px;
+    --size-clip: 1px;
     --fs-tile: var(--fs-3xl);
     --h-tab: 48px;
     --h-row: 56px;

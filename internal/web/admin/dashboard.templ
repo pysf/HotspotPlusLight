@@ -12,33 +12,35 @@ templ DashboardPage(l ui.LayoutData, v dashboardView) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Dashboard")
 		<p class="u-muted">Updates every 10 seconds.</p>
-		@DashboardContent(v)
+		@DashboardContent(v, false)
 	}
 }
 
 // DashboardContent is everything under the page title. It is the polled fragment: it re-fetches itself every 10 s (htmx), keeping the page.
-templ DashboardContent(v dashboardView) {
-	<div class="u-swap-in l-flow" data-dashboard hx-get={ dashboardContentURL } hx-trigger="every 10s" hx-swap="outerHTML">
-		@ui.Tiles() {
-			@OnlineTile(v.Online)
-			@ui.Tile("Traffic today (so far)", templ.Attributes{"data-tile": "traffic"}) {
-				@ui.TileValue(v.Traffic.Today, templ.Attributes{"data-traffic-today": strconv.FormatInt(v.Traffic.TodayBytes, 10)})
-				@ui.TileNote("Yesterday "+v.Traffic.Yesterday+": "+v.Traffic.VsYesterday, templ.Attributes{"data-vs-yesterday": v.Traffic.VsYesterday})
-				@ui.TileNote("Same day last week "+v.Traffic.LastWeek+": "+v.Traffic.VsLastWeek, templ.Attributes{"data-vs-lastweek": v.Traffic.VsLastWeek})
-			}
-			@ui.Tile("Failed logins today", templ.Attributes{"data-tile": "failed"}) {
-				@ui.TileValue(strconv.FormatInt(v.Failed.Total, 10), templ.Attributes{"data-failed-total": strconv.FormatInt(v.Failed.Total, 10)})
-				if v.Failed.HasTop {
-					@ui.TileNote("Most common: "+v.Failed.Text+" ("+strconv.FormatInt(v.Failed.Count, 10)+")", templ.Attributes{"data-failed-top": v.Failed.Code})
-				} else {
-					@ui.TileNote("No failed logins today.", templ.Attributes{"data-failed-empty": true})
+templ DashboardContent(v dashboardView, oob bool) {
+	<div class="l-flow" data-dashboard data-poll data-swap-fade hx-get={ dashboardContentURL } hx-trigger="every 10s" hx-swap="outerHTML">
+		<div data-region="tiles">
+			@ui.Tiles() {
+				@OnlineTile(v.Online)
+				@ui.Tile("Traffic today (so far)", templ.Attributes{"data-tile": "traffic"}) {
+					@ui.TileValue(v.Traffic.Today, templ.Attributes{"data-traffic-today": strconv.FormatInt(v.Traffic.TodayBytes, 10)})
+					@ui.TileNote("Yesterday "+v.Traffic.Yesterday+": "+v.Traffic.VsYesterday, templ.Attributes{"data-vs-yesterday": v.Traffic.VsYesterday})
+					@ui.TileNote("Same day last week "+v.Traffic.LastWeek+": "+v.Traffic.VsLastWeek, templ.Attributes{"data-vs-lastweek": v.Traffic.VsLastWeek})
+				}
+				@ui.Tile("Failed logins today", templ.Attributes{"data-tile": "failed"}) {
+					@ui.TileValue(strconv.FormatInt(v.Failed.Total, 10), templ.Attributes{"data-failed-total": strconv.FormatInt(v.Failed.Total, 10)})
+					if v.Failed.HasTop {
+						@ui.TileNote("Most common: "+v.Failed.Text+" ("+strconv.FormatInt(v.Failed.Count, 10)+")", templ.Attributes{"data-failed-top": v.Failed.Code})
+					} else {
+						@ui.TileNote("No failed logins today.", templ.Attributes{"data-failed-empty": true})
+					}
 				}
 			}
-		}
-		<div>
+		</div>
+		<div data-region="link">
 			@LinkStatusPanel(v.Link)
 		</div>
-		<section class="l-flow" aria-label="Needs attention">
+		<section class="l-flow" data-region="attention" aria-label="Needs attention">
 			@AttentionSection(v.Expiring)
 			@AttentionSection(v.NearLimit)
 		</section>
@@ -46,6 +48,9 @@ templ DashboardContent(v dashboardView) {
 			@ChartSection(c)
 		}
 	</div>
+	if oob {
+		@ui.OnlineBadge(v.Online.Now, true)
+	}
 }
 
 // OnlineTile is the Online now tile.
@@ -62,7 +67,7 @@ templ AttentionSection(a attentionView) {
 		<h2>{ a.Title } ({ strconv.Itoa(a.Count) })</h2>
 		if len(a.Rows) == 0 {
 			<div data-empty>
-				@ui.EmptyState(a.Empty)
+				@ui.EmptyState("", a.Empty)
 			</div>
 		} else {
 			@ui.Table(a.Title, []string{"Member", a.Column}) {
@@ -82,11 +87,11 @@ templ AttentionSection(a attentionView) {
 
 // ChartSection is one chart with its heading. When every bar is 0 it shows the empty text instead.
 templ ChartSection(c chartView) {
-	<section class="l-stack" data-chart={ c.Key } aria-label={ c.Title }>
+	<section class="l-stack" data-region={ "chart-" + c.Key } data-chart={ c.Key } aria-label={ c.Title }>
 		<h2>{ c.Title }</h2>
 		if c.Top == 0 {
 			<div data-empty>
-				@ui.EmptyState(c.Empty)
+				@ui.EmptyState("", c.Empty)
 			</div>
 		} else {
 			@ui.BarChart(c.Bars, c.Top, c.Caption)

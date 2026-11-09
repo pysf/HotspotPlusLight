@@ -229,7 +229,7 @@ func (h handlers) dashboardContent(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, DashboardContent(v))
+	h.render(w, r, http.StatusOK, DashboardContent(v, true))
 }
 
 // linkEvent is one row of the link status table.

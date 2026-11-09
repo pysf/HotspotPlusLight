@@ -87,12 +87,12 @@ func BatchesPage(l ui.LayoutData, res voucher.ListResult) templ.Component {
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = ui.PageHeader("Batches").Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.PageHeader("Vouchers").Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if res.Total == 0 {
-				templ_7745c5c3_Err = ui.EmptyState("No batches yet. Create the first one.").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.EmptyState("No batches yet", "Create the first one.").Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -117,11 +117,7 @@ func BatchesPage(l ui.LayoutData, res voucher.ListResult) templ.Component {
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = ui.Table("Batches", []string{"Label", "Rename", "Plan", "Created", "Members", "Unused", ""}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = ui.Pagination(ui.PageProps{Page: res.Page, Pages: res.Pages, Href: batchesHref(res.Per), Total: res.Total, Per: res.Per}).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.TablePaged("Batches", []string{"Label", "Rename", "Plan", "Created", "Members", "Unused", ""}, ui.PageProps{Page: res.Page, Pages: res.Pages, Href: batchesHref(res.Per), Total: res.Total, Per: res.Per}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -161,7 +157,7 @@ func BatchRow(r domain.BatchRow, res voucher.ListResult) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(strconv.FormatInt(r.Batch.ID, 10)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 54, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 53, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
@@ -174,7 +170,7 @@ func BatchRow(r domain.BatchRow, res voucher.ListResult) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(strconv.Itoa(r.Members)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 54, Col: 100}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 53, Col: 100}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
@@ -187,7 +183,7 @@ func BatchRow(r domain.BatchRow, res voucher.ListResult) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(strconv.Itoa(r.Online)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 54, Col: 139}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 53, Col: 139}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -200,7 +196,7 @@ func BatchRow(r domain.BatchRow, res voucher.ListResult) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(labelText(r.Batch.Label))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 55, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 54, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -213,7 +209,7 @@ func BatchRow(r domain.BatchRow, res voucher.ListResult) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templruntime.NewAttributeExpression(batchURL(r.Batch.ID)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 57, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 56, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -226,7 +222,7 @@ func BatchRow(r domain.BatchRow, res voucher.ListResult) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.NewAttributeExpression(r.Batch.Label).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 58, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 57, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 		if templ_7745c5c3_Err != nil {
@@ -247,7 +243,7 @@ func BatchRow(r domain.BatchRow, res voucher.ListResult) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(r.PlanName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 62, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 61, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -260,7 +256,7 @@ func BatchRow(r domain.BatchRow, res voucher.ListResult) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmtTime(r.Batch.CreatedAt, res.Loc))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 63, Col: 98}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 62, Col: 98}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -273,7 +269,7 @@ func BatchRow(r domain.BatchRow, res voucher.ListResult) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(r.Members))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 64, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 63, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -286,7 +282,7 @@ func BatchRow(r domain.BatchRow, res voucher.ListResult) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(r.Unused))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 65, Col: 83}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/batches.templ`, Line: 64, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -377,13 +373,13 @@ func BatchNewPage(l ui.LayoutData, p BatchFormProps) templ.Component {
 						}()
 					}
 					ctx = templ.InitializeContext(ctx)
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<p><a href=\"/admin/plans/new\">New plan</a></p>")
+					templ_7745c5c3_Err = ui.LinkButton("primary", "/admin/plans/new", "New plan", nil).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = ui.EmptyState("No plans exist yet. Create a plan first, then create batches.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var19), templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.EmptyState("No plans yet", "No plans exist yet. Create a plan first, then create batches.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var19), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -447,7 +443,7 @@ func BatchFormView(p BatchFormProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, " ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

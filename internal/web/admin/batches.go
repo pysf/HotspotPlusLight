@@ -45,7 +45,7 @@ func (h handlers) batches(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, BatchesPage(layout(r, "Batches", batchesHome), res))
+	h.render(w, r, http.StatusOK, BatchesPage(layout(r, "Vouchers", batchesHome), res))
 }
 
 // batchFormProps returns the props of the batch form.

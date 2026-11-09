@@ -38,7 +38,7 @@ Both numbers live in the component files (`layout.css`, `table.css`, `sheet.css`
 
 ## 5. App shell (`ui.Layout`, `layout.css`)
 Written once in the base layout:
-- **Side bar** (glass): brand mark + "HotspotPlus Lite" + business name; nav: Dashboard, Members, Online now (live count badge), Plans, Vouchers (the batches page), Usage, Router, Settings;
+- **Side bar** (glass): brand mark + "HotspotPlus Lite" + business name; nav: Dashboard, Members, Online now, Plans, Vouchers (the batches page), Usage, Router, Settings. The page title and h1 equal the nav label ("Vouchers", "Online now"). The Online now badge shows the online count and is hidden at 0; the Online page and the dashboard fragment refresh it out of band every 10 s (`ui.OnlineBadge`, so it also appears when the count goes from 0 to more);
   footer "Router connected" (dot filled) or "No recent router packets" (hollow; a packet in the last 5 minutes counts).
 - **Top bar** (glass, 64 px / 60 on phone): business name on phone, today's date, Password link, theme icon button, Log out. On phone the three are 44 px icon buttons.
 - **Page**: `.l-page` is a grid with 24 px gap. Page header `.l-page-head`: h1, optional line under it, actions on the right (full width on phone).
@@ -57,13 +57,13 @@ Written once in the base layout:
 | `c-pill` | Icon + word, `data-tone` ok / warn / bad / off / info (`ui.Pill(status, text)` picks tone and icon). No dot. `c-dot` (`data-on`) follows it with 12 px space. `c-live`, `c-badge`. |
 | `c-meter` | Native `<meter>`: accent below 80 %, warning from 80 %, red when full. `c-usage` groups it with its figures. |
 | `c-card`, `c-tile`, `c-kv`, `c-li`, `c-group-title` | Card 20 px radius; `data-pad` adds padding. Tiles 4 across (2 under 1000 px). |
-| `c-table`, `c-pager`, `c-bulk` | Cell 12 x 16. Under 700 px rows are cards from `data-label`; `thead` is hidden by clipping, not `display: none`. |
+| `c-table`, `c-pager`, `c-bulk` | Cell 12 x 16. The pager sits inside the table card (`ui.TablePaged`) under the rows, with a 1 px top line. A card that holds a table is `data-flush` (the only card that clips). Under 700 px rows are cards from `data-label`; `thead` is hidden by clipping, not `display: none`. |
 | `c-menu`, `c-menu__item` | Popover, glass, `--sh-3`; items 40 px, optional icon, danger in red after a divider. |
 | `c-sheet`, `c-modal`, `c-toast`, `c-notice`, `c-empty`, `c-skel` | Native `<dialog>` sheet (right drawer, bottom sheet on phone) and modal (icon, title, text, buttons); toast pill (errors stay until closed); notice with icon (ok, warn, error, info); empty state with icon circle; skeleton lines. |
 | `c-credentials`, `c-code`, `c-chart` | Credential blocks in big monospace; code box; charts are inline SVG with classes (`c-chart__line`, `__bar`, ...). |
 
 ## 7. Interaction rules (htmx)
 - Filtering, searching and paging update only the list region and push the URL. Forms submit with htmx; errors (422) re-render the form fragment in place.
-- Refreshed regions get `u-swap-in` (55 % to 100 % opacity in 0.4 s) and no `aria-live`. Tiles keep their size, charts keep their view box, so nothing jumps.
+- Polled regions (`data-poll`) skip a poll while the tab is hidden or a dialog or menu is open (`swap.js`). After a swap only the regions (`data-region`) whose content changed get `u-swap-in` (55 % to 100 % opacity in 0.4 s); the first render does not fade. Refreshed regions have no `aria-live`. Tiles keep their size, charts keep their view box, so nothing jumps.
 - Row menu, sheet and modal are native `popover` and `<dialog>`. Destructive actions ask in the shared confirm dialog first.
 - Focus: `:focus-visible` 3 px outline in `--c-focus`, offset 2 px. Never removed. Touch targets are 44 px under 700 px.

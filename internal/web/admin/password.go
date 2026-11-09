@@ -47,7 +47,7 @@ func (h handlers) passwordPage(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, PasswordPage(layout(r, "Password", ""), PasswordProps{Forced: must}))
+	h.render(w, r, http.StatusOK, PasswordPage(layout(r, "Password", passwordHome), PasswordProps{Forced: must}))
 }
 
 // passwordChange changes the admin password (BR-20), or shows the errors.

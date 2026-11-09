@@ -57,7 +57,7 @@ func (h handlers) sessionsPage(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, SessionsPage(layout(r, "Online", sessionsHome), v))
+	h.render(w, r, http.StatusOK, SessionsPage(layout(r, "Online now", sessionsHome), v))
 }
 
 // sessionsTable shows the table fragment that the page polls every 10 seconds.
@@ -67,7 +67,7 @@ func (h handlers) sessionsTable(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, SessionsTable(v))
+	h.render(w, r, http.StatusOK, SessionsTable(v, true))
 }
 
 // sessionKick disconnects one session (BR-18).

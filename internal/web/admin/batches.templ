@@ -33,18 +33,17 @@ func labelText(l string) string {
 // BatchesPage lists the batches.
 templ BatchesPage(l ui.LayoutData, res voucher.ListResult) {
 	@ui.Layout(l) {
-		@ui.PageHeader("Batches") {
+		@ui.PageHeader("Vouchers") {
 			@ui.LinkButton("primary", "/admin/batches/new", "New batch", nil)
 		}
 		if res.Total == 0 {
-			@ui.EmptyState("No batches yet. Create the first one.")
+			@ui.EmptyState("No batches yet", "Create the first one.")
 		} else {
-			@ui.Table("Batches", []string{"Label", "Rename", "Plan", "Created", "Members", "Unused", ""}) {
+			@ui.TablePaged("Batches", []string{"Label", "Rename", "Plan", "Created", "Members", "Unused", ""}, ui.PageProps{Page: res.Page, Pages: res.Pages, Href: batchesHref(res.Per), Total: res.Total, Per: res.Per}) {
 				for _, r := range res.Rows {
 					@BatchRow(r, res)
 				}
 			}
-			@ui.Pagination(ui.PageProps{Page: res.Page, Pages: res.Pages, Href: batchesHref(res.Per), Total: res.Total, Per: res.Per})
 		}
 	}
 }
@@ -77,8 +76,8 @@ templ BatchNewPage(l ui.LayoutData, p BatchFormProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("New batch")
 		if len(p.Plans) == 0 {
-			@ui.EmptyState("No plans exist yet. Create a plan first, then create batches.") {
-				<p><a href="/admin/plans/new">New plan</a></p>
+			@ui.EmptyState("No plans yet", "No plans exist yet. Create a plan first, then create batches.") {
+				@ui.LinkButton("primary", "/admin/plans/new", "New plan", nil)
 			}
 		} else {
 			@BatchFormView(p)

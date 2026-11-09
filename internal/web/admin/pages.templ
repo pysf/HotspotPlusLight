@@ -66,7 +66,7 @@ templ PlanListFragment(plans []domain.Plan) {
 // PlanListBody is the inside of the plan list region.
 templ PlanListBody(plans []domain.Plan) {
 	if len(plans) == 0 {
-		@ui.EmptyState("No plans yet. Create the first one.")
+		@ui.EmptyState("No plans yet", "Create the first one.")
 	} else {
 		@ui.Table("Plans", []string{"Name", "Validity", "Speed", "Data", "Time", "Devices", ""}) {
 			for _, p := range plans {
