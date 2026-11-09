@@ -26,7 +26,6 @@ const gigaword = int64(1) << 32
 // CumulativeFromAcct returns the cumulative counters of an accounting packet
 // (BR-11): upload from the Input octets and gigawords, download from the Output
 // ones, seconds from Acct-Session-Time.
-// VERIFY-ON-HARDWARE (PLAN 13.5/13.6): Input = upload, and when Gigawords appear.
 func CumulativeFromAcct(inOctets, inGiga, outOctets, outGiga, sessionTime uint32) Counters {
 	return Counters{Upload: withGiga(inOctets, inGiga), Download: withGiga(outOctets, outGiga), Seconds: int64(sessionTime)}
 }

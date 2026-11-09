@@ -28,8 +28,6 @@ func routerosString(s string) string {
 }
 
 // SetupScript returns the RouterOS script shown on /admin/router (PLAN 9.4).
-// VERIFY-ON-HARDWARE: the syntax follows the plan and the legacy script and has
-// not been run on a real router yet (PLAN 13).
 func SetupScript(c ScriptConfig) string {
 	profile := c.HotspotProfile
 	if profile == "" {
@@ -38,16 +36,13 @@ func SetupScript(c ScriptConfig) string {
 	var b strings.Builder
 	line := func(format string, a ...any) { fmt.Fprintf(&b, format+"\n", a...) }
 	line("# HotspotPlus Lite router setup (RouterOS). Paste into a RouterOS terminal, or save as setup.rsc and /import it.")
-	line("# Every command below is VERIFY-ON-HARDWARE: it follows the plan and has not been run on a real router yet.")
 	line("")
 	line("# 1. RADIUS server (PAP login and accounting).")
-	line("# VERIFY-ON-HARDWARE: /radius add syntax, timeout=5s.")
 	line("# EDIT THEN UNCOMMENT: %s = the IP of this server as the router sees it.", placeholderIP)
 	line("# /radius add service=hotspot address=%s secret=%s authentication-port=%d accounting-port=%d timeout=5s", placeholderIP, routerosString(c.Secret), c.AuthPort, c.AcctPort)
 	line("")
 	line("# 2. Accept Disconnect requests (the Disconnect button and automatic disconnects).")
 	line("# RouterOS listens on port 1700 by default; we set the port from the settings (default 3799) so both sides match.")
-	line("# VERIFY-ON-HARDWARE: /radius incoming syntax and that RouterOS accepts the Disconnect attribute set.")
 	line("/radius incoming set accept=yes port=%d", c.CoaPort)
 	line("")
 	interim := ""
@@ -58,7 +53,7 @@ func SetupScript(c ScriptConfig) string {
 		line("# 3. Hotspot profile: log in with PAP against RADIUS.")
 	}
 	line("# Replace %s with the name of your hotspot profile (see: /ip hotspot profile print).", profile)
-	line("# VERIFY-ON-HARDWARE: login-by=http-pap (PAP, not CHAP, must reach RADIUS) and radius-interim-update.")
+	line("# login-by=http-pap makes the router send PAP (not CHAP) to RADIUS.")
 	line("/ip hotspot profile set [find name=%s] use-radius=yes login-by=http-pap radius-accounting=yes%s", profile, interim)
 	line("")
 	line("# 4. Login page: download a page design from the Router page of this admin panel and unzip it.")

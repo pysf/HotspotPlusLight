@@ -190,7 +190,7 @@ Pushing a tag `v*` runs `.github/workflows/release.yml`, which builds these file
 - `PLAN.md`: the plan, decisions, business rules (BR), schema, RADIUS spec, phases. `PLAN.md` wins over other files.
 - `CLAUDE.md`: context for agents working in this repo.
 - `docs/`: notes per phase, `DESIGN.md` and `FRONTEND.md` (admin UI rules), `perf-results.md`.
-- Hardware items still to verify on a real router are marked `VERIFY-ON-HARDWARE` in the code and in PLAN.md section 13.
+- Any new RouterOS detail that is not yet checked on a real router is marked `VERIFY-ON-HARDWARE` in the code. The first hardware check list (PLAN.md section 13) was done on 2026-11-09.
 
 ## Site
 

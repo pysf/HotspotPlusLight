@@ -200,7 +200,7 @@ func TestE8_09_Readme(t *testing.T) {
 	r := string(b)
 	for _, want := range []string{
 		"HotspotPlus Lite", "https://github.com/pysf/hotspotplus", "AGPL-3.0",
-		"https://pysf.github.io/HotspotPlusLight/", "PLAN.md", "CLAUDE.md", "VERIFY-ON-HARDWARE",
+		"https://pysf.github.io/HotspotPlusLight/", "PLAN.md", "CLAUDE.md",
 		"make run", "make test", "make ci", "make generate", "make perf", "make perf-quick", "make release", "make build-cross",
 		"<!-- perf:start -->", "<!-- perf:end -->",
 		"flowchart", "sequenceDiagram", "1812", "1813", "3799", "8081",

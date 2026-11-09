@@ -30,10 +30,10 @@ If `PLAN.md` and this file disagree, `PLAN.md` wins; fix this file.
 - `HSP_DATA_DIR` and `HSP_DEV` stay env-only. All other `HSP_*` vars seed the first-boot settings row; the dashboard is authoritative after that.
 
 ## Open decisions
-All open decisions are resolved except the hardware items (VERIFY-ON-HARDWARE). See `PLAN.md` §3 for the full list.
+All open decisions are resolved. The hardware items were verified by the owner on 2026-11-09. See `PLAN.md` §3 for the full list.
 
 ## Current status
-Phases 0–19 are done in code (Phases 17–19 added the dashboard home page, `PLAN.md` D25–D28, BR-25–BR-30, §11). The full e2e suite passes. The owner still has to do the hardware validation — see `PLAN.md` §13 for the checklist. Per-phase notes are in `docs/phaseN-notes.md` and in git history.
+Phases 0–19 and design v2 (steps 1 to 7) are done (Phases 17–19 added the dashboard home page, `PLAN.md` D25–D28, BR-25–BR-30, §11). The full e2e suite passes. The owner verified the hardware checklist on a real MikroTik on 2026-11-09 (`PLAN.md` §13). Per-phase notes are in `docs/phaseN-notes.md` and in git history.
 
 ## How we work here
 00. **Simple language.** Short sentences, plain words. No jargon. This applies to chat, docs, comments, and commit messages.
@@ -45,7 +45,7 @@ Phases 0–19 are done in code (Phases 17–19 added the dashboard home page, `P
 5. **Parameterized SQL only.** No string-built queries.
 6. **Keep `PLAN.md` current.** If a decision changes, update the plan in the same change and note the date.
 7. **Enforcement in two layers.** The router gets exact limits at login (`Mikrotik-Xmit/Recv-Limit` + Gigawords, `Session-Timeout`). The server also disconnects by itself: on each Start/Interim, `session.Enforcer` runs `domain.ShouldEnd` and sends a Disconnect. Keep `MONITOR:` comments only for real remaining gaps.
-8. **Do not guess RouterOS/RADIUS vendor details.** Mark anything unverified with `VERIFY-ON-HARDWARE`.
+8. **Do not guess RouterOS/RADIUS vendor details.** The hardware items were verified by the owner on 2026-11-09. Mark any new unverified detail with `VERIFY-ON-HARDWARE`.
 9. **Keep README and site in sync.** When you change user-facing features, routes, settings, or behavior, update `README.md` and the relevant `site/` pages in the same change.
 
 ## Go comments (owner, 2026-11-04)

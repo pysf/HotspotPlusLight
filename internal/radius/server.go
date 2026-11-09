@@ -352,9 +352,8 @@ func (s *Server) reply(w radius.ResponseWriter, r *radius.Request, v auth.Verdic
 		rfc2865.SessionTimeout_Set(resp, rfc2865.SessionTimeout(g.SessionTimeout))
 		// Layer 1 of the enforcement (O3): the exact bytes left, in both directions,
 		// as low 32 bits plus -Gigawords.
-		// VERIFY-ON-HARDWARE (PLAN 13.2): the type ids match PLAN 7.5. Still to prove:
-		// what Recv/Xmit mean in the Hotspot, that the Gigawords limits are honoured,
-		// and the Rate-Limit syntax.
+		// The type ids are in PLAN 7.5. The same value goes in both directions, so the
+		// server checks the sum.
 		if g.DataLimited {
 			mikrotik.MikrotikRecvLimit_Set(resp, mikrotik.MikrotikRecvLimit(g.DataLow))
 			mikrotik.MikrotikXmitLimit_Set(resp, mikrotik.MikrotikXmitLimit(g.DataLow))
@@ -421,7 +420,7 @@ func isCHAP(p *radius.Packet) bool {
 // bytes only (RFC 2865 5.2). The library cuts the plaintext at the first zero
 // byte, so a wrong-secret block with an early zero byte would look like a short
 // valid password (about 1 in 150 packets).
-// VERIFY-ON-HARDWARE: RouterOS pads with zeros.
+// RouterOS pads with zeros.
 func zeroPadded(p *radius.Packet) bool {
 	a, ok := p.Lookup(rfc2865.UserPassword_Type)
 	if !ok || len(a) < 16 || len(a)%16 != 0 || len(p.Secret) == 0 {

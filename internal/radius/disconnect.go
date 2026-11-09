@@ -54,9 +54,8 @@ func NewDisconnector(s SettingsReader, link DisconnectRecorder, log *slog.Logger
 // domain.ErrKickBadReply (replies that fail the Message-Authenticator check) or
 // domain.ErrKickNoSecret (no shared secret is set; nothing is sent).
 //
-// VERIFY-ON-HARDWARE: RouterOS accepts User-Name, Acct-Session-Id, Framed-IP-Address and
-// Calling-Station-Id (in its own MAC spelling), sends Error-Cause in its NAK (503 needs it), and has
-// "incoming" RADIUS enabled on port 3799 (PLAN 13).
+// The router must have "incoming" RADIUS enabled on the Disconnect port. It matches the session
+// by User-Name, Acct-Session-Id, Framed-IP-Address and Calling-Station-Id (in its own MAC spelling).
 func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) error {
 	if err := t.Validate(); err != nil {
 		return err
@@ -81,7 +80,6 @@ func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) e
 	// RFC 5176 allows Message-Authenticator and RouterOS 7.15+ may require it
 	// (BlastRADIUS). It is computed with a zero Authenticator field, because the
 	// Request Authenticator that Encode computes afterwards covers it (RFC 3579 3.2).
-	// VERIFY-ON-HARDWARE: RouterOS accepts it on incoming RADIUS (port 3799).
 	p.Authenticator = [16]byte{}
 	if err := sealMA(p, p.Authenticator); err != nil {
 		return err

@@ -1,0 +1,12 @@
+# Text that tests compare byte for byte (for example the LICENSE hash) keeps LF endings on Windows too.
+# The MikroTik files under reference/ and internal/routerpack/ keep the endings they have.
+LICENSE text eol=lf
+*.md text eol=lf
+*.go text eol=lf
+*.templ text eol=lf
+site/** text eol=lf
+site/**/*.png binary
+site/**/*.jpg binary
+site/**/*.svg text eol=lf
+site/**/*.ico binary
+site/**/*.woff2 binary

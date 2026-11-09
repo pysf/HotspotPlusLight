@@ -433,7 +433,6 @@ func TestE8_03_SetupScript(t *testing.T) {
 		"login-by=http-pap",
 		"radius-accounting=yes",
 		"radius-interim-update=120s",
-		"VERIFY-ON-HARDWARE",
 		"extracted hotspot folder",
 	} {
 		if !strings.Contains(script, want) {

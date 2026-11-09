@@ -176,7 +176,7 @@ func RouterPage(l ui.LayoutData, p RouterProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div><p>Paste this into the router’s New Terminal. It adds your RADIUS server and turns it on for the hotspot. It contains the RADIUS shared secret, so do not share it. Each command is marked VERIFY-ON-HARDWARE until it has been checked on your router.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div><p>Paste this into the router’s New Terminal. It adds your RADIUS server and turns it on for the hotspot. It contains the RADIUS shared secret, so do not share it.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

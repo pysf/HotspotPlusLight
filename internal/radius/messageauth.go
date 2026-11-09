@@ -17,8 +17,6 @@ import (
 // set, silently dropping replies that do not carry it. layeh.com/radius
 // never adds it, so the router ignored every Accept and Reject (docs/radius-reply-bug.md).
 //
-// VERIFY-ON-HARDWARE: the RouterOS option name and default (PLAN 13).
-//
 // DECISION: a request without Message-Authenticator is still accepted (older
 // routers do not send it). A future setting could require it.
 

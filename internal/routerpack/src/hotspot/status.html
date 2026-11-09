@@ -26,13 +26,13 @@ $(if session-time-left)
       <div><dt>Time left</dt><dd>$(session-time-left)</dd></div>
 $(endif)
 $(if remain-bytes-total)
-      <!-- VERIFY-ON-HARDWARE: the router gives this number in bytes, and only when the RADIUS server sets a total limit. -->
+      <!-- The router gives this number in bytes, and only when the RADIUS server sets a total limit. -->
       <div><dt>Data left (bytes)</dt><dd>$(remain-bytes-total)</dd></div>
 $(endif)
     </dl>
 
 $(if link-orig)
-    <!-- VERIFY-ON-HARDWARE: not every RouterOS version fills the address of the first site on this page. -->
+    <!-- Not every RouterOS version fills the address of the first site on this page. -->
     <a class="btn" href="$(link-orig)">Continue</a>
 $(endif)
     <form action="$(link-logout)">

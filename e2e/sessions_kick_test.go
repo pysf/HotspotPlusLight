@@ -205,7 +205,7 @@ func TestE5_03_KickSendsDisconnect(t *testing.T) {
 	if ip, err := rfc2865.FramedIPAddress_Lookup(p); err != nil || !ip.Equal(net.ParseIP("192.168.88.10")) {
 		t.Errorf("Framed-IP-Address %v %v", ip, err)
 	}
-	// The stored MAC is already in the RouterOS spelling and is sent as is. VERIFY-ON-HARDWARE: that the router matches on it.
+	// The stored MAC is already in the RouterOS spelling and is sent as is.
 	if got := rfc2865.CallingStationID_GetString(p); got != "AA:BB:CC:DD:EE:01" {
 		t.Errorf("Calling-Station-Id %q", got)
 	}

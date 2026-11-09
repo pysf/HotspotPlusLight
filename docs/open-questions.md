@@ -2,6 +2,8 @@
 
 Work continues on the stated default until you answer. Newest last.
 
+Note (2026-11-09): the hardware items listed here were verified by the owner on a real router.
+
 ## Decided by the owner (2026-11-02)
 - **Rows 1-29: all working defaults accepted**, except 12 (still open) and where noted below.
 - **Row 5:** PLAN 7.3 is right: Accounting-On/Off are acknowledged and change nothing.

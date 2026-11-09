@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"runtime"
 	"testing"
 	"time"
 
@@ -38,6 +39,9 @@ func TestReplySourceIsRequestDestination(t *testing.T) {
 }
 
 func replySource(t *testing.T, accept bool) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows gives no destination address, so replies use the plain socket (see Listen)")
+	}
 	lan := lanIPv4(t)
 	conn, err := Listen(":0", slog.Default())
 	if err != nil {

@@ -43,7 +43,7 @@ Multi-tenancy/Business entity, resellers, operators, roles/ACL/tokens, invoices,
 | D1 | Single business. No tenant concept anywhere. |
 | D2 | One admin account. |
 | D3 | One router, MikroTik only. **No NAS entity and no router-type field.** |
-| D4 | **PAP only.** Evidence: the portal posts the plaintext password to the router, and the router's `rlogin.html` redirect uses `$(plain-passwd)`. (Router-side `login-by` is not in the repo — confirm on hardware, §13.) |
+| D4 | **PAP only.** Evidence: the portal posts the plaintext password to the router, and the router's `rlogin.html` redirect uses `$(plain-passwd)`. (Router-side `login-by` is not in the repo — confirmed on hardware, §13.) |
 | D5 | Native Go RADIUS server (auth, accounting, Disconnect). No FreeRADIUS. |
 | D6 | SQLite only. No Redis, ClickHouse, Kafka. |
 | D7 | Dropped: SMS/verification, payments, invoices, coupons, campaigns, tickets, departments, resellers, operators, reports, roles/ACL/tokens, themes. |
@@ -475,7 +475,7 @@ Always respond with **Accounting-Response** after the transaction commits. A pre
 **Known edge cases (accepted, `MONITOR:` comments; Phase 4 review, 2026-11-01):** (1) a reordered/delayed Interim (cur < prev) is treated as a counter restart (over-counts, rewinds the stored counter); (2) a late Interim/Stop with no open row and figures above the latest finished row creates a new row and double-bills the overlap (needed for server downtime, E4.17); (3) the finished-row fallback of `LatestSession` is a full scan (no index; fix = an index migration).
 
 ### 7.4 Disconnect (CoA port)
-See BR-18. `Calling-Station-Id` is the stored RouterOS-style MAC sent as is (BR-3, 2026-11-02; VERIFY-ON-HARDWARE that the router matches it). Packet code 40; expect 41 (ACK) / 42 (NAK). Router needs incoming RADIUS enabled (see §9.4, verify on hardware).
+See BR-18. `Calling-Station-Id` is the stored RouterOS-style MAC sent as is (BR-3, 2026-11-02). Packet code 40; expect 41 (ACK) / 42 (NAK). Router needs incoming RADIUS enabled (see §9.4).
 
 ### 7.5 MikroTik vendor attributes (vendor-id 14988)
 | Attribute | Type id | Use |
@@ -486,7 +486,7 @@ See BR-18. `Calling-Station-Id` is the stored RouterOS-style MAC sent as is (BR-
 | Mikrotik-Recv-Limit-Gigawords | 14 | high 32 bits of the bytes left; sent only when above 0 |
 | Mikrotik-Xmit-Limit-Gigawords | 15 | the same for Xmit |
 
-*Type ids (Recv-Limit 1, Xmit-Limit 2, Rate-Limit 8, Recv-Gigawords 14, Xmit-Gigawords 15, vendor 14988) match the MikroTik dictionary shipped with `layeh.com/radius`; the semantics on a real router remain VERIFY-ON-HARDWARE (§13). `Mikrotik-Total-Limit` is not used: the MikroTik RADIUS page does not document it.*
+*Type ids (Recv-Limit 1, Xmit-Limit 2, Rate-Limit 8, Recv-Gigawords 14, Xmit-Gigawords 15, vendor 14988) match the MikroTik dictionary shipped with `layeh.com/radius`; checked on a real router (§13, 2026-11-09). `Mikrotik-Total-Limit` is not used: the MikroTik RADIUS page does not document it.*
 
 ### 7.6 Message catalog (English only — O11)
 *(Phase 12, 2026-11-04: `TOO_MANY_ATTEMPTS` and `GENERAL_ERROR` were removed; nothing sent them. The page API is gone and the RADIUS `Reply-Message` is now only the `<CODE>` (O20 updated). The router pages map codes to text in their MESSAGES block.)* Each reject has a stable **code** and an English **message** (kept in the server log and the admin UI).
@@ -728,7 +728,9 @@ All E2E tests green on a clean checkout with no external services; hardware chec
 
 ---
 
-## 13. Hardware lab checklist (cannot be proven from the repo)
+## 13. Hardware lab checklist (done by the owner on 2026-11-09)
+The owner ran this checklist on a real MikroTik on 2026-11-09 and everything works. Items 16 and 17 are facts found in the lab and stay as documented behavior. Use `VERIFY-ON-HARDWARE` only for new unverified details.
+
 1. Confirm hotspot profile `login-by` is `http-pap` (or at least PAP reaches RADIUS: Access-Request contains `User-Password`, not `CHAP-Password`).
 2. Verify MikroTik VSA type ids (§7.5). **Phase 11a:** which direction `Mikrotik-Recv-Limit` and `Mikrotik-Xmit-Limit` mean (the MikroTik doc does not say; we send the same value in both, so each direction can use the full allowance and the server checks the sum); that the router honours the `-Gigawords` limits above 4 GiB; that the session ends at `Session-Timeout`. **Over-grant window:** each direction gets the full bytes left, so if the router counts the two directions separately, a member can move up to 2x the bytes left before the server (layer 2) catches it at the next Interim; measure it.
 3. Rate limit string accepted and applied (`Nk/Nk`).
@@ -752,7 +754,7 @@ All E2E tests green on a clean checkout with no external services; hardware chec
 ## 14. Risks
 | Risk | Mitigation |
 |---|---|
-| RADIUS details differ on real RouterOS | Fake router is only as good as our assumptions → lab checklist §13 gates the release |
+| RADIUS details differ on real RouterOS | Fake router is only as good as our assumptions → lab checklist §13 (done 2026-11-09) covered it |
 | PAP over plain HTTP/UDP on the LAN | Accepted (D9); documented |
 | SQLite write contention under many interims | 60 s interval × expected users is far below SQLite limits; WAL + short transactions; measured by the capacity test in `perf/` (Phase 11d, `make perf`, results in `docs/perf-results.md`) |
 | Server down/restart | Accepted, no extra handling (owner 2026-11-01): no new logins during the outage, accounting gap heals on the next interim (D-A), sessions with a lost Stop go stale |

@@ -10,7 +10,6 @@ import (
 // Listen opens a UDP socket for RADIUS on addr. For ":port" and "0.0.0.0:port"
 // the socket is IPv4 only and each reply leaves from the address the request was
 // sent to (RouterOS drops a reply from another address).
-// VERIFY-ON-HARDWARE: the reply source address seen by the router on macOS and Linux.
 func Listen(addr string, log *slog.Logger) (net.PacketConn, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil || (host != "" && host != "0.0.0.0") {
