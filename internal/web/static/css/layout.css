@@ -115,6 +115,7 @@
   .l-stack { display: grid; gap: var(--s-4); }
   .l-flow { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-5); }
   .l-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+  .l-cluster[data-end] { justify-content: flex-end; }
   .l-split { display: flex; gap: var(--s-2); }
   .l-split > :first-child { flex: 1; min-inline-size: 0; }
   .l-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-3); }
@@ -122,6 +123,7 @@
   .l-cols { display: grid; gap: var(--s-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .l-cols[data-cols="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .l-cols[data-cols="2-1"] { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; }
+  .l-cols[data-cols="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .l-cols[data-cols="1-1.5"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); align-items: start; }
   .l-grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(var(--w-grid), 1fr)); }
 
@@ -149,7 +151,7 @@
   /* Icon rail. */
   @media (max-width: 999px) {
     :root { --nav-w: var(--nav-w-rail); }
-    .l-cols[data-cols="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .l-cols[data-cols="3"], .l-cols[data-cols="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .l-brand__text, .l-side-foot__text, .l-nav__link .c-badge { display: none; }
     .l-brand, .l-side-foot { justify-content: center; padding-inline: 0; }
     .l-nav__link { justify-content: center; padding: 0; }

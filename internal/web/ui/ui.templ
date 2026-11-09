@@ -337,6 +337,20 @@ templ FormCard(attrs templ.Attributes) {
 	</form>
 }
 
+// SettingGroup is one group of a settings page: the title and a line of help on the left, the fields in a card on the right.
+// On narrow screens the help sits above the card.
+templ SettingGroup(title, sub string) {
+	<section class="c-setting">
+		<header>
+			<h2>{ title }</h2>
+			<p>{ sub }</p>
+		</header>
+		@Card() {
+			{ children... }
+		}
+	</section>
+}
+
 // CardTitle is the heading of a Card.
 templ CardTitle(title string) {
 	<h2 class="c-card__title">{ title }</h2>
@@ -1290,14 +1304,11 @@ templ Pagination(p PageProps) {
 	}
 }
 
-// CodeBlock shows read-only text (a script) in a box with a Copy button; the
-// click is handled by clipboard.js (delegated on [data-copy-target]).
+// CodeBlock shows read-only text (a script) in a box. A Copy button elsewhere on the page
+// copies it with data-copy-target set to id; clipboard.js handles the click.
 templ CodeBlock(id, text string) {
 	<div class="c-code">
 		<textarea class="c-input c-code__text" id={ id } data-script rows="18" readonly spellcheck="false">{ text }</textarea>
-		<div>
-			@Button("secondary", "Copy", templ.Attributes{"type": "button", "data-copy-target": id})
-		</div>
 	</div>
 }
 

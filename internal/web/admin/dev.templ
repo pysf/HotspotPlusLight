@@ -226,7 +226,8 @@ templ DevComponentsPage(l ui.LayoutData) {
 			@ui.Button("secondary", "Open sheet", templ.Attributes{"data-open-dialog": "g-cred-sheet"})
 		}
 		@galleryItem("Code block") {
-			<div class="l-narrow">
+			<div class="l-narrow l-stack">
+				@ui.ButtonIcon("secondary", "copy", "Copy script", templ.Attributes{"type": "button", "data-size": "sm", "data-copy-target": "g-code"})
 				@ui.CodeBlock("g-code", "/ip hotspot print")
 			</div>
 		}

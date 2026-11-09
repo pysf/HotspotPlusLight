@@ -3,6 +3,7 @@
 //                            aria-pressed keeps its icon and changes aria-pressed and aria-label; a text button changes its text)
 //   [data-select-all="sel"]  a checkbox that ticks every checkbox matching sel
 //   [data-generate-digits="id"]  a button that puts a random 6-digit number into the field #id and shows it
+//   [data-generate-alnum="id"]   a button that puts 24 random letters and digits into the field #id and shows it
 //   select[data-summary-for="id"]  a select: the data-summary of the chosen option is written into the element #id
 //   [data-bulk-bar]          the bar of a [data-bulk-guard] form: shown with the count while something is ticked;
 //                            [data-bulk-clear] unticks everything
@@ -14,6 +15,22 @@ function randomDigits(n) {
   const buf = new Uint32Array(n);
   crypto.getRandomValues(buf);
   return Array.from(buf, (v) => v % 10).join("");
+}
+
+const ALNUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+// randomAlnum returns n random letters and digits from the browser's random source.
+// Bytes of 248 or more are skipped, so every character is equally likely.
+function randomAlnum(n) {
+  let out = "";
+  while (out.length < n) {
+    const buf = new Uint8Array(n);
+    crypto.getRandomValues(buf);
+    for (const b of buf) {
+      if (b < 248 && out.length < n) { out += ALNUM[b % ALNUM.length]; }
+    }
+  }
+  return out;
 }
 
 // syncBulk shows the bulk bar with the number of selected rows, or hides it when nothing is ticked.
@@ -58,6 +75,16 @@ document.addEventListener("click", (e) => {
     const field = document.getElementById(gen.getAttribute("data-generate-digits"));
     if (field) {
       field.value = randomDigits(6);
+      setShown(field, document.querySelector('[data-reveal="' + field.id + '"]'), true);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    return;
+  }
+  const genAlnum = e.target.closest("[data-generate-alnum]");
+  if (genAlnum) {
+    const field = document.getElementById(genAlnum.getAttribute("data-generate-alnum"));
+    if (field) {
+      field.value = randomAlnum(24);
       setShown(field, document.querySelector('[data-reveal="' + field.id + '"]'), true);
       field.dispatchEvent(new Event("input", { bubbles: true }));
     }

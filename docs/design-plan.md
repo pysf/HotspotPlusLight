@@ -56,6 +56,15 @@ details, unless the design is wrong for the product.
    - Renew (clears usage), Open details and Delete are rows in More options. They sit outside the `form` element, so htmx sends no form fields with them (the step 3 notes are fixed). The state card switch and the More fields belong to the form through the `form="member-form"` attribute; the Save changes button too. A 422 re-renders the whole sheet, so the actions stay.
    - The list (`Members.dc.html`, unchanged) was checked again. Known differences, all product facts: the data cell reads "7.9 GB / 10 GB" with a "left" line (the board has "7.9 of 10 GB"); the search hint mentions mobile; Expires column; bulk bar has Delete only; chip "Expiring soon" (deviation 8).
    - `dialog.js`: the `close-sheet` event now empties the sheet host first. Before, a saved edit could reopen the sheet, because the old form was still in the host when the empty answer was swapped in.
+12. Router and Settings (step 6), where the product has more or less than the design:
+   - The Router page has no "Router connected" pill. The router link status lives on the Dashboard ("Router link" card; E19.02).
+   - Each of the 8 cards keeps a live preview in an `iframe` (`c-pack-frame`) instead of the drawn thumbnail, and has Download plus "Open preview". The card title and text are the design's name and About text (the design shows file names such as `login.html`). The grid is `l-cols` `data-cols="4"` (2 under 1000 px, 1 on a phone).
+   - The "Copy script" button sits in the card head (`ui.CodeBlock` is now the text box only). The script stays in a read-only textarea, not a `pre`, because the copy button reads its value. The upload steps keep the product facts: `flash/hotspot`, PAP only, and a hint about editing `login.html`, MESSAGES and `errors.txt`. The steps are 4, as in the design.
+   - Settings is one form with one "Save settings" button, not one Save per group: the server checks and saves all settings together (one `PUT /admin/settings`). So the page line is "Change what you need, then save once." instead of "Each group saves on its own." The groups are `ui.SettingGroup` (`c-setting`).
+   - Fields the board shows but the product does not have (not added): Idle timeout, Longest session, Block after wrong passwords (the Limits group), Sign-in and Accounting port (the product has the RADIUS auth and acct listen addresses in Server addresses), Password length as a select (the product has a number field). Product fields the board lacks: batch counter, maximum vouchers, default plan (own group "Members"), session retention ("Keep finished sessions (days)"), log level and format (group "Logs"), CoA port and accounting interval (group RADIUS).
+   - The restart-needed banner stays at the top of the form. Server addresses and Logs say that a change needs a restart.
+   - The secret field has the eye button and a new "Generate" button (24 letters and digits, `data-generate-alnum`, `forms.js`). The old "Reveal" text button with `id="reveal-secret"` is gone; E1.10 now looks for `button[data-reveal]` and `button[data-generate-alnum]`.
+   - Saving shows the inline "Settings saved." note (E16.04 reads it) and also a toast. A failed save shows a "Not saved. Fix N fields and try again." notice above the field errors.
 
 ## Steps
 Each step: a sonnet agent builds it (tests first where logic changes), a separate sonnet agent
@@ -72,7 +81,7 @@ it, and keep each test's intent. No inline style or script (CSP).
 | 3 | Members list (chips, bulk bar, stacked cards on phone), Add/edit sheet, credentials card, row menus | DONE (commit "Design v2 step 3") |
 | 4 | Plans (cards + edit form, delete-blocked reason), Online sessions (kick + confirm) | DONE |
 | 5 | Vouchers/batches (form, list, A4 print sheet 3x6), Usage (7/30/90 switch, chart, top 10) | DONE |
-| 6 | Router (8 download cards, script, link status) and Settings (grouped form) | todo |
+| 6 | Router (8 download cards, script, upload steps) and Settings (grouped form) | DONE |
 | 7 | Change the admin username (added 2026-11-09, owner request). Design: board `docs/design/Account.dc.html` ("1b Password and username", the page behind the Password link: a Username card and a Password card, each with its own Save button, current password required) and the Set new password screen in `Login.dc.html` (new Username field, pre-filled with the current name, hint "Keep admin or choose your own."). Server: username rules as for other usernames, other admin sessions end, e2e tests, README and site first-login page | todo |
 
 ## How to continue from another machine

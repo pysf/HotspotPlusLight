@@ -19,7 +19,6 @@
   .c-field__pair { display: flex; gap: var(--s-2); }
   .c-field__pair > :first-child { flex: 1; min-inline-size: 0; }
   .c-field__pair > .c-select-wrap { flex: none; inline-size: 112px; }
-  .c-section-title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); letter-spacing: var(--ls-h3); }
 
   @media (max-width: 699px) {
     .c-form-grid { grid-template-columns: minmax(0, 1fr); }

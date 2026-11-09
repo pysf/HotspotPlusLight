@@ -67,9 +67,9 @@
 <li><code>login-by=http-pap</code> is needed: the server accepts PAP only. With CHAP, every login is rejected.</li>
 <li>The accounting interval in the script is the value from Settings (60 s by default).</li>
 </ul>
-<p>Paste the script into a RouterOS terminal (WinBox, SSH), or save it as <code>setup.rsc</code> and run <code>/import setup.rsc</code>. It contains the shared secret, so do not share it.</p></section>
+<p>Press <strong>Copy script</strong>, then paste the script into a RouterOS terminal (WinBox, SSH), or save it as <code>setup.rsc</code> and run <code>/import setup.rsc</code>. It contains the shared secret, so do not share it.</p></section>
 <section><h2 id="page"><a href="#page">Step 3: the login page</a></h2>
-<p>On the same Router page choose a design and press <strong>Download</strong>. You get a zip with a folder named <code>hotspot</code>. Unzip it, then upload the unzipped <code>hotspot</code> folder to the router (Files in WinBox, or FTP) and replace the old one. On routers that keep files on flash storage the folder is <code>flash/hotspot</code>.</p>
+<p>On the same Router page, under <strong>Sign-in pages</strong>, choose a design and press <strong>Download</strong> (<strong>Open preview</strong> shows it first). You get a zip with a folder named <code>hotspot</code>. Unzip it, then upload the unzipped <code>hotspot</code> folder to the router (Files in WinBox, or FTP) and replace the old one. On routers that keep files on flash storage the folder is <code>flash/hotspot</code>.</p>
 <p>See <a href="../hotspot-login-pages/">Hotspot login pages</a> for the designs and how to edit them.</p></section>
 <section><h2 id="firewall"><a href="#firewall">Firewall</a></h2>
 <p>These ports must be open. HotspotPlus Lite never talks to members, only to the router and to you:</p>

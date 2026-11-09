@@ -17,5 +17,6 @@
   .c-input:focus, .c-input.is-focus { outline: var(--ring-w) solid var(--c-focus); outline-offset: 1px; border-color: var(--c-focus); }
   .c-input[aria-invalid="true"], .c-input.is-error { border-color: var(--st-bad-dot); box-shadow: inset 0 0 0 1px var(--st-bad-dot); }
   .c-input:disabled { background: var(--c-fill); color: var(--c-text-3); cursor: not-allowed; border-color: var(--c-line-strong); }
+  .c-input[inputmode="numeric"], .c-input[inputmode="decimal"] { font-variant-numeric: tabular-nums; }
   .c-input[data-mono] { font-family: var(--font-mono); letter-spacing: .02em; }
 }

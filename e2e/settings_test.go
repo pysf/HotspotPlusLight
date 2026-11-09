@@ -219,7 +219,7 @@ func TestE1_10_Settings(t *testing.T) {
 			t.Errorf("settings form lacks %s", f)
 		}
 	}
-	if d.Find(`input[name="radius_shared_secret"][type="password"]`).Length() != 1 || d.Find(`#reveal-secret`).Length() != 1 {
+	if d.Find(`input[name="radius_shared_secret"][type="password"]`).Length() != 1 || d.Find(`button[data-reveal="radius_shared_secret"]`).Length() != 1 || d.Find(`button[data-generate-alnum="radius_shared_secret"]`).Length() != 1 {
 		t.Error("secret must be masked with a reveal button")
 	}
 	if v := form.Get("coa_port"); v != "3799" {

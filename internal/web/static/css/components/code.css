@@ -1,6 +1,6 @@
-/* Read-only text block with a Copy button (the router script). */
+/* Read-only text block (the router script). Its Copy button sits in the card head. */
 @layer components {
-  .c-code { display: grid; gap: var(--s-2); }
+  .c-code { display: grid; }
   .c-code__text {
     block-size: var(--h-code);
     padding: var(--s-4);

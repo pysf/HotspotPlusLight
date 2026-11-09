@@ -2,52 +2,72 @@ package admin
 
 import "hotspotpluslight/internal/web/ui"
 
-// RouterPage shows the page designs and the setup script.
+// RouterPage shows the page designs, the setup script and the upload steps.
 templ RouterPage(l ui.LayoutData, p RouterProps) {
 	@ui.Layout(l) {
-		@ui.PageHeader("Router")
-		<div>
-			@ui.Card() {
-				@ui.CardTitle("Login pages")
-				<p>
-					The login pages live on the router. Pick a design and download it as a zip. Unzip it, then drag the
-					<code>hotspot</code> folder into Files on the router and replace the old one. On routers with flash storage
-					the folder is <code>flash/hotspot</code>. Keep the hotspot profile on PAP (<code>login-by=http-pap</code>); if you turn on http-chap, logins fail.
-				</p>
-				<p>
-					To change the heading, the subtitle or the logo, open <code>login.html</code> in a text editor. Comments in
-					the file show where. To translate, change the text in the block called MESSAGES in <code>login.html</code>,
-					the text in <code>errors.txt</code> and the labels in the other pages.
-					The MikroTik default pages are the ones RouterOS ships. A failed login shows the raw code there, for example OUT_OF_BULK.
-				</p>
-			}
-		</div>
-		<section class="l-stack" aria-label="Page designs">
-			<div class="l-grid">
+		@ui.PageHeaderSub("Router", "Set up your MikroTik and give it your own sign-in pages.") {
+		}
+		@ui.Section("Sign-in pages") {
+			<div class="l-cols" data-cols="4">
 				for _, d := range p.Designs {
-					<div data-design={ d.Key }>
-						@ui.Card() {
-							@ui.CardTitle(d.Title)
+					<article class="c-card c-plan" data-pad="s" data-design={ d.Key }>
+						<iframe class="c-pack-frame" loading="lazy" tabindex="-1" title={ d.Title + " preview" } src={ previewURL(d.Key) }></iframe>
+						<div>
+							<h3 class="c-plan__name">{ d.Title }</h3>
 							<p class="u-muted">{ d.About }</p>
-							<iframe class="c-pack-frame" loading="lazy" tabindex="-1" title={ d.Title + " preview" } src={ previewURL(d.Key) }></iframe>
-							@ui.Actions() {
-								@ui.LinkButton("primary", zipURL(d.Key), "Download", templ.Attributes{"data-download": true})
-								@ui.LinkButton("secondary", previewURL(d.Key), "Open preview", templ.Attributes{"data-preview": true, "target": "_blank", "rel": "noopener"})
-							}
-						}
-					</div>
+						</div>
+						<div class="c-plan__actions">
+							@ui.LinkButtonIcon("secondary", "download", zipURL(d.Key), "Download", templ.Attributes{"data-download": true, "data-size": "sm", "aria-label": "Download " + d.Title})
+							@ui.LinkButton("ghost", previewURL(d.Key), "Open preview", templ.Attributes{"data-preview": true, "data-size": "sm", "target": "_blank", "rel": "noopener"})
+						</div>
+					</article>
 				}
 			</div>
-		</section>
-		<div>
-			@ui.Card() {
-				@ui.CardTitle("Router setup script")
-				<p>
-					Paste this into a RouterOS terminal. It contains the RADIUS shared secret, so do not share it.
-					Each command is marked VERIFY-ON-HARDWARE until it has been checked on your router.
-				</p>
-				@ui.CodeBlock("setup-script", p.Script)
-			}
+		}
+		<div class="l-cols" data-cols="2-1">
+			<section class="c-card" data-pad aria-labelledby="script-title">
+				<div class="l-stack">
+					<div class="c-card__head">
+						<h2 class="c-card__title" id="script-title">Setup script</h2>
+						@ui.ButtonIcon("secondary", "copy", "Copy script", templ.Attributes{"type": "button", "data-size": "sm", "data-copy-target": "setup-script"})
+					</div>
+					<p>
+						Paste this into the router’s New Terminal. It adds your RADIUS server and turns it on for the hotspot.
+						It contains the RADIUS shared secret, so do not share it.
+						Each command is marked VERIFY-ON-HARDWARE until it has been checked on your router.
+					</p>
+					@ui.CodeBlock("setup-script", p.Script)
+				</div>
+			</section>
+			<section class="c-card" data-pad aria-labelledby="upload-title">
+				<div class="l-stack">
+					<div class="c-card__head">
+						<h2 class="c-card__title" id="upload-title">How to upload the pages</h2>
+					</div>
+					<ol class="c-steps">
+						<li><span>Download the design you want. It is a zip with the whole <code>hotspot</code> folder.</span></li>
+						<li>
+							<span>
+								Unzip it. In WinBox, open <b>Files</b>, drag the <code>hotspot</code> folder in and replace the old one.
+								On routers with flash storage the folder is <code>flash/hotspot</code>.
+							</span>
+						</li>
+						<li>
+							<span>
+								Open <b>IP › Hotspot › Server Profiles</b> and set HTML Directory to <b>hotspot</b>.
+								Keep the profile on PAP (<code>login-by=http-pap</code>); if you turn on http-chap, logins fail.
+							</span>
+						</li>
+						<li><span>Join the Wi-Fi on a phone and check the sign-in page.</span></li>
+					</ol>
+					<p class="c-hint">
+						To change the heading, the subtitle or the logo, open <code>login.html</code> in a text editor. Comments in
+						the file show where. To translate, change the text in the block called MESSAGES in <code>login.html</code>,
+						the text in <code>errors.txt</code> and the labels in the other pages.
+						The MikroTik default pages are the ones RouterOS ships. A failed login shows the raw code there, for example OUT_OF_BULK.
+					</p>
+				</div>
+			</section>
 		</div>
 	}
 }

@@ -124,7 +124,7 @@ export default [
   "page": "Configuration",
   "heading": "The Settings page",
   "url": "docs/configuration/#settings-page",
-  "keywords": "These are saved in the database and edited on the Settings page of the admin panel. Settings marked restart required take effect on the next server start. After you save one, the page shows a notice until you restart the server yourself. The listen addresses a"
+  "keywords": "These are saved in the database and edited on the Settings page of the admin panel. The page has groups (Business, RADIUS, Members, Voucher defaults, Server addresses, Logs). One Save settings button at the bottom saves all of them. Next to the RADIUS secret, "
  },
  {
   "page": "First login",
@@ -226,7 +226,7 @@ export default [
   "page": "Router setup",
   "heading": "Step 3: the login page",
   "url": "docs/router-setup/#page",
-  "keywords": "On the same Router page choose a design and press Download . You get a zip with a folder named hotspot . Unzip it, then upload the unzipped hotspot folder to the router (Files in WinBox, or FTP) and replace the old one. On routers that keep files on flash stor"
+  "keywords": "On the same Router page, under Sign-in pages , choose a design and press Download ( Open preview shows it first). You get a zip with a folder named hotspot . Unzip it, then upload the unzipped hotspot folder to the router (Files in WinBox, or FTP) and replace "
  },
  {
   "page": "Router setup",

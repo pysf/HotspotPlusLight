@@ -265,7 +265,8 @@ type SettingsProps struct {
 // SettingsPage shows the settings form.
 templ SettingsPage(l ui.LayoutData, p SettingsProps) {
 	@ui.Layout(l) {
-		@ui.PageHeader("Settings")
+		@ui.PageHeaderSub("Settings", "Change what you need, then save once.") {
+		}
 		@SettingsFormView(p)
 	}
 }
@@ -292,41 +293,69 @@ func planOptions(plans []domain.Plan) []ui.Option {
 	return o
 }
 
+// numeric makes a field open the number keypad on a phone.
+var numeric = templ.Attributes{"inputmode": "numeric"}
+
 // SettingsFormView is the settings form and the PUT response body: 200 with a flash, or 422 with field errors.
+// All groups are in one form with one Save button, because the server saves and checks all settings together.
 templ SettingsFormView(p SettingsProps) {
-	@ui.FormCard(templ.Attributes{"id": "settings-form", "hx-put": "/admin/settings", "hx-target": "this", "hx-swap": "outerHTML"}) {
+	<form id="settings-form" class="l-flow" hx-put="/admin/settings" hx-target="this" hx-swap="outerHTML">
 		if p.Saved {
 			@ui.Flash("ok", "Settings saved.")
+		}
+		if len(p.Errors) > 0 {
+			@ui.NoticeTitled("error", "Not saved", "Fix "+plural(len(p.Errors), "field")+" and try again.")
 		}
 		if p.RestartNeeded {
 			@ui.Flash("warn", "Restart the server to apply the saved server settings (addresses and log options).")
 		}
-		@ui.Field(ui.FieldProps{Label: "Business name", Name: "business_name", Value: p.Form.BusinessName, Error: p.Errors["business_name"], Hint: "Shown on printed vouchers and in the admin header. Leave empty to hide."})
-		@ui.Select(ui.SelectProps{Label: "Time zone", Name: "timezone", Value: p.Form.Timezone, Options: timezoneOptions(p.Form.Timezone), Error: p.Errors["timezone"], Hint: "Dates are shown in this zone."})
-		@ui.FieldPair(ui.PairProps{Label: "RADIUS shared secret", For: "radius_shared_secret", Hint: "Letters and digits only. Use a long random one (20 or more characters). Must match the secret configured on the router. Changes apply immediately.", Errors: []ui.NamedError{{Name: "radius_shared_secret", Msg: p.Errors["radius_shared_secret"]}}}) {
-			@ui.InputControl(ui.FieldProps{Name: "radius_shared_secret", Type: "password", Value: p.Form.RadiusSharedSecret, Error: p.Errors["radius_shared_secret"], Attrs: templ.Attributes{"autocomplete": "off"}})
-			@ui.Button("secondary", "Reveal", templ.Attributes{"type": "button", "id": "reveal-secret", "data-reveal": "radius_shared_secret"})
+		@ui.SettingGroup("Business", "Shown on vouchers and in the admin header.") {
+			@ui.Field(ui.FieldProps{Label: "Business name", Name: "business_name", Value: p.Form.BusinessName, Error: p.Errors["business_name"], Hint: "Shown on printed vouchers and in the admin header. Leave empty to hide."})
+			@ui.Select(ui.SelectProps{Label: "Time zone", Name: "timezone", Value: p.Form.Timezone, Options: timezoneOptions(p.Form.Timezone), Error: p.Errors["timezone"], Hint: "Dates are shown in this zone."})
 		}
-		@ui.Field(ui.FieldProps{Label: "Disconnect (CoA) port", Name: "coa_port", Value: p.Form.CoaPort, Error: p.Errors["coa_port"], Hint: "1-65535. Router default: 3799."})
-		@ui.Field(ui.FieldProps{Label: "Accounting interval (seconds)", Name: "accounting_interval_seconds", Value: p.Form.AccountingIntervalSeconds, Error: p.Errors["accounting_interval_seconds"], Hint: "At least 10."})
-		@ui.Select(ui.SelectProps{Label: "Default plan", Name: "default_plan_id", Value: p.Form.DefaultPlanID, Options: planFilterOptions(p.Plans, "(none)"), Error: p.Errors["default_plan_id"], Hint: "Preselected on the new-member form; nothing is assigned silently."})
-		@ui.Field(ui.FieldProps{Label: "Voucher username prefix", Name: "batch_username_prefix", Value: p.Form.BatchUsernamePrefix, Error: p.Errors["batch_username_prefix"], Hint: "English letters and digits."})
-		@ui.Field(ui.FieldProps{Label: "Next voucher number", Name: "batch_counter", Value: p.Form.BatchCounter, Error: p.Errors["batch_counter"], Hint: "It can only go up."})
-		@ui.Field(ui.FieldProps{Label: "Maximum vouchers per batch", Name: "batch_max_count", Value: p.Form.BatchMaxCount, Error: p.Errors["batch_max_count"]})
-		@ui.Field(ui.FieldProps{Label: "Voucher password length", Name: "voucher_password_length", Value: p.Form.VoucherPasswordLength, Error: p.Errors["voucher_password_length"], Hint: "4-20 digits."})
-		@ui.Textarea(ui.TextareaProps{Label: "Voucher help text", Name: "voucher_help", Value: p.Form.VoucherHelp, Error: p.Errors["voucher_help"], Hint: "Printed on every voucher. Empty = the default English text."})
-		@ui.Field(ui.FieldProps{Label: "Keep finished sessions (days)", Name: "session_retention_days", Value: p.Form.SessionRetentionDays, Error: p.Errors["session_retention_days"], Hint: "0 = keep forever."})
-		<h2 class="c-section-title">Server</h2>
-		<p class="c-hint">These settings take effect after the server is restarted.</p>
-		@ui.Field(ui.FieldProps{Label: "Admin address", Name: "admin_addr", Value: p.Form.AdminAddr, Error: p.Errors["admin_addr"], Hint: "host:port or :port for the admin panel (e.g. :8081). Port 0 = OS-assigned."})
-		@ui.Field(ui.FieldProps{Label: "RADIUS auth address", Name: "radius_auth_addr", Value: p.Form.RadiusAuthAddr, Error: p.Errors["radius_auth_addr"], Hint: "host:port for RADIUS authentication (e.g. :1812)."})
-		@ui.Field(ui.FieldProps{Label: "RADIUS acct address", Name: "radius_acct_addr", Value: p.Form.RadiusAcctAddr, Error: p.Errors["radius_acct_addr"], Hint: "host:port for RADIUS accounting (e.g. :1813)."})
-		@ui.Select(ui.SelectProps{Label: "Log level", Name: "log_level", Value: p.Form.LogLevel, Options: []ui.Option{{Value: "debug", Label: "debug"}, {Value: "info", Label: "info"}, {Value: "warn", Label: "warn"}, {Value: "error", Label: "error"}}, Error: p.Errors["log_level"]})
-		@ui.Select(ui.SelectProps{Label: "Log format", Name: "log_format", Value: p.Form.LogFormat, Options: []ui.Option{{Value: "text", Label: "text (key=value)"}, {Value: "json", Label: "json"}}, Error: p.Errors["log_format"]})
-		@ui.Actions() {
-			@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
+		@ui.SettingGroup("RADIUS", "The secret and the Disconnect port must match the router.") {
+			@ui.FieldPair(ui.PairProps{Label: "RADIUS shared secret", For: "radius_shared_secret", Hint: "Letters and digits only. Use a long random one (20 or more characters). Must match the secret configured on the router. Changes apply immediately.", Errors: []ui.NamedError{{Name: "radius_shared_secret", Msg: p.Errors["radius_shared_secret"]}}}) {
+				@ui.InputControl(ui.FieldProps{Name: "radius_shared_secret", Type: "password", Value: p.Form.RadiusSharedSecret, Error: p.Errors["radius_shared_secret"], Attrs: templ.Attributes{"autocomplete": "off", "data-mono": true}})
+				@ui.RevealButton("radius_shared_secret")
+				@ui.ButtonIcon("secondary", "wand", "Generate", templ.Attributes{"type": "button", "data-size": "sm", "data-generate-alnum": "radius_shared_secret"})
+			}
+			<div class="c-form-grid">
+				@ui.Field(ui.FieldProps{Label: "Disconnect (CoA) port", Name: "coa_port", Value: p.Form.CoaPort, Error: p.Errors["coa_port"], Hint: "1-65535. Router default: 3799.", Attrs: numeric})
+				@ui.Field(ui.FieldProps{Label: "Accounting interval (seconds)", Name: "accounting_interval_seconds", Value: p.Form.AccountingIntervalSeconds, Error: p.Errors["accounting_interval_seconds"], Hint: "At least 10.", Attrs: numeric})
+			</div>
 		}
-	}
+		@ui.SettingGroup("Members", "Used on the new member form.") {
+			@ui.Select(ui.SelectProps{Label: "Default plan", Name: "default_plan_id", Value: p.Form.DefaultPlanID, Options: planFilterOptions(p.Plans, "(none)"), Error: p.Errors["default_plan_id"], Hint: "Preselected on the new-member form; nothing is assigned silently."})
+		}
+		@ui.SettingGroup("Voucher defaults", "Used when you create a new batch.") {
+			<div class="c-form-grid">
+				@ui.Field(ui.FieldProps{Label: "Voucher username prefix", Name: "batch_username_prefix", Value: p.Form.BatchUsernamePrefix, Error: p.Errors["batch_username_prefix"], Hint: "English letters and digits.", Attrs: templ.Attributes{"data-mono": true}})
+				@ui.Field(ui.FieldProps{Label: "Next voucher number", Name: "batch_counter", Value: p.Form.BatchCounter, Error: p.Errors["batch_counter"], Hint: "It can only go up.", Attrs: numeric})
+				@ui.Field(ui.FieldProps{Label: "Maximum vouchers per batch", Name: "batch_max_count", Value: p.Form.BatchMaxCount, Error: p.Errors["batch_max_count"], Attrs: numeric})
+				@ui.Field(ui.FieldProps{Label: "Voucher password length", Name: "voucher_password_length", Value: p.Form.VoucherPasswordLength, Error: p.Errors["voucher_password_length"], Hint: "4-20 digits.", Attrs: numeric})
+				<div data-span="2">
+					@ui.Textarea(ui.TextareaProps{Label: "Voucher help text", Name: "voucher_help", Value: p.Form.VoucherHelp, Error: p.Errors["voucher_help"], Hint: "Printed on every voucher. Empty = the default English text."})
+				</div>
+			</div>
+		}
+		@ui.SettingGroup("Server addresses", "Where this app listens. A change needs a restart.") {
+			@ui.Field(ui.FieldProps{Label: "Admin address", Name: "admin_addr", Value: p.Form.AdminAddr, Error: p.Errors["admin_addr"], Hint: "host:port or :port for the admin panel (e.g. :8081). Port 0 = OS-assigned."})
+			<div class="c-form-grid">
+				@ui.Field(ui.FieldProps{Label: "RADIUS auth address", Name: "radius_auth_addr", Value: p.Form.RadiusAuthAddr, Error: p.Errors["radius_auth_addr"], Hint: "host:port for RADIUS authentication (e.g. :1812)."})
+				@ui.Field(ui.FieldProps{Label: "RADIUS acct address", Name: "radius_acct_addr", Value: p.Form.RadiusAcctAddr, Error: p.Errors["radius_acct_addr"], Hint: "host:port for RADIUS accounting (e.g. :1813)."})
+			</div>
+		}
+		@ui.SettingGroup("Logs", "Old sessions are removed automatically. The log level and format need a restart.") {
+			@ui.Field(ui.FieldProps{Label: "Keep finished sessions (days)", Name: "session_retention_days", Value: p.Form.SessionRetentionDays, Error: p.Errors["session_retention_days"], Hint: "0 = keep forever.", Attrs: numeric})
+			<div class="c-form-grid">
+				@ui.Select(ui.SelectProps{Label: "Log level", Name: "log_level", Value: p.Form.LogLevel, Options: []ui.Option{{Value: "debug", Label: "debug"}, {Value: "info", Label: "info"}, {Value: "warn", Label: "warn"}, {Value: "error", Label: "error"}}, Error: p.Errors["log_level"]})
+				@ui.Select(ui.SelectProps{Label: "Log format", Name: "log_format", Value: p.Form.LogFormat, Options: []ui.Option{{Value: "text", Label: "text (key=value)"}, {Value: "json", Label: "json"}}, Error: p.Errors["log_format"]})
+			</div>
+		}
+		<div class="l-cluster" data-end>
+			@ui.Button("primary", "Save settings", templ.Attributes{"type": "submit"})
+		</div>
+	</form>
 }
 
 // PasswordProps holds what the admin password form shows.
