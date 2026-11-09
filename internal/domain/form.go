@@ -25,6 +25,9 @@ func (e *InUseError) Error() string {
 	return fmt.Sprintf("plan is used by %d members and %d batches", e.Members, e.Batches)
 }
 
+// PlanUsage counts what holds a plan: members and batches.
+type PlanUsage struct{ Members, Batches int }
+
 // FieldErrors maps a form field name to its message. Empty = valid.
 type FieldErrors map[string]string
 

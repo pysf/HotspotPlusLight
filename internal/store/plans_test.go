@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"hotspotpluslight/internal/domain"
 )
@@ -139,5 +140,40 @@ func TestDeletePlanRefusesDefault(t *testing.T) {
 	}
 	if ok, _ := s.PlanExists(ctx, id); !ok {
 		t.Fatal("default plan was deleted")
+	}
+}
+
+func TestPlanUsageCountsMembersAndBatches(t *testing.T) {
+	s := seeded(t)
+	ctx := context.Background()
+	a, _ := s.CreatePlan(ctx, samplePlan("A"), fixed())
+	b, _ := s.CreatePlan(ctx, samplePlan("B"), fixed())
+	for _, u := range []string{"x", "y"} {
+		if _, err := s.db.Exec(`INSERT INTO member(username,password_enc,plan_id,subscription_date,created_at,updated_at) VALUES (?,x'00',?,1,1,1)`, u, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.db.Exec(`INSERT INTO batch(label, plan_id, count, duration_days, expires_at, created_at) VALUES ('l',?,1,1,1,1)`, b); err != nil {
+		t.Fatal(err)
+	}
+	use, err := s.PlanUsage(ctx)
+	if err != nil || use[a] != (domain.PlanUsage{Members: 2}) || use[b] != (domain.PlanUsage{Batches: 1}) {
+		t.Fatalf("%v %v", use, err)
+	}
+}
+
+func TestListOnlineSessionsHasMemberName(t *testing.T) {
+	s := seeded(t)
+	ctx := context.Background()
+	id := oneMember(t, s)
+	if _, err := s.db.Exec(`UPDATE member SET first_name='Anna', last_name='Keller' WHERE id=?`, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO session(member_id, username, acct_session_id, nas_ip, status, started_at, last_update_at) VALUES (?, 'm1', 's1', '1.1.1.1', 1, 100, 100)`, id); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := s.ListOnlineSessions(ctx, time.Unix(50, 0), 10, 0)
+	if err != nil || len(rows) != 1 || rows[0].MemberName != "Anna Keller" {
+		t.Fatalf("%+v %v", rows, err)
 	}
 }

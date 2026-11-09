@@ -119,7 +119,7 @@ func TestE5_12_OnlinePageColumnsAndPolling(t *testing.T) {
 	d := r.Doc(t)
 	var heads []string
 	d.Find("table thead th").Each(func(_ int, s *goquery.Selection) { heads = append(heads, text(s)) })
-	want := []string{"Username", "IP", "MAC", "Started", "Duration", "Download", "Upload", ""}
+	want := []string{"Who", "IP address", "MAC address", "Time online", "Data down / up", "Kick"}
 	if strings.Join(heads, "|") != strings.Join(want, "|") {
 		t.Fatalf("headers %q, want %q", heads, want)
 	}
@@ -127,7 +127,7 @@ func TestE5_12_OnlinePageColumnsAndPolling(t *testing.T) {
 	if row.Length() != 1 {
 		t.Fatalf("%d rows", row.Length())
 	}
-	cell := func(c string) string { return text(row.Find("td[data-col=" + c + "]")) }
+	cell := func(c string) string { return text(row.Find("[data-col=" + c + "]")) }
 	if cell("username") != "alice" || cell("ip") != "192.168.88.10" || cell("mac") != "AA:BB:CC:DD:EE:01" {
 		t.Fatalf("cells: user %q ip %q mac %q", cell("username"), cell("ip"), cell("mac"))
 	}

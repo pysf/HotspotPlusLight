@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"hotspotpluslight/internal/domain"
+	"hotspotpluslight/internal/plan"
 	"hotspotpluslight/internal/web/ui"
 )
 
@@ -37,19 +38,30 @@ func limit(v float64, unit string) string {
 	return num(v) + " " + unit
 }
 
-// minutes returns a time limit as text, and "Unlimited" for 0.
-func minutes(m int) string {
-	if m == 0 {
-		return "Unlimited"
+// limitText returns a speed or size for the plan card, and "No limit" for 0.
+func limitText(v float64, unit string) string {
+	if v == 0 {
+		return "No limit"
+	}
+	return num(v) + " " + unit
+}
+
+// timeText returns a time limit for the plan card: whole hours when it divides by 60, else minutes. "No limit" for 0.
+func timeText(m int) string {
+	switch {
+	case m == 0:
+		return "No limit"
+	case m%60 == 0:
+		return plural(m/60, "hour")
 	}
 	return strconv.Itoa(m) + " min"
 }
 
 // PlansPage lists the plans.
-templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
+templ PlansPage(l ui.LayoutData, plans []plan.Detail) {
 	@ui.Layout(l) {
-		@ui.PageHeader("Plans") {
-			@ui.LinkButton("primary", "/admin/plans/new", "New plan", sheetOpen("/admin/plans/new"))
+		@ui.PageHeaderSub("Plans", "What each kind of guest gets.") {
+			@ui.LinkButtonIcon("primary", "plus", "/admin/plans/new", "Add plan", sheetOpen("/admin/plans/new"))
 		}
 		<div id="plan-list" class="l-flow" aria-live="polite" aria-busy="false">
 			@PlanListBody(plans)
@@ -59,42 +71,81 @@ templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
 }
 
 // PlanListFragment is the answer to a request from the plan list region.
-templ PlanListFragment(plans []domain.Plan) {
+templ PlanListFragment(plans []plan.Detail) {
 	@PlanListBody(plans)
 }
 
 // PlanListBody is the inside of the plan list region.
-templ PlanListBody(plans []domain.Plan) {
+templ PlanListBody(plans []plan.Detail) {
 	if len(plans) == 0 {
-		@ui.EmptyState("No plans yet", "Create the first one.")
-	} else {
-		@ui.Table("Plans", []string{"Name", "Validity", "Speed", "Data", "Time", "Devices", ""}) {
-			for _, p := range plans {
-				<tr>
-					<td data-label="Name"><a href={ templ.SafeURL(planURL(p.ID)) }>{ p.Name }</a></td>
-					<td data-label="Validity" class="u-nums">{ strconv.Itoa(p.DurationDays) } days</td>
-					<td data-label="Speed">{ limit(p.SpeedValue, p.SpeedUnit) }</td>
-					<td data-label="Data">{ limit(p.BulkValue, p.BulkUnit) }</td>
-					<td data-label="Time">{ minutes(p.TimeLimitMinutes) }</td>
-					<td data-label="Devices">{ strconv.Itoa(p.MaxSessions) }</td>
-					<td data-slot="actions">
-						@ui.Menu("plan-menu-"+strconv.FormatInt(p.ID, 10), "Actions for "+p.Name) {
-							@ui.MenuItem("Edit", false, sheetOpen(planURL(p.ID)))
-							@ui.MenuSep()
-							@ui.MenuItem("Delete", true, templ.Attributes{"hx-delete": planURL(p.ID), "hx-target": "#" + planListID, "hx-swap": "none", "hx-confirm": "Delete plan " + p.Name + "?"})
-						}
-					</td>
-				</tr>
-			}
+		@ui.EmptyState("No plans yet", "Create the first one.") {
+			@ui.LinkButtonIcon("primary", "plus", "/admin/plans/new", "Add plan", sheetOpen("/admin/plans/new"))
 		}
+	} else {
+		<div class="l-grid">
+			for _, d := range plans {
+				@PlanCard(d)
+			}
+		</div>
 	}
 	@ui.Refresher(plansHome, plansChanged, "#"+planListID)
+}
+
+// PlanCard is one plan: its limits, and Edit and Delete. Delete is disabled, with the reason below, while the plan cannot be deleted.
+templ PlanCard(d plan.Detail) {
+	{{ id := strconv.FormatInt(d.Plan.ID, 10) }}
+	{{ reason := blockedReason(d) }}
+	<article class="c-card c-plan" data-pad data-plan data-id={ id } data-name={ d.Plan.Name }>
+		<div class="c-plan__head">
+			<h2 class="c-plan__name">{ d.Plan.Name }</h2>
+			<span class="c-plan__members u-nums" data-plan-members>{ plural(d.Members, "member") }</span>
+		</div>
+		<dl>
+			<div><dt>Data limit</dt><dd>{ limitText(d.Plan.BulkValue, d.Plan.BulkUnit) }</dd></div>
+			<div><dt>Time limit</dt><dd>{ timeText(d.Plan.TimeLimitMinutes) }</dd></div>
+			<div><dt>Valid for</dt><dd>{ plural(d.Plan.DurationDays, "day") }</dd></div>
+			<div><dt>Speed limit</dt><dd>{ limitText(d.Plan.SpeedValue, d.Plan.SpeedUnit) }</dd></div>
+			<div><dt>Devices</dt><dd>{ strconv.Itoa(d.Plan.MaxSessions) }</dd></div>
+		</dl>
+		<div class="c-plan__foot">
+			<div class="c-plan__actions">
+				@ui.LinkButtonIcon("secondary", "edit", planURL(d.Plan.ID), "Edit", planEditAttrs(d.Plan))
+				if reason == "" {
+					@ui.ButtonIcon("danger", "trash", "Delete", planDeleteAttrs(d.Plan))
+				} else {
+					@ui.ButtonIcon("danger", "trash", "Delete", templ.Attributes{"data-size": "sm", "aria-disabled": "true", "aria-describedby": "why-" + id})
+				}
+			</div>
+			if reason != "" {
+				<p class="c-hint c-plan__why" id={ "why-" + id } data-plan-why>
+					@ui.Icon("info")
+					<span>Can’t delete: { reason }</span>
+				</p>
+			}
+		</div>
+	</article>
+}
+
+// planEditAttrs makes the Edit link of a card open the plan in the sheet.
+func planEditAttrs(p domain.Plan) templ.Attributes {
+	a := sheetOpen(planURL(p.ID))
+	a["data-size"] = "sm"
+	a["aria-label"] = "Edit " + p.Name
+	return a
+}
+
+// planDeleteAttrs is the Delete button of a plan that can be deleted: it asks first, and the answer goes to the toast and the list refresh.
+func planDeleteAttrs(p domain.Plan) templ.Attributes {
+	a := rowAction("delete", planURL(p.ID), planListID, "Delete plan "+p.Name+"?")
+	a["data-size"] = "sm"
+	a["aria-label"] = "Delete " + p.Name
+	return a
 }
 
 // PlanNewPage is the new plan form as a page (the no-JavaScript fallback of the sheet).
 templ PlanNewPage(l ui.LayoutData) {
 	@ui.Layout(l) {
-		@ui.PageHeader("New plan")
+		@ui.PageHeader("Add plan")
 		@PlanFormView(PlanFormProps{Form: domain.NewPlanForm(), Action: "post", URL: "/admin/plans"})
 	}
 }
@@ -114,6 +165,7 @@ type PlanFormProps struct {
 	Action  string // "post" or "put"
 	URL     string
 	Members int  // members using the plan (edit only)
+	Blocked string // why the plan cannot be deleted, "" if it can (edit only)
 	Sheet   bool // shown in the sheet: targets the sheet body, no card
 }
 
@@ -140,23 +192,39 @@ func planFormAttrs(p PlanFormProps) templ.Attributes {
 	if p.Sheet {
 		a["hx-target"], a["hx-swap"] = "#"+sheetBodyID, "innerHTML"
 		a["data-sheet-title"] = "Edit plan"
+		if p.Form.Name != "" {
+			a["data-sheet-title"] = "Edit plan · " + p.Form.Name
+		}
 		if p.Action == "post" {
-			a["data-sheet-title"] = "New plan"
+			a["data-sheet-title"] = "Add plan"
 		}
 	}
 	a["hx-"+p.Action] = p.URL
 	return a
 }
 
-// PlanFormView is both the new and edit form; it is also the 422 response body. In the sheet it has no card.
+// PlanFormView is both the new and edit form; it is also the 422 response body. In the sheet it fills the sheet: fields scroll, buttons stay at the bottom.
 templ PlanFormView(p PlanFormProps) {
 	if p.Sheet {
-		@ui.SheetForm(planFormAttrs(p)) {
-			@planFields(p)
+		@ui.SheetFormPane(planFormAttrs(p)) {
+			@ui.SheetBody() {
+				@planFields(p)
+			}
+			@ui.SheetFoot() {
+				@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
+				@ui.Button("primary", "Save plan", templ.Attributes{"type": "submit"})
+			}
 		}
 	} else {
 		@ui.FormCard(planFormAttrs(p)) {
 			@planFields(p)
+			@ui.Actions() {
+				@ui.Button("primary", "Save plan", templ.Attributes{"type": "submit"})
+				@ui.LinkButton("secondary", "/admin/plans", "Cancel", nil)
+				if p.Action == "put" && p.Blocked == "" {
+					@ui.ConfirmDelete("Delete plan", p.URL, "Delete this plan?")
+				}
+			}
 		}
 	}
 }
@@ -167,28 +235,20 @@ templ planFields(p PlanFormProps) {
 		<div class="c-notice" data-kind="warn" data-plan-warning>{ membersWarning(p.Members) }</div>
 	}
 	@ui.Field(ui.FieldProps{Label: "Name", Name: "name", Value: p.Form.Name, Error: p.Errors["name"]})
-	@ui.Field(ui.FieldProps{Label: "Validity (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Whole number, at least 1."})
+	@ui.Field(ui.FieldProps{Label: "Valid for (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Whole number, at least 1."})
 	@ui.FieldPair(ui.PairProps{Label: "Speed limit", For: "speed_value", Hint: "0 = no speed limit. Decimals allowed.", Errors: []ui.NamedError{{Name: "speed_value", Msg: p.Errors["speed_value"]}, {Name: "speed_unit", Msg: p.Errors["speed_unit"]}}}) {
-		@ui.InputControl(ui.FieldProps{Name: "speed_value", Value: p.Form.SpeedValue, Error: p.Errors["speed_value"]})
-		@ui.SelectControl(ui.SelectProps{Name: "speed_unit", Value: p.Form.SpeedUnit, Options: unitOptions(domain.SpeedUnits), Error: p.Errors["speed_unit"]})
+		@ui.InputControl(ui.FieldProps{Name: "speed_value", Value: p.Form.SpeedValue, Error: p.Errors["speed_value"], Attrs: templ.Attributes{"inputmode": "decimal"}})
+		@ui.SelectControl(ui.SelectProps{AriaLabel: "Speed unit", Name: "speed_unit", Value: p.Form.SpeedUnit, Options: unitOptions(domain.SpeedUnits), Error: p.Errors["speed_unit"]})
 	}
 	@ui.FieldPair(ui.PairProps{Label: "Data limit", For: "bulk_value", Hint: "0 = unlimited data. Decimals allowed.", Errors: []ui.NamedError{{Name: "bulk_value", Msg: p.Errors["bulk_value"]}, {Name: "bulk_unit", Msg: p.Errors["bulk_unit"]}}}) {
-		@ui.InputControl(ui.FieldProps{Name: "bulk_value", Value: p.Form.BulkValue, Error: p.Errors["bulk_value"]})
-		@ui.SelectControl(ui.SelectProps{Name: "bulk_unit", Value: p.Form.BulkUnit, Options: unitOptions(domain.BulkUnits), Error: p.Errors["bulk_unit"]})
+		@ui.InputControl(ui.FieldProps{Name: "bulk_value", Value: p.Form.BulkValue, Error: p.Errors["bulk_value"], Attrs: templ.Attributes{"inputmode": "decimal"}})
+		@ui.SelectControl(ui.SelectProps{AriaLabel: "Data unit", Name: "bulk_unit", Value: p.Form.BulkUnit, Options: unitOptions(domain.BulkUnits), Error: p.Errors["bulk_unit"]})
 	}
-	@ui.Field(ui.FieldProps{Label: "Time limit (minutes)", Name: "time_limit_minutes", Value: p.Form.TimeLimitMinutes, Error: p.Errors["time_limit_minutes"], Hint: "0 = unlimited time."})
-	@ui.Field(ui.FieldProps{Label: "Simultaneous devices", Name: "max_sessions", Value: p.Form.MaxSessions, Error: p.Errors["max_sessions"], Hint: "Whole number, at least 1."})
+	@ui.Field(ui.FieldProps{Label: "Time limit (minutes)", Name: "time_limit_minutes", Value: p.Form.TimeLimitMinutes, Error: p.Errors["time_limit_minutes"], Hint: "0 = unlimited time.", Attrs: templ.Attributes{"inputmode": "numeric"}})
+	@ui.Field(ui.FieldProps{Label: "Devices at the same time", Name: "max_sessions", Value: p.Form.MaxSessions, Error: p.Errors["max_sessions"], Hint: "Whole number, at least 1.", Attrs: templ.Attributes{"inputmode": "numeric"}})
 	@ui.Checkbox(ui.CheckboxProps{Label: "Renew automatically when the validity ends", Name: "auto_resubscribe", Checked: p.Form.AutoResubscribe})
-	@ui.Actions() {
-		@ui.Button("primary", "Save", templ.Attributes{"type": "submit"})
-		if p.Sheet {
-			@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
-		} else {
-			@ui.LinkButton("secondary", "/admin/plans", "Cancel", nil)
-			if p.Action == "put" {
-				@ui.ConfirmDelete("Delete plan", p.URL, "Delete this plan?")
-			}
-		}
+	if p.Blocked != "" {
+		@ui.NoticeTitled("warn", "This plan can’t be deleted", p.Blocked)
 	}
 }
 

@@ -148,7 +148,7 @@ export default [
   "page": "First login",
   "heading": "Create a plan",
   "url": "docs/first-login/#plan",
-  "keywords": "No plan exists after the first start, and every member needs a plan. Open Plans and choose New plan : Field Meaning Name Shown in lists. Names are unique, ignoring case. Validity (days) A whole number, at least 1. The member can use the plan this long, counted"
+  "keywords": "No plan exists after the first start, and every member needs a plan. Open Plans and choose Add plan . A side panel opens: Field Meaning Name Shown in lists. Names are unique, ignoring case. Valid for (days) A whole number, at least 1. The member can use the pl"
  },
  {
   "page": "First login",
@@ -166,7 +166,7 @@ export default [
   "page": "First login",
   "heading": "See who is online",
   "url": "docs/first-login/#online",
-  "keywords": "The Dashboard shows how many are online now, today's traffic and the router link. The Online page lists the open sessions and refreshes every 10 seconds. Disconnect sends a RADIUS Disconnect request to the router. The Usage page shows traffic per day for 30 da"
+  "keywords": "The Dashboard shows how many are online now, today's traffic and the router link. The Online now page lists the open sessions (user name, name, IP and MAC address, time online, data down and up) and refreshes every 10 seconds. Kick asks first, then sends a RAD"
  },
  {
   "page": "Dashboard",
@@ -304,7 +304,7 @@ export default [
   "page": "How it works",
   "heading": "Disconnect (kick)",
   "url": "docs/how-it-works/#kick",
-  "keywords": "The Disconnect button on the Online page, and the automatic kicks above, send a RADIUS Disconnect-Request to the router on the Disconnect port (3799 by default), with the user name and the session details. If the router answers ACK, the session is marked ended"
+  "keywords": "The Kick button on the Online now page, and the automatic kicks above, send a RADIUS Disconnect-Request to the router on the Disconnect port (3799 by default), with the user name and the session details. If the router answers ACK, the session is marked ended w"
  },
  {
   "page": "How it works",
@@ -382,7 +382,7 @@ export default [
   "page": "Troubleshooting",
   "heading": "Router and usage",
   "url": "docs/troubleshooting/#router-problems",
-  "keywords": "Disconnect does nothing, or the admin panel shows an error On the router, run /radius incoming set accept=yes port=3799 , with the same port as Disconnect (CoA) port on the Settings page. Check that the router accepts UDP 3799 from the server in its firewall. "
+  "keywords": "Kick does nothing, or the admin panel shows an error On the router, run /radius incoming set accept=yes port=3799 , with the same port as Disconnect (CoA) port on the Settings page. Check that the router accepts UDP 3799 from the server in its firewall. The se"
  },
  {
   "page": "Troubleshooting",

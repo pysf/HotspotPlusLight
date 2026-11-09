@@ -11,44 +11,92 @@ import (
 // SessionsPage lists the online sessions.
 templ SessionsPage(l ui.LayoutData, v session.OnlineView) {
 	@ui.Layout(l) {
-		@ui.PageHeader("Online now")
 		@SessionsTable(v, false)
 	}
 }
 
-// SessionsTable is the polled fragment: it re-fetches itself every 10 s (htmx), keeping the page.
+// onlineSummary is the line under the title of the online page.
+func onlineSummary(total int) string {
+	switch total {
+	case 0:
+		return "Nobody is connected."
+	case 1:
+		return "1 device is connected."
+	}
+	return strconv.Itoa(total) + " devices are connected."
+}
+
+// SessionsTable is the polled fragment: the page head and the table. It re-fetches itself every 10 s (htmx), keeping the page.
 templ SessionsTable(v session.OnlineView, oob bool) {
 	<div id="online-table" class="l-flow" data-poll hx-get={ tableURL(v.Page, v.Per) } hx-trigger="every 10s" hx-swap="outerHTML">
-		<p class="u-muted" data-updated-note>Updated by the router every { strconv.Itoa(v.IntervalSeconds) } s</p>
+		@ui.PageHeaderSub("Online now", onlineSummary(v.Total)) {
+			@ui.LiveStatus("Live · updates every 10 s")
+		}
 		if v.Total == 0 {
 			@ui.EmptyState("Nobody is online", "Members show up here when they log in.")
 		} else {
-			@ui.TablePaged("Online sessions", []string{"Username", "IP", "MAC", "Started", "Duration", "Download", "Upload", ""}, ui.PageProps{Page: v.Page, Pages: v.Pages, Href: sessionsHref(v.Per), Total: v.Total, Per: v.Per}) {
+			@ui.TablePagedHead("Devices online now", sessionHead(), ui.PageProps{Page: v.Page, Pages: v.Pages, Href: sessionsHref(v.Per), Total: v.Total, Per: v.Per}) {
 				for _, s := range v.Rows {
 					@SessionRow(s, v)
 				}
 			}
 		}
+		<p class="u-muted u-small" data-updated-note>Updated by the router every { strconv.Itoa(v.IntervalSeconds) } s</p>
 	</div>
 	if oob {
 		@ui.OnlineBadge(v.Total, true)
 	}
 }
 
-// SessionRow is one row of the online table, with its Disconnect button.
+// sessionHead is the header row of the online table.
+templ sessionHead() {
+	<th scope="col">Who</th>
+	<th scope="col">IP address</th>
+	<th scope="col">MAC address</th>
+	<th scope="col">Time online</th>
+	<th scope="col">Data down / up</th>
+	<th scope="col" data-slot="actions"><span class="u-sr-only">Kick</span></th>
+}
+
+// kickAttrs makes the Kick button ask first, in the words of the design, then send the Disconnect.
+func kickAttrs(s domain.Session, v session.OnlineView) templ.Attributes {
+	who := "This device"
+	if s.MemberName != "" {
+		who = s.MemberName + "’s device"
+	}
+	a := ui.ConfirmAttrs("post", kickURL(s.ID, v), who+" will be disconnected now. They can sign in again while their account is valid.")
+	a["data-confirm-title"] = "Kick " + s.Username + "?"
+	a["data-confirm-ok"] = "Kick device"
+	a["data-confirm-icon"] = "power"
+	a["data-size"] = "sm"
+	a["aria-label"] = "Kick " + s.Username
+	return a
+}
+
+// SessionRow is one row of the online table, with its Kick button.
 templ SessionRow(s domain.Session, v session.OnlineView) {
 	<tr data-session data-id={ strconv.FormatInt(s.ID, 10) } data-username={ s.Username }>
-		<td data-col="username" data-label="Username"><a href={ templ.SafeURL(memberURL(s.MemberID)) }>{ s.Username }</a></td>
-		<td data-col="ip" data-label="IP" class="u-nums">{ s.FramedIP }</td>
-		<td data-col="mac" data-label="MAC" class="u-nums">{ s.MAC }</td>
-		<td data-col="started" data-label="Started" class="u-nums">{ fmtTime(s.StartedAt, v.Loc) }</td>
-		<td data-col="duration" data-label="Duration" class="u-nums">{ domain.FormatDuration(int64(v.Now.Sub(s.StartedAt).Seconds())) }</td>
-		<td data-col="download" data-label="Download" class="u-nums">{ domain.FormatSize(s.Cum.Download) }</td>
-		<td data-col="upload" data-label="Upload" class="u-nums">{ domain.FormatSize(s.Cum.Upload) }</td>
-		<td data-slot="actions">
-			@ui.Actions() {
-				@ui.ConfirmAction("Disconnect", "post", kickURL(s.ID, v), "Disconnect this session?")
+		<td data-col="username" data-label="Who">
+			<a class="c-table__main" href={ templ.SafeURL(memberURL(s.MemberID)) }>{ s.Username }</a>
+			if s.MemberName != "" {
+				<div class="c-table__sub" data-col="name">{ s.MemberName }</div>
 			}
+		</td>
+		<td data-col="ip" data-label="IP address" class="u-nums"><div class="c-table__v">{ s.FramedIP }</div></td>
+		<td data-col="mac" data-label="MAC address" class="u-mono"><div class="c-table__v">{ s.MAC }</div></td>
+		<td data-label="Time online" class="u-nums">
+			<div class="c-table__v">
+				<span data-col="duration">{ domain.FormatDuration(int64(v.Now.Sub(s.StartedAt).Seconds())) }</span>
+				<span class="c-table__sub" data-col="started" title="Started">{ fmtTime(s.StartedAt, v.Loc) }</span>
+			</div>
+		</td>
+		<td data-label="Data" class="u-nums">
+			<div class="c-table__v">
+				<span data-col="download">{ domain.FormatSize(s.Cum.Download) }</span> / <span data-col="upload">{ domain.FormatSize(s.Cum.Upload) }</span>
+			</div>
+		</td>
+		<td data-slot="actions">
+			@ui.ButtonIcon("danger", "power", "Kick", kickAttrs(s, v))
 		</td>
 	</tr>
 }

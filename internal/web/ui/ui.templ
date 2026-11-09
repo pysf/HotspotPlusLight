@@ -916,25 +916,26 @@ templ ConfirmDelete(label, url, confirm string) {
 // ConfirmAction is a button that asks for confirmation, then sends method (post|put|delete) to url.
 // Responses are swapped into #flash (errors and conflicts); a success answers HX-Redirect.
 templ ConfirmAction(label, method, url, confirm string) {
-	@Button("secondary", label, confirmAttrs(method, url, confirm))
+	@Button("secondary", label, ConfirmAttrs(method, url, confirm))
 }
 
-// confirmAttrs returns the htmx attributes of a button that asks for confirmation first.
-func confirmAttrs(method, url, confirm string) templ.Attributes {
+// ConfirmAttrs returns the htmx attributes of a button that asks for confirmation first.
+func ConfirmAttrs(method, url, confirm string) templ.Attributes {
 	return templ.Attributes{"type": "button", "hx-" + method: url, "hx-confirm": confirm, "hx-target": "#flash", "hx-swap": "innerHTML"}
 }
 
 // ConfirmModal is the one shared confirm dialog. dialog.js fills it with the hx-confirm text of a button.
+// A button may also set data-confirm-title, data-confirm-ok (the confirm button text) and data-confirm-icon (a sprite icon name).
 templ ConfirmModal() {
 	<dialog id="confirm-modal" class="c-modal" role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-text">
-		<span class="c-modal__icon" aria-hidden="true">
+		<span class="c-modal__icon" aria-hidden="true" id="confirm-icon">
 			@IconAs("alert", "l", "")
 		</span>
 		<h2 class="c-modal__title" id="confirm-title">Please confirm</h2>
 		<p class="c-modal__text" id="confirm-text" data-confirm-text></p>
 		<div class="c-modal__foot">
 			<button type="button" class="c-btn" data-size="sm" data-close value="cancel">Cancel</button>
-			<button type="button" class="c-btn" data-size="sm" data-variant="danger-solid" data-close value="ok" autofocus>Confirm</button>
+			<button type="button" class="c-btn" data-size="sm" data-variant="danger-solid" data-close value="ok" autofocus id="confirm-ok">Confirm</button>
 		</div>
 	</dialog>
 }

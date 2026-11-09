@@ -1,12 +1,37 @@
 // One shared confirm modal. htmx asks before it sends a request that has hx-confirm;
 // we show the server-rendered text in <dialog id="confirm-modal"> instead of window.confirm.
 // Also: close buttons ([data-close]) and sheets that open and close on server events.
+// fillConfirm sets the text, title, icon and confirm button of the shared dialog from the asking element.
+// Without data-confirm-* attributes the dialog shows its defaults.
+function fillConfirm(modal, question, elt) {
+  const ok = document.getElementById("confirm-ok");
+  const icon = elt.getAttribute("data-confirm-icon") || "alert";
+  modal.querySelector("[data-confirm-text]").textContent = question;
+  document.getElementById("confirm-title").textContent = elt.getAttribute("data-confirm-title") || "Please confirm";
+  document.getElementById("confirm-icon").replaceChildren(spriteIcon(icon, "l"));
+  const label = elt.getAttribute("data-confirm-ok") || "Confirm";
+  ok.replaceChildren(...(icon === "alert" ? [] : [spriteIcon(icon, "s")]), label);
+}
+
+// spriteIcon returns an <svg> that uses an icon of the page sprite.
+function spriteIcon(name, size) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("class", "c-icon");
+  svg.setAttribute("data-size", size);
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS(ns, "use");
+  use.setAttribute("href", "#i-" + name);
+  svg.append(use);
+  return svg;
+}
+
 document.addEventListener("htmx:confirm", (e) => {
   const question = e.detail.question;
   const modal = document.getElementById("confirm-modal");
   if (!question || !modal) { return; }
   e.preventDefault();
-  modal.querySelector("[data-confirm-text]").textContent = question;
+  fillConfirm(modal, question, e.detail.elt);
   modal.returnValue = "";
   modal.showModal();
   modal.addEventListener("close", () => {

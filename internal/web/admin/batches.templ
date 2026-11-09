@@ -3,16 +3,20 @@ package admin
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"hotspotpluslight/internal/domain"
 	"hotspotpluslight/internal/voucher"
 	"hotspotpluslight/internal/web/ui"
 )
 
-// plural returns n with noun, in the plural form unless n is 1.
+// plural returns n with noun, in the plural form unless n is 1 ("es" after "ch").
 func plural(n int, noun string) string {
 	if n == 1 {
 		return "1 " + noun
+	}
+	if strings.HasSuffix(noun, "ch") {
+		return strconv.Itoa(n) + " " + noun + "es"
 	}
 	return strconv.Itoa(n) + " " + noun + "s"
 }

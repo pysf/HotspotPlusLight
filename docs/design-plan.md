@@ -25,6 +25,16 @@ details, unless the design is wrong for the product.
    - The credentials card has no "Wi-Fi network" row (the product does not store one). It shows Plan, Valid until and Devices (the plan's device limit). "Copy all details" stays as a ghost button.
    - "Generate" makes a random 6-digit number (the product default), not a longer password.
 
+9. Plans and Online sessions (step 4), where the product has more or less than the design:
+   - The plan edit form stays in the sheet (as for members), not as a card next to the plan cards, so no card is marked `aria-current`. The cards are an auto-fill grid (`l-grid`), not a fixed two columns.
+   - The form keeps the product fields: one speed (value and unit, used for both directions), data limit with unit, time limit in minutes, "Renew automatically", and the hints "0 = no limit". The design's Download / Upload and "leave empty" are not product rules. Labels take the design wording ("Valid for (days)", "Devices at the same time", "Save plan", "Add plan").
+   - The card row is "Speed limit" (one value), and a time limit that divides by 60 shows in hours ("8 hours", else "90 min").
+   - Delete is blocked also for the default plan and for plans held by batches (the design only knew members); the reason text says which. The edit sheet shows the same reason in a warning box.
+   - The online table has no Started column: the start time is the small line under "Time online". Download and upload share the "Data down / up" cell. The "Who" sub line is the member's first and last name (the design's "Voucher, 6 Nov" is not stored).
+   - The button says "Kick". The confirm is the one shared dialog; a button can set `data-confirm-title`, `data-confirm-ok` and `data-confirm-icon` (see `dialog.js`).
+   - The page head, with the Live line ("Live · updates every 10 s", deviation 7), is inside the polled fragment so the device count stays current. The "Updated by the router every N s" note stays under the table.
+   - `plural` now adds "es" after "ch" ("2 batches"; it said "batchs").
+
 ## Steps
 Each step: a sonnet agent builds it (tests first where logic changes), a separate sonnet agent
 reviews it (`code-review` at high), real findings are fixed, then commit `Design vN: ...`.
@@ -38,7 +48,7 @@ it, and keep each test's intent. No inline style or script (CSP).
 | 1 | Tokens, system fonts, shared components, app shell (side bar, top bar, phone tab bar with More), icon sprite, theme (cookie `light`/`dark`/auto), component gallery, review fixes | DONE (commit "Design v2 step 1") |
 | 2 | Login, Set new password (rules list), Dashboard (tiles, Needs attention, Router link, 3 charts, Live dot, 10 s refresh without jumps) | DONE (commit "Design v2 step 2") |
 | 3 | Members list (chips, bulk bar, stacked cards on phone), Add/edit sheet, credentials card, row menus | DONE (commit "Design v2 step 3") |
-| 4 | Plans (cards + edit form, delete-blocked reason), Online sessions (kick + confirm) | todo |
+| 4 | Plans (cards + edit form, delete-blocked reason), Online sessions (kick + confirm) | DONE |
 | 5 | Vouchers/batches (form, list, A4 print sheet 3x6), Usage (7/30/90 switch, chart, top 10) | todo |
 | 6 | Router (8 download cards, script, link status) and Settings (grouped form) | todo |
 

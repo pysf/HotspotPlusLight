@@ -42,6 +42,7 @@ type AuthService interface {
 // PlanService is the plan part of internal/plan.
 type PlanService interface {
 	List(ctx context.Context) ([]domain.Plan, error)
+	Details(ctx context.Context) ([]plan.Detail, error)
 	Get(ctx context.Context, id int64) (plan.Detail, error)
 	Create(ctx context.Context, f domain.PlanForm) (int64, domain.FieldErrors, error)
 	Update(ctx context.Context, id int64, f domain.PlanForm) (domain.FieldErrors, error)
