@@ -61,7 +61,13 @@ func (f *fakeRepo) UpdatePlan(_ context.Context, p domain.Plan, _ time.Time) err
 	f.plans[p.ID] = p
 	return nil
 }
-func (f *fakeRepo) DeletePlan(_ context.Context, id int64) error { delete(f.plans, id); return nil }
+func (f *fakeRepo) DeletePlan(_ context.Context, id int64) error {
+	if n := f.members[id]; n > 0 { // like the store: the foreign key refuses
+		return &domain.InUseError{Members: n}
+	}
+	delete(f.plans, id)
+	return nil
+}
 func (f *fakeRepo) CountMembersOnPlan(_ context.Context, id int64) (int, error) {
 	return f.members[id], nil
 }

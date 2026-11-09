@@ -30,9 +30,9 @@ type LayoutData struct {
 	PasswordURL string
 }
 
-// htmxConfig makes htmx swap 422, 409, 429 and 502 responses like successes (PLAN 8.2);
-// other 4xx and 5xx stay errors. htmx indicator styles are off because our CSS styles .htmx-request.
-const htmxConfig = `{"includeIndicatorStyles":false,"responseHandling":[{"code":"422|409|429|502","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
+// htmxConfig makes htmx swap 400, 404, 409, 422, 429, 500 and 502 responses like successes (PLAN 8.2),
+// because handlers answer these with an error fragment; 401 and 403 carry HX-Redirect and stay errors. htmx indicator styles are off because our CSS styles .htmx-request.
+const htmxConfig = `{"includeIndicatorStyles":false,"responseHandling":[{"code":"400|404|409|422|429|500|502","swap":true},{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":false,"error":true}]}`
 
 // appScripts are the JS modules every page of the shell loads (after htmx).
 var appScripts = []string{"js/theme.js", "js/dialog.js", "js/clipboard.js", "js/toast.js", "js/shortcuts.js", "js/nav.js", "js/forms.js", "js/menu.js", "js/password.js"}
@@ -82,7 +82,7 @@ func crumbs(d LayoutData) []string {
 			return []string{it.Label, d.Title}
 		}
 	}
-	// Active matches no nav item (or is empty): the page title alone.
+	// When Active matches no nav item, or is empty, the crumb is the page title alone.
 	if d.Title == "" {
 		return nil
 	}
@@ -1369,7 +1369,7 @@ func Refresher(url, event, target string) templ.Component {
 	})
 }
 
-// Pill is a status: a dot and a text. status is "active", "expiring", "expired" or "disabled".
+// Pill is a status shown as coloured text. status is "active", "expiring", "expired" or "disabled".
 func Pill(status, text string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

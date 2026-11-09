@@ -32,6 +32,11 @@ func (s *Store) InAcctTx(ctx context.Context, fn func(tx *AcctTx) error) error {
 	return tx.Commit()
 }
 
+// Settings returns the settings row, read inside the transaction.
+func (t *AcctTx) Settings(ctx context.Context) (domain.Settings, error) {
+	return scanSettings(t.tx.QueryRowContext(ctx, settingsSelect))
+}
+
 // MemberByUsername returns the member, or domain.ErrNotFound.
 func (t *AcctTx) MemberByUsername(ctx context.Context, username string) (domain.Member, error) {
 	m, err := scanMember(t.tx.QueryRowContext(ctx, `SELECT `+memberCols+` FROM member m WHERE m.username = ?`, username), nil)
@@ -52,8 +57,6 @@ const sessionCols = `id, member_id, username, acct_session_id, nas_ip, nas_ident
 
 // LatestSession returns the latest open row of the identity key (username, session
 // id, NAS IP), else the latest finished one. It returns nil when there is none.
-// MONITOR: the finished-row query has no usable index (session_open_key is partial)
-// and scans the table, only when no row is open. Add an index migration if it matters.
 func (t *AcctTx) LatestSession(ctx context.Context, username, sessionID, nasIP string) (*domain.Session, error) {
 	for _, open := range []string{" AND ended_at IS NULL", " AND ended_at IS NOT NULL"} {
 		sess, err := scanSession(t.tx.QueryRowContext(ctx, `SELECT `+sessionCols+` FROM session WHERE username=? AND acct_session_id=? AND nas_ip=?`+open+
@@ -104,27 +107,46 @@ func (t *AcctTx) UpdateSession(ctx context.Context, s domain.Session) error {
 // AddUsage adds d to the member's counters in SQL, so it is relative to what the
 // row holds inside this transaction (BR-11, BR-13b).
 func (t *AcctTx) AddUsage(ctx context.Context, memberID int64, d domain.Counters, now time.Time) error {
-	_, err := t.tx.ExecContext(ctx, `UPDATE member SET used_download_bytes=used_download_bytes+?, used_upload_bytes=used_upload_bytes+?,
-		used_seconds=used_seconds+?, updated_at=? WHERE id=?`, d.Download, d.Upload, d.Seconds, now.Unix(), memberID)
+	_, err := t.tx.ExecContext(ctx, `UPDATE member SET used_download_bytes=min(used_download_bytes+?1, ?4), used_upload_bytes=min(used_upload_bytes+?2, ?4),
+		used_seconds=used_seconds+?3, updated_at=?5 WHERE id=?6`, d.Download, d.Upload, d.Seconds, domain.MaxUsedBytes, now.Unix(), memberID)
 	return err
 }
 
 // AddDailyUsage adds d to the member's usage_daily row for day, creating it if needed (D12).
 func (t *AcctTx) AddDailyUsage(ctx context.Context, memberID int64, day string, d domain.Counters) error {
 	_, err := t.tx.ExecContext(ctx, `INSERT INTO usage_daily(member_id, day, down, up, seconds) VALUES (?,?,?,?,?)
-		ON CONFLICT(member_id, day) DO UPDATE SET down=down+excluded.down, up=up+excluded.up, seconds=seconds+excluded.seconds`,
-		memberID, day, d.Download, d.Upload, d.Seconds)
+		ON CONFLICT(member_id, day) DO UPDATE SET down=min(down+excluded.down, ?6), up=min(up+excluded.up, ?6), seconds=seconds+excluded.seconds`,
+		memberID, day, d.Download, d.Upload, d.Seconds, domain.MaxUsedBytes)
 	return err
 }
 
+// pruneChunk is how many rows one pruning statement deletes. Small chunks let
+// accounting writes in between, because the write connection is the only one.
+const pruneChunk = 1000
+
 // PruneSessions deletes finished sessions that ended before cutoff, and open
 // ones that have been silent since before cutoff (their Stop never came). It
-// returns how many rows went.
+// returns how many rows went. It deletes in chunks so other writes can go in.
 func (s *Store) PruneSessions(ctx context.Context, cutoff time.Time) (int, error) {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM session WHERE COALESCE(ended_at, last_update_at) < ?`, cutoff.Unix())
-	if err != nil {
-		return 0, err
+	return s.pruneSessions(ctx, cutoff, pruneChunk, nil)
+}
+
+// pruneSessions is PruneSessions with a chunk size and a hook that runs after each chunk.
+func (s *Store) pruneSessions(ctx context.Context, cutoff time.Time, chunk int, afterChunk func()) (int, error) {
+	total := 0
+	for {
+		res, err := s.db.ExecContext(ctx, `DELETE FROM session WHERE id IN
+			(SELECT id FROM session WHERE COALESCE(ended_at, last_update_at) < ? LIMIT ?)`, cutoff.Unix(), chunk)
+		if err != nil {
+			return total, err
+		}
+		n, _ := res.RowsAffected()
+		total += int(n)
+		if afterChunk != nil {
+			afterChunk()
+		}
+		if int(n) < chunk {
+			return total, nil
+		}
 	}
-	n, _ := res.RowsAffected()
-	return int(n), nil
 }

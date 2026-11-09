@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -87,13 +88,17 @@ func (e *Enforcer) Start(end Ender) {
 	}
 }
 
-// Stop ends the workers and waits for them. No Check may follow.
+// Stop ends the workers and waits for them. A second call does nothing.
 func (e *Enforcer) Stop() {
 	if e.cancel == nil {
 		return
 	}
-	e.cancel()
 	e.mu.Lock()
+	if e.stopped {
+		e.mu.Unlock()
+		return
+	}
+	e.cancel()
 	e.stopped = true // a late Check must not send on the closed channel
 	close(e.jobs)
 	e.mu.Unlock()
@@ -221,7 +226,8 @@ func (e *Enforcer) interval(ctx context.Context) time.Duration {
 // session must be disconnected.
 func (e *Enforcer) decide(ctx context.Context, j job) (domain.Reason, Target, bool) {
 	fail := func(err error) (domain.Reason, Target, bool) {
-		if ctx.Err() == nil {
+		// A member or plan deleted before the worker ran leaves nothing to enforce.
+		if ctx.Err() == nil && !errors.Is(err, domain.ErrNotFound) {
 			e.log.Error("enforcement check failed", "username", j.key.username, "err", err)
 		}
 		return "", Target{}, false

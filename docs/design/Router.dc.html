@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Router</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<svg class="sprite" aria-hidden="true" focusable="false">
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c2 .6 3.2 2.3 3.5 5.2"/></symbol>
+<symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.2" r=".9"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
+<symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9V7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a3 3 0 0 0 0 6v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a3 3 0 0 0 0-6zM14 6v12"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20v-6M12 20V5M19 20v-9"/></symbol>
+<symbol id="i-router" viewBox="0 0 24 24"><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 17h.01M11 17h.01M8 14l-2-5M16 14l2-5"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+<symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M16 8l4 4-4 4M20 12H9"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+<symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+</svg>
+
+<div class="board">
+<sc-for list="{{variants}}" as="v" hint-placeholder-count="4">
+<section class="vwrap">
+<p class="vlabel">{{v.label}}</p>
+<div class="{{v.cls}}">
+<div class="app">
+
+<aside class="side">
+<div class="brand"><span class="brand-mark"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg></span><div><b>HotspotPlus</b><small>Harbour Café</small></div></div>
+<nav class="nav" aria-label="Main">
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg><span class="nav-t">Dashboard</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span class="nav-t">Members</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg><span class="nav-t">Online now</span><span class="badge">24</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg><span class="nav-t">Plans</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-ticket"/></svg><span class="nav-t">Vouchers</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg><span class="nav-t">Usage</span></a>
+<a href="#" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-router"/></svg><span class="nav-t">Router</span></a>
+<a href="#"><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg><span class="nav-t">Settings</span></a>
+</nav>
+<div class="side-foot"><span class="dot dot-on"></span><span class="nav-t">Router connected</span></div>
+</aside>
+
+<div class="main">
+<header class="top">
+<span class="top-brand"><span class="brand-mark"><svg class="ic" aria-hidden="true"><use href="#i-wifi"/></svg></span>Harbour Café</span>
+<span class="top-date tx-sm tx-3">Monday 9 November</span>
+<span class="grow"></span>
+<a class="btn btn-ghost" href="#" aria-label="Password"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg><span class="lbl">Password</span></a>
+<button class="ibtn" type="button" aria-label="Switch theme"><svg class="ic ic-sun" aria-hidden="true"><use href="#i-sun"/></svg><svg class="ic ic-moon" aria-hidden="true"><use href="#i-moon"/></svg></button>
+<button class="btn" type="button" aria-label="Log out"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg><span class="lbl">Log out</span></button>
+</header>
+
+<main class="page">
+<div class="ph">
+<div><h1 class="tx-h1">Router</h1><p>Set up your MikroTik and give it your own sign-in pages.</p></div>
+<span class="pill pill-ok"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>Router connected</span>
+</div>
+
+<section aria-labelledby="pg-h" class="stack">
+<h2 class="tx-h2" id="pg-h">Sign-in pages</h2>
+<div class="g4">
+<sc-for list="{{pages}}" as="p" hint-placeholder-count="8">
+<article class="card card-s plan">
+<div class="thumb" role="img" aria-label="Preview of {{p.file}}"><div class="thumb-card"><i></i><i></i><i></i><i class="thumb-btn"></i></div></div>
+<div><b class="mono">{{p.file}}</b><p class="tx-sm tx-2">{{p.desc}}</p></div>
+<button class="btn btn-sm btn-block" type="button" aria-label="Download {{p.file}}"><svg class="ic ic-s" aria-hidden="true"><use href="#i-download"/></svg>Download</button>
+</article>
+</sc-for>
+</div>
+</section>
+
+<div class="g21">
+<section class="card stack" aria-labelledby="sc-h">
+<div class="card-h"><h2 id="sc-h">Setup script</h2><button class="btn btn-sm" type="button"><svg class="ic ic-s" aria-hidden="true"><use href="#i-copy"/></svg>Copy script</button></div>
+<p class="tx-2">Paste this into the router’s New Terminal. It adds your RADIUS server and turns it on for the hotspot.</p>
+<pre class="code"># HotspotPlus Lite · RADIUS setup
+/radius add service=hotspot address=192.168.88.10 secret="k8Qm-2Tz-91xd" authentication-port=1812 accounting-port=1813 timeout=3s
+/ip hotspot profile set [find default=yes] use-radius=yes radius-accounting=yes radius-interim-update=1m login-by=http-chap,http-pap
+/radius incoming set accept=yes port=3799</pre>
+</section>
+
+<section class="card stack" aria-labelledby="up-h">
+<div class="card-h"><h2 id="up-h">How to upload the pages</h2></div>
+<ol class="steps">
+<li><span>Download the pages you want, or all eight.</span></li>
+<li><span>In WinBox, open <b>Files</b> and drag them into the <b>hotspot</b> folder.</span></li>
+<li><span>Open <b>IP › Hotspot › Server Profiles</b> and set HTML Directory to <b>hotspot</b>.</span></li>
+<li><span>Join the Wi-Fi on a phone and check the sign-in page.</span></li>
+</ol>
+</section>
+</div>
+</main>
+</div>
+
+<nav class="tabbar" aria-label="Main">
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-home"/></svg>Home</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-users"/></svg>Members</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-wifi"/></svg>Online</a>
+<a href="#"><svg class="ic ic-l" aria-hidden="true"><use href="#i-ticket"/></svg>Vouchers</a>
+<a href="#" aria-current="page"><svg class="ic ic-l" aria-hidden="true"><use href="#i-more"/></svg>More</a>
+</nav>
+</div>
+</div>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2736,"height":4800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      variants: [
+        { cls: 'hp t-light vw-d', label: 'Light · Desktop 1280' },
+        { cls: 'hp t-dark vw-d', label: 'Dark · Desktop 1280' },
+        { cls: 'hp t-light vw-p', label: 'Light · Phone 390' },
+        { cls: 'hp t-dark vw-p', label: 'Dark · Phone 390' }
+      ],
+      pages: [
+        { file: 'login.html', desc: 'First page guests see.' },
+        { file: 'alogin.html', desc: 'Shown after signing in.' },
+        { file: 'status.html', desc: 'Time and data left.' },
+        { file: 'logout.html', desc: 'Shown after signing out.' },
+        { file: 'error.html', desc: 'Shown when sign-in fails.' },
+        { file: 'redirect.html', desc: 'Sends guests to sign in.' },
+        { file: 'rlogin.html', desc: 'Asks to sign in again.' },
+        { file: 'radvert.html', desc: 'Optional notice before sign-in.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

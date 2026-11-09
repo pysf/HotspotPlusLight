@@ -47,8 +47,8 @@ func scalar[T any](t *testing.T, db *sql.DB, q string, args ...any) T {
 	return v
 }
 
-// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily, 0003_admin_must_change, 0004_drop_page_api_settings, 0005_business_name, 0006_server_settings, 0007_login_failure_daily).
-const wantMigrations = 7
+// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily, 0003_admin_must_change, 0004_drop_page_api_settings, 0005_business_name, 0006_server_settings, 0007_login_failure_daily, 0008_session_indexes).
+const wantMigrations = 8
 
 // pageIsClean reports inline style, inline handlers, hx-on and inline scripts/styles in a page.
 func pageIsClean(d *goquery.Document) []string {

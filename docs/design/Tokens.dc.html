@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Design tokens</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="hp doc-board t-light">
+<p class="tx-cap tx-3">Foundations</p>
+<h1>Design tokens</h1>
+<p>All values live in <code>hp.css</code> as CSS custom properties. Light is the default on <code>:root</code>. Dark is set by <code>[data-theme="dark"]</code>, or automatically by the OS unless the admin picked light. Components only use tokens, never raw values.</p>
+
+<h2>Colour</h2>
+<table>
+<thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Use</th></tr></thead>
+<tbody>
+<tr><td><code>--c-bg</code></td><td class="t-light pane"><i class="sw u-bg"></i>#f5f5f7</td><td class="t-dark pane"><i class="sw u-bg"></i>#0b0b0d</td><td>Page background</td></tr>
+<tr><td><code>--c-surface</code></td><td class="t-light pane"><i class="sw u-surface"></i>#ffffff</td><td class="t-dark pane"><i class="sw u-surface"></i>#1c1c1e</td><td>Cards, sheets, inputs</td></tr>
+<tr><td><code>--c-surface-2</code></td><td class="t-light pane"><i class="sw u-surface2"></i>#f9f9fb</td><td class="t-dark pane"><i class="sw u-surface2"></i>#232326</td><td>Table head, row hover, inset areas</td></tr>
+<tr><td><code>--c-fill</code></td><td class="t-light pane"><i class="sw u-fill"></i>8% grey</td><td class="t-dark pane"><i class="sw u-fill"></i>10% white</td><td>Quiet buttons, hover</td></tr>
+<tr><td><code>--c-fill-2</code></td><td class="t-light pane"><i class="sw u-fill2"></i>14% grey</td><td class="t-dark pane"><i class="sw u-fill2"></i>18% white</td><td>Meter track, pressed</td></tr>
+<tr><td><code>--c-line</code></td><td class="t-light pane"><i class="sw u-line"></i>14% grey</td><td class="t-dark pane"><i class="sw u-line"></i>14% white</td><td>Thin separators</td></tr>
+<tr><td><code>--c-line-strong</code></td><td class="t-light pane"><i class="sw u-linestrong"></i>30% grey</td><td class="t-dark pane"><i class="sw u-linestrong"></i>30% white</td><td>Chip and card edges</td></tr>
+<tr><td><code>--c-input-line</code></td><td class="t-light pane"><i class="sw u-inputline"></i>#86868b</td><td class="t-dark pane"><i class="sw u-inputline"></i>#727278</td><td>Input border (3:1 rule)</td></tr>
+<tr><td><code>--c-text</code></td><td class="t-light pane"><i class="sw u-text"></i>#1d1d1f</td><td class="t-dark pane"><i class="sw u-text"></i>#f5f5f7</td><td>Main text</td></tr>
+<tr><td><code>--c-text-2</code></td><td class="t-light pane"><i class="sw u-text2"></i>#515154</td><td class="t-dark pane"><i class="sw u-text2"></i>#c7c7cc</td><td>Secondary text</td></tr>
+<tr><td><code>--c-text-3</code></td><td class="t-light pane"><i class="sw u-text3"></i>#6e6e73</td><td class="t-dark pane"><i class="sw u-text3"></i>#98989f</td><td>Hints, labels (still 4.6:1+)</td></tr>
+<tr><td><code>--c-accent</code></td><td class="t-light pane"><i class="sw u-accent"></i>#0062cc</td><td class="t-dark pane"><i class="sw u-accent"></i>#4da3ff</td><td>The one accent</td></tr>
+<tr><td><code>--c-accent-hover</code></td><td class="t-light pane"><i class="sw u-accenthover"></i>#004fa6</td><td class="t-dark pane"><i class="sw u-accenthover"></i>#7bbaff</td><td>Accent hover</td></tr>
+<tr><td><code>--c-accent-soft</code></td><td class="t-light pane"><i class="sw u-accentsoft"></i>10% accent</td><td class="t-dark pane"><i class="sw u-accentsoft"></i>16% accent</td><td>Current nav item, selected row</td></tr>
+<tr><td><code>--c-accent-fg</code></td><td class="t-light pane">#ffffff</td><td class="t-dark pane">#04122b</td><td>Text on accent</td></tr>
+<tr><td><code>--c-danger</code></td><td class="t-light pane"><i class="sw u-danger"></i>#c4271d</td><td class="t-dark pane"><i class="sw u-danger"></i>#ff6961</td><td>Solid destructive button</td></tr>
+<tr><td><code>--c-glass</code></td><td class="t-light pane"><i class="sw u-glass"></i>74% white</td><td class="t-dark pane"><i class="sw u-glass"></i>74% #1c1c1e</td><td>Bars and menus (with blur)</td></tr>
+<tr><td><code>--s-ok-fg / -bg / -dot</code></td><td class="t-light pane"><i class="sw u-okfg"></i><i class="sw u-okbg"></i><i class="sw u-okdot"></i></td><td class="t-dark pane"><i class="sw u-okfg"></i><i class="sw u-okbg"></i><i class="sw u-okdot"></i></td><td>Active, online</td></tr>
+<tr><td><code>--s-warn-fg / -bg / -dot</code></td><td class="t-light pane"><i class="sw u-warnfg"></i><i class="sw u-warnbg"></i><i class="sw u-warndot"></i></td><td class="t-dark pane"><i class="sw u-warnfg"></i><i class="sw u-warnbg"></i><i class="sw u-warndot"></i></td><td>Expiring soon</td></tr>
+<tr><td><code>--s-bad-fg / -bg / -dot</code></td><td class="t-light pane"><i class="sw u-badfg"></i><i class="sw u-badbg"></i><i class="sw u-baddot"></i></td><td class="t-dark pane"><i class="sw u-badfg"></i><i class="sw u-badbg"></i><i class="sw u-baddot"></i></td><td>Expired, over quota, errors</td></tr>
+<tr><td><code>--s-off-fg / -bg / -dot</code></td><td class="t-light pane"><i class="sw u-offfg"></i><i class="sw u-offbg"></i><i class="sw u-offdot"></i></td><td class="t-dark pane"><i class="sw u-offfg"></i><i class="sw u-offbg"></i><i class="sw u-offdot"></i></td><td>Disabled, offline</td></tr>
+</tbody>
+</table>
+<p class="tx-sm">Status pairs: <code>-fg</code> text on <code>-bg</code> is at least 5.3:1 in both themes. <code>-dot</code> is for shapes and meters (at least 3:1). Every status also carries an icon and a word.</p>
+
+<h2>Type scale</h2>
+<table>
+<tbody>
+<tr><td><code>--fs-3xl</code> 34 / 700</td><td class="tx-display">Online now 24</td><td>Big numbers, login title</td></tr>
+<tr><td><code>--fs-2xl</code> 28 / 700</td><td class="tx-h1">Dashboard</td><td>Page title (24 on phone)</td></tr>
+<tr><td><code>--fs-xl</code> 20 / 600</td><td class="tx-h2">Needs attention</td><td>Section title</td></tr>
+<tr><td><code>--fs-lg</code> 17 / 600</td><td class="tx-h3">Router link status</td><td>Card title</td></tr>
+<tr><td><code>--fs-md</code> 15 / 400</td><td>Anna Keller, room 204</td><td>Body, inputs, buttons</td></tr>
+<tr><td><code>--fs-sm</code> 13 / 400</td><td class="tx-sm">Last login request 12 s ago</td><td>Hints, table head, pills</td></tr>
+<tr><td><code>--fs-xs</code> 12 / 600</td><td class="tx-cap">Expiring soon</td><td>Group labels (caps)</td></tr>
+</tbody>
+</table>
+<p class="tx-sm">Font: <code>-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif</code>. Mono (vouchers, passwords, script): <code>ui-monospace, SFMono-Regular, Menlo, Consolas, monospace</code>. Numbers in tables and tiles use <code>tabular-nums</code>.</p>
+
+<h2>Space, radius, shadow</h2>
+<table>
+<tbody>
+<tr><td><code>--sp-1</code> 4</td><td><i class="sp-box sp-1b"></i></td><td><code>--sp-2</code> 8</td><td><i class="sp-box sp-2b"></i></td><td><code>--sp-3</code> 12</td><td><i class="sp-box sp-3b"></i></td><td><code>--sp-4</code> 16</td><td><i class="sp-box sp-4b"></i></td></tr>
+<tr><td><code>--sp-5</code> 24</td><td><i class="sp-box sp-5b"></i></td><td><code>--sp-6</code> 32</td><td><i class="sp-box sp-6b"></i></td><td><code>--sp-7</code> 48</td><td><i class="sp-box sp-7b"></i></td><td><code>--sp-8</code> 64</td><td><i class="sp-box sp-8b"></i></td></tr>
+</tbody>
+</table>
+<div class="row-w mt-4">
+<div class="rd-box rd-sm">sm 8</div><div class="rd-box rd-md">md 12</div><div class="rd-box rd-lg">lg 20</div><div class="rd-box rd-xl">xl 28</div><div class="rd-box rd-pill">pill</div>
+</div>
+<div class="g3 mt-4 t-light pane">
+<div class="sh-box sh-1">--sh-1 card</div><div class="sh-box sh-2">--sh-2 raised</div><div class="sh-box sh-3">--sh-3 sheet, menu</div>
+</div>
+<p class="tx-sm mt-2">Other tokens: <code>--ctl</code> 40 px control height (44 px on phone), <code>--nav-w</code> 240 px, <code>--ease</code> cubic-bezier(.2,.8,.2,1), <code>--dur</code> 160 ms.</p>
+
+<h2>Copy-ready CSS (colour tokens)</h2>
+<pre class="code">:root, [data-theme="light"] {
+  --c-bg:#f5f5f7; --c-surface:#fff; --c-surface-2:#f9f9fb;
+  --c-fill:rgba(60,60,67,.08); --c-fill-2:rgba(60,60,67,.14);
+  --c-line:rgba(60,60,67,.14); --c-line-strong:rgba(60,60,67,.30);
+  --c-input-line:#86868b;
+  --c-text:#1d1d1f; --c-text-2:#515154; --c-text-3:#6e6e73;
+  --c-accent:#0062cc; --c-accent-hover:#004fa6; --c-accent-fg:#fff;
+  --c-accent-soft:rgba(0,98,204,.10); --c-focus:#0062cc;
+  --c-danger:#c4271d; --c-danger-hover:#a51f17; --c-danger-fg:#fff;
+  --s-ok-fg:#1b6e33;   --s-ok-bg:rgba(52,199,89,.16);   --s-ok-dot:#1f9d43;
+  --s-warn-fg:#8a5300; --s-warn-bg:rgba(255,159,10,.18); --s-warn-dot:#d17b00;
+  --s-bad-fg:#b3261e;  --s-bad-bg:rgba(255,59,48,.12);   --s-bad-dot:#e5352b;
+  --s-off-fg:#5b5b61;  --s-off-bg:rgba(120,120,128,.16); --s-off-dot:#8e8e93;
+}
+[data-theme="dark"] {
+  --c-bg:#0b0b0d; --c-surface:#1c1c1e; --c-surface-2:#232326;
+  --c-fill:rgba(235,235,245,.10); --c-fill-2:rgba(235,235,245,.18);
+  --c-line:rgba(235,235,245,.14); --c-line-strong:rgba(235,235,245,.30);
+  --c-input-line:#727278;
+  --c-text:#f5f5f7; --c-text-2:#c7c7cc; --c-text-3:#98989f;
+  --c-accent:#4da3ff; --c-accent-hover:#7bbaff; --c-accent-fg:#04122b;
+  --c-accent-soft:rgba(77,163,255,.16); --c-focus:#4da3ff;
+  --c-danger:#ff6961; --c-danger-hover:#ff857e; --c-danger-fg:#2a0705;
+  --s-ok-fg:#62d97f;   --s-ok-bg:rgba(52,199,89,.18);   --s-ok-dot:#30d158;
+  --s-warn-fg:#ffb74d; --s-warn-bg:rgba(255,159,10,.20); --s-warn-dot:#ff9f0a;
+  --s-bad-fg:#ff8a80;  --s-bad-bg:rgba(255,69,58,.20);   --s-bad-dot:#ff453a;
+  --s-off-fg:#a8a8b0;  --s-off-bg:rgba(150,150,160,.20); --s-off-dot:#8e8e93;
+}
+:root {
+  --fs-xs:12px; --fs-sm:13px; --fs-md:15px; --fs-lg:17px; --fs-xl:20px; --fs-2xl:28px; --fs-3xl:34px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:48px; --sp-8:64px;
+  --r-sm:8px; --r-md:12px; --r-lg:20px; --r-xl:28px; --r-pill:999px;
+}</pre>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":2500}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

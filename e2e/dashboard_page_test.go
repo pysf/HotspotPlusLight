@@ -67,7 +67,7 @@ func attentionNames(d *goquery.Document, key string) []string {
 func TestE18_01_DashboardIsTheHomePage(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	anon := harness.NewAdminClient(t, s)
-	if r := anon.Get("/admin"); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
+	if r := anon.GetPage("/admin"); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
 		t.Errorf("anonymous: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
 	c := harness.LoginAsAdmin(t, s)
@@ -486,7 +486,7 @@ func TestE18_14_FragmentNeedsLogin(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	anon := harness.NewAdminClient(t, s)
 	const p = "/admin/dashboard/content"
-	if r := anon.Get(p); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
+	if r := anon.GetPage(p); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
 		t.Errorf("%s anonymous: %d %q", p, r.StatusCode, r.Header.Get("Location"))
 	}
 }

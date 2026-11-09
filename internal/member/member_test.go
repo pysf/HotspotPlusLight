@@ -22,8 +22,11 @@ type fakeRepo struct {
 	settings domain.Settings
 	sessions []domain.SessionTarget
 	next     int64
+	planGone bool // the write fails as if the plan was deleted after the check
 	deleted  []domain.MemberSelection
 	late     []domain.SessionTarget // sessions that appear after the kick step, seen inside the delete transaction
+	// changeAtDelete, when set, edits each session as the delete transaction sees it (an Interim moved the IP).
+	changeAtDelete func(*domain.SessionTarget)
 }
 
 func newRepo() *fakeRepo {
@@ -33,6 +36,9 @@ func newRepo() *fakeRepo {
 }
 
 func (f *fakeRepo) CreateMember(_ context.Context, in domain.MemberInput, enc []byte, now time.Time) (int64, error) {
+	if f.planGone {
+		return 0, domain.ErrPlanGone
+	}
 	for _, m := range f.members {
 		if equalFold(m.Username, in.Username) {
 			return 0, domain.ErrUsernameTaken
@@ -72,7 +78,13 @@ func (f *fakeRepo) GetMemberRow(ctx context.Context, id int64, _ time.Time) (dom
 }
 
 func (f *fakeRepo) UpdateMember(_ context.Context, id int64, in domain.MemberInput, _ time.Time) error {
+	if f.planGone {
+		return domain.ErrPlanGone
+	}
 	m := f.members[id]
+	if m.Username != in.Username && len(f.sessions) > 0 { // the store refuses a rename while online
+		return domain.ErrMemberOnline
+	}
 	m.Username, m.Active, m.PlanID = in.Username, in.Active, in.PlanID
 	f.members[id] = m
 	return nil
@@ -131,7 +143,13 @@ func (f *fakeRepo) OpenSessions(context.Context, domain.MemberSelection, time.Ti
 
 func (f *fakeRepo) DeleteMembers(_ context.Context, sel domain.MemberSelection, _ time.Time) (int, []domain.SessionTarget, error) {
 	f.deleted = append(f.deleted, sel)
-	return len(sel.IDs), append(append([]domain.SessionTarget(nil), f.sessions...), f.late...), nil
+	out := append(append([]domain.SessionTarget(nil), f.sessions...), f.late...)
+	if f.changeAtDelete != nil {
+		for i := range out {
+			f.changeAtDelete(&out[i])
+		}
+	}
+	return len(sel.IDs), out, nil
 }
 
 func (f *fakeRepo) GetPlan(_ context.Context, id int64) (domain.Plan, error) {
@@ -310,6 +328,18 @@ func TestDeleteKicksSessionsThatAppearBeforeTheTransaction(t *testing.T) {
 	}
 }
 
+// A session whose IP or MAC changed between the kick read and the delete is the same session (review B11): it gets one Disconnect.
+func TestDeleteDoesNotKickTwiceWhenTheSessionChanged(t *testing.T) {
+	s, r, d := setup()
+	r.sessions = []domain.SessionTarget{{ID: 5, Username: "a", AcctSessionID: "1", FramedIP: "10.0.0.2", MAC: "AA:BB:CC:DD:EE:01"}}
+	r.late = []domain.SessionTarget{{ID: 6, Username: "a", AcctSessionID: "2"}}
+	r.changeAtDelete = func(t *domain.SessionTarget) { t.FramedIP, t.MAC = "10.0.0.9", "AA:BB:CC:DD:EE:02" }
+	res, err := s.Delete(context.Background(), domain.MemberSelection{IDs: []int64{1}})
+	if err != nil || len(d.calls) != 2 || res.Kick.Attempted != 2 {
+		t.Fatalf("%+v %v %d calls", res, err, len(d.calls))
+	}
+}
+
 func TestDeleteBatchKicksSessionsThatAppearBeforeTheTransaction(t *testing.T) {
 	s, r, d := setup()
 	r.late = []domain.SessionTarget{{Username: "v1", AcctSessionID: "late"}}
@@ -373,5 +403,20 @@ func TestKickSendsDisconnectsConcurrently(t *testing.T) {
 	}
 	if len(d.calls) != 24 {
 		t.Fatalf("%d calls", len(d.calls))
+	}
+}
+
+// TestPlanGoneBecomesFormError covers review B4: a plan deleted after the check
+// gives a plan_id form error, not an error.
+func TestPlanGoneBecomesFormError(t *testing.T) {
+	s, r, _ := setup()
+	ctx := context.Background()
+	id, _, _ := s.Create(ctx, domain.MemberForm{Username: "Alice", PlanID: "1", Active: true})
+	r.planGone = true
+	if _, errs, err := s.Create(ctx, domain.MemberForm{Username: "Bob", PlanID: "1"}); err != nil || errs["plan_id"] == "" {
+		t.Errorf("Create: %v %v", errs, err)
+	}
+	if errs, _, err := s.Update(ctx, id, domain.MemberForm{Username: "Alice", PlanID: "1", Active: true}); err != nil || errs["plan_id"] == "" {
+		t.Errorf("Update: %v %v", errs, err)
 	}
 }

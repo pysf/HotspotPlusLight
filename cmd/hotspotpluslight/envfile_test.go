@@ -101,3 +101,42 @@ func parseEnvFileString(s string) (map[string]string, error) {
 }
 
 func newScanner(s string) *bufio.Scanner { return bufio.NewScanner(strings.NewReader(s)) }
+
+// TestE16_06_EnvFileQuotedWithComment covers review B1: a quoted value
+// followed by " # comment" must be unquoted.
+func TestE16_06_EnvFileQuotedWithComment(t *testing.T) {
+	m, err := parseEnvFileString("A=\"127.0.0.1:8081\" # local\nB='x # y'   # c\nC=\"a\"\nD=\"unclosed # x\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for k, want := range map[string]string{"A": "127.0.0.1:8081", "B": "x # y", "C": "a", "D": `"unclosed`} {
+		if m[k] != want {
+			t.Errorf("%s = %q, want %q", k, m[k], want)
+		}
+	}
+}
+
+// TestE16_06b_EnvFileQuoteEdgeCases covers quotes inside values, junk after
+// the closing quote, unclosed quotes, empty values and '#' inside quotes.
+func TestE16_06b_EnvFileQuoteEdgeCases(t *testing.T) {
+	for in, want := range map[string]string{
+		`K="a"b"`:       `a"b`,
+		`K='it's'`:      `it's`,
+		`K="x" # c`:     `x`,
+		`K="x" junk`:    `"x" junk`,
+		`K="unclosed`:   `"unclosed`,
+		`K=""`:          ``,
+		`K=''  # c`:     ``,
+		`K="a # b"`:     `a # b`,
+		`K="a # b" # c`: `a # b`,
+		`K="x"#c`:       `x`,
+	} {
+		m, err := parseEnvFileString(in + "\n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m["K"] != want {
+			t.Errorf("%s: got %q, want %q", in, m["K"], want)
+		}
+	}
+}

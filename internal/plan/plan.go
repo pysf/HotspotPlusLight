@@ -95,10 +95,5 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	} else if def {
 		return domain.ErrDefault
 	}
-	if n, err := s.repo.CountMembersOnPlan(ctx, id); err != nil {
-		return err
-	} else if n > 0 {
-		return &domain.InUseError{Members: n}
-	}
-	return s.repo.DeletePlan(ctx, id) // the RESTRICT foreign key still guards a member added meanwhile
+	return s.repo.DeletePlan(ctx, id) // the store counts the members and batches that block it
 }

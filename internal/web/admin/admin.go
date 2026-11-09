@@ -198,11 +198,15 @@ func (h handlers) pageEnv(next http.Handler) http.Handler {
 			theme = c.Value
 		}
 		env := ui.Env{Theme: ui.ParseTheme(theme), Asset: h.Assets.URL}
-		// A failed read only hides the business name (and is logged); the page still renders.
-		if st, err := h.Settings.Get(r.Context()); err != nil {
-			slog.Warn("admin: read settings for the business name", "err", err)
-		} else {
-			env.BusinessName = st.BusinessName
+		// A request with HX-Target renders a fragment (for example a list that polls), which has
+		// no header or tab title, so it skips the settings read.
+		if hxTarget(r) == "" {
+			// A failed read only hides the business name (and is logged); the page still renders.
+			if st, err := h.Settings.Get(r.Context()); err != nil {
+				slog.Warn("admin: read settings for the business name", "err", err)
+			} else {
+				env.BusinessName = st.BusinessName
+			}
 		}
 		next.ServeHTTP(w, r.WithContext(ui.WithEnv(r.Context(), env)))
 	})
@@ -259,6 +263,9 @@ func (h handlers) serverError(w http.ResponseWriter, r *http.Request, err error)
 		h.appFail(w, http.StatusInternalServerError, "", "Something went wrong. Try again.")
 		return
 	}
+	if keepTarget(w, r, http.StatusInternalServerError, "Something went wrong. Try again.") {
+		return
+	}
 	h.render(w, r, http.StatusInternalServerError, ui.ErrorFragment("Something went wrong. Check the server log."))
 }
 
@@ -284,6 +291,19 @@ func inSheet(r *http.Request) bool { return hxTarget(r) == sheetBodyID }
 func fromApp(r *http.Request) bool {
 	t := hxTarget(r)
 	return t == listID || t == planListID || t == sheetBodyID
+}
+
+// keepTarget answers an htmx request for a polled or other fragment (any HX-Target that is not
+// a list or the sheet) with a toast and no swap, so a transient error does not replace its content.
+// It returns false, and writes nothing, for any other request.
+func keepTarget(w http.ResponseWriter, r *http.Request, status int, msg string) bool {
+	if !isHTMX(r) || hxTarget(r) == "" || fromApp(r) {
+		return false
+	}
+	setTrigger(w, map[string]any{"toast": msg})
+	w.Header().Set("HX-Reswap", "none")
+	w.WriteHeader(status)
+	return true
 }
 
 // setTrigger sets the HX-Trigger header: one event per key (a string value is the toast text).
@@ -330,6 +350,12 @@ func (h handlers) appOrFlash(w http.ResponseWriter, r *http.Request, status int,
 // isHTMX reports whether the request comes from htmx.
 func isHTMX(r *http.Request) bool { return r.Header.Get("HX-Request") == "true" }
 
+// isPageRequest reports whether r is a plain browser page load (GET or HEAD without HX-Request).
+// A self-refreshing list is a GET from htmx and must not get a page redirect swapped into it.
+func isPageRequest(r *http.Request) bool {
+	return (r.Method == http.MethodGet || r.Method == http.MethodHead) && !isHTMX(r)
+}
+
 // htmxRedirect answers an htmx request with HX-Redirect and a plain request with 303.
 func htmxRedirect(w http.ResponseWriter, r *http.Request, status int, to string) {
 	if isHTMX(r) {
@@ -353,7 +379,7 @@ func (h handlers) requireSession(next http.Handler) http.Handler {
 			return
 		}
 		if !ok {
-			if r.Method == http.MethodGet || r.Method == http.MethodHead {
+			if isPageRequest(r) {
 				http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
 				return
 			}

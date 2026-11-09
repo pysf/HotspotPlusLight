@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Voucher sheet print layout</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<svg class="sprite" aria-hidden="true" focusable="false">
+<symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 9V4h10v5M7 17H5a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="7" y="14" width="10" height="6" rx="1"/></symbol>
+<symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+</svg>
+
+<div class="hp t-light print-board">
+<div>
+<div class="print-bar no-print">
+<a class="btn" href="#"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg>Back to vouchers</a>
+<button class="btn btn-primary" type="button"><svg class="ic" aria-hidden="true"><use href="#i-printer"/></svg>Print</button>
+</div>
+
+<article class="a4" aria-label="Voucher sheet, page 1 of 1">
+<header class="a4-h">
+<div><h1>Harbour Café</h1><p>Wi-Fi vouchers · November weekend · Day pass, 1 GB, valid 1 day</p></div>
+<p>Page 1 of 1</p>
+</header>
+<div class="a4-grid">
+<sc-for list="{{vouchers}}" as="c" hint-placeholder-count="18">
+<div class="vch">
+<div class="vch-t"><span>Harbour Café</span><span>Wi-Fi</span></div>
+<dl>
+<div><dt>Username</dt><dd>{{c.user}}</dd></div>
+<div><dt>Password</dt><dd>{{c.pass}}</dd></div>
+</dl>
+<p>Join “Harbour-Guest”, then sign in on the page that opens.</p>
+</div>
+</sc-for>
+</div>
+</article>
+</div>
+
+<aside class="print-side">
+<div class="mini">
+<h3>Page</h3>
+<ul>
+<li>A4, portrait, 10 mm inside margin. Set the browser margin to None.</li>
+<li>3 columns × 6 rows = 18 vouchers per page. Each card is 63 × 42 mm.</li>
+<li>Business name is the page title. It also sits small on every card, so a cut-out card still says whose Wi-Fi it is.</li>
+<li>More than 18 vouchers: a new page starts, with the same header and “Page 2 of 3”.</li>
+</ul>
+</div>
+<div class="mini">
+<h3>Type and ink</h3>
+<ul>
+<li>Black on white only, even if the app is in dark mode.</li>
+<li>Username and password: mono, bold, 13 pt, so 0 / O and l / 1 are easy to tell apart. Passwords skip look-alike letters.</li>
+<li>Labels 7.5 pt capitals. Help text 8 pt, one sentence.</li>
+<li>Dashed 0.25 mm cut lines. No colour, no shadows, no icons.</li>
+</ul>
+</div>
+<div class="mini">
+<h3>Hidden when printing</h3>
+<ul>
+<li>Side bar, top bar, tab bar, and the Back / Print buttons (class <code>no-print</code>).</li>
+<li><code>@page { size: A4; margin: 0 }</code> and <code>break-inside: avoid</code> on each card.</li>
+</ul>
+</div>
+</aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1500,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const pw = ['k7Qm4xTz','H3rp9WvN','b8Xc2KdE','Tn5Ya6Zr','Fw4Jg7Mq','p9Lc3VsA','Dx6Rb2Hy','Ue8Nk5Wt','Cs3Yp7Gm','Jv2Qa9Kf','Mh5Zt4Bn','Rg7Xe3Pw','Ya4Ld8Ts','Nq6Wc2Vj','Kb9Fr5Hx','Ze3Mu7Dp','Ts8Gk4Ya','Wp2Hn6Rc'];
+    return {
+      vouchers: pw.map((p, i) => ({ user: 'hbr-' + String(101 + i).padStart(4, '0'), pass: p }))
+    };
+  }
+}
+</script>
+</body>
+</html>

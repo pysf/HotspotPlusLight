@@ -4,10 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
-
-	"github.com/go-chi/chi/v5"
 
 	"hotspotpluslight/internal/domain"
 	"hotspotpluslight/internal/web/ui"
@@ -28,12 +25,6 @@ func planForm(r *http.Request) domain.PlanForm {
 	}
 }
 
-// planID returns the plan id of the path. It returns false for anything that is not a positive integer.
-func planID(r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	return id, err == nil && id > 0
-}
-
 // planURL returns the path of one plan.
 func planURL(id int64) string { return fmt.Sprintf("%s/%d", plansHome, id) }
 
@@ -48,6 +39,9 @@ func (h handlers) notFound(w http.ResponseWriter, r *http.Request, what string) 
 		setTrigger(w, ev)
 		w.Header().Set("HX-Reswap", "none")
 		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if keepTarget(w, r, http.StatusNotFound, what+" not found.") {
 		return
 	}
 	h.render(w, r, http.StatusNotFound, ui.ErrorFragment(what+" not found."))
@@ -97,7 +91,7 @@ func (h handlers) planCreate(w http.ResponseWriter, r *http.Request) {
 
 // planEdit shows the edit plan form, in the sheet or as a page.
 func (h handlers) planEdit(w http.ResponseWriter, r *http.Request) {
-	id, ok := planID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Plan")
 		return
@@ -118,7 +112,7 @@ func (h handlers) planEdit(w http.ResponseWriter, r *http.Request) {
 
 // planUpdate saves a plan, or shows the field errors with 422.
 func (h handlers) planUpdate(w http.ResponseWriter, r *http.Request) {
-	id, ok := planID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Plan")
 		return
@@ -146,7 +140,7 @@ func (h handlers) planUpdate(w http.ResponseWriter, r *http.Request) {
 
 // planDelete deletes a plan (O12). A plan in use or the default plan answers 409.
 func (h handlers) planDelete(w http.ResponseWriter, r *http.Request) {
-	id, ok := planID(r)
+	id, ok := pathID(r)
 	if !ok {
 		h.notFound(w, r, "Plan")
 		return
@@ -157,11 +151,7 @@ func (h handlers) planDelete(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, domain.ErrNotFound):
 		h.notFound(w, r, "Plan")
 	case errors.As(err, &inUse):
-		msg := fmt.Sprintf("This plan is used by %d members and cannot be deleted.", inUse.Members)
-		if inUse.Members == 0 {
-			msg = fmt.Sprintf("This plan is used by %s and cannot be deleted. Delete the batches first.", plural(inUse.Batches, "batch"))
-		}
-		h.appOrFlash(w, r, http.StatusConflict, msg)
+		h.appOrFlash(w, r, http.StatusConflict, inUseMessage(inUse))
 	case errors.Is(err, domain.ErrDefault):
 		h.appOrFlash(w, r, http.StatusConflict, "This plan is the default plan. Clear the default plan in Settings first.")
 	case err != nil:
@@ -171,4 +161,16 @@ func (h handlers) planDelete(w http.ResponseWriter, r *http.Request) {
 	default:
 		htmxRedirect(w, r, http.StatusOK, plansHome)
 	}
+}
+
+// inUseMessage tells the admin which members and batches block the deletion of a plan.
+func inUseMessage(e *domain.InUseError) string {
+	if e.Batches == 0 {
+		return fmt.Sprintf("This plan is used by %s and cannot be deleted.", plural(e.Members, "member"))
+	}
+	used := plural(e.Batches, "batch")
+	if e.Members > 0 {
+		used = plural(e.Members, "member") + " and " + used
+	}
+	return fmt.Sprintf("This plan is used by %s and cannot be deleted. Delete the batches first.", used)
 }

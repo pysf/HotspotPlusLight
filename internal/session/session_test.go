@@ -27,6 +27,9 @@ type fakeDB struct {
 	pruneErr             error                      // PruneSessions fails with it
 	prunedFailuresBefore string                     // the day key given to PruneLoginFailures
 	daily                map[string]domain.Counters // "id/day" -> sum
+	tz                   string                     // the time zone in the settings; "" means UTC
+	reads                int                        // settings reads outside an accounting transaction
+	txReads              int                        // settings reads inside one
 }
 
 func newDB() *fakeDB {
@@ -48,7 +51,22 @@ func (f *fakeDB) PruneLoginFailures(_ context.Context, beforeDay string) (int, e
 }
 
 func (f *fakeDB) GetSettings(context.Context) (domain.Settings, error) {
-	return domain.Settings{Timezone: "UTC", AccountingIntervalSeconds: 60, SessionRetentionDays: f.retDays}, nil
+	f.reads++
+	return f.settings(), nil
+}
+
+// Settings is the AcctTx read of the settings row.
+func (f *fakeDB) Settings(context.Context) (domain.Settings, error) {
+	f.txReads++
+	return f.settings(), nil
+}
+
+func (f *fakeDB) settings() domain.Settings {
+	tz := f.tz
+	if tz == "" {
+		tz = "UTC"
+	}
+	return domain.Settings{Timezone: tz, AccountingIntervalSeconds: 60, SessionRetentionDays: f.retDays}
 }
 
 // online mirrors the SQL predicate: not ended and updated since the cut-off.
@@ -350,5 +368,29 @@ func TestDisconnectAckThenStoreFailureIsSuccess(t *testing.T) {
 	}
 	if len(disc.Calls) != 1 {
 		t.Fatalf("%d Disconnects", len(disc.Calls))
+	}
+}
+
+// The time zone is read inside the accounting transaction, and only when a day row is written (review B11).
+// A change in the settings counts from the next packet.
+func TestAccountReadsTimeZoneInsideTheTransaction(t *testing.T) {
+	db := newDB()
+	clk := clock.NewFake(time.Date(2026, 1, 1, 23, 30, 0, 0, time.UTC))
+	s := New(db, &FakeDisconnector{}, clk)
+	ctx := context.Background()
+	if err := s.Account(ctx, rec(domain.AcctStart, "alice", 0)); err != nil {
+		t.Fatal(err)
+	}
+	if db.reads != 0 || db.txReads != 0 {
+		t.Fatalf("a packet without usage read settings: %d outside, %d inside", db.reads, db.txReads)
+	}
+	s.Account(ctx, rec(domain.AcctInterim, "alice", 100))
+	db.tz = "Asia/Tokyo" // 23:30 UTC is already the next day there
+	s.Account(ctx, rec(domain.AcctInterim, "alice", 300))
+	if db.reads != 0 || db.txReads != 2 {
+		t.Fatalf("settings reads: %d outside, %d inside", db.reads, db.txReads)
+	}
+	if db.daily["1/2026-01-01"].Download != 100 || db.daily["1/2026-01-02"].Download != 200 {
+		t.Fatalf("daily %+v", db.daily)
 	}
 }

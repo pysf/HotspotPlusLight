@@ -3,8 +3,10 @@ package store
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -107,8 +109,11 @@ func (s *Store) appliedChecksums(ctx context.Context) (map[int]string, error) {
 	out := map[int]string{}
 	var name string
 	err := s.db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'`).Scan(&name)
-	if err != nil { // no table yet: fresh database
+	if errors.Is(err, sql.ErrNoRows) { // no table yet: fresh database
 		return out, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT version, checksum FROM schema_migrations`)
 	if err != nil {

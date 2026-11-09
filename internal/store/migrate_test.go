@@ -146,3 +146,17 @@ func TestEmbeddedMigrations(t *testing.T) {
 		}
 	}
 }
+
+// TestAppliedChecksumsReturnsRealErrors covers review B6: only a missing
+// schema_migrations table means a fresh database.
+func TestAppliedChecksumsReturnsRealErrors(t *testing.T) {
+	s := openTemp(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := s.appliedChecksums(ctx); err == nil {
+		t.Fatal("cancelled context: want an error, got a fresh database")
+	}
+	if m, err := s.appliedChecksums(context.Background()); err != nil || len(m) != 0 {
+		t.Fatalf("fresh database: %v %v", m, err)
+	}
+}

@@ -73,13 +73,21 @@ type Quota struct {
 	AllowedSeconds, UsedSeconds, RemainingSecs int64
 }
 
+// satAdd returns a+b for non-negative a and b, saturating at math.MaxInt64.
+func satAdd(a, b int64) int64 {
+	if a > math.MaxInt64-b {
+		return math.MaxInt64
+	}
+	return a + b
+}
+
 // QuotaOf returns the quota of member state m on plan p. The login check and
 // the admin summary both use it (BR-22).
 func QuotaOf(m MemberState, p Plan) Quota {
 	q := Quota{
 		WindowStart: m.SubscriptionDate,
 		WindowEnd:   m.SubscriptionDate.Add(time.Duration(min(p.DurationDays, maxWindowDays)) * 24 * time.Hour), // BR-5
-		UsedBytes:   m.UsedDownload + m.UsedUpload,
+		UsedBytes:   satAdd(m.UsedDownload, m.UsedUpload),
 		UsedSeconds: m.UsedSeconds,
 	}
 	if p.BulkValue == 0 { // BR-7: 0 = unlimited

@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -163,7 +164,7 @@ func TestE10_04_GalleryOnlyInDev(t *testing.T) {
 		}
 	}
 	// Still behind the login.
-	if r := harness.NewAdminClient(t, on).Get("/admin/dev/components"); r.StatusCode != 303 {
+	if r := harness.NewAdminClient(t, on).GetPage("/admin/dev/components"); r.StatusCode != 303 {
 		t.Errorf("anonymous gallery: %d, want 303", r.StatusCode)
 	}
 }
@@ -339,4 +340,62 @@ func TestE1_20_SidebarGroupsAndIcons(t *testing.T) {
 			t.Errorf("nav link %q has no icon", strings.TrimSpace(a.Text()))
 		}
 	})
+}
+
+// E16.11 (review B10.3) the htmx config swaps every status for which a handler renders an error fragment
+// (400, 404, 422, 409, 429, 500, 502). Rules are read the way htmx does: the first rule whose code matches wins.
+func TestE16_11_HtmxSwapsErrorFragments(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	raw, ok := c.Get("/admin/plans").Doc(t).Find(`meta[name="htmx-config"]`).Attr("content")
+	if !ok {
+		t.Fatal("no htmx-config meta tag")
+	}
+	var cfg struct {
+		ResponseHandling []struct {
+			Code string `json:"code"`
+			Swap bool   `json:"swap"`
+		} `json:"responseHandling"`
+	}
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	swaps := func(status int) bool {
+		for _, rule := range cfg.ResponseHandling {
+			if regexp.MustCompile("^(?:" + rule.Code + ")$").MatchString(strconv.Itoa(status)) {
+				return rule.Swap
+			}
+		}
+		return false
+	}
+	for _, st := range []int{400, 404, 409, 422, 429, 500, 502} {
+		if !swaps(st) {
+			t.Errorf("status %d is not swapped, so its error message would be dropped", st)
+		}
+	}
+	// A redirect answer carries no body to swap.
+	if swaps(401) || swaps(403) {
+		t.Error("401 and 403 must not be swapped")
+	}
+}
+
+// E16.15 (review B10.3) a polled fragment (the Online table) that gets a 404 must not have its content
+// replaced by an error box: htmx is told not to swap and a toast is sent. A plain page load still gets the box.
+func TestE16_15_PolledTargetErrorIsNotSwapped(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.NewAdminClient(t, s)
+	c.Login("admin", "admin")
+	c.SetPassword("admin", "a much longer password", "a much longer password")
+	r := c.SendHX("POST", "/admin/sessions/999999/disconnections", nil, "session-list")
+	if r.StatusCode != http.StatusNotFound || r.Header.Get("HX-Reswap") != "none" || !strings.Contains(r.Header.Get("HX-Trigger"), `"toast"`) {
+		t.Errorf("session-list: %d reswap %q trigger %q", r.StatusCode, r.Header.Get("HX-Reswap"), r.Header.Get("HX-Trigger"))
+	}
+	r = c.SendHX("POST", "/admin/sessions/999999/disconnections", nil, "flash")
+	if r.Header.Get("HX-Reswap") != "none" {
+		t.Errorf("flash: reswap %q", r.Header.Get("HX-Reswap"))
+	}
+	r = c.Send("POST", "/admin/sessions/999999/disconnections", nil)
+	if r.StatusCode != http.StatusNotFound || r.Header.Get("HX-Reswap") != "" {
+		t.Errorf("no target: %d reswap %q", r.StatusCode, r.Header.Get("HX-Reswap"))
+	}
 }

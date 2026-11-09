@@ -4,17 +4,26 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"hotspotpluslight/internal/domain"
 )
 
+// maxBatchSkips is how many taken usernames one batch skips before it gives up.
+const maxBatchSkips = 10000
+
 // CreateBatch inserts the batch row and its members and advances settings.batch_counter
 // in one transaction (BR-15), then returns the batch and the new usernames. The write
-// lock is taken up front, so two creations never read the same counter. It fails the
-// whole batch with *domain.UsernameConflictError when a username exists, and with
-// domain.ErrPlanGone when the plan was deleted.
+// lock is taken up front, so two creations never read the same counter. Usernames that
+// already exist are skipped and the counter moves past them. It fails with
+// *domain.UsernameConflictError when too many names are taken, and with
+// domain.ErrPlanGone when the plan was deleted. It fails when the number of
+// passwords is not Count.
 func (s *Store) CreateBatch(ctx context.Context, nb domain.NewBatch, now time.Time) (domain.Batch, []string, error) {
+	if len(nb.PasswordsEnc) != nb.Input.Count {
+		return domain.Batch{}, nil, fmt.Errorf("batch has %d passwords for %d members", len(nb.PasswordsEnc), nb.Input.Count)
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return domain.Batch{}, nil, err
@@ -37,20 +46,27 @@ func (s *Store) CreateBatch(ctx context.Context, nb domain.NewBatch, now time.Ti
 	if err != nil {
 		return domain.Batch{}, nil, err
 	}
-	usernames := make([]string, nb.Input.Count)
-	for i, enc := range nb.PasswordsEnc {
-		name := domain.BatchUsername(prefix, counter+i)
-		_, err := tx.ExecContext(ctx, `INSERT INTO member(username, password_enc, active, plan_id, subscription_date, expires_at, batch_id, created_at, updated_at)
-			VALUES (?,?,1,?,?,?,?,?,?)`, name, enc, nb.Input.PlanID, now.Unix(), nb.ExpiresAt.Unix(), batchID, now.Unix(), now.Unix())
-		if sqliteCode(err) == sqliteConstraintUnique {
-			return domain.Batch{}, nil, &domain.UsernameConflictError{Username: name}
+	usernames := make([]string, 0, nb.Input.Count)
+	next := counter
+	for _, enc := range nb.PasswordsEnc {
+		for {
+			name := domain.BatchUsername(prefix, next)
+			next++
+			res, err := tx.ExecContext(ctx, `INSERT INTO member(username, password_enc, active, plan_id, subscription_date, expires_at, batch_id, created_at, updated_at)
+				VALUES (?,?,1,?,?,?,?,?,?) ON CONFLICT(username) DO NOTHING`, name, enc, nb.Input.PlanID, now.Unix(), nb.ExpiresAt.Unix(), batchID, now.Unix(), now.Unix())
+			if err != nil {
+				return domain.Batch{}, nil, err
+			}
+			if n, _ := res.RowsAffected(); n == 1 {
+				usernames = append(usernames, name)
+				break
+			}
+			if next-counter > maxBatchSkips+nb.Input.Count { // a block of taken names this long is a misconfiguration
+				return domain.Batch{}, nil, &domain.UsernameConflictError{Username: name}
+			}
 		}
-		if err != nil {
-			return domain.Batch{}, nil, err
-		}
-		usernames[i] = name
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE settings SET batch_counter = batch_counter + ?, updated_at=? WHERE id=1`, nb.Input.Count, now.Unix()); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE settings SET batch_counter = ?, updated_at=? WHERE id=1`, next, now.Unix()); err != nil {
 		return domain.Batch{}, nil, err
 	}
 	if err := tx.Commit(); err != nil {

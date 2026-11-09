@@ -53,19 +53,23 @@ var Themes = []Design{
 	{"ocean", "Ocean", "Deep teal with a white card."},
 }
 
-// Pack builds the folders. It has no state.
-type Pack struct{}
+// Pack builds the folders. The previews read from a copy made once in New, which is never changed afterwards.
+type Pack struct {
+	built map[string]map[string][]byte
+}
 
 // zipTime is the time of every zip entry, so the same design always gives the same zip.
 var zipTime = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // New returns a Pack. It fails only if the binary was built with a broken asset tree.
 func New() (*Pack, error) {
-	p := &Pack{}
+	p := &Pack{built: map[string]map[string][]byte{}}
 	for _, d := range p.Designs() {
-		if _, err := p.Files(d.Key); err != nil {
+		files, err := p.Files(d.Key)
+		if err != nil {
 			return nil, fmt.Errorf("%s: %w", d.Key, err)
 		}
+		p.built[d.Key] = files
 	}
 	return p, nil
 }
@@ -118,6 +122,13 @@ func (p *Pack) Files(key string) (map[string][]byte, error) {
 		}
 	}
 	return files, nil
+}
+
+// builtFiles returns the files of design key from the copy made in New, and false for an unknown key.
+// The caller must not change the result.
+func (p *Pack) builtFiles(key string) (map[string][]byte, bool) {
+	files, ok := p.built[key]
+	return files, ok
 }
 
 // css returns the shared layout plus the token block of theme key.

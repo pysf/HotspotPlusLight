@@ -632,6 +632,23 @@ func TestE10_23_BulkDeleteRefreshes(t *testing.T) {
 	}
 }
 
+// E16.10 (review B10.2) a bulk delete from the page whose Disconnect fails still sends the members-changed
+// event, so the deleted rows leave the list.
+func TestE16_10_BulkDeleteWithFailedKickRefreshes(t *testing.T) {
+	f := newP5(t)
+	p := f.plan("One")
+	id := f.member(p, "alice")
+	f.online("alice", "a1", "192.168.88.11", "AA:BB:CC:DD:EE:01")
+	f.coa.Always(fakenas.NAK)
+	r := f.c.SendHX("POST", "/admin/members/bulk-delete", url.Values{"id": {strconv.FormatInt(id, 10)}, "confirmed": {"1"}}, "bulk-result")
+	if r.StatusCode != 200 || !strings.Contains(r.Body, "could not be disconnected") {
+		t.Fatalf("bulk delete: %d %s", r.StatusCode, r.Body)
+	}
+	if ev := hxTrigger(t, r); ev["members-changed"] == nil {
+		t.Errorf("no members-changed event: %v", r.Header)
+	}
+}
+
 // E10.24 a vanished row or a server error from a list or sheet gives a refresh event and a clear toast.
 func TestE10_24_VanishedAndFailed(t *testing.T) {
 	f := newP5(t)

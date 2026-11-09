@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Design rationale</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hp.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="hp doc-board t-light">
+<p class="tx-cap tx-3">HotspotPlus Lite · Admin design · v1</p>
+<h1>Design rationale</h1>
+<p>A quiet tool for one person at a front desk. It should feel like a good phone settings app: calm, big touch targets, plain words. Nothing here needs training.</p>
+
+<h2>The idea in four lines</h2>
+<ul>
+<li><b>Calm.</b> Light grey page, white rounded cards, thin lines, soft shadows. One blue accent. Colour is kept for meaning.</li>
+<li><b>Quick jobs first.</b> Add guest, print vouchers, see who is online, kick, check router. These are always one tap from the side bar (or the bottom bar on a phone).</li>
+<li><b>Status is never only colour.</b> Every status has a word and a shape: Active ✓, Expiring (clock), Expired / Over quota (warning), Disabled (slash). Online is a filled dot, offline a hollow ring, and both have text for screen readers.</li>
+<li><b>Same markup everywhere.</b> Each screen is one piece of HTML that adapts from 360 to 1920 px. Tables become stacked cards on a phone. The boards show 1280 and 390 side by side from the same markup.</li>
+</ul>
+
+<h2>Navigation</h2>
+<p>Side bar on a laptop (8 places, router status at the bottom). On a tablet it shrinks to icons. On a phone it becomes a bottom bar with 4 places plus “More”. The top bar always carries <b>Password</b>, the <b>theme switch</b> and <b>Log out</b>; on a phone these are three 44 px icon buttons.</p>
+
+<h2>Look and feel</h2>
+<ul>
+<li>System font stack (San Francisco on Apple, Segoe UI on Windows, Roboto on Android). 7-step type scale from 12 to 34 px.</li>
+<li>Radius: 8 / 12 / 20 / 28 px and full pill. Buttons and chips are pills; cards are 20 px; sheets and dialogs 28 px.</li>
+<li>Depth: three shadows. Top bar and side bar are slightly see-through with blur. Dark mode uses lighter surfaces instead of heavier shadows.</li>
+<li>Motion: only 160 ms hover/press, a 200 ms sheet slide, and a soft fade when numbers refresh. Reduced-motion turns all of it off.</li>
+</ul>
+
+<h2>The 10-second refresh</h2>
+<p>The Dashboard swaps only the changed numbers. Tiles have a fixed height, numbers use fixed-width digits, and charts keep their size, so nothing jumps. New values fade from 55% to 100% in 0.4 s. A small “Live” dot with “Updated 4 s ago” shows it is alive.</p>
+
+<h2>What I assumed (tell me if any is wrong)</h2>
+<ul>
+<li>Business name sample: “Harbour Café”. Wi-Fi name sample: “Harbour-Guest”. All data on the boards is made up.</li>
+<li>“Over quota” is shown as a red status, in the same family as Expired. The filter chip “Expired” includes it.</li>
+<li>“Expiring soon” means ends within 3 days. Over quota means 100% of the data limit.</li>
+<li>The Password page link in the top bar goes to a normal change-password page. I designed the forced “Set new password” screen only; the normal page reuses the same card.</li>
+<li>Voucher sheet: A4, 3 × 6 = 18 vouchers per page, business name on top of the page.</li>
+<li>Router page: eight MikroTik hotspot pages (login, alogin, status, logout, error, redirect, rlogin, radvert).</li>
+<li>Phone “More” opens a small list: Plans, Usage, Router, Settings. It is a menu, not a page.</li>
+<li>Icons are a small inline SVG sprite per page (24 px grid, 1.75 px stroke). No emoji, no remote files.</li>
+</ul>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

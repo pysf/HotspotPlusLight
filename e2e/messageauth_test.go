@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	"layeh.com/radius"
 
@@ -55,5 +56,36 @@ func TestE15_03_DisconnectMessageAuthenticator(t *testing.T) {
 	f.coa.Always(fakenas.ACKBadMA)
 	if r := f.c.Send("POST", spath(f.sessionDBID("sess-2")), nil); r.StatusCode == 200 {
 		t.Fatalf("a reply with a wrong Message-Authenticator was accepted: %s", r.Body)
+	}
+}
+
+// E16.05 (review A3) a request with a valid Message-Authenticator proves the shared secret, so a password with a
+// tab or a non-UTF-8 byte gets a normal reply and no wrong-secret alarm. Without one, the old heuristics stay (E8.07).
+func TestE16_05_ValidMADisablesWrongSecretHeuristics(t *testing.T) {
+	f := newP5(t)
+	for _, pw := range []string{"pw\tx", "pw\xff\xfe"} {
+		r, err := f.nas.Authenticate("nobody", pw)
+		if err != nil || r.Code != radius.CodeAccessReject {
+			t.Fatalf("password %q: want a normal reject, got %v %v", pw, r, err)
+		}
+	}
+	d := f.c.Get("/admin").Doc(t)
+	if n := text(d.Find("[data-bad-secret-count]")); n != "0" {
+		t.Errorf("bad secret count %q, want 0", n)
+	}
+}
+
+// E16.05b (review A3) the opposite case: a wrong Message-Authenticator with a garbage password still raises
+// the wrong-secret alarm and gets no reply. E8.07 covers only a readable password.
+func TestE16_05b_WrongMAWithGarbagePasswordStillAlarms(t *testing.T) {
+	f := newP5(t)
+	bad := fakenas.New(f.s.Addrs.RadiusAuth, "wrong-secret")
+	bad.Timeout = 300 * time.Millisecond
+	if _, err := bad.Authenticate("nobody", "pw\xff\xfe\t"); err == nil {
+		t.Fatal("a wrong-secret Access-Request was answered")
+	}
+	d := f.c.Get("/admin").Doc(t)
+	if n := text(d.Find("[data-bad-secret-count]")); n != "1" {
+		t.Errorf("bad secret count %q, want 1", n)
 	}
 }

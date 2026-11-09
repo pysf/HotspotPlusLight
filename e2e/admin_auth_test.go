@@ -108,7 +108,7 @@ func TestE1_03_ProtectedPagesAndLanding(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	anon := harness.NewAdminClient(t, s)
 	for _, p := range []string{"/admin", "/admin/members", "/admin/plans", "/admin/plans/new", "/admin/plans/1", "/admin/settings"} {
-		r := anon.Get(p)
+		r := anon.GetPage(p)
 		if r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
 			t.Errorf("%s anonymous: %d %q", p, r.StatusCode, r.Header.Get("Location"))
 		}
@@ -199,7 +199,7 @@ func TestE1_17_AdminSession(t *testing.T) {
 		t.Fatalf("activity did not extend: %d", r.StatusCode)
 	}
 	fc.Advance(61 * time.Minute)
-	if r := c.Get("/admin/members"); r.StatusCode != 303 {
+	if r := c.GetPage("/admin/members"); r.StatusCode != 303 {
 		t.Fatalf("61 min idle: %d", r.StatusCode)
 	}
 	if r := rawGet(t, s, cookie, "/admin/plans"); r.StatusCode != 303 {
@@ -225,11 +225,25 @@ func TestE1_17_AdminSession(t *testing.T) {
 		t.Fatalf("set-password: %s", se)
 	}
 	for _, cl := range []*harness.AdminClient{a, b} {
-		if r := cl.Get("/admin/members"); r.StatusCode != 303 {
+		if r := cl.GetPage("/admin/members"); r.StatusCode != 303 {
 			t.Fatalf("session survived set-password: %d", r.StatusCode)
 		}
 	}
 	if scalar[int](t, db, `SELECT count(*) FROM admin_session`) != 0 {
 		t.Fatal("rows survive set-password")
+	}
+}
+
+// E16.08 (review B10.1) a self-refreshing list (htmx GET) with an ended session gets 401 and HX-Redirect,
+// not a 303 whose login page would be swapped into the table. A plain page load keeps the 303.
+func TestE16_08_ExpiredSessionOnHtmxGet(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	anon := harness.NewAdminClient(t, s)
+	r := anon.GetHX("/admin/sessions/table", "session-list")
+	if r.StatusCode != http.StatusUnauthorized || r.Header.Get("HX-Redirect") != "/admin/login" {
+		t.Errorf("htmx GET: %d HX-Redirect %q", r.StatusCode, r.Header.Get("HX-Redirect"))
+	}
+	if r := anon.GetPage("/admin/sessions/table"); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/login" {
+		t.Errorf("page GET: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
 }

@@ -26,29 +26,21 @@ func counter(t *testing.T, s *Store) int {
 	return n
 }
 
-// A failed creation (username clash mid-insert) rolls everything back, the counter
-// included, and the next creation reuses the same numbers (BR-15).
-func TestCreateBatchRollbackKeepsCounter(t *testing.T) {
+// A username that is already taken is skipped and the counter moves past it (review A2, BR-15).
+func TestCreateBatchSkipsTakenUsername(t *testing.T) {
 	s := seeded(t)
 	ctx := context.Background()
 	p, _ := s.CreatePlan(ctx, samplePlan("P"), fixed())
 	start := counter(t, s)
-	addMember(t, s, "wifi"+itoa(start+2), p, nil) // collides with the 3rd voucher
-	_, _, err := s.CreateBatch(ctx, newBatch(p, 5), fixed())
-	var c *domain.UsernameConflictError
-	if !errors.As(err, &c) {
-		t.Fatalf("want conflict, got %v", err)
-	}
-	var batches, members int
-	s.db.QueryRow(`SELECT count(*) FROM batch`).Scan(&batches)
-	s.db.QueryRow(`SELECT count(*) FROM member`).Scan(&members)
-	if counter(t, s) != start || batches != 0 || members != 1 {
-		t.Fatalf("counter %d (want %d), batches %d, members %d", counter(t, s), start, batches, members)
-	}
-	s.db.Exec(`DELETE FROM member`)
-	_, names, err := s.CreateBatch(ctx, newBatch(p, 2), fixed())
-	if err != nil || names[0] != "wifi"+itoa(start) || counter(t, s) != start+2 {
+	addMember(t, s, "wifi"+itoa(start+2), p, nil) // the 3rd voucher name is taken
+	_, names, err := s.CreateBatch(ctx, newBatch(p, 5), fixed())
+	if err != nil || len(names) != 5 || names[2] != "wifi"+itoa(start+3) || counter(t, s) != start+6 {
 		t.Fatalf("%v %v counter %d", names, err, counter(t, s))
+	}
+	var members int
+	s.db.QueryRow(`SELECT count(*) FROM member`).Scan(&members)
+	if members != 6 {
+		t.Fatalf("%d members, want 6", members)
 	}
 }
 
@@ -99,5 +91,30 @@ func TestDeletePlanInUseCounts(t *testing.T) {
 	var in *domain.InUseError
 	if err := s.DeletePlan(ctx, p); !errors.As(err, &in) || in.Members != 3 || in.Batches != 1 {
 		t.Fatalf("%v", err)
+	}
+}
+
+// TestCreateBatchWrongPasswordCount covers review B5: the number of passwords
+// must equal Count, with nothing written and no panic.
+func TestCreateBatchWrongPasswordCount(t *testing.T) {
+	s := seeded(t)
+	ctx := context.Background()
+	p, _ := s.CreatePlan(ctx, samplePlan("P"), fixed())
+	start := counter(t, s)
+	for _, extra := range []int{-1, 1} {
+		nb := newBatch(p, 3)
+		if extra < 0 {
+			nb.PasswordsEnc = nb.PasswordsEnc[:2]
+		} else {
+			nb.PasswordsEnc = append(nb.PasswordsEnc, []byte("x"))
+		}
+		if _, _, err := s.CreateBatch(ctx, nb, fixed()); err == nil {
+			t.Fatalf("extra %d: want an error", extra)
+		}
+	}
+	var members int
+	s.db.QueryRow(`SELECT count(*) FROM member`).Scan(&members)
+	if members != 0 || counter(t, s) != start {
+		t.Fatalf("members %d, counter %d (start %d)", members, counter(t, s), start)
 	}
 }

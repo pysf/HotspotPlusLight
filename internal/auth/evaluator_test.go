@@ -15,6 +15,20 @@ import (
 type plainCipher struct{}
 
 func (plainCipher) Decrypt(b []byte) ([]byte, error) { return b, nil }
+func (plainCipher) Encrypt(b []byte) ([]byte, error) { return b, nil }
+
+// countingCipher counts Decrypt calls and keeps the last input.
+type countingCipher struct {
+	plainCipher
+	decrypts int
+	last     []byte
+}
+
+func (c *countingCipher) Decrypt(b []byte) ([]byte, error) {
+	c.decrypts++
+	c.last = b
+	return c.plainCipher.Decrypt(b)
+}
 
 type fakeLogin struct {
 	member   domain.Member
@@ -68,7 +82,11 @@ func newFake() *fakeLogin {
 }
 
 func login(f *fakeLogin, user, pw string) (Verdict, error) {
-	return NewEvaluator(f, plainCipher{}, clock.NewFake(now0), slog.New(slog.NewTextHandler(io.Discard, nil))).Login(context.Background(), user, pw)
+	ev, err := NewEvaluator(f, plainCipher{}, clock.NewFake(now0), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		return Verdict{}, err
+	}
+	return ev.Login(context.Background(), user, pw)
 }
 
 func TestEvaluatorOrder(t *testing.T) {
@@ -148,5 +166,51 @@ func TestEvaluatorUnknownUserRejectsLikeWrongPassword(t *testing.T) {
 	b, errB := login(f, "alice", "bad")
 	if errA != nil || errB != nil || a.Reason != domain.ReasonInvalidCredentials || b != a {
 		t.Fatalf("%+v %+v %v %v", a, b, errA, errB)
+	}
+}
+
+// TestUnknownUserDoesTheSameWork covers review B8: an unknown username goes
+// through one Decrypt of a valid ciphertext, like a known one, so the timing
+// does not tell which usernames exist.
+func TestUnknownUserDoesTheSameWork(t *testing.T) {
+	f := newFake()
+	c := &countingCipher{}
+	ev, err := NewEvaluator(f, c, clock.NewFake(now0), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := ev.Login(context.Background(), "alice", "wrong"); v.Reason != domain.ReasonInvalidCredentials {
+		t.Fatalf("known: %+v", v)
+	}
+	known := c.decrypts
+	c.decrypts = 0
+	if v, _ := ev.Login(context.Background(), "nobody", "wrong"); v.Reason != domain.ReasonInvalidCredentials {
+		t.Fatalf("unknown: %+v", v)
+	}
+	if c.decrypts != known || known != 1 {
+		t.Fatalf("decrypts: known %d, unknown %d, want 1 and 1", known, c.decrypts)
+	}
+}
+
+// TestInactiveBeforePlanChecks covers review B7 (PLAN 7.2: check 2 before 3-4).
+func TestInactiveBeforePlanChecks(t *testing.T) {
+	f := newFake()
+	f.member.Active = false
+	f.planErr = domain.ErrNotFound
+	if v, _ := login(f, "alice", "pw"); v.Reason != domain.ReasonInactive {
+		t.Fatalf("got %q", v.Reason)
+	}
+}
+
+type failingCipher struct{ plainCipher }
+
+func (failingCipher) Encrypt([]byte) ([]byte, error) { return nil, errors.New("bad key") }
+
+// TestNewEvaluatorFailsWhenCipherCannotEncrypt checks that a broken cipher is
+// reported at construction.
+func TestNewEvaluatorFailsWhenCipherCannotEncrypt(t *testing.T) {
+	ev, err := NewEvaluator(newFake(), failingCipher{}, clock.NewFake(now0), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err == nil || ev != nil {
+		t.Fatalf("got %v, %v; want an error", ev, err)
 	}
 }

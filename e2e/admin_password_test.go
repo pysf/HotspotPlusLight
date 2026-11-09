@@ -29,7 +29,7 @@ func TestE11_20_ForcedToPasswordPage(t *testing.T) {
 	c.Login("admin", "admin") // lands on the password page
 
 	for _, p := range []string{"/admin", "/admin/members", "/admin/members/new", "/admin/plans", "/admin/settings", "/admin/router", "/admin/usage", "/admin/sessions", "/admin/batches"} {
-		r := c.Get(p)
+		r := c.GetPage(p)
 		if r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/password" {
 			t.Errorf("GET %s: %d %q (want 303 /admin/password)", p, r.StatusCode, r.Header.Get("Location"))
 		}
@@ -52,7 +52,7 @@ func TestE11_20_ForcedToPasswordPage(t *testing.T) {
 	if r := c.Send("POST", "/admin/logout", nil); r.StatusCode != 200 {
 		t.Errorf("logout: %d", r.StatusCode)
 	}
-	if r := c.Get("/admin/password"); r.StatusCode != 303 || r.Header.Get("Location") != "/admin/login" {
+	if r := c.GetPage("/admin/password"); r.StatusCode != 303 || r.Header.Get("Location") != "/admin/login" {
 		t.Errorf("after logout: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
 }
@@ -150,7 +150,7 @@ func TestE11_23_ChangeSucceeds(t *testing.T) {
 			t.Errorf("current session %s: %d", p, r.StatusCode)
 		}
 	}
-	if r := other.Get("/admin/members"); r.StatusCode != 303 || r.Header.Get("Location") != "/admin/login" {
+	if r := other.GetPage("/admin/members"); r.StatusCode != 303 || r.Header.Get("Location") != "/admin/login" {
 		t.Errorf("other session: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
 	fresh := harness.NewAdminClient(t, s)
@@ -314,7 +314,7 @@ func TestE1_06_SetPasswordCLI(t *testing.T) {
 	if n := scalar[int](t, db, `SELECT count(*) FROM admin_session`); n != 0 {
 		t.Fatalf("sessions left: %d", n)
 	}
-	if r := c.Get("/admin/members"); r.StatusCode != 303 {
+	if r := c.GetPage("/admin/members"); r.StatusCode != 303 {
 		t.Fatalf("old session still valid: %d", r.StatusCode)
 	}
 	fresh := harness.NewAdminClient(t, s)
@@ -373,4 +373,44 @@ func TestE1_15_PasswordStrength(t *testing.T) {
 		t.Fatalf("compliant rejected: %s", se)
 	}
 	harness.NewAdminClient(t, s).Login(username, good)
+}
+
+// E16.09 (review B10.1) while the password change is pending, an htmx GET (a polling list) gets
+// HX-Redirect to the password page, not a 303 whose page would be swapped into the list.
+func TestE16_09_ForcedPasswordOnHtmxGet(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.NewAdminClient(t, s)
+	c.Login("admin", "admin")
+	r := c.GetHX("/admin/sessions/table", "session-list")
+	if r.StatusCode != http.StatusForbidden || r.Header.Get("HX-Redirect") != "/admin/password" {
+		t.Errorf("htmx GET: %d HX-Redirect %q", r.StatusCode, r.Header.Get("HX-Redirect"))
+	}
+}
+
+// E16.13 (review B11) a password piped in with a trailing space is kept as typed, but the admin is told,
+// because "echo pw | ..." in Windows cmd adds that space by mistake.
+func TestE16_13_PipedPasswordTrailingSpaceWarns(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	_, se, code := runCLI(t, s, "Another-Passw0rd-OK! \r\n", "admin", "set-password", "--stdin")
+	if code != 0 || !strings.Contains(se, "ends with a space") {
+		t.Fatalf("exit %d, stderr %q", code, se)
+	}
+	_, se, code = runCLI(t, s, "Third-Passw0rd-Fine!\r\n", "admin", "set-password", "--stdin")
+	if code != 0 || strings.Contains(se, "ends with a space") {
+		t.Fatalf("no trailing space: exit %d, stderr %q", code, se)
+	}
+}
+
+// E16.14 (review B11) set-password on a database that is older than migration 0003 says to run serve first,
+// not a raw SQL error.
+func TestE16_14_SetPasswordOnOldDatabase(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	db := harness.DB(t, s.DataDir)
+	if _, err := db.Exec(`ALTER TABLE admin DROP COLUMN must_change_password`); err != nil {
+		t.Fatal(err)
+	}
+	_, se, code := runCLI(t, s, "Another-Passw0rd-OK!\n", "admin", "set-password", "--stdin")
+	if code == 0 || !strings.Contains(se, "serve") || strings.Contains(se, "no such column") {
+		t.Fatalf("exit %d, stderr %q", code, se)
+	}
 }
