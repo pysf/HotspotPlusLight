@@ -48,12 +48,12 @@
 <aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="./" aria-current="page">Run as a service</a><ul class="sub"><li><a href="#systemd">Linux (systemd)</a></li><li><a href="#windows">Windows service</a></li><li><a href="#macos">macOS (launchd)</a></li><li><a href="#check">Check that it runs</a></li></ul></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../dashboard/">Dashboard</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
 <article class="doc"><span class="kick">Documentation</span><h1>Running as a service</h1><p class="intro">Run HotspotPlus Lite in the background and start it at boot, on Linux, Windows or macOS.</p>
 <section><h2 id="systemd"><a href="#systemd">Linux (systemd)</a></h2>
-<p>Create a user for the service and a settings file that only root and that user can read:</p>
+<p>Create a user for the service, and an env file that only root and that user can read:</p>
 <pre><code>sudo useradd --system --no-create-home --shell /usr/sbin/nologin hsp
 printf 'HSP_DATA_DIR=/var/lib/hotspotpluslight\n' | sudo tee /etc/hotspotpluslight.env &gt;/dev/null
 sudo chown root:hsp /etc/hotspotpluslight.env
 sudo chmod 640 /etc/hotspotpluslight.env</code></pre>
-<p>The secret key is created automatically on first start (only when there is no database yet) and saved to <code>/var/lib/hotspotpluslight/hsp.key</code>. Back up that folder — it holds both the database and the key.</p>
+<p>At the first start, the server creates the secret key automatically, but only when there is no database yet. It saves the key to <code>/var/lib/hotspotpluslight/hsp.key</code>. Back up that folder: it holds both the database and the key.</p>
 <p>Create <code>/etc/systemd/system/hotspotpluslight.service</code>:</p>
 <pre><code>[Unit]
 Description=HotspotPlus Lite
@@ -69,14 +69,14 @@ Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target</code></pre>
-<p>Start it and make it start at boot:</p>
+<p>Start the service and make it start at boot:</p>
 <pre><code>sudo systemctl daemon-reload
 sudo systemctl enable --now hotspotpluslight
 systemctl status hotspotpluslight</code></pre>
 <p>The first-start block and the log lines are in the journal:</p>
 <pre><code>journalctl -u hotspotpluslight</code></pre>
-<p>The ports are all above 1024, so the service needs no extra privileges. <code>systemctl stop</code> sends SIGTERM: the server stops taking new requests, lets the accounting requests in flight finish, then closes the database.</p>
-<p>If you forget the admin password, run the reset as the same user, so the database files keep their owner:</p>
+<p>All the ports are above 1024, so the service needs no extra privileges. <code>systemctl stop</code> sends SIGTERM. The server then stops taking new requests and lets the accounting requests (usage updates from the router) that are already in progress finish. Then it closes the database.</p>
+<p>If you forget the admin password, run the reset as the service user, so that the database files keep their owner:</p>
 <pre><code>sudo -u hsp hotspotpluslight --env-file /etc/hotspotpluslight.env admin set-password</code></pre></section>
 <section><h2 id="windows"><a href="#windows">Windows service</a></h2>
 <p>The program can install itself as a Windows service. Open PowerShell <strong>as Administrator</strong>, go to the folder with <code>hotspotpluslight.exe</code> and run:</p>
@@ -85,25 +85,25 @@ systemctl status hotspotpluslight</code></pre>
 .\hotspotpluslight.exe service start</code></pre>
 <p><code>service install</code> does this:</p>
 <ul>
-<li>It makes the folder <code>C:\ProgramData\HotspotPlusLight</code>. To use another folder, add <code>--dir D:\hsp</code>.</li>
-<li>It limits access to that folder to SYSTEM and Administrators, because it holds the secret key.</li>
-<li>If <code>hsp.env</code> is not there yet, it writes it with a new <code>HSP_SECRET_KEY</code> and <code>HSP_DATA_DIR</code> set to the <code>data</code> subfolder.</li>
-<li>It registers the service <code>HotspotPlusLight</code> (display name "HotspotPlus Lite"). It starts with Windows and runs <code>serve --env-file</code> with that file.</li>
-<li>It sets the service to restart after a failure: after 5, 15 and 60 seconds.</li>
+<li>It creates the folder <code>C:\ProgramData\HotspotPlusLight</code>. To use another folder, add <code>--dir D:\hsp</code>.</li>
+<li>It lets only SYSTEM and Administrators open that folder, because the folder holds the secret key.</li>
+<li>If the env file <code>hsp.env</code> does not exist yet, it creates the file with a new <code>HSP_SECRET_KEY</code>, and with <code>HSP_DATA_DIR</code> set to the <code>data</code> subfolder.</li>
+<li>It registers the service <code>HotspotPlusLight</code> (display name "HotspotPlus Lite"). The service starts with Windows and runs <code>serve --env-file</code> with that file.</li>
+<li>It sets the service to restart after a failure, after 5, 15 and 60 seconds.</li>
 </ul>
 <p>The logs and the first-start block are in <code>hsp.log</code> in that folder:</p>
 <pre><code>type C:\ProgramData\HotspotPlusLight\hsp.log</code></pre>
-<p>Stop and remove the service. Your data is kept:</p>
+<p>To stop and remove the service, run the commands below. Your data is kept.</p>
 <pre><code>.\hotspotpluslight.exe service stop
 .\hotspotpluslight.exe service uninstall</code></pre>
 <p>Do not move <code>hotspotpluslight.exe</code> after the install, because the service points to it. To reset the admin password:</p>
 <pre><code>.\hotspotpluslight.exe admin set-password --env-file C:\ProgramData\HotspotPlusLight\hsp.env</code></pre>
-<p>Allow the ports in the Windows firewall (Administrator PowerShell):</p>
+<p>Allow the ports in the Windows firewall. Run this in PowerShell as Administrator:</p>
 <pre><code>netsh advfirewall firewall add rule name="HotspotPlus Lite admin" dir=in action=allow protocol=TCP localport=8081
 netsh advfirewall firewall add rule name="HotspotPlus Lite RADIUS" dir=in action=allow protocol=UDP localport=1812-1813</code></pre>
-<div class="note"><b>Keep a copy of hsp.env</b><p>It holds the secret key. Without it the stored member passwords cannot be read. See <a href="../backup-and-upgrade/">Backup and upgrade</a>.</p></div></section>
+<div class="note"><b>Keep a copy of hsp.env</b><p>It holds the secret key. Without the key, the stored member passwords cannot be read. See <a href="../backup-and-upgrade/">Backup and upgrade</a>.</p></div></section>
 <section><h2 id="macos"><a href="#macos">macOS (launchd)</a></h2>
-<p>The <code>service</code> commands work only on Windows. On macOS, use launchd. Put settings such as <code>HSP_DATA_DIR</code> in <code>/usr/local/etc/hotspotpluslight.env</code> (readable only by root) and create <code>/Library/LaunchDaemons/local.hotspotpluslight.plist</code>:</p>
+<p>The <code>service</code> commands work only on Windows. On macOS, use launchd. Put variables such as <code>HSP_DATA_DIR</code> in the env file <code>/usr/local/etc/hotspotpluslight.env</code> (readable only by root). Then create <code>/Library/LaunchDaemons/local.hotspotpluslight.plist</code>:</p>
 <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;plist version="1.0"&gt;
 &lt;dict&gt;
@@ -121,14 +121,14 @@ netsh advfirewall firewall add rule name="HotspotPlus Lite RADIUS" dir=in action
   &lt;key&gt;StandardErrorPath&lt;/key&gt;&lt;string&gt;/var/log/hotspotpluslight.log&lt;/string&gt;
 &lt;/dict&gt;
 &lt;/plist&gt;</code></pre>
-<p>launchd starts the program in <code>/</code>, and the data folder defaults to the relative path <code>data</code>, so the database would go to <code>/data</code>, which is read-only. Set the data folder in the env file, and create it:</p>
+<p>launchd starts the program in the <code>/</code> folder. The data folder defaults to the relative path <code>data</code>, so the database would go to <code>/data</code>, which is read-only. Set the data folder in the env file and create it:</p>
 <pre><code>echo 'HSP_DATA_DIR=/usr/local/var/hotspotpluslight' | sudo tee -a /usr/local/etc/hotspotpluslight.env &gt;/dev/null
 sudo mkdir -p /usr/local/var/hotspotpluslight</code></pre>
 <pre><code>sudo launchctl bootstrap system /Library/LaunchDaemons/local.hotspotpluslight.plist
 sudo launchctl bootout system /Library/LaunchDaemons/local.hotspotpluslight.plist</code></pre>
-<p>The first command starts the service, the second stops it. The project does not test launchd, so treat this as a starting point.</p></section>
+<p>The first command starts the service. The second command stops it. The project does not test launchd, so use this setup as a starting point.</p></section>
 <section><h2 id="check"><a href="#check">Check that it runs</a></h2>
-<p>On the server, <code>curl http://127.0.0.1:8081/healthz</code> prints <code>ok</code>. In a browser, <code>http://SERVER-IP:8081/admin</code> shows the login page. Then continue with <a href="../first-login/">First login</a>.</p></section>
+<p>On the server, <code>curl http://127.0.0.1:8081/healthz</code> prints <code>ok</code>. In a browser, <code>http://SERVER-IP:8081/admin</code> shows the admin login page. Then continue with <a href="../first-login/">First login</a>.</p></section>
 <nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../installation/"><small>Previous</small>Installation</a><a class="next" rel="next" href="../configuration/"><small>Next</small>Configuration</a></nav></article>
 </div></main>
 <footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>

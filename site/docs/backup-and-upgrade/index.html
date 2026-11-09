@@ -46,29 +46,29 @@
 </div></header>
 <main id="main" class="docs"><div class="wrap">
 <aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../dashboard/">Dashboard</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="./" aria-current="page">Backup and upgrade</a><ul class="sub"><li><a href="#what">What to back up</a></li><li><a href="#backup">Back up the database</a></li><li><a href="#restore">Restore</a></li><li><a href="#upgrade">Upgrade</a></li><li><a href="#retention">What is kept</a></li></ul></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
-<article class="doc"><span class="kick">Documentation</span><h1>Backup and upgrade</h1><p class="intro">Back up the SQLite file and the secret key, restore them, and upgrade by replacing the binary.</p>
+<article class="doc"><span class="kick">Documentation</span><h1>Backup and upgrade</h1><p class="intro">Back up and restore the SQLite file and the secret key. Upgrade by replacing the program.</p>
 <section><h2 id="what"><a href="#what">What to back up</a></h2>
-<p>The state is two things:</p>
+<p>You need to back up 2 things:</p>
 <ol class="steps">
 <li><b>The database</b>, <code>hsp.db</code> in the data folder.</li>
-<li><b>The secret key</b>, <code>hsp.key</code> in the data folder (or <code>HSP_SECRET_KEY</code> in your env file, if you set it manually).</li>
+<li><b>The secret key</b>, <code>hsp.key</code> in the data folder (or <code>HSP_SECRET_KEY</code> in your env file, if you set the key yourself).</li>
 </ol>
-<div class="note warn"><b>Keep the key</b><p>If the key is lost, the stored member passwords are <strong>unrecoverable</strong>, and the server will not start on that database. It never makes a new key when <code>hsp.db</code> exists. Back up the data folder: it holds both <code>hsp.db</code> and <code>hsp.key</code>. Keep a copy in a safe place, apart from the machine.</p></div></section>
+<div class="note warn"><b>Keep the key</b><p>If you lose the key, the stored member passwords are <strong>unrecoverable</strong> and the server does not start on that database. The server never makes a new key when <code>hsp.db</code> exists. Back up the data folder: it holds both <code>hsp.db</code> and <code>hsp.key</code>. Keep a copy in a safe place, not on the server computer.</p></div></section>
 <section><h2 id="backup"><a href="#backup">Back up the database</a></h2>
-<p>Use SQLite's own backup command. It makes a consistent copy while the server is running. The <code>sqlite3</code> tool is separate from HotspotPlus Lite, so install it if you do not have it.</p>
+<p>Use the backup command of SQLite. It makes a complete, correct copy while the server is running. The <code>sqlite3</code> tool is not part of HotspotPlus Lite, so install it if you do not have it.</p>
 <pre><code>sqlite3 hsp.db ".backup backup-$(date +%F).db"</code></pre>
-<p>Run it in the data folder, or give the full path of <code>hsp.db</code>. On Windows, use <code>sqlite3.exe</code> with a file name of your own. Do not copy <code>hsp.db</code> alone while the server runs: recent changes can still be in <code>hsp.db-wal</code>. To run it every night on Linux, add a line like this with <code>crontab -e</code> (the percent signs must be escaped in cron):</p>
+<p>Run it in the data folder, or give the full path of <code>hsp.db</code>. On Windows, use <code>sqlite3.exe</code> and choose the backup file name yourself. Do not copy <code>hsp.db</code> alone while the server runs: recent changes can still be in <code>hsp.db-wal</code>. To run the backup every night on Linux, add a line like this with <code>crontab -e</code>. In cron, each percent sign needs a backslash before it:</p>
 <pre><code>0 3 * * * sqlite3 /var/lib/hotspotpluslight/hsp.db ".backup /backups/hsp-$(date +\%F).db"</code></pre>
 <p>There is no backup or restore feature inside the program.</p></section>
 <section><h2 id="restore"><a href="#restore">Restore</a></h2>
 <ol class="steps">
 <li>Stop the server.</li>
-<li>Put the backup file in the data folder as <code>hsp.db</code>, and delete old <code>hsp.db-wal</code> and <code>hsp.db-shm</code> files there.</li>
+<li>Put the backup file in the data folder as <code>hsp.db</code>, and delete any old <code>hsp.db-wal</code> and <code>hsp.db-shm</code> files there.</li>
 <li>Start the server with the data folder that holds both <code>hsp.db</code> and <code>hsp.key</code>. If you use an env file with <code>HSP_SECRET_KEY</code>, use the same key.</li>
 </ol>
-<p>To move to a new machine, copy the database (from a backup) and the key, and start the program there.</p></section>
+<p>To move the server to a new computer, copy the database (from a backup) and the key to it. Then start the program there.</p></section>
 <section><h2 id="upgrade"><a href="#upgrade">Upgrade</a></h2>
-<p>An upgrade replaces the program and restarts it. The database migrations run by themselves at start and only go forward. Make a backup first: you cannot go back to an older program on a migrated database, but you can restore the backup.</p>
+<p>To upgrade, you replace the program and restart it. The database migrations (changes to the database layout) run by themselves at start and only go forward. Make a backup first. You cannot go back to an older program on a migrated database, but you can restore the backup.</p>
 <h3>Linux (systemd)</h3>
 <pre><code>curl -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-linux-amd64.tar.gz
 tar -xzf hotspotpluslight-linux-amd64.tar.gz
@@ -80,10 +80,10 @@ sudo systemctl start hotspotpluslight</code></pre>
 # replace hotspotpluslight.exe with the new file, in the same place
 .\hotspotpluslight.exe service start</code></pre>
 <h3>macOS or a plain run</h3>
-<p>Stop the program with Ctrl+C or SIGTERM, replace the file and start it again.</p>
-<p>Check the version with <code>hotspotpluslight version</code>. The log shows <code>migrations applied</code> with a count when the database was upgraded. The version is inside the file, so the download links never change.</p></section>
+<p>Stop the program with <code>Ctrl+C</code> or SIGTERM. Replace the file and start it again.</p>
+<p>Check the version with <code>hotspotpluslight version</code>. When the database was upgraded, the log shows <code>migrations applied</code> with a count. The version is stored inside the program, not in the file name, so the download links never change.</p></section>
 <section><h2 id="retention"><a href="#retention">What is kept</a></h2>
-<p>Finished sessions older than 90 days are removed (the setting <em>Keep finished sessions (days)</em>; 0 keeps them forever). The daily usage history and the members are kept.</p></section>
+<p>Finished sessions older than 90 days are removed. You change this with the <strong>Keep finished sessions (days)</strong> setting on the <strong>Settings</strong> page; 0 keeps them forever. The daily usage history and the members are kept.</p></section>
 <nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../architecture/"><small>Previous</small>Architecture</a><a class="next" rel="next" href="../troubleshooting/"><small>Next</small>Troubleshooting</a></nav></article>
 </div></main>
 <footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>

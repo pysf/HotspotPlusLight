@@ -1,12 +1,12 @@
 # HotspotPlus Lite
 
 A small hotspot manager for one MikroTik router: Go, HTMX and SQLite in one binary, with a built-in RADIUS server (PAP).
-It is a rewrite of HotspotPlus - https://github.com/pysf/hotspotplus - kept small: one business, one admin, one router, one database file.
-The admin makes plans and members (or printable voucher batches). The server checks the limits at login and during accounting, and can kick a session.
+It is a small rewrite of HotspotPlus (https://github.com/pysf/hotspotplus): one business, one admin, one router, one database file.
+The admin creates plans and members (or batches of printable vouchers). The server checks the limits at login and during accounting. It can also kick a session.
 
 User guides (install, router setup, login pages, backup, troubleshooting) are on the site: https://pysf.github.io/HotspotPlusLight/
 
-This README is for developers. The public name is "HotspotPlus Lite". The binary, Go module, repo and Windows service keep the name `hotspotpluslight`.
+This README is for developers. The public name is "HotspotPlus Lite". The binary, Go module and repo keep the name `hotspotpluslight`. The Windows service is named `HotspotPlusLight`.
 
 License: GNU AGPL-3.0, see [LICENSE](LICENSE).
 
@@ -103,9 +103,16 @@ sequenceDiagram
 
 ### Dashboard
 
-The admin home page (`/admin`) shows three tiles (online now with today's peak, traffic today, failed logins today), the router status panel (last login request, accounting packet and Disconnect; moved here from the Router page), a short Needs attention list (members expiring in 3 days, members at 80% of their data) and three charts (traffic for 14 days, busy hours, active members per day). The whole page refreshes by itself every 10 seconds.
+The admin home page (`/admin`) shows:
 
-**Failed logins** are counted per day and reason code, one count for every Access-Reject the server sends. No user names and no addresses are stored. A router retry of the same request counts once. Packets the server does not answer (for example a wrong shared secret) are not counted here; the router status panel counts those. The counts are kept for the *session retention* days of the Settings page (90 by default, 0 = forever) and deleted with the old sessions. See the site page "Dashboard" for what each number means.
+- three tiles: **Online now** (with today's peak), **Traffic today** and **Failed logins today**
+- the router status panel (last login request, accounting packet and Disconnect; moved here from the Router page)
+- a short Needs attention list (members expiring in 3 days, members at 80% of their data)
+- three charts (traffic for 14 days, busy hours, active members per day)
+
+The whole page refreshes by itself every 10 seconds.
+
+**Failed logins** are counted per day and reason code, one count for every Access-Reject the server sends. No user names and no addresses are stored. A router retry of the same request counts once. Packets the server does not answer (for example, a wrong shared secret) are not counted here. The router status panel counts those. The server keeps the counts for the session retention days (the **Keep finished sessions (days)** setting on the **Settings** page; 90 by default, 0 = forever). It deletes them together with the old sessions. The "Dashboard" page on the site explains each number.
 
 ## Package map
 
@@ -147,9 +154,9 @@ The admin home page (`/admin`) shows three tiles (online now with today's peak, 
 | First login: admin / admin, then a forced password change; the admin panel then opens on the Dashboard | O15, D25 |
 | Failed logins are counted per day and reason, with counts only (no user names, no addresses), kept for the session retention days | D27 |
 | Deleting a plan that members use is blocked | O12 |
-| AES-256 key auto-generated on first start (only if `hsp.db` does not exist), saved to `{DATA_DIR}/hsp.key`; back this file up with `hsp.db` | -- |
-| Listen addresses and log settings: env vars seed the first start; the Settings page is the only place after that | -- |
-| Time zone is a dropdown. The RADIUS secret is letters and digits only (use 20 or more); the first-start secret is generated that way | -- |
+| The AES-256 secret key is created automatically at the first start (only if `hsp.db` does not exist) and saved to `{DATA_DIR}/hsp.key`. Back up this file with `hsp.db` | -- |
+| Listen addresses and log settings: environment variables seed the first start. After that, only the Settings page changes them | -- |
+| Time zone is a dropdown. The RADIUS shared secret is letters and digits only (use 20 or more). The server creates the first-start shared secret the same way | -- |
 
 ## Develop
 
@@ -157,7 +164,7 @@ Requires Go 1.26 (see `go.mod`). No CGO, no external services, no Node.
 
 | Command | What it does |
 |---|---|
-| `make run` | build and start with data in `./data` (key auto-generated to `data/hsp.key` on first run) |
+| `make run` | build and start with data in `./data` (the secret key is created automatically in `data/hsp.key` at the first start) |
 | `make reset-db` | delete the dev database in `./data` (asks first; `FORCE=1` skips; keeps `data/hsp.key`) |
 | `make test` | all tests with the race detector |
 | `make ci` | `go vet` and the tests |
@@ -187,18 +194,18 @@ Pushing a tag `v*` runs `.github/workflows/release.yml`, which builds these file
 
 ## Site
 
-The user site (landing page and docs) is in `site/`: plain HTML, CSS and small ES modules, no build step, no Node. `.github/workflows/pages.yml` deploys it to GitHub Pages on a push to `main` that changes `site/` (set Pages to the source "GitHub Actions" once in the repo settings).
+The user site (landing page and docs) is in `site/`: plain HTML, CSS and small ES modules, no build step, no Node. `.github/workflows/pages.yml` deploys it to GitHub Pages on each push to `main` that changes `site/`. Do this once in the repo settings: set the Pages source to "GitHub Actions".
 
-Where to change the base URL: the base URL `https://pysf.github.io/HotspotPlusLight/` is written out in the `canonical`, `og:url`, `og:image` and `twitter:image` tags of every page, in `sitemap.xml` and `robots.txt`, and in the asset links of `site/404.html` (the 404 page is served at any depth, so it cannot use relative links). Every other link is relative. To use a custom domain, replace the base URL in all of `site/` in one go, for example:
+Where to change the base URL: the base URL `https://pysf.github.io/HotspotPlusLight/` is written out in the `canonical`, `og:url`, `og:image` and `twitter:image` tags of every page, in `sitemap.xml` and `robots.txt`, and in the asset links of `site/404.html`. (The 404 page is served at any depth, so it cannot use relative links.) Every other link is relative. To use a custom domain, replace the base URL in all of `site/` in one go. For example:
 
 ```sh
 grep -rl 'https://pysf.github.io/HotspotPlusLight/' site | xargs sed -i.bak 's|https://pysf.github.io/HotspotPlusLight/|https://example.com/|g'
 ```
 
-This also fixes `site/404.html`: its asset links are absolute because the 404 page is served at any depth, and the page CSP only allows `self`, so on a custom domain or a local preview the 404 page loses its styles until the base URL is changed. The `sed` command above makes `.bak` backup files; delete them with `find site -name '*.bak' -delete`. The test E13.17 checks that the base URL is the same everywhere. The image `site/assets/img/og-image.png` was drawn once with headless Chrome from `reference/og-image.html`.
+This also fixes `site/404.html`. Its asset links are absolute, and the page CSP only allows `self`. So on a custom domain or a local preview, the 404 page has no styles until you change the base URL. The `sed` command above makes `.bak` backup files. Delete them with `find site -name '*.bak' -delete`. The test E13.17 checks that the base URL is the same everywhere. The image `site/assets/img/og-image.png` was drawn once with headless Chrome from `reference/og-image.html`.
 
 ## Performance
-The capacity test raises the number of online users step by step (500 up to 50000) and stops at the first step that fails. Run `make perf` (the full run, about 25-30 minutes): only this run rewrites this section and `docs/perf-results.md`. `make perf-quick` (short check) and runs with your own `HSP_PERF_STEPS` or `HSP_PERF_STEP_SECONDS` only print to the screen. The test never fails the build, unless you set `HSP_PERF_MIN_USERS`.
+The capacity test raises the number of online users step by step (from 500 up to 50,000). It stops at the first step that fails. Run `make perf` for the full run (about 25-30 minutes). Only this run rewrites this section and `docs/perf-results.md`. `make perf-quick` (a short check) and runs with your own `HSP_PERF_STEPS` or `HSP_PERF_STEP_SECONDS` only print to the screen. The test never fails the build unless you set `HSP_PERF_MIN_USERS`.
 
 <!-- perf:start -->
 Max online users on this machine: **30000** (last passing step). Run on 2026-11-04, each step 120 s after its warm-up.

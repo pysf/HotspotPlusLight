@@ -33,7 +33,7 @@ If `PLAN.md` and this file disagree, `PLAN.md` wins; fix this file.
 All open decisions are resolved except the hardware items (VERIFY-ON-HARDWARE). See `PLAN.md` §3 for the full list.
 
 ## Current status
-Phases 0–19 are done in code (Phases 17–19 added the dashboard home page, `PLAN.md` D25–D28, BR-25–BR-30, §11). The owner still has to run the full e2e suite (agents do not run it) and do the hardware validation — see `PLAN.md` §13 for the checklist. Per-phase notes are in `docs/phaseN-notes.md` and in git history.
+Phases 0–19 are done in code (Phases 17–19 added the dashboard home page, `PLAN.md` D25–D28, BR-25–BR-30, §11). The full e2e suite passes. The owner still has to do the hardware validation — see `PLAN.md` §13 for the checklist. Per-phase notes are in `docs/phaseN-notes.md` and in git history.
 
 ## How we work here
 00. **Simple language.** Short sentences, plain words. No jargon. This applies to chat, docs, comments, and commit messages.
@@ -77,7 +77,9 @@ The project tags `MONITOR:` (rule 7) and `VERIFY-ON-HARDWARE` (rule 8) still app
 - **Refactor before commenting.** If a block needs a comment only to explain what it does, try a better name or a smaller function first.
 
 ## Phase workflow (owner, 2026-11-01)
-Each phase is done by its own agent: tests first (E2E ids from `PLAN.md` §11), implement until green, **do not commit**. Then the orchestrator: (1) re-runs `gofmt -l .`, `go vet ./...`, `go test -race -count=1 ./internal/... ./cmd/...` (agents never run `./e2e`; the owner runs it, so ask); (2) starts a **separate review agent** (fresh context, not the implementing agent) that runs the `code-review` skill at `medium` on the uncommitted changes and reports findings; real findings are fixed and the tests re-run; (3) commits with a `Phase N: …` message; (4) only then starts the next phase.
+Each phase is done by its own agent: tests first (E2E ids from `PLAN.md` §11), implement until green, **do not commit**. Then the orchestrator: (1) re-runs `gofmt -l .`, `go vet ./...`, `go test -race -count=1 ./internal/... ./cmd/...` and the full e2e suite `go test -count=1 -timeout 600s ./e2e/` (the orchestrator runs it; sub agents do not); (2) starts a **separate review agent** (fresh context, not the implementing agent) that runs the `code-review` skill at `medium` on the uncommitted changes and reports findings; real findings are fixed and the tests re-run; (3) commits with a `Phase N: …` message; (4) only then starts the next phase.
+
+Medium and large tasks run as sub agents. Sub agents use the Sonnet model (owner, 2026-11-09).
 
 ## Conventions (decided by the owner, `PLAN.md` O1)
 Go (module requires 1.26 because `modernc.org/sqlite` does), **chi** router + **templ** components, vendored pinned htmx, `modernc.org/sqlite` (no CGO), `layeh.com/radius`, `bcrypt`, `httptest` + `goquery` in tests, `log/slog`. Timestamps are Unix seconds UTC; display in `settings.timezone`. Env vars are prefixed `HSP_` (see `PLAN.md` §9.2). Layout in `PLAN.md` §9.1.

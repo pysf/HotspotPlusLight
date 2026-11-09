@@ -46,11 +46,11 @@
 </div></header>
 <main id="main" class="docs"><div class="wrap">
 <aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="./" aria-current="page">Installation</a><ul class="sub"><li><a href="#download">Download</a></li><li><a href="#linux">Linux</a></li><li><a href="#macos">macOS</a></li><li><a href="#windows">Windows</a></li><li><a href="#first-run">The first start</a></li><li><a href="#build">Build from source</a></li><li><a href="#ports">Ports</a></li></ul></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../dashboard/">Dashboard</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
-<article class="doc"><span class="kick">Documentation</span><h1>Installation</h1><p class="intro">Download the program for your system, start it once, and open the admin panel. Building from source is also easy.</p>
+<article class="doc"><span class="kick">Documentation</span><h1>Installation</h1><p class="intro">Download the program for your system, start it once and open the admin panel. Building it from source is also easy.</p>
 <section><h2 id="download"><a href="#download">Download</a></h2>
-<p>Every release has nine files. Each holds the program, <code>README.md</code> and <code>LICENSE</code>. The file names have no version, so these links always give the newest release.</p>
+<p>Every release has 9 files. Each file holds the program, <code>README.md</code> and <code>LICENSE</code>. The file names have no version number, so these links always give you the newest release.</p>
 <div class="tbl" tabindex="0" role="region" aria-label="Download files"><table><thead><tr><th scope="col">System</th><th scope="col">Build</th><th scope="col">File</th></tr></thead><tbody><tr><td>Linux</td><td>x86 64-bit</td><td><a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-linux-amd64.tar.gz" rel="noopener"><code>hotspotpluslight-linux-amd64.tar.gz</code></a></td></tr><tr><td>Linux</td><td>x86 32-bit</td><td><a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-linux-386.tar.gz" rel="noopener"><code>hotspotpluslight-linux-386.tar.gz</code></a></td></tr><tr><td>Linux</td><td>ARM 64-bit</td><td><a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-linux-arm64.tar.gz" rel="noopener"><code>hotspotpluslight-linux-arm64.tar.gz</code></a></td></tr><tr><td>Linux</td><td>ARM 32-bit (ARMv7, Raspberry Pi 2 and newer)</td><td><a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-linux-arm.tar.gz" rel="noopener"><code>hotspotpluslight-linux-arm.tar.gz</code></a></td></tr><tr><td>Windows</td><td>x86 64-bit</td><td><a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-windows-amd64.zip" rel="noopener"><code>hotspotpluslight-windows-amd64.zip</code></a></td></tr><tr><td>Windows</td><td>x86 32-bit</td><td><a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-windows-386.zip" rel="noopener"><code>hotspotpluslight-windows-386.zip</code></a></td></tr><tr><td>Windows</td><td>ARM 64-bit</td><td><a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-windows-arm64.zip" rel="noopener"><code>hotspotpluslight-windows-arm64.zip</code></a></td></tr><tr><td>macOS</td><td>Intel</td><td><a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-darwin-amd64.tar.gz" rel="noopener"><code>hotspotpluslight-darwin-amd64.tar.gz</code></a></td></tr><tr><td>macOS</td><td>Apple silicon</td><td><a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-darwin-arm64.tar.gz" rel="noopener"><code>hotspotpluslight-darwin-arm64.tar.gz</code></a></td></tr></tbody></table></div>
-<p>The checksums are in <a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/SHA256SUMS" rel="noopener"><code>SHA256SUMS</code></a>. To check a file: <code>sha256sum FILE</code> on Linux, <code>shasum -a 256 FILE</code> on macOS, or <code>Get-FileHash -Algorithm SHA256 FILE</code> in PowerShell, then compare the result with that list.</p>
+<p>The checksums are in <a href="https://github.com/pysf/HotspotPlusLight/releases/latest/download/SHA256SUMS" rel="noopener"><code>SHA256SUMS</code></a>. To check a file, run <code>sha256sum FILE</code> on Linux, <code>shasum -a 256 FILE</code> on macOS or <code>Get-FileHash -Algorithm SHA256 FILE</code> in PowerShell. Then compare the result with that list.</p>
 <p>There is no Windows 32-bit ARM build and no 32-bit macOS build, because Go does not support them. The 32-bit ARM Linux build needs ARMv7, so it does not run on the Raspberry Pi Zero or Pi 1.</p></section>
 <section><h2 id="linux"><a href="#linux">Linux</a></h2>
 <p>Download, unpack and install the program:</p>
@@ -58,26 +58,27 @@
 tar -xzf hotspotpluslight-linux-amd64.tar.gz
 sudo install -m 755 hotspotpluslight /usr/local/bin/
 hotspotpluslight version</code></pre>
-<p>Start the server from the same folder. It creates the secret key and the database on first start:</p>
+<p>Start the server from the same folder. At the first start, the server creates the secret key and the database:</p>
 <pre><code>hotspotpluslight serve</code></pre>
-<p>By default the database and the key file go in a folder called <code>data</code> next to where you run the command. Back up that folder: it holds both <code>hsp.db</code> and <code>hsp.key</code>. Set <code>HSP_DATA_DIR</code> to use a different folder; set <code>HSP_SECRET_KEY</code> to manage the key yourself instead of auto-generating it. A key is only generated for a new data folder; if <code>hsp.db</code> exists and the key is missing, the server will not start. To start at boot, see <a href="../running-as-a-service/">Running as a service</a>.</p></section>
+<p>By default, the database and the secret key (<code>hsp.key</code>) go in a folder called <code>data</code>, in the folder where you run the command. Back up that data folder: it holds both <code>hsp.db</code> and <code>hsp.key</code>.</p>
+<p>Set <code>HSP_DATA_DIR</code> to use a different data folder. Set <code>HSP_SECRET_KEY</code> if you want to manage the key yourself, so the server does not create one. The server creates a key only for a new data folder. If <code>hsp.db</code> exists and the key is missing, the server does not start. To start the server at boot, see <a href="../running-as-a-service/">Run as a service</a>.</p></section>
 <section><h2 id="macos"><a href="#macos">macOS</a></h2>
 <p>Use <code>darwin-arm64</code> on Apple silicon or <code>darwin-amd64</code> on an Intel Mac:</p>
 <pre><code>curl -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-darwin-arm64.tar.gz
 tar -xzf hotspotpluslight-darwin-arm64.tar.gz
 ./hotspotpluslight version</code></pre>
-<p>Then create <code>hsp.env</code> and start the server as shown for Linux. If macOS blocks a file you downloaded in a browser, remove the quarantine mark with <code>xattr -d com.apple.quarantine hotspotpluslight</code>.</p></section>
+<p>Then start the server as shown for Linux. If macOS blocks a file you downloaded in a browser, remove the quarantine mark with <code>xattr -d com.apple.quarantine hotspotpluslight</code>.</p></section>
 <section><h2 id="windows"><a href="#windows">Windows</a></h2>
 <p>Open PowerShell, then download and unpack the zip:</p>
 <pre><code>curl.exe -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-windows-amd64.zip
 Expand-Archive hotspotpluslight-windows-amd64.zip -DestinationPath C:\hotspotpluslight
 cd C:\hotspotpluslight
 .\hotspotpluslight.exe version</code></pre>
-<p>To try it in the window, start it:</p>
+<p>To try it in the PowerShell window, start it:</p>
 <pre><code>.\hotspotpluslight.exe serve</code></pre>
-<p>For daily use, install the Windows service instead. It makes the settings file and the key for you. See <a href="../running-as-a-service/#windows">Running as a service</a>.</p></section>
+<p>For daily use, install the Windows service instead. The service install creates the env file and the secret key for you. See <a href="../running-as-a-service/#windows">Run as a service</a>.</p></section>
 <section><h2 id="first-run"><a href="#first-run">The first start</a></h2>
-<p>On the first start the server creates the database, creates the admin account and prints this block. The log lines go to stderr and the block goes to stdout. This is the real output:</p>
+<p>On the first start, the server creates the database and the admin account, and prints this block. The log lines go to stderr and the block goes to stdout. This is the real output:</p>
 <pre class="out"><code>time=2026-11-04T17:44:47.540+01:00 level=INFO msg="migrations applied" count=4
 === HotspotPlus Lite first start ===
 Log in with username: admin  password: admin
@@ -86,17 +87,18 @@ Forgot it later? Run: hotspotpluslight admin set-password
 ====================================
 time=2026-11-04T17:44:47.593+01:00 level=INFO msg="admin account created with the default password; it must be changed at first login"
 time=2026-11-04T17:44:47.594+01:00 level=INFO msg=listening admin=[::]:8081 radius_auth=[::]:1812 radius_acct=[::]:1813</code></pre>
-<p>Open <code>http://SERVER-IP:8081/admin</code> in a browser. <code>SERVER-IP</code> is the address of the computer that runs the server. The address <code>/healthz</code> answers <code>ok</code> without a login, for monitors.</p>
+<p>Open <code>http://SERVER-IP:8081/admin</code> in a browser. <code>SERVER-IP</code> is the address of the computer that runs the server. The <code>/healthz</code> address answers <code>ok</code> without a login, so monitoring tools can use it.</p>
 <p>Next: <a href="../first-login/">First login</a>.</p></section>
 <section><h2 id="build"><a href="#build">Build from source</a></h2>
-<p>You need Go 1.26 (see <code>go.mod</code>) and make. The build has no cgo and no Node step.</p>
+<p>You need Go 1.26 (see <code>go.mod</code>) and <code>make</code>. The build needs no cgo and no Node.js step.</p>
 <pre><code>git clone https://github.com/pysf/HotspotPlusLight.git
 cd HotspotPlusLight
 make build</code></pre>
-<p><code>make build</code> writes <code>bin/hotspotpluslight</code>. For a 64-bit Windows program use <code>make build-windows</code>, which writes <code>bin/hotspotpluslight.exe</code>. <code>make run</code> builds and starts the server with data in <code>./data</code>; the key is auto-generated to <code>data/hsp.key</code> on first start.</p></section>
+<p><code>make build</code> writes <code>bin/hotspotpluslight</code>. For a 64-bit Windows program, use <code>make build-windows</code>, which writes <code>bin/hotspotpluslight.exe</code>. <code>make run</code> builds and starts the server with its data in <code>./data</code>. At the first start, the server creates the key in <code>data/hsp.key</code>.</p></section>
 <section><h2 id="ports"><a href="#ports">Ports</a></h2>
-<div class="tbl" tabindex="0" role="region" aria-label="Ports"><table><thead><tr><th scope="col">Port</th><th scope="col">Direction</th><th scope="col">Used for</th></tr></thead><tbody><tr><td>TCP 8081</td><td>to the server, from your computer</td><td>The admin panel and <code>/healthz</code> (plain HTTP).</td></tr><tr><td>UDP 1812</td><td>to the server, from the router</td><td>RADIUS login requests.</td></tr><tr><td>UDP 1813</td><td>to the server, from the router</td><td>RADIUS accounting.</td></tr><tr><td>UDP 3799</td><td>to the router, from the server</td><td>Disconnect requests (the port is a setting).</td></tr></tbody></table></div>
-<p>The addresses and ports of the server can be changed on the <strong>Settings</strong> page. A restart is needed. The env vars <code>HSP_ADMIN_ADDR</code>, <code>HSP_RADIUS_AUTH_ADDR</code> and <code>HSP_RADIUS_ACCT_ADDR</code> only set the first start; after that the page is used. See <a href="../configuration/">Configuration</a>. The firewall rules are on the <a href="../router-setup/#firewall">Router setup</a> page.</p></section>
+<p>The MikroTik router talks to the server with RADIUS (the protocol the router uses to ask the server about each login).</p>
+<div class="tbl" tabindex="0" role="region" aria-label="Ports"><table><thead><tr><th scope="col">Port</th><th scope="col">Direction</th><th scope="col">Used for</th></tr></thead><tbody><tr><td>TCP 8081</td><td>to the server, from your computer</td><td>The admin panel and <code>/healthz</code> (plain HTTP).</td></tr><tr><td>UDP 1812</td><td>to the server, from the router</td><td>RADIUS login requests.</td></tr><tr><td>UDP 1813</td><td>to the server, from the router</td><td>RADIUS accounting (usage updates the router sends during a session).</td></tr><tr><td>UDP 3799</td><td>to the router, from the server</td><td>Disconnect requests (the port is a setting).</td></tr></tbody></table></div>
+<p>You can change the addresses and ports of the server on the <strong>Settings</strong> page (restart required). The environment variables <code>HSP_ADMIN_ADDR</code>, <code>HSP_RADIUS_AUTH_ADDR</code> and <code>HSP_RADIUS_ACCT_ADDR</code> are used only at the first start. After that, the server uses the <strong>Settings</strong> page. See <a href="../configuration/">Configuration</a>. For the firewall rules, see <a href="../router-setup/#firewall">Router setup</a>.</p></section>
 <nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../"><small>Previous</small>Introduction</a><a class="next" rel="next" href="../running-as-a-service/"><small>Next</small>Run as a service</a></nav></article>
 </div></main>
 <footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>

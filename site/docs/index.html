@@ -46,46 +46,46 @@
 </div></header>
 <main id="main" class="docs"><div class="wrap">
 <aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="./" aria-current="page">Introduction</a><ul class="sub"><li><a href="#what-it-is">What it is</a></li><li><a href="#parts">How the parts fit</a></li><li><a href="#requirements">What you need</a></li><li><a href="#limits">What it does not do</a></li><li><a href="#read-next">Where to start</a></li><li><a href="#origin">Where it comes from</a></li></ul></li><li><a href="installation/">Installation</a></li><li><a href="running-as-a-service/">Run as a service</a></li><li><a href="configuration/">Configuration</a></li><li><a href="first-login/">First login</a></li><li><a href="dashboard/">Dashboard</a></li><li><a href="router-setup/">Router setup</a></li><li><a href="hotspot-login-pages/">Hotspot login pages</a></li><li><a href="how-it-works/">How it works</a></li><li><a href="architecture/">Architecture</a></li><li><a href="backup-and-upgrade/">Backup and upgrade</a></li><li><a href="troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
-<article class="doc"><span class="kick">Documentation</span><h1>HotspotPlus Lite documentation</h1><p class="intro">HotspotPlus Lite keeps Wi-Fi accounts for a MikroTik hotspot on your own network. This is a short guide to what it is and how to start.</p>
+<article class="doc"><span class="kick">Documentation</span><h1>HotspotPlus Lite documentation</h1><p class="intro">HotspotPlus Lite keeps Wi-Fi accounts for a MikroTik hotspot on your own network. This page explains what it is and how to start.</p>
 <section><h2 id="what-it-is"><a href="#what-it-is">What it is</a></h2>
-<p>HotspotPlus Lite manages Wi-Fi accounts for <strong>one MikroTik hotspot router</strong>. You make <strong>plans</strong> (data, time, validity, speed, number of devices) and <strong>members</strong>, or you print a batch of <strong>vouchers</strong>. At every login the router asks the program, and the program says yes or no. While the member is online it counts the usage, and it can disconnect the member.</p>
+<p>HotspotPlus Lite manages Wi-Fi accounts for <strong>one MikroTik hotspot router</strong>. You make <strong>plans</strong> (data limit, time limit, validity period, speed limit, simultaneous devices) and <strong>members</strong>, or you print a batch of <strong>vouchers</strong>. At every login, the router asks the server and the server says yes or no. While the member is online, the server counts the usage and can disconnect the member.</p>
 <ul>
 <li>One program, one SQLite file. No cloud and no database server.</li>
-<li>A web admin panel for members, plans, vouchers, live sessions and usage.</li>
-<li>A built-in RADIUS server (PAP login) for the router.</li>
+<li>An admin panel in your browser for members, plans, vouchers, live sessions and usage.</li>
+<li>A built-in RADIUS server for the router, with PAP login. RADIUS is the protocol the router uses to ask the server about each login.</li>
 <li>Ready-made login pages for the router, in 8 designs.</li>
 </ul></section>
 <section><h2 id="parts"><a href="#parts">How the parts fit</a></h2>
 <ol class="steps">
-<li><b>The router</b> runs the hotspot and stores the login page. It sends each login and each accounting packet to the server by RADIUS.</li>
-<li><b>HotspotPlus Lite</b> runs on a computer on the same network. It answers RADIUS on UDP 1812 and 1813, serves the admin panel on TCP 8081, and keeps everything in one SQLite file.</li>
-<li><b>You</b> use the admin panel in a browser. Members only ever see the login page on the router.</li>
+<li><b>The router</b> runs the hotspot and stores the login page. It sends each login and each accounting packet (usage updates during a session) to the server by RADIUS.</li>
+<li><b>HotspotPlus Lite</b> runs on a computer on the same network. It answers RADIUS on UDP 1812 and UDP 1813 and serves the admin panel on TCP 8081. It keeps everything in one SQLite file.</li>
+<li><b>You</b> use the admin panel in a browser. Members see only the login page on the router.</li>
 </ol>
-<p>The page <a href="how-it-works/">How it works</a> explains each step. The README has diagrams (<a href="https://github.com/pysf/HotspotPlusLight#readme" rel="noopener">on GitHub</a>).</p></section>
+<p><a href="how-it-works/">How it works</a> explains each step. The README has diagrams (<a href="https://github.com/pysf/HotspotPlusLight#readme" rel="noopener">on GitHub</a>).</p></section>
 <section><h2 id="requirements"><a href="#requirements">What you need</a></h2>
 <ul>
-<li>A MikroTik router with the Hotspot feature already working.</li>
-<li>A computer that is always on, on the same network as the router: Linux, Windows or macOS (x86 or ARM).</li>
-<li>UDP 1812 and 1813 open from the router to that computer, and UDP 3799 open from that computer to the router. See <a href="router-setup/#firewall">Router setup</a>.</li>
+<li>A MikroTik router with the hotspot feature already working.</li>
+<li>A computer on the same network as the router that is always on. It can run Linux, Windows or macOS (x86 or ARM).</li>
+<li>UDP 1812 and UDP 1813 open from the router to that computer, and UDP 3799 open from that computer to the router. See <a href="router-setup/#firewall">Router setup</a>.</li>
 </ul><div class="note"><b>Local network only</b><p>The admin panel uses plain HTTP and has no HTTPS. Run it on your local network and do not make it reachable from the hotspot network or the internet.</p></div></section>
 <section><h2 id="limits"><a href="#limits">What it does not do</a></h2>
 <ul>
-<li>One router and one admin account. No multi-tenant mode.</li>
+<li>One router and one admin account. No multi-tenant mode (one install for many businesses).</li>
 <li>MikroTik routers only, and PAP login only. If the router uses CHAP, the server rejects the login.</li>
-<li>No payments, SMS, self-signup or plan choice by members.</li>
+<li>No payments and no SMS. Members cannot sign up or choose a plan by themselves.</li>
 <li>The admin panel and all messages are in English. You can translate the login page by hand.</li>
-<li>No HTTPS and no reverse proxy setup: it is made for a local network.</li>
+<li>No HTTPS and no reverse proxy setup. The server is made for a local network.</li>
 </ul></section>
 <section><h2 id="read-next"><a href="#read-next">Where to start</a></h2>
 <ol class="steps">
-<li><a href="installation/">Install</a> the program and start it once.</li>
-<li>Make it <a href="running-as-a-service/">run as a service</a>.</li>
-<li><a href="first-login/">Log in</a>, set a password, and create a plan and a member.</li>
-<li>Follow the <a href="router-setup/">router setup</a> and upload a <a href="hotspot-login-pages/">login page</a>.</li>
+<li>Install the program and start it once (see <a href="installation/">Installation</a>).</li>
+<li>Set it up as a service (see <a href="running-as-a-service/">Run as a service</a>).</li>
+<li>Log in, set a new password and create a plan and a member (see <a href="first-login/">First login</a>).</li>
+<li>Set up the router (see <a href="router-setup/">Router setup</a>) and upload a login page (see <a href="hotspot-login-pages/">Hotspot login pages</a>).</li>
 </ol>
-<p>Keep <a href="backup-and-upgrade/">backup and upgrade</a> and <a href="troubleshooting/">troubleshooting</a> close.</p></section>
+<p>Keep <a href="backup-and-upgrade/">Backup and upgrade</a> and <a href="troubleshooting/">Troubleshooting</a> close at hand.</p></section>
 <section><h2 id="origin"><a href="#origin">Where it comes from</a></h2>
-<p>HotspotPlus Lite is a rewrite of <a href="https://github.com/pysf/hotspotplus" rel="noopener">HotspotPlus</a>. It keeps the member, plan and quota rules and removes the infrastructure and the multi-tenant product around them. It is open source under the AGPL-3.0, and the code is on <a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a>.</p></section>
+<p>HotspotPlus Lite is a rewrite of <a href="https://github.com/pysf/hotspotplus" rel="noopener">HotspotPlus</a>. It keeps the rules for members, plans and limits. It removes the extra infrastructure and the multi-tenant product around them. It is open source under the AGPL-3.0. The code is on <a href="https://github.com/pysf/HotspotPlusLight" rel="noopener">GitHub</a>.</p></section>
 <nav class="pager" aria-label="Previous and next page"><span></span><a class="next" rel="next" href="installation/"><small>Next</small>Installation</a></nav></article>
 </div></main>
 <footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>
