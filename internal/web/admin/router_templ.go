@@ -45,7 +45,7 @@ func RouterPage(l ui.LayoutData, p RouterProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"l-gap-bottom\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -65,7 +65,7 @@ func RouterPage(l ui.LayoutData, p RouterProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p class=\"l-gap-bottom\">The login pages live on the router. Pick a design and download it as a zip. Unzip it, then drag the <code>hotspot</code> folder into Files on the router and replace the old one. On routers with flash storage the folder is <code>flash/hotspot</code>. Keep the hotspot profile on PAP (<code>login-by=http-pap</code>); if you turn on http-chap, logins fail.</p><p class=\"l-gap-bottom\">To change the heading, the subtitle or the logo, open <code>login.html</code> in a text editor. Comments in the file show where. To translate, change the text in the block called MESSAGES in <code>login.html</code>, the text in <code>errors.txt</code> and the labels in the other pages. The MikroTik default pages are the ones RouterOS ships. A failed login shows the raw code there, for example OUT_OF_BULK.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p>The login pages live on the router. Pick a design and download it as a zip. Unzip it, then drag the <code>hotspot</code> folder into Files on the router and replace the old one. On routers with flash storage the folder is <code>flash/hotspot</code>. Keep the hotspot profile on PAP (<code>login-by=http-pap</code>); if you turn on http-chap, logins fail.</p><p>To change the heading, the subtitle or the logo, open <code>login.html</code> in a text editor. Comments in the file show where. To translate, change the text in the block called MESSAGES in <code>login.html</code>, the text in <code>errors.txt</code> and the labels in the other pages. The MikroTik default pages are the ones RouterOS ships. A failed login shows the raw code there, for example OUT_OF_BULK.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -75,7 +75,7 @@ func RouterPage(l ui.LayoutData, p RouterProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><section class=\"l-gap-bottom\" aria-label=\"Page designs\"><div class=\"l-grid\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><section class=\"l-stack\" aria-label=\"Page designs\"><div class=\"l-grid\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -113,27 +113,27 @@ func RouterPage(l ui.LayoutData, p RouterProps) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p class=\"u-muted l-gap-bottom\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p class=\"u-muted\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(d.About)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/router.templ`, Line: 31, Col: 48}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/router.templ`, Line: 31, Col: 35}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</p><iframe class=\"c-pack-frame l-gap-bottom\" loading=\"lazy\" tabindex=\"-1\" title=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</p><iframe class=\"c-pack-frame\" loading=\"lazy\" tabindex=\"-1\" title=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.Title + " preview").Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/router.templ`, Line: 32, Col: 106}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/router.templ`, Line: 32, Col: 93}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 					if templ_7745c5c3_Err != nil {
@@ -146,7 +146,7 @@ func RouterPage(l ui.LayoutData, p RouterProps) templ.Component {
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(previewURL(d.Key)).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/router.templ`, Line: 32, Col: 132}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/router.templ`, Line: 32, Col: 119}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 					if templ_7745c5c3_Err != nil {
@@ -193,7 +193,7 @@ func RouterPage(l ui.LayoutData, p RouterProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div></section><div class=\"l-gap-bottom\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div></section><div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -213,7 +213,7 @@ func RouterPage(l ui.LayoutData, p RouterProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<p class=\"l-gap-bottom\">Paste this into a RouterOS terminal. It contains the RADIUS shared secret, so do not share it. Each command is marked VERIFY-ON-HARDWARE until it has been checked on your router.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<p>Paste this into a RouterOS terminal. It contains the RADIUS shared secret, so do not share it. Each command is marked VERIFY-ON-HARDWARE until it has been checked on your router.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

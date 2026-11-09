@@ -1,24 +1,68 @@
-/* Data table. At small widths rows become cards (rules in layout.css, labels from data-label). */
+/* Data table. Under 700 px each row becomes a card: data-label on a cell prints its label.
+   The select cell (data-slot="select") sits left, the first other cell is the main one, the actions cell sits right. */
 @layer components {
-  .c-table-wrap { margin-block-end: var(--s-4); overflow-x: auto; }
-  .c-table { inline-size: 100%; }
+  .c-table-wrap { overflow-x: auto; }
+  .c-table { inline-size: 100%; border-collapse: collapse; }
   .c-table th {
-    padding: calc(var(--cell-y) - var(--s-1)) var(--cell-x);
-    border-block-end: 1px solid var(--line);
-    color: var(--muted);
-    font-size: var(--fs-small);
-    font-weight: var(--fw-medium);
+    padding: var(--s-3) var(--s-4);
+    border-block-end: 1px solid var(--c-line);
+    background: var(--c-surface-2);
+    color: var(--c-text-3);
+    font-size: var(--fs-xs);
+    font-weight: var(--fw-semibold);
+    letter-spacing: .03em;
     text-align: start;
     white-space: nowrap;
   }
   .c-table td {
-    padding: var(--cell-y) var(--cell-x);
-    border-block-end: 1px solid var(--line);
+    padding: var(--s-3) var(--s-4);
+    border-block-end: 1px solid var(--c-line);
     vertical-align: middle;
   }
-  .c-table tbody tr { transition: background var(--ease); }
-  .c-table tbody tr:hover { background: var(--elev); }
   .c-table tbody tr:last-child td { border-block-end: 0; }
-  .c-table td[data-slot="actions"] { text-align: end; inline-size: var(--w-act); }
-  .c-table__sub { margin-block-start: 1px; color: var(--muted); font-size: var(--fs-small); }
+  .c-table tbody tr:hover, .c-table tbody tr.is-hover { background: var(--c-surface-2); }
+  .c-table tbody tr[aria-selected="true"], .c-table tbody tr:has(.c-check:checked) { background: var(--c-accent-soft); }
+  .c-table td[data-slot="select"] { inline-size: var(--w-chk); padding-inline-end: 0; }
+  .c-table td[data-slot="actions"] { inline-size: var(--w-act); text-align: end; }
+  .c-table__sub { display: block; margin-block-start: 1px; color: var(--c-text-3); font-size: var(--fs-sm); font-weight: 400; }
+  .c-table td, .c-table__sub { overflow-wrap: anywhere; }
+
+  .c-bulk {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    padding: 10px 10px 10px 20px;
+    border: 1px solid var(--c-line-strong);
+    border-radius: var(--r-lg);
+    background: var(--c-surface);
+    box-shadow: var(--sh-2);
+  }
+  .c-bulk > b { margin-inline-end: auto; }
+
+  @media (max-width: 699px) {
+    .c-table thead { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .c-table, .c-table tbody { display: block; }
+    .c-table tr {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--s-2) var(--s-1);
+      align-items: center;
+      padding: var(--s-2) var(--s-3) 14px;
+      border-block-end: 1px solid var(--c-line);
+    }
+    .c-table tr:has(> td[data-slot="select"]) { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .c-table tbody tr:last-child { border-block-end: 0; }
+    .c-table td { display: block; grid-column: 1 / -1; padding: 0 var(--s-1); border: 0; }
+    .c-table td[data-label]::before { content: attr(data-label); display: inline-block; inline-size: var(--w-label); color: var(--c-text-3); font-size: var(--fs-sm); font-weight: 400; }
+    .c-table .c-meter { display: inline-block; inline-size: 40%; min-inline-size: var(--w-meter); margin-inline-end: var(--s-2); vertical-align: middle; }
+    .c-table__sub { display: inline; margin-inline-start: var(--s-2); }
+    .c-table td[data-slot="select"] { grid-column: 1; grid-row: 1; inline-size: auto; padding: 0; }
+    .c-table td[data-slot="actions"] { grid-column: -2; grid-row: 1; inline-size: auto; padding: 0; justify-self: end; }
+    .c-table td:first-child:not([data-slot]), .c-table td[data-slot="select"] + td { grid-column: 1; grid-row: 1; }
+    .c-table td:first-child:not([data-slot]) .c-table__sub, .c-table td[data-slot="select"] + td .c-table__sub { display: block; margin-inline-start: 0; }
+    .c-table tr:has(> td[data-slot="select"]) td[data-slot="select"] + td { grid-column: 2; }
+    .c-table td:first-child:not([data-slot])::before, .c-table td[data-slot="select"] + td::before { content: none; }
+    .c-table-wrap { overflow: visible; }
+  }
 }

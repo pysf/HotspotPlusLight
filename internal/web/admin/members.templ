@@ -112,7 +112,7 @@ templ MembersPage(l ui.LayoutData, p MembersProps) {
 			@ui.Select(ui.SelectProps{Label: "Page size", Name: "per", Value: strconv.Itoa(p.Result.Per), Options: pageSizeOptions()})
 			@MemberChips(p, false)
 		}
-		<div id="member-list" aria-live="polite" aria-busy="false">
+		<div id="member-list" class="l-flow" aria-live="polite" aria-busy="false">
 			@MemberListBody(p)
 		</div>
 		@ui.SheetHost("sheet")
@@ -130,13 +130,13 @@ templ MemberListBody(p MembersProps) {
 	if p.Result.Total == 0 {
 		@ui.EmptyState("No members match.")
 	} else {
-		<form id="bulk-form" data-bulk-guard hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML">
+		<form id="bulk-form" class="l-flow" data-bulk-guard hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML">
 			<input type="hidden" name="q" value={ p.Filter.Query }/>
 			<input type="hidden" name="plan" value={ planFilterValue(p.Filter.PlanID) }/>
 			<input type="hidden" name="status" value={ p.Filter.Status }/>
 			<div class="l-toolbar">
-				<label class="c-check"><input type="checkbox" data-select-all="#bulk-form input[name=id]"/> Select all on this page</label>
-				<label class="c-check" data-select-all-results><input type="checkbox" name="all_results" value="1"/> Select all { strconv.Itoa(p.Result.Total) } results of this filter</label>
+				<label class="c-choice"><span class="c-hit"><input type="checkbox" class="c-check" data-select-all="#bulk-form input[name=id]"/></span> Select all on this page</label>
+				<label class="c-choice" data-select-all-results><span class="c-hit"><input type="checkbox" class="c-check" name="all_results" value="1"/></span> Select all { strconv.Itoa(p.Result.Total) } results of this filter</label>
 				@ui.Button("danger", "Delete selected", templ.Attributes{"type": "submit"})
 			</div>
 			<div id="bulk-result"></div>
@@ -149,7 +149,7 @@ templ MemberListBody(p MembersProps) {
 				}
 			}
 		</form>
-		@ui.Pagination(ui.PageProps{Page: p.Result.Page, Pages: p.Result.Pages, Href: listHref(p.Filter, p.Result.Per), Target: "#" + listID})
+		@ui.Pagination(ui.PageProps{Page: p.Result.Page, Pages: p.Result.Pages, Href: listHref(p.Filter, p.Result.Per), Target: "#" + listID, Total: p.Result.Total, Per: p.Result.Per})
 	}
 	@ui.Refresher(p.URL, membersChanged, "#"+listID)
 }
@@ -165,7 +165,7 @@ templ UsageCells(m memberVM) {
 // MemberRow is one row of the members list.
 templ MemberRow(m memberVM) {
 	<tr data-member data-id={ strconv.FormatInt(m.ID, 10) } data-username={ m.Username } data-status={ m.Status } data-verdict={ m.VerdictCode } data-online={ strconv.FormatBool(m.Online) }>
-		<td data-slot="select"><input type="checkbox" aria-label="Select" name="id" value={ strconv.FormatInt(m.ID, 10) }/></td>
+		<td data-slot="select"><span class="c-hit"><input type="checkbox" class="c-check" aria-label="Select" name="id" value={ strconv.FormatInt(m.ID, 10) }/></span></td>
 		<td data-label="User">
 			<a href={ templ.SafeURL(memberURL(m.ID)) }>{ m.Username }</a>
 			if m.Mobile != "" {
@@ -402,7 +402,7 @@ templ MemberCreated(c createdVM) {
 // MemberStatus is the plan / status / online line. With oob it is sent as an
 // out-of-band swap, so a kick response refreshes it next to the flash.
 templ MemberStatus(m memberVM, oob bool) {
-	<p id="member-status" class="u-muted l-gap-bottom" { oobAttrs(oob)... }>
+	<p id="member-status" class="u-muted" { oobAttrs(oob)... }>
 		Plan { m.PlanName } · status { m.Status }
 		if m.Online {
 			· online
@@ -439,13 +439,13 @@ templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 					if m.UnlimitedData {
 						<p class="u-muted">This plan has unlimited data.</p>
 					} else {
-						<p class="l-gap-bottom">Current extra data: <strong class="u-nums" data-extra-bulk>{ m.ExtraBulk }</strong></p>
+						<p>Current extra data: <strong class="u-nums" data-extra-bulk>{ m.ExtraBulk }</strong></p>
 						@ExtraBulkFormView(ExtraBulkProps{URL: memberURL(m.ID) + "/extra-bulk", Value: m.ExtraBulkValue, Unit: m.PlanUnit})
 					}
 				}
 				@ui.Card() {
 					@ui.CardTitle("Password")
-					<div id="password-view" class="l-gap-bottom">
+					<div id="password-view">
 						@ui.Button("secondary", "Reveal", templ.Attributes{"type": "button", "hx-get": memberURL(m.ID) + "/password", "hx-target": "#password-view", "hx-swap": "innerHTML"})
 					</div>
 					<form class="l-stack" hx-put={ memberURL(m.ID) + "/password" } hx-target="#password-view" hx-swap="innerHTML">
@@ -494,7 +494,7 @@ templ PasswordShown(pw string) {
 
 // BulkConfirm is the delete confirmation: it carries the selection and confirmed=1 back to the same route.
 templ BulkConfirm(st member.BulkStats, sel url.Values) {
-	<form id="bulk-confirm" class="c-card c-form l-gap-bottom" hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML">
+	<form id="bulk-confirm" class="c-card c-form" hx-post="/admin/members/bulk-delete" hx-target="#bulk-result" hx-swap="innerHTML">
 		<p>
 			Delete <strong data-confirm-members>{ strconv.Itoa(st.Members) }</strong> members?
 			<strong data-confirm-online>{ strconv.Itoa(st.Online) }</strong> of them are online and will be disconnected first.
@@ -516,5 +516,5 @@ templ BulkConfirm(st member.BulkStats, sel url.Values) {
 // DeletedNotice reports a delete whose Disconnect-Requests partly failed (BR-18, BR-23).
 templ DeletedNotice(res member.DeleteResult, backURL, backLabel string) {
 	@ui.Flash("warn", fmt.Sprintf("Deleted %d members. %d of %d open sessions could not be disconnected.", res.Deleted, res.Kick.Failed, res.Kick.Attempted))
-	<p class="l-gap-bottom"><a href={ templ.SafeURL(backURL) }>{ backLabel }</a></p>
+	<p><a href={ templ.SafeURL(backURL) }>{ backLabel }</a></p>
 }

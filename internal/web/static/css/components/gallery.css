@@ -1,6 +1,26 @@
-/* Page design cards (router page), and the dev component gallery. */
+/* Router page design cards, the plan card and thumbnail, the settings group, and the dev component gallery. */
 @layer components {
-  .c-pack-frame { display: block; inline-size: 100%; block-size: var(--h-pack-frame); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--panel); pointer-events: none; }
-  .c-gallery-item { display: grid; gap: var(--s-2); padding-block: var(--s-4); border-block-end: 1px solid var(--line); }
-  .c-gallery-item > h3 { color: var(--muted); font-size: var(--fs-small); font-weight: var(--fw-medium); }
+  .c-pack-frame { display: block; inline-size: 100%; block-size: var(--h-pack-frame); border: 1px solid var(--c-line); border-radius: var(--r-lg); background: var(--c-surface); pointer-events: none; }
+
+  .c-plan { display: grid; gap: var(--s-4); align-content: start; }
+  .c-plan dl { display: grid; }
+  .c-plan dl > div { display: flex; justify-content: space-between; gap: var(--s-3); padding-block: 9px; border-block-start: 1px solid var(--c-line); font-size: var(--fs-sm); }
+  .c-plan dt { color: var(--c-text-2); }
+  .c-plan dd { font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; text-align: end; }
+  .c-plan[aria-current="true"] { border-color: var(--c-accent); box-shadow: 0 0 0 1px var(--c-accent), var(--sh-1); }
+
+  .c-thumb { display: grid; place-items: center; aspect-ratio: 4 / 3; padding: var(--s-3); border: 1px solid var(--c-line); border-radius: var(--r-md); background: var(--c-fill); }
+  .c-thumb__card { display: grid; gap: 5px; inline-size: 62%; padding: 10px; border-radius: var(--r-sm); background: var(--c-surface); box-shadow: var(--sh-1); }
+  .c-thumb__card > i { display: block; block-size: 5px; border-radius: 3px; background: var(--c-fill-2); }
+  .c-thumb__card > i:first-child { inline-size: 40%; background: var(--c-text-3); }
+  .c-thumb__card > i[data-btn] { block-size: 9px; margin-block-start: 3px; background: var(--c-accent); }
+
+  .c-setting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--s-5); }
+  .c-setting > header p { margin-block-start: var(--s-1); color: var(--c-text-2); font-size: var(--fs-sm); }
+  @media (max-width: 999px) {
+    .c-setting { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .c-gallery-item { display: grid; gap: var(--s-2); padding-block: var(--s-4); border-block-end: 1px solid var(--c-line); }
+  .c-gallery-item > h3 { color: var(--c-text-3); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 }

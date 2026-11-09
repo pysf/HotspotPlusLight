@@ -19,9 +19,12 @@ templ DevComponentsPage(l ui.LayoutData) {
 		@galleryItem("Button") {
 			@ui.Button("secondary", "Default", nil)
 			@ui.Button("primary", "Primary", nil)
-			@ui.Button("danger", "Danger", nil)
+			@ui.Button("danger", "Delete (soft)", nil)
+			@ui.Button("danger-solid", "Kick device", nil)
 			@ui.Button("ghost", "Ghost", nil)
 			@ui.Button("secondary", "Disabled", templ.Attributes{"disabled": true})
+			@ui.Button("primary", "Loading", templ.Attributes{"data-loading": true})
+			@ui.Button("secondary", "Small", templ.Attributes{"data-size": "sm"})
 			@ui.LinkButton("secondary", "#", "Link button", nil)
 		}
 		@galleryItem("Button, block") {
@@ -31,8 +34,9 @@ templ DevComponentsPage(l ui.LayoutData) {
 		}
 		@galleryItem("Icon button") {
 			@ui.IconButton("plus", "Add", nil)
-			@ui.IconButton("close", "Close", nil)
+			@ui.IconButton("x", "Close", nil)
 			@ui.IconButton("copy", "Copy", nil)
+			@ui.IconButton("more", "Disabled", templ.Attributes{"disabled": true})
 		}
 		@galleryItem("Field, input, select") {
 			<div class="l-stack l-narrow">
@@ -40,6 +44,27 @@ templ DevComponentsPage(l ui.LayoutData) {
 				@ui.Field(ui.FieldProps{Label: "With error", Name: "g_err", Value: "x", Error: "This value is not valid."})
 				@ui.Select(ui.SelectProps{Label: "Plan", Name: "g_plan", Value: "b", Options: []ui.Option{{Value: "a", Label: "Basic"}, {Value: "b", Label: "Premium"}}})
 				@ui.Checkbox(ui.CheckboxProps{Label: "Active", Name: "g_active", Checked: true})
+			</div>
+		}
+		@galleryItem("Checkbox, switch, segmented control") {
+			<label class="c-choice"><span class="c-hit"><input type="checkbox" class="c-check"/></span> Off</label>
+			<label class="c-choice"><span class="c-hit"><input type="checkbox" class="c-check" checked/></span> On</label>
+			<label class="c-choice"><span class="c-hit"><input type="checkbox" class="c-check" checked disabled/></span> Disabled</label>
+			<label class="c-choice"><input type="checkbox" class="c-switch" role="switch"/> Off</label>
+			<label class="c-choice"><input type="checkbox" class="c-switch" role="switch" checked/> On</label>
+			<label class="c-choice"><input type="checkbox" class="c-switch" role="switch" disabled/> Disabled</label>
+			<span class="c-seg" role="radiogroup" aria-label="Range">
+				<button type="button" role="radio" aria-checked="false">7</button>
+				<button type="button" role="radio" aria-checked="true">30</button>
+				<button type="button" role="radio" aria-checked="false">90</button>
+			</span>
+		}
+		@galleryItem("Input states") {
+			<div class="l-stack l-narrow">
+				<input class="c-input is-hover" value="Hover" aria-label="Hover"/>
+				<input class="c-input is-focus" value="Focus" aria-label="Focus"/>
+				<input class="c-input" value="Disabled" aria-label="Disabled" disabled/>
+				<input class="c-input" value="Error" aria-label="Error" aria-invalid="true"/>
 			</div>
 		}
 		@galleryItem("Search") {
@@ -57,14 +82,18 @@ templ DevComponentsPage(l ui.LayoutData) {
 			@ui.Flash("ok", "Saved.")
 			@ui.Flash("warn", "Check this.")
 			@ui.Flash("error", "Something failed.")
+			@ui.Flash("info", "Good to know.")
 		}
 		@galleryItem("Pill and online dot") {
 			@ui.Pill("active", "Active")
 			@ui.Pill("expiring", "Expiring")
 			@ui.Pill("expired", "Expired")
 			@ui.Pill("disabled", "Disabled")
+			@ui.Pill("info", "Info")
 			@ui.OnlineDot(true)
 			@ui.OnlineDot(false)
+			@ui.LiveStatus("Live, updated 4 s ago")
+			<span class="c-badge u-nums">24</span>
 		}
 		@galleryItem("Meter") {
 			<div class="l-narrow">
@@ -121,22 +150,52 @@ templ DevComponentsPage(l ui.LayoutData) {
 			}
 		}
 		@galleryItem("Pager") {
-			@ui.Pagination(ui.PageProps{Page: 2, Pages: 5, Href: galleryHref})
+			@ui.Pagination(ui.PageProps{Page: 2, Pages: 5, Href: galleryHref, Total: 48, Per: 10})
 		}
-		@galleryItem("Empty") {
+		@galleryItem("Empty, skeleton") {
 			@ui.EmptyState("Nothing here yet.")
+			<div class="c-card l-stack" data-pad aria-busy="true">
+				<div class="c-skel" data-w="40"></div>
+				<div class="c-skel"></div>
+				<div class="c-skel" data-w="80"></div>
+				<div class="c-skel" data-size="lg"></div>
+			</div>
+		}
+		@galleryItem("List rows, key and value, steps") {
+			<div class="c-card l-narrow" data-pad>
+				<h3 class="c-group-title">Expiring soon</h3>
+				<div class="c-li">
+					<span class="c-icon-circle" data-tone="warn">
+						@ui.IconAs("clock", "s", "")
+					</span>
+					<div class="u-grow">
+						<b>room204</b>
+						<small>Premium 10 GB</small>
+					</div>
+					@ui.Pill("expiring", "2 days left")
+				</div>
+				<dl class="c-kv">
+					<div><dt>Last login request</dt><dd>12 s ago</dd></div>
+					<div><dt>Last accounting packet</dt><dd>8 s ago</dd></div>
+				</dl>
+				<ol class="c-steps">
+					<li>Download the pages.</li>
+					<li>Upload them to the router.</li>
+				</ol>
+			</div>
 		}
 		@galleryItem("Menu, sheet, modal, toast") {
 			@ui.Menu("g-menu", "More") {
-				@ui.MenuItem("Edit", false, nil)
-				@ui.MenuItem("Renew", false, nil)
+				@ui.MenuItemIcon("edit", "Edit", false, nil)
+				@ui.MenuItemIcon("clock", "Renew", false, nil)
 				@ui.MenuSep()
-				@ui.MenuItem("Delete", true, nil)
+				@ui.MenuItemIcon("trash", "Delete", true, nil)
 			}
 			@ui.Button("secondary", "Open sheet", templ.Attributes{"data-open-dialog": "g-sheet"})
 			@ui.Button("secondary", "Open modal", templ.Attributes{"data-open-dialog": "g-modal"})
 			@ui.Button("secondary", "Confirm (hx-confirm)", templ.Attributes{"hx-get": "/admin/dev/components", "hx-confirm": "Do the thing?", "hx-swap": "none"})
 			@ui.Button("secondary", "Show toast", templ.Attributes{"data-toast": "Saved."})
+			@ui.Button("secondary", "Show error toast", templ.Attributes{"data-toast": "Could not save. Try again.", "data-toast-kind": "error"})
 		}
 		@galleryItem("Credentials") {
 			<div class="l-narrow">
@@ -169,7 +228,7 @@ templ DevComponentsPage(l ui.LayoutData) {
 			}
 		}
 		@galleryItem("Icons") {
-			for _, n := range []string{"home", "users", "ticket", "wifi", "chart", "layers", "router", "settings", "logout", "menu", "search", "plus", "more", "sun", "close", "copy", "check"} {
+			for _, n := range []string{"home", "users", "wifi", "layers", "ticket", "chart", "router", "settings", "key", "sun", "moon", "logout", "more", "check-circle", "clock", "alert", "arrow-down", "arrow-up", "chevron-right", "chevron-left", "chevron-down", "printer", "plus", "eye", "wand", "trash", "copy", "x", "slash", "search", "power", "info", "edit", "download", "circle"} {
 				@ui.Icon(n)
 			}
 		}

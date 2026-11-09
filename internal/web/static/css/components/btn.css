@@ -1,26 +1,53 @@
-/* Button or link-button. data-variant: default | primary | danger | ghost. data-size="block" = full width. */
+/* Button or link-button. data-variant: default | primary | ghost | danger (soft) | danger-solid.
+   data-size: sm | block. A running htmx request or data-loading shows a spinner and blocks clicks. */
 @layer components {
   .c-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--s-2);
-    block-size: var(--h-btn);
+    min-block-size: var(--ctl);
     padding-inline: var(--btn-pad-x);
-    border: 1px solid var(--line-strong);
-    border-radius: var(--r-btn);
-    background: var(--elev);
-    color: var(--text);
-    font-weight: var(--fw-medium);
+    border: 0;
+    border-radius: var(--r-pill);
+    background: var(--c-fill);
+    color: var(--c-text);
+    font-size: var(--fs-md);
+    font-weight: var(--fw-semibold);
+    line-height: 1;
     white-space: nowrap;
-    transition: border-color var(--ease), background var(--ease), color var(--ease);
+    text-decoration: none;
+    transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
   }
-  .c-btn:hover { border-color: var(--faint); text-decoration: none; }
-  .c-btn[data-variant="primary"] { background: var(--accent); border-color: transparent; color: var(--on-accent); }
-  .c-btn[data-variant="primary"]:hover { filter: brightness(var(--brightness-hover)); }
-  .c-btn[data-variant="danger"] { color: var(--bad); }
-  .c-btn[data-variant="ghost"] { background: none; border-color: transparent; color: var(--muted); }
-  .c-btn[data-variant="ghost"]:hover { color: var(--text); }
-  .c-btn[data-size="block"] { inline-size: 100%; block-size: var(--h-btn-block); }
-  .c-btn:disabled, .c-btn[aria-disabled="true"], .c-btn.htmx-request { opacity: var(--opacity-disabled); pointer-events: none; }
+  .c-btn:hover, .c-btn.is-hover { background: var(--c-fill-2); text-decoration: none; }
+  .c-btn:active { transform: scale(.98); }
+
+  .c-btn[data-variant="primary"] { background: var(--c-accent); color: var(--c-accent-fg); }
+  .c-btn[data-variant="primary"]:hover, .c-btn[data-variant="primary"].is-hover { background: var(--c-accent-hover); }
+  a.c-btn[data-variant="primary"] { color: var(--c-accent-fg); }
+
+  .c-btn[data-variant="ghost"] { background: transparent; }
+  .c-btn[data-variant="ghost"]:hover, .c-btn[data-variant="ghost"].is-hover { background: var(--c-fill); }
+
+  .c-btn[data-variant="danger"] { background: var(--st-bad-bg); color: var(--st-bad-fg); }
+  .c-btn[data-variant="danger"]:hover, .c-btn[data-variant="danger"].is-hover { background: var(--st-bad-bg); box-shadow: inset 0 0 0 1.5px var(--st-bad-dot); }
+
+  .c-btn[data-variant="danger-solid"] { background: var(--c-danger); color: var(--c-danger-fg); }
+  .c-btn[data-variant="danger-solid"]:hover, .c-btn[data-variant="danger-solid"].is-hover { background: var(--c-danger-hover); }
+
+  .c-btn[data-size="sm"] { min-block-size: var(--h-btn-sm); padding-inline: var(--btn-pad-x-sm); font-size: var(--fs-sm); }
+  .c-btn[data-size="block"] { inline-size: 100%; }
+
+  .c-btn:disabled, .c-btn[aria-disabled="true"] { opacity: var(--opacity-disabled); cursor: not-allowed; transform: none; }
+  .c-btn.htmx-request, .c-btn[data-loading] { pointer-events: none; }
+  .c-btn.htmx-request::before, .c-btn[data-loading]::before {
+    content: "";
+    inline-size: var(--size-ic-pill);
+    block-size: var(--size-ic-pill);
+    border: 2px solid currentColor;
+    border-inline-end-color: transparent;
+    border-radius: 50%;
+    animation: c-spin .7s linear infinite;
+  }
+  @keyframes c-spin { to { transform: rotate(360deg); } }
 }

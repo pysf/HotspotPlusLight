@@ -51,7 +51,7 @@ templ PlansPage(l ui.LayoutData, plans []domain.Plan) {
 		@ui.PageHeader("Plans") {
 			@ui.LinkButton("primary", "/admin/plans/new", "New plan", sheetOpen("/admin/plans/new"))
 		}
-		<div id="plan-list" aria-live="polite" aria-busy="false">
+		<div id="plan-list" class="l-flow" aria-live="polite" aria-busy="false">
 			@PlanListBody(plans)
 		</div>
 		@ui.SheetHost("sheet")
@@ -113,7 +113,7 @@ type PlanFormProps struct {
 	Errors  domain.FieldErrors
 	Action  string // "post" or "put"
 	URL     string
-	Members int // members using the plan (edit only)
+	Members int  // members using the plan (edit only)
 	Sheet   bool // shown in the sheet: targets the sheet body, no card
 }
 

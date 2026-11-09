@@ -1,0 +1,44 @@
+# Plan: apply the new admin design (started 2026-11-09)
+
+Source of the design: `docs/design/` (boards + `hp.css`; see its README). The production CSS is
+our own port in `internal/web/static/css/`. Rule from the owner: apply the design with ALL its
+details, unless the design is wrong for the product.
+
+## Allowed deviations from the design
+1. Class names keep the `c-` prefix.
+2. Usage bars stay on the native `<meter>` (no `pct-N` classes).
+3. `@media` queries (phone < 700 px, icon rail < 1000 px), not container queries.
+4. Status tokens are `--st-*` (our spacing tokens are `--s-N`).
+5. Product facts win where the design is wrong:
+   - the Router page has the MikroTik default plus 7 themes (not "eight pages: login, alogin, ...");
+   - "over quota" is not a member status (it is a Needs attention item on the dashboard);
+   - brand text is "HotspotPlus Lite".
+
+## Steps
+Each step: a sonnet agent builds it (tests first where logic changes), a separate sonnet agent
+reviews it (`code-review` at high), real findings are fixed, then commit `Design vN: ...`.
+Checks: `go run github.com/a-h/templ/cmd/templ@v0.3.1100 generate`, `gofmt -l .`, `go vet ./...`,
+`GOOS=windows go vet ./...`, `go test -race -count=1 ./internal/... ./cmd/...`, then the owner
+(or the orchestrator) runs `go test ./e2e`. Update the e2e selectors only when the design forces
+it, and keep each test's intent. No inline style or script (CSP).
+
+| Step | Scope | State |
+|---|---|---|
+| 1 | Tokens, system fonts, shared components, app shell (side bar, top bar, phone tab bar with More), icon sprite, theme (cookie `light`/`dark`/auto), component gallery | built, review pending (branch `design-v2`) |
+| 2 | Login, Set new password (rules list), Dashboard (tiles, Needs attention, Router link, 3 charts, Live dot, 10 s refresh without jumps) | todo |
+| 3 | Members list (chips, bulk bar, stacked cards on phone), Add/edit sheet, credentials card, row menus | todo |
+| 4 | Plans (cards + edit form, delete-blocked reason), Online sessions (kick + confirm) | todo |
+| 5 | Vouchers/batches (form, list, A4 print sheet 3x6), Usage (7/30/90 switch, chart, top 10) | todo |
+| 6 | Router (8 download cards, script, link status) and Settings (grouped form) | todo |
+
+## Known notes from step 1
+- No max page width in the design: check tables at 1920 px.
+- Phone table cells: the Usage cell layout is awkward; redo in step 3.
+- The dashboard fade (`swap-in`) also plays on the first load; limit it to htmx swaps.
+- The Online badge shows only when the count is above 0; the router footer says "Router connected"
+  only if a packet came in the last 5 minutes.
+- Not looked at in a browser yet: the More menu, sheets, filled member rows.
+
+## Other open work (not design)
+Router login bug (reply leaves, router times out; see `docs/radius-reply-bug.md`), Group C items in
+`docs/review-findings.md`, GitHub Pages setup, hardware lab checks (`PLAN.md` section 13).

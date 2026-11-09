@@ -1,12 +1,25 @@
+/* Icons come from the sprite in the base layout: <svg class="c-icon"><use href="#i-name"/></svg>. */
 @layer components {
+  .c-sprite { position: absolute; inline-size: 0; block-size: 0; overflow: hidden; }
   .c-icon {
     flex: none;
-    inline-size: var(--size-icon);
-    block-size: var(--size-icon);
+    inline-size: var(--size-ic);
+    block-size: var(--size-ic);
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.7;
+    stroke-width: 1.75;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+  .c-icon[data-size="s"] { inline-size: var(--size-ic-s); block-size: var(--size-ic-s); }
+  .c-icon[data-size="l"] { inline-size: var(--size-ic-l); block-size: var(--size-ic-l); }
+
+  /* The theme button shows the moon in light mode and the sun in dark mode (the icon of the mode you switch to). */
+  .c-theme-sun { display: none; }
+  :root[data-theme="dark"] .c-theme-sun { display: inline; }
+  :root[data-theme="dark"] .c-theme-moon { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) .c-theme-sun { display: inline; }
+    :root:not([data-theme="light"]):not([data-theme="dark"]) .c-theme-moon { display: none; }
   }
 }

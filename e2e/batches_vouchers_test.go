@@ -509,11 +509,11 @@ func TestE7_10_BatchList(t *testing.T) {
 	if href := ra.Find("a[data-reprint]").AttrOr("href", ""); href != bpath(a)+"/vouchers" {
 		t.Errorf("reprint href %q", href)
 	}
-	// Navigation has a Batches item.
-	if d.Find(`nav a[href="/admin/batches"]`).Length() != 1 {
-		t.Error("no Batches nav item")
+	// Navigation has a Vouchers item (the batches page).
+	if d.Find(`#sidebar a[href="/admin/batches"]`).Length() != 1 {
+		t.Error("no Vouchers nav item")
 	}
-	if d.Find(`nav a[href="/admin/batches"][aria-current="page"]`).Length() != 1 {
+	if d.Find(`#sidebar a[href="/admin/batches"][aria-current="page"]`).Length() != 1 {
 		t.Error("Batches is not the active item on its own page")
 	}
 

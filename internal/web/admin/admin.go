@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
@@ -190,6 +191,9 @@ func Handler(d Deps) http.Handler {
 	return r
 }
 
+// routerRecent is how long after its last packet the router still counts as connected.
+const routerRecent = 5 * time.Minute
+
 // pageEnv puts the theme, the asset URLs and the business name into the request context for ui.Layout.
 func (h handlers) pageEnv(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -207,9 +211,37 @@ func (h handlers) pageEnv(next http.Handler) http.Handler {
 			} else {
 				env.BusinessName = st.BusinessName
 			}
+			h.shellStatus(r, &env)
 		}
 		next.ServeHTTP(w, r.WithContext(ui.WithEnv(r.Context(), env)))
 	})
+}
+
+// shellStatus fills the parts of the page frame that show live facts: the date, the online count and the
+// router state. Only a request with a session cookie gets them, so the login page costs nothing extra.
+// A failed read leaves them hidden.
+func (h handlers) shellStatus(r *http.Request, env *ui.Env) {
+	if _, err := r.Cookie(cookieName); err != nil {
+		return
+	}
+	if h.Sessions != nil {
+		if v, err := h.Sessions.Online(r.Context(), 1, 1); err != nil {
+			slog.Warn("admin: read the online count for the side bar", "err", err)
+		} else {
+			env.Online = v.Total
+			if v.Loc != nil {
+				env.Today = v.Now.In(v.Loc).Format("Monday 2 January")
+			}
+		}
+	}
+	if h.Link != nil {
+		snap := h.Link.Snapshot()
+		last := snap.AccessRequest.At
+		if snap.Accounting.At.After(last) {
+			last = snap.Accounting.At
+		}
+		env.RouterUp = !last.IsZero() && time.Since(last) < routerRecent
+	}
 }
 
 // devComponents serves the component gallery. It is a 404 unless HSP_DEV=1.
@@ -229,16 +261,16 @@ func noStore(next http.Handler) http.Handler {
 	})
 }
 
-// nav is the sidebar menu.
+// nav is the side bar menu. Tab is the label in the phone tab bar; links without one sit in "More".
 var nav = []ui.NavItem{
-	{Label: "Dashboard", Href: dashboardHome, Group: "Manage", Icon: "home"},
-	{Label: "Members", Href: "/admin/members", Group: "Manage", Icon: "users"},
-	{Label: "Batches", Href: batchesHome, Group: "Manage", Icon: "ticket"},
-	{Label: "Online", Href: sessionsHome, Group: "Manage", Icon: "wifi"},
-	{Label: "Usage", Href: usageHome, Group: "Manage", Icon: "chart"},
-	{Label: "Plans", Href: "/admin/plans", Group: "Setup", Icon: "layers"},
-	{Label: "Router", Href: "/admin/router", Group: "Setup", Icon: "router"},
-	{Label: "Settings", Href: "/admin/settings", Group: "Setup", Icon: "settings"},
+	{Label: "Dashboard", Href: dashboardHome, Icon: "home", Tab: "Home"},
+	{Label: "Members", Href: "/admin/members", Icon: "users", Tab: "Members"},
+	{Label: "Online now", Href: sessionsHome, Icon: "wifi", Tab: "Online", Live: true},
+	{Label: "Plans", Href: "/admin/plans", Icon: "layers"},
+	{Label: "Vouchers", Href: batchesHome, Icon: "ticket", Tab: "Vouchers"},
+	{Label: "Usage", Href: usageHome, Icon: "chart"},
+	{Label: "Router", Href: "/admin/router", Icon: "router"},
+	{Label: "Settings", Href: "/admin/settings", Icon: "settings"},
 }
 
 // layout returns the page frame data for the request.

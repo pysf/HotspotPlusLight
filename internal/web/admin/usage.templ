@@ -12,9 +12,9 @@ import (
 templ UsagePage(l ui.LayoutData, v usage.View) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Usage")
-		<h2 class="l-gap-bottom">Daily traffic, last { strconv.Itoa(len(v.Days)) } days</h2>
+		<h2>Daily traffic, last { strconv.Itoa(len(v.Days)) } days</h2>
 		@ui.BarChart(usageBars(v), v.MaxTotal, "download + upload, all members; peak "+domain.FormatSize(v.MaxTotal))
-		<h2 class="l-gap-bottom">Top members</h2>
+		<h2>Top members</h2>
 		<nav class="l-toolbar" aria-label="Range">
 			for _, d := range domain.UsageRanges {
 				@ui.Chip(ui.ChipProps{Label: strconv.Itoa(d) + " days", Href: usageHref(d), Selected: d == v.Range, Attrs: templ.Attributes{"data-range": strconv.Itoa(d)}})

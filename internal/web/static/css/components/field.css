@@ -1,14 +1,27 @@
-/* Label above a control, optional hint and error below. Also the form card, the pair row and the checkbox. */
+/* Label above a control; hint or error right under it. Also the form card and the pair row. */
 @layer components {
-  .c-form { display: grid; gap: var(--s-4); padding: var(--s-6); }
+  .c-form { display: grid; gap: var(--s-4); padding: var(--s-5); }
   .c-form[data-flush] { padding: 0; }
-  .c-field { display: grid; gap: var(--s-1h); }
-  .c-field__label { color: var(--muted); font-size: var(--fs-small); }
-  .c-field__hint { color: var(--faint); font-size: var(--fs-small); }
-  .c-field__error { color: var(--bad); font-size: var(--fs-small); }
+  .c-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); }
+  .c-form-grid > [data-span="2"] { grid-column: 1 / -1; }
+  .c-field { display: grid; gap: 6px; }
+  .c-field__label { color: var(--c-text-2); font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+  .c-field__hint, .c-hint { color: var(--c-text-3); font-size: var(--fs-sm); }
+  .c-field__error {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    color: var(--st-bad-fg);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+  }
+  .c-field__error .c-icon { inline-size: var(--size-ic-s); block-size: var(--size-ic-s); margin-block-start: 1px; }
   .c-field__pair { display: flex; gap: var(--s-2); }
   .c-field__pair > :first-child { flex: 1; min-inline-size: 0; }
-  .c-field__pair > .c-select { inline-size: auto; }
-  .c-check { display: flex; align-items: center; gap: var(--s-2); }
-  .c-check input { inline-size: var(--size-check); block-size: var(--size-check); accent-color: var(--accent); }
+  .c-field__pair > .c-select-wrap { flex: none; inline-size: 112px; }
+  .c-section-title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); letter-spacing: var(--ls-h3); }
+
+  @media (max-width: 699px) {
+    .c-form-grid { grid-template-columns: minmax(0, 1fr); }
+  }
 }

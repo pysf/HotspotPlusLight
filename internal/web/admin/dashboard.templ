@@ -11,14 +11,14 @@ import (
 templ DashboardPage(l ui.LayoutData, v dashboardView) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Dashboard")
-		<p class="u-muted l-gap-bottom">Updates every 10 seconds.</p>
+		<p class="u-muted">Updates every 10 seconds.</p>
 		@DashboardContent(v)
 	}
 }
 
 // DashboardContent is everything under the page title. It is the polled fragment: it re-fetches itself every 10 s (htmx), keeping the page.
 templ DashboardContent(v dashboardView) {
-	<div data-dashboard hx-get={ dashboardContentURL } hx-trigger="every 10s" hx-swap="outerHTML">
+	<div class="u-swap-in l-flow" data-dashboard hx-get={ dashboardContentURL } hx-trigger="every 10s" hx-swap="outerHTML">
 		@ui.Tiles() {
 			@OnlineTile(v.Online)
 			@ui.Tile("Traffic today (so far)", templ.Attributes{"data-tile": "traffic"}) {
@@ -35,10 +35,10 @@ templ DashboardContent(v dashboardView) {
 				}
 			}
 		}
-		<div class="l-gap-bottom">
+		<div>
 			@LinkStatusPanel(v.Link)
 		</div>
-		<section class="l-gap-bottom" aria-label="Needs attention">
+		<section class="l-flow" aria-label="Needs attention">
 			@AttentionSection(v.Expiring)
 			@AttentionSection(v.NearLimit)
 		</section>
@@ -58,8 +58,8 @@ templ OnlineTile(o dashboard.OnlineNow) {
 
 // AttentionSection is one Needs attention list: a heading with the full count, at most five members, or an empty text.
 templ AttentionSection(a attentionView) {
-	<div class="l-gap-bottom" data-attention={ a.Key } data-count={ strconv.Itoa(a.Count) }>
-		<h2 class="l-gap-bottom">{ a.Title } ({ strconv.Itoa(a.Count) })</h2>
+	<div class="l-stack" data-attention={ a.Key } data-count={ strconv.Itoa(a.Count) }>
+		<h2>{ a.Title } ({ strconv.Itoa(a.Count) })</h2>
 		if len(a.Rows) == 0 {
 			<div data-empty>
 				@ui.EmptyState(a.Empty)
@@ -82,8 +82,8 @@ templ AttentionSection(a attentionView) {
 
 // ChartSection is one chart with its heading. When every bar is 0 it shows the empty text instead.
 templ ChartSection(c chartView) {
-	<section class="l-gap-bottom" data-chart={ c.Key } aria-label={ c.Title }>
-		<h2 class="l-gap-bottom">{ c.Title }</h2>
+	<section class="l-stack" data-chart={ c.Key } aria-label={ c.Title }>
+		<h2>{ c.Title }</h2>
 		if c.Top == 0 {
 			<div data-empty>
 				@ui.EmptyState(c.Empty)
@@ -99,9 +99,9 @@ templ ChartSection(c chartView) {
 
 // LinkStatusPanel shows what the router last sent. It lives in memory and starts empty after a restart.
 templ LinkStatusPanel(v linkView) {
-	<div data-link-status>
-		<h2 class="l-gap-bottom">Router status</h2>
-		<p class="u-muted l-gap-bottom">Since the server started. A wrong shared secret on the router shows up as bad-secret packets.</p>
+	<div class="l-stack" data-link-status>
+		<h2>Router status</h2>
+		<p class="u-muted">Since the server started. A wrong shared secret on the router shows up as bad-secret packets.</p>
 		@ui.Table("Router status", []string{"", "When", "Router address", "Result"}) {
 			for _, e := range v.Events {
 				<tr data-link={ e.Key }>
@@ -112,7 +112,7 @@ templ LinkStatusPanel(v linkView) {
 				</tr>
 			}
 		}
-		<p class="l-gap-bottom">Packets with a wrong shared secret: <strong class="u-nums" data-bad-secret-count>{ v.BadTotal }</strong></p>
+		<p>Packets with a wrong shared secret: <strong class="u-nums" data-bad-secret-count>{ v.BadTotal }</strong></p>
 		if len(v.BadSources) > 0 {
 			<div data-bad-secret-sources>
 				@ui.Table("Wrong shared secret sources", []string{"Source address", "Packets", "Last seen"}) {

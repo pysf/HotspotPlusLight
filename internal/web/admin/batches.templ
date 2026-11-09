@@ -44,7 +44,7 @@ templ BatchesPage(l ui.LayoutData, res voucher.ListResult) {
 					@BatchRow(r, res)
 				}
 			}
-			@ui.Pagination(ui.PageProps{Page: res.Page, Pages: res.Pages, Href: batchesHref(res.Per)})
+			@ui.Pagination(ui.PageProps{Page: res.Page, Pages: res.Pages, Href: batchesHref(res.Per), Total: res.Total, Per: res.Per})
 		}
 	}
 }

@@ -1,19 +1,34 @@
-/* Page links with Previous and Next. */
+/* "1-8 of 312" on the left, Previous / page links / Next on the right. */
 @layer components {
-  .c-pager { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1h); margin-block-end: var(--s-4); }
+  .c-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    color: var(--c-text-2);
+    font-size: var(--fs-sm);
+  }
+  .c-pager__nav { display: flex; flex-wrap: wrap; gap: var(--s-1); margin-inline-start: auto; }
   .c-pager__link {
     display: inline-grid;
     place-items: center;
-    min-inline-size: var(--w-pager-btn);
-    block-size: var(--w-pager-btn);
+    min-inline-size: var(--ctl);
+    block-size: var(--ctl);
     padding-inline: var(--s-2);
-    border-radius: var(--r-btn);
-    background: var(--panel);
-    color: var(--text);
+    border-radius: var(--r-pill);
+    color: var(--c-text);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-semibold);
     font-variant-numeric: tabular-nums;
-    transition: background var(--ease);
+    transition: background var(--dur) var(--ease);
   }
-  .c-pager__link:hover { background: var(--elev); text-decoration: none; }
-  .c-pager__link[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
-  .c-pager__link[aria-disabled="true"] { opacity: var(--opacity-disabled); pointer-events: none; }
+  .c-pager__link:hover { background: var(--c-fill); text-decoration: none; }
+  .c-pager__link[aria-current="page"] { background: var(--c-text); color: var(--c-bg); }
+  @media (max-width: 699px) {
+    .c-pager > [data-pager-summary] { flex: 1 1 100%; }
+    .c-pager__nav { margin-inline: auto; flex-wrap: nowrap; }
+  }
+  .c-pager__link[aria-disabled="true"] { opacity: .4; cursor: not-allowed; pointer-events: none; }
 }

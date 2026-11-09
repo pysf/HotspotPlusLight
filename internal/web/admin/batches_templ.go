@@ -121,7 +121,7 @@ func BatchesPage(l ui.LayoutData, res voucher.ListResult) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = ui.Pagination(ui.PageProps{Page: res.Page, Pages: res.Pages, Href: batchesHref(res.Per)}).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Pagination(ui.PageProps{Page: res.Page, Pages: res.Pages, Href: batchesHref(res.Per), Total: res.Total, Per: res.Per}).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

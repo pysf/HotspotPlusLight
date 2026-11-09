@@ -566,7 +566,7 @@ HotspotPlusLight/
   internal/radius/             UDP server, handlers, MikroTik attrs, CoA client, message catalog — calls the services
   internal/web/admin/          handlers + templ components (reusable: layout, table, pagination, filter bar, form field, confirm dialog, flash)
   internal/routerpack/         hotspot folders (Phase 12b): `mikrotik/` (byte copy of reference/hotspot), `src/hotspot/` (pages, helpers, xml, js), `src/css/layout.css` + `src/css/themes/<key>.css` (one token block per theme), preview with sample values, zip packaging; `go:embed`; plus `script.go` (router setup script)
-  internal/web/static/         htmx, the Inter font (vendored, pinned), our CSS (`css/`) and JS (`js/`); `static.go` bundles and hashes them at startup (D24, 2026-11-03, `docs/ui-notes.md`)
+  internal/web/static/         htmx (vendored, pinned), our CSS (`css/`) and JS (`js/`); `static.go` bundles and hashes them at startup (D24, 2026-11-03, `docs/ui-notes.md`)
   e2e/                         black-box tests, harness, fake router
   docs/
 ```

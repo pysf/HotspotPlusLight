@@ -84,16 +84,16 @@ func TestE18_01_DashboardIsTheHomePage(t *testing.T) {
 	}
 }
 
-// E18.02 the sidebar lists Dashboard first and marks it as the current page; the other items are as before.
+// E18.02 the sidebar lists the 8 pages in the design order (Vouchers is the batches page) and marks the current one.
 func TestE18_02_SidebarHasDashboardFirst(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	c := harness.LoginAsAdmin(t, s)
-	want := []string{"Dashboard", "Members", "Batches", "Online", "Usage", "Plans", "Router", "Settings"}
+	want := []string{"Dashboard", "Members", "Online now", "Plans", "Vouchers", "Usage", "Router", "Settings"}
 	links := func(d *goquery.Document) (names []string, current []string) {
 		d.Find("#sidebar a.l-nav__link").Each(func(_ int, a *goquery.Selection) {
-			names = append(names, text(a))
+			names = append(names, text(a.Find(".l-nav__text")))
 			if a.AttrOr("aria-current", "") == "page" {
-				current = append(current, text(a))
+				current = append(current, text(a.Find(".l-nav__text")))
 			}
 		})
 		return names, current

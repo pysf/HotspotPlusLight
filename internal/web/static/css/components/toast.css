@@ -1,22 +1,33 @@
-/* Short message at the bottom. Shown by toast.js (data-open). */
+/* Short message at the bottom, shown by toast.js (data-open). data-kind="error" stays until closed. */
 @layer components {
   .c-toast {
     position: fixed;
     inset-inline: 0;
-    inset-block-end: var(--s-8);
+    inset-block-end: 28px;
     inline-size: fit-content;
-    max-inline-size: calc(100% - var(--s-8));
+    max-inline-size: calc(100% - var(--s-6));
     margin-inline: auto;
-    padding: var(--s-3) var(--s-4);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: var(--s-3) var(--s-5) var(--s-3) var(--s-4);
     border-radius: var(--r-pill);
-    background: var(--text);
-    color: var(--bg);
+    background: var(--c-text);
+    color: var(--c-bg);
+    box-shadow: var(--sh-3);
     font-weight: var(--fw-medium);
     opacity: 0;
     translate: 0 var(--s-5);
     pointer-events: none;
     z-index: var(--z-toast);
-    transition: opacity var(--ease), translate var(--ease);
+    transition: opacity var(--dur) var(--ease), translate var(--dur) var(--ease);
   }
-  .c-toast[data-open] { opacity: 1; translate: 0 0; }
+  .c-toast[data-open] { opacity: 1; translate: 0 0; pointer-events: auto; }
+  .c-toast[data-kind="error"] { background: var(--c-surface); color: var(--st-bad-fg); box-shadow: var(--sh-3), inset 0 0 0 1.5px var(--st-bad-dot); }
+  .c-toast__close { display: none; margin-inline-start: var(--s-1); color: inherit; }
+  .c-toast[data-kind="error"] .c-toast__close { display: inline-grid; }
+
+  @media (max-width: 699px) {
+    .c-toast { inset-block-end: 96px; }
+  }
 }

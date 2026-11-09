@@ -1,8 +1,20 @@
-/* Dashboard tiles: a row of small cards, each with one big figure. */
+/* Dashboard tiles: small cards with one big figure. Four across, two on a tablet. */
 @layer components {
-  .c-tiles { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fit, minmax(var(--w-select), 1fr)); }
-  .c-tile { padding: var(--s-4); }
-  .c-tile__label { color: var(--muted); font-size: var(--fs-small); }
-  .c-tile__value { font-size: var(--fs-hero); font-weight: 600; margin-block: var(--s-1); }
-  .c-tile__note { font-size: var(--fs-small); }
+  .c-tiles { display: grid; gap: var(--s-4); grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .c-tile {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    min-block-size: var(--h-tile);
+    padding: 20px;
+    border-radius: var(--r-lg);
+  }
+  .c-tile__label { display: flex; align-items: center; gap: var(--s-2); color: var(--c-text-2); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+  .c-tile__value { font-size: var(--fs-tile); line-height: 1.1; font-weight: var(--fw-bold); letter-spacing: var(--ls-h1); font-variant-numeric: tabular-nums; }
+  .c-tile__value small { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--c-text-3); letter-spacing: 0; }
+  .c-tile__note { color: var(--c-text-3); font-size: var(--fs-sm); }
+
+  @media (max-width: 999px) {
+    .c-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
 }

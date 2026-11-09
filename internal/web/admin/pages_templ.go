@@ -158,7 +158,7 @@ func PlansPage(l ui.LayoutData, plans []domain.Plan) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div id=\"plan-list\" aria-live=\"polite\" aria-busy=\"false\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div id=\"plan-list\" class=\"l-flow\" aria-live=\"polite\" aria-busy=\"false\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

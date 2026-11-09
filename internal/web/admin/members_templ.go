@@ -256,7 +256,7 @@ func MembersPage(l ui.LayoutData, p MembersProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div id=\"member-list\" aria-live=\"polite\" aria-busy=\"false\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div id=\"member-list\" class=\"l-flow\" aria-live=\"polite\" aria-busy=\"false\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -336,7 +336,7 @@ func MemberListBody(p MembersProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<form id=\"bulk-form\" data-bulk-guard hx-post=\"/admin/members/bulk-delete\" hx-target=\"#bulk-result\" hx-swap=\"innerHTML\"><input type=\"hidden\" name=\"q\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<form id=\"bulk-form\" class=\"l-flow\" data-bulk-guard hx-post=\"/admin/members/bulk-delete\" hx-target=\"#bulk-result\" hx-swap=\"innerHTML\"><input type=\"hidden\" name=\"q\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -375,14 +375,14 @@ func MemberListBody(p MembersProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><div class=\"l-toolbar\"><label class=\"c-check\"><input type=\"checkbox\" data-select-all=\"#bulk-form input[name=id]\"> Select all on this page</label> <label class=\"c-check\" data-select-all-results><input type=\"checkbox\" name=\"all_results\" value=\"1\"> Select all ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><div class=\"l-toolbar\"><label class=\"c-choice\"><span class=\"c-hit\"><input type=\"checkbox\" class=\"c-check\" data-select-all=\"#bulk-form input[name=id]\"></span> Select all on this page</label> <label class=\"c-choice\" data-select-all-results><span class=\"c-hit\"><input type=\"checkbox\" class=\"c-check\" name=\"all_results\" value=\"1\"></span> Select all ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(p.Result.Total))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/members.templ`, Line: 139, Col: 146}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/members.templ`, Line: 139, Col: 190}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -436,7 +436,7 @@ func MemberListBody(p MembersProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Pagination(ui.PageProps{Page: p.Result.Page, Pages: p.Result.Pages, Href: listHref(p.Filter, p.Result.Per), Target: "#" + listID}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Pagination(ui.PageProps{Page: p.Result.Page, Pages: p.Result.Pages, Href: listHref(p.Filter, p.Result.Per), Target: "#" + listID, Total: p.Result.Total, Per: p.Result.Per}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -610,20 +610,20 @@ func MemberRow(m memberVM) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\"><td data-slot=\"select\"><input type=\"checkbox\" aria-label=\"Select\" name=\"id\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\"><td data-slot=\"select\"><span class=\"c-hit\"><input type=\"checkbox\" class=\"c-check\" aria-label=\"Select\" name=\"id\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templruntime.NewAttributeExpression(strconv.FormatInt(m.ID, 10)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/members.templ`, Line: 168, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/members.templ`, Line: 168, Col: 149}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\"></td><td data-label=\"User\"><a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\"></span></td><td data-label=\"User\"><a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1438,7 +1438,7 @@ func MemberStatus(m memberVM, oob bool) templ.Component {
 			templ_7745c5c3_ElementWriter := templ_7745c5c3_Buffer
 			templ_7745c5c3_Buffer := templ.GetBuffer()
 			var templ_7745c5c3_ElementScripts []templ.ComponentScript
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<p id=\"member-status\" class=\"u-muted l-gap-bottom\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<p id=\"member-status\" class=\"u-muted\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1642,14 +1642,14 @@ func MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) templ.Component 
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<p class=\"l-gap-bottom\">Current extra data: <strong class=\"u-nums\" data-extra-bulk>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<p>Current extra data: <strong class=\"u-nums\" data-extra-bulk>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var61 string
 					templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(m.ExtraBulk)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/members.templ`, Line: 442, Col: 102}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/members.templ`, Line: 442, Col: 81}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 					if templ_7745c5c3_Err != nil {
@@ -1686,7 +1686,7 @@ func MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) templ.Component 
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<div id=\"password-view\" class=\"l-gap-bottom\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<div id=\"password-view\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -1925,7 +1925,7 @@ func BulkConfirm(st member.BulkStats, sel url.Values) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<form id=\"bulk-confirm\" class=\"c-card c-form l-gap-bottom\" hx-post=\"/admin/members/bulk-delete\" hx-target=\"#bulk-result\" hx-swap=\"innerHTML\"><p>Delete <strong data-confirm-members>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<form id=\"bulk-confirm\" class=\"c-card c-form\" hx-post=\"/admin/members/bulk-delete\" hx-target=\"#bulk-result\" hx-swap=\"innerHTML\"><p>Delete <strong data-confirm-members>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -2066,14 +2066,14 @@ func DeletedNotice(res member.DeleteResult, backURL, backLabel string) templ.Com
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "<p class=\"l-gap-bottom\"><a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "<p><a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var78 string
 		templ_7745c5c3_Var78, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(backURL)).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/members.templ`, Line: 519, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/members.templ`, Line: 519, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var78)
 		if templ_7745c5c3_Err != nil {
@@ -2086,7 +2086,7 @@ func DeletedNotice(res member.DeleteResult, backURL, backLabel string) templ.Com
 		var templ_7745c5c3_Var79 string
 		templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(backLabel)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/members.templ`, Line: 519, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/admin/members.templ`, Line: 519, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 		if templ_7745c5c3_Err != nil {

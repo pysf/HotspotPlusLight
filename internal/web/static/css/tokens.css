@@ -1,155 +1,185 @@
-/* Design tokens. Two themes: air (default) and air-dark. Components read only these. */
+/* Design tokens (design v2, docs/design/hp.css). Light is the default; dark follows the OS unless the admin chose light. Components read only these. */
 @layer tokens {
-  @font-face {
-    font-family: "Inter";
-    font-style: normal;
-    font-weight: 100 900;
-    font-display: swap;
-    src: url("/admin/static/inter-latin-wght-normal.woff2") format("woff2");
+  /* Light. */
+  :root, :root[data-theme="light"] {
+    color-scheme: light;
+    --c-bg: #f5f5f7;
+    --c-surface: #ffffff;
+    --c-surface-2: #f9f9fb;
+    --c-fill: rgba(60, 60, 67, .08);
+    --c-fill-2: rgba(60, 60, 67, .14);
+    --c-line: rgba(60, 60, 67, .14);
+    --c-line-strong: rgba(60, 60, 67, .30);
+    --c-input-line: #86868b;
+    --c-text: #1d1d1f;
+    --c-text-2: #515154;
+    --c-text-3: #6e6e73;
+    --c-accent: #0062cc;
+    --c-accent-hover: #004fa6;
+    --c-accent-fg: #ffffff;
+    --c-accent-soft: rgba(0, 98, 204, .10);
+    --c-focus: #0062cc;
+    --c-danger: #c4271d;
+    --c-danger-hover: #a51f17;
+    --c-danger-fg: #ffffff;
+    --c-glass: rgba(255, 255, 255, .74);
+    --c-scrim: rgba(20, 20, 24, .38);
+    --st-ok-fg: #1b6e33;   --st-ok-bg: rgba(52, 199, 89, .16);   --st-ok-dot: #1f9d43;
+    --st-warn-fg: #8a5300; --st-warn-bg: rgba(255, 159, 10, .18); --st-warn-dot: #d17b00;
+    --st-bad-fg: #b3261e;  --st-bad-bg: rgba(255, 59, 48, .12);   --st-bad-dot: #e5352b;
+    --st-off-fg: #5b5b61;  --st-off-bg: rgba(120, 120, 128, .16); --st-off-dot: #8e8e93;
+    --sh-1: 0 1px 2px rgba(0, 0, 0, .04), 0 1px 8px rgba(0, 0, 0, .04);
+    --sh-2: 0 2px 6px rgba(0, 0, 0, .05), 0 12px 32px rgba(0, 0, 0, .08);
+    --sh-3: 0 8px 24px rgba(0, 0, 0, .10), 0 32px 64px rgba(0, 0, 0, .16);
   }
 
+  /* Dark, chosen by the admin. */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --c-bg: #0b0b0d;
+    --c-surface: #1c1c1e;
+    --c-surface-2: #232326;
+    --c-fill: rgba(235, 235, 245, .10);
+    --c-fill-2: rgba(235, 235, 245, .18);
+    --c-line: rgba(235, 235, 245, .14);
+    --c-line-strong: rgba(235, 235, 245, .30);
+    --c-input-line: #727278;
+    --c-text: #f5f5f7;
+    --c-text-2: #c7c7cc;
+    --c-text-3: #98989f;
+    --c-accent: #4da3ff;
+    --c-accent-hover: #7bbaff;
+    --c-accent-fg: #04122b;
+    --c-accent-soft: rgba(77, 163, 255, .16);
+    --c-focus: #4da3ff;
+    --c-danger: #ff6961;
+    --c-danger-hover: #ff857e;
+    --c-danger-fg: #2a0705;
+    --c-glass: rgba(28, 28, 30, .74);
+    --c-scrim: rgba(0, 0, 0, .58);
+    --st-ok-fg: #62d97f;   --st-ok-bg: rgba(52, 199, 89, .18);   --st-ok-dot: #30d158;
+    --st-warn-fg: #ffb74d; --st-warn-bg: rgba(255, 159, 10, .20); --st-warn-dot: #ff9f0a;
+    --st-bad-fg: #ff8a80;  --st-bad-bg: rgba(255, 69, 58, .20);   --st-bad-dot: #ff453a;
+    --st-off-fg: #a8a8b0;  --st-off-bg: rgba(150, 150, 160, .20); --st-off-dot: #8e8e93;
+    --sh-1: 0 0 0 1px rgba(255, 255, 255, .03), 0 1px 8px rgba(0, 0, 0, .4);
+    --sh-2: 0 2px 6px rgba(0, 0, 0, .4), 0 12px 32px rgba(0, 0, 0, .5);
+    --sh-3: 0 8px 24px rgba(0, 0, 0, .5), 0 32px 64px rgba(0, 0, 0, .65);
+  }
+
+  /* Dark by the OS, when the admin did not choose light. The values repeat the block above: CSS cannot share them. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) {
+      color-scheme: dark;
+      --c-bg: #0b0b0d; --c-surface: #1c1c1e; --c-surface-2: #232326;
+      --c-fill: rgba(235, 235, 245, .10); --c-fill-2: rgba(235, 235, 245, .18);
+      --c-line: rgba(235, 235, 245, .14); --c-line-strong: rgba(235, 235, 245, .30);
+      --c-input-line: #727278; --c-text: #f5f5f7; --c-text-2: #c7c7cc; --c-text-3: #98989f;
+      --c-accent: #4da3ff; --c-accent-hover: #7bbaff; --c-accent-fg: #04122b;
+      --c-accent-soft: rgba(77, 163, 255, .16); --c-focus: #4da3ff;
+      --c-danger: #ff6961; --c-danger-hover: #ff857e; --c-danger-fg: #2a0705;
+      --c-glass: rgba(28, 28, 30, .74); --c-scrim: rgba(0, 0, 0, .58);
+      --st-ok-fg: #62d97f; --st-ok-bg: rgba(52, 199, 89, .18); --st-ok-dot: #30d158;
+      --st-warn-fg: #ffb74d; --st-warn-bg: rgba(255, 159, 10, .20); --st-warn-dot: #ff9f0a;
+      --st-bad-fg: #ff8a80; --st-bad-bg: rgba(255, 69, 58, .20); --st-bad-dot: #ff453a;
+      --st-off-fg: #a8a8b0; --st-off-bg: rgba(150, 150, 160, .20); --st-off-dot: #8e8e93;
+      --sh-1: 0 0 0 1px rgba(255, 255, 255, .03), 0 1px 8px rgba(0, 0, 0, .4);
+      --sh-2: 0 2px 6px rgba(0, 0, 0, .4), 0 12px 32px rgba(0, 0, 0, .5);
+      --sh-3: 0 8px 24px rgba(0, 0, 0, .5), 0 32px 64px rgba(0, 0, 0, .65);
+    }
+  }
+
+  /* Blur is polish only: without it the bars use the solid surface color. The long selector beats every theme block above. */
+  @supports not (backdrop-filter: blur(1px)) {
+    :root:root:root { --c-glass: var(--c-surface); }
+  }
+
+  /* Type, space, radius, size and motion are the same in every theme. */
   :root {
-    --font-sans: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-
-    /* Spacing scale (rem, 16px root). */
-    --s-1: .25rem;
-    --s-1h: .375rem;
-    --s-2: .5rem;
-    --s-3: .75rem;
-    --s-4: 1rem;
-    --s-5: 1.25rem;
-    --s-5h: 1.375rem;
-    --s-6: 1.5rem;
-    --s-8: 2rem;
-    --s-9: 2.25rem;
-    --s-11: 2.75rem;
-    --s-14: 3.5rem;
-
-    /* Type. */
-    --fs-base: .875rem;
-    --fs-small: .75rem;
-    --fs-chip: .8125rem;
-    --fs-head: 1rem;
-    --fs-hero: 1.5rem;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --fs-xs: 12px; --fs-sm: 13px; --fs-md: 15px; --fs-lg: 17px; --fs-xl: 20px; --fs-2xl: 28px; --fs-3xl: 34px;
+    --fs-tab: 11px;
+    --fs-credential: 20px;
     --lh-base: 1.45;
     --fw-medium: 500;
     --fw-semibold: 600;
-    --ls-title: -.025em;
+    --fw-bold: 700;
+    --ls-h1: -.02em;
+    --ls-h2: -.012em;
+    --ls-h3: -.01em;
+    --ls-caps: .06em;
 
-    /* Status colors (same in every theme). */
-    --ok: #3ecf8e;
-    --warn: #f5a524;
-    --bad: #ff5d5d;
+    /* Spacing: 4, 8, 12, 16, 24, 32, 48, 64. */
+    --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px;
+    --s-hair: 2px;
 
-    /* Sizes shared by all themes. */
-    --size-icon: 1rem;
-    --size-chevron: .3125rem;
-    --ls-head: -.01em;
-    --brightness-hover: 1.1;
-    --btn-pad-x: calc(var(--s-4) + 2px);
-    --h-btn-block: calc(var(--h-btn) + 6px);
-    --size-icon-btn: 2rem;
-    --size-dot: .4375rem;
-    --size-logo: 3.25rem;
-    --size-check: 1rem;
-    --w-sidebar: 14.5rem;
-    --w-page: 73.75rem;
-    --w-form: 36rem;
-    --w-sheet: 26.875rem;
-    --w-modal: 23.75rem;
-    --w-menu: 11rem;
-    --w-login: 22.5rem;
-    --w-search: 26.25rem;
-    --w-select: 9.5rem;
-    --w-meter: 8.75rem;
-    --h-meter: .3125rem;
-    --h-chip: 1.875rem;
-    --h-topbar: 3.25rem;
-    --h-chart: 10rem;
-    --h-pack-frame: 24rem;
-    --h-code: 22rem;
-    --w-pager-btn: 2rem;
-    --w-label: 5rem;
-    --w-act: 2.75rem;
-    --w-confirm: 20rem;
-    --r-pill: 99px;
-    --r-dot: 50%;
-    --r-logo: .875rem;
+    --r-sm: 8px; --r-md: 12px; --r-lg: 20px; --r-xl: 28px; --r-pill: 999px;
+
+    /* Layout. */
+    --ctl: 40px;           /* control height; 44 px on a phone */
+    --pad: 32px;           /* page padding; 16 px on a phone */
+    --nav-w: 240px;        /* 76 px as an icon rail */
+    --h-topbar: 64px;
+    --w-form: 576px;
+    --w-sheet: 440px;
+    --w-dialog: 420px;
+    --w-auth: 420px;
+    --w-menu: 210px;
+    --w-search: 420px;
+    --w-select: 152px;
+    --w-label: 80px;
+    --w-grid: 320px;
+
+    /* Component sizes. */
+    --size-brand: 34px; --size-brand-sm: 30px; --size-brand-lg: 52px;
+    --size-ic: 20px; --size-ic-s: 16px; --size-ic-l: 24px; --size-ic-pill: 15px;
+    --size-dot: 10px;
+    --size-check: 22px;
+    --w-switch: 48px; --h-switch: 28px; --size-knob: 19px;
+    --h-pill: 26px;
+    --h-meter: 8px; --w-meter: 64px; --w-usage: 150px;
+    --h-btn-sm: 34px;
+    --btn-pad-x: 18px; --btn-pad-x-sm: 14px; --input-pad-x: 14px;
+    --pad-dialog: 28px;
+    --fs-tile: var(--fs-3xl);
+    --h-tab: 48px;
+    --h-row: 56px;
+    --h-tile: 128px;
+    --h-chart: 160px;
+    --h-code: 352px;
+    --h-pack-frame: 384px;
+    --h-skel: 14px; --h-skel-lg: 28px;
+    --size-badge: 22px;
+    --size-icon-circle: 36px; --size-icon-circle-lg: 48px; --size-empty-icon: 64px;
+    --size-step: 26px;
+    --w-act: 64px;
+    --w-chk: 52px;
 
     /* Motion and layers. */
-    --ease: 150ms ease;
-    --dur-sheet: 250ms;
-    --dur-toast: 2200ms;
-    --z-sidebar: 20;
-    --z-topbar: 30;
-    --z-toast: 90;
-    --opacity-disabled: .4;
-    --opacity-count: .6;
-    --blur-backdrop: 2px;
-    --blur-sidebar: 20px;
-    --scrim: rgb(0 0 0 / .5);
-    --ring-w: 2px;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+    --dur: 160ms;
+    --dur-sheet: 200ms;
+    --dur-swap: 400ms;
+    --dur-toast: 4000ms;
+    --blur-glass: saturate(1.8) blur(24px);
+    --opacity-disabled: .42;
+    --ring-w: 3px;
     --ring-offset: 2px;
+    --z-topbar: 5;
+    --z-tabbar: 6;
+    --z-toast: 90;
   }
 
-  /* Air (default, light). */
-  :root, :root[data-theme="air"] {
-    color-scheme: light;
-    --bg: #f5f5f7;
-    --panel: #fff;
-    --elev: #f0f0f3;
-    --line: rgb(0 0 0 / .06);
-    --line-strong: rgb(0 0 0 / .12);
-    --text: #1d1d1f;
-    --muted: #6e6e73;
-    --faint: #a1a1a6;
-    --accent: #0071e3;
-    --on-accent: #fff;
-    --shadow-card: 0 1px 2px rgb(0 0 0 / .04), 0 10px 30px rgb(0 0 0 / .05);
-    --shadow-pop: 0 12px 40px rgb(0 0 0 / .10);
-    --shadow-nav: 0 1px 2px rgb(0 0 0 / .06);
-    --card-border: transparent;
-    --sidebar-bg: rgb(245 245 247 / .8);
-    --login-glow: rgb(0 113 227 / .10);
-    --r-ctl: 12px;
-    --r-card: 18px;
-    --r-btn: 99px;
-    --r-sheet: 20px;
-    --h-btn: 2.25rem;
-    --h-input: 2.625rem;
-    --cell-y: 1.125rem;
-    --cell-x: 1.375rem;
-    --fs-title: 2rem;
-  }
-
-  /* Air dark: dark colors, Air shape. */
-  :root[data-theme="air-dark"] {
-    color-scheme: dark;
-    --bg: #0b0b0c;
-    --panel: #111113;
-    --elev: #17171a;
-    --line: rgb(255 255 255 / .07);
-    --line-strong: rgb(255 255 255 / .13);
-    --text: #f2f2f3;
-    --muted: #8b8b93;
-    --faint: #5d5d65;
-    --accent: #4c8dff;
-    --on-accent: #fff;
-    --shadow-card: none;
-    --shadow-pop: 0 10px 40px rgb(0 0 0 / .45);
-    --shadow-nav: none;
-    --card-border: var(--line);
-    --sidebar-bg: rgb(11 11 12 / .8);
-    --login-glow: rgb(76 141 255 / .16);
-    --r-ctl: 12px;
-    --r-card: 18px;
-    --r-btn: 99px;
-    --r-sheet: 20px;
-    --h-btn: 2.25rem;
-    --h-input: 2.625rem;
-    --cell-y: 1.125rem;
-    --cell-x: 1.375rem;
-    --fs-title: 2rem;
+  /* Phone: bigger touch targets, smaller page padding and titles. */
+  @media (max-width: 699px) {
+    :root {
+      --ctl: 44px;
+      --pad: 16px;
+      --fs-2xl: 24px;
+      --fs-3xl: 30px;
+      --h-topbar: 60px;
+      --h-btn-sm: 44px;
+      --fs-tile: 28px;
+    }
   }
 }

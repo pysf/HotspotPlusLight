@@ -1,5 +1,13 @@
 /* Read-only text block with a Copy button (the router script). */
 @layer components {
   .c-code { display: grid; gap: var(--s-2); }
-  .c-code__text { block-size: var(--h-code); font-family: var(--font-mono); font-size: var(--fs-small); }
+  .c-code__text {
+    block-size: var(--h-code);
+    padding: var(--s-4);
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-md);
+    background: var(--c-surface-2);
+    font: 13px / 1.6 var(--font-mono);
+    overflow-wrap: anywhere;
+  }
 }
