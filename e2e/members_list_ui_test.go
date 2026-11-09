@@ -350,14 +350,37 @@ func TestE10_15_SheetFragments(t *testing.T) {
 	if d.Find("input[name=username]").AttrOr("value", "") != "alice" {
 		t.Error("edit form lacks the member's data")
 	}
-	act := d.Find("[data-actions]")
+	// Design 4b: the actions sit outside the form element, so htmx sends no form fields with them.
+	if d.Find("form#member-form button[hx-post], form#member-form button[hx-delete]").Length() != 0 {
+		t.Error("sheet actions must not sit inside the form")
+	}
 	var names []string
-	act.Find("button").Each(func(_ int, s *goquery.Selection) { names = append(names, text(s)) })
-	if strings.Join(names, "|") != "Renew|Disable|Disconnect|Delete" {
+	d.Find("[data-state] button, details[data-more] button").Each(func(_ int, s *goquery.Selection) { names = append(names, text(s)) })
+	if strings.Join(names, "|") != "Kick now|Renew|Delete" {
 		t.Errorf("sheet actions %q", names)
 	}
-	if act.Find(`button:contains("Disable")`).AttrOr("hx-post", "") != mpath(id)+"/toggle" || act.Find(`button:contains("Delete")`).AttrOr("hx-confirm", "") == "" {
-		t.Error("sheet actions: toggle route or confirm missing")
+	kick := d.Find(`button:contains("Kick now")`)
+	if kick.AttrOr("hx-post", "") != mpath(id)+"/disconnections" || kick.AttrOr("hx-confirm", "") == "" || kick.AttrOr("disabled", "x") == "x" {
+		t.Errorf("Kick now: %v (disabled while the member is offline)", kick.Nodes)
+	}
+	if d.Find(`button:contains("Renew")`).AttrOr("hx-post", "") != mpath(id)+"/renewals" || d.Find(`button:contains("Delete")`).AttrOr("hx-confirm", "") == "" {
+		t.Error("sheet actions: renew route or delete confirm missing")
+	}
+	// Enable and disable is the switch, saved with the form (it keeps the toggle behaviour of Update, BR-18).
+	if sw := d.Find(`input[name=active][form="member-form"]`); sw.Length() != 1 || sw.AttrOr("role", "") != "switch" {
+		t.Error("the Account enabled switch is missing or not tied to the form")
+	}
+	if p := d.Find(`a[href="` + mpath(id) + `/voucher"]`); text(p) != "Print login details" || p.AttrOr("target", "") != "_blank" {
+		t.Error("the state card needs a Print login details link")
+	}
+	if d.Find("[data-sheet-sub]").AttrOr("data-sheet-sub", "") == "" || d.Find("[data-sheet-title]").AttrOr("data-sheet-title", "") != "alice" {
+		t.Error("the sheet title is the username and the sub line says since when")
+	}
+	if pw := d.Find("form#member-form input[name=password]"); pw.AttrOr("type", "") != "password" || pw.AttrOr("value", "") == "" {
+		t.Error("the edit sheet has the current password in a hidden field")
+	}
+	if u := d.Find(`form#member-form input[name=username]`); u.Length() != 1 || u.AttrOr("disabled", "x") != "x" || u.AttrOr("readonly", "x") != "x" {
+		t.Error("the username stays editable, in the form (not in More options)")
 	}
 	if a := d.Find(`a[href="` + mpath(id) + `"]`); text(a) != "Open details" {
 		t.Errorf("Open details link: %q", text(a))
@@ -416,11 +439,11 @@ func TestE10_16_SheetValidation(t *testing.T) {
 	if scalar[int](t, f.db, `SELECT count(*) FROM member`) != 0 {
 		t.Error("nothing may be stored")
 	}
-	// Edit: the 422 keeps the actions section.
+	// Edit: the 422 keeps the actions.
 	id := f.member(p, "dave")
 	r = f.c.SendHX("PUT", mpath(id), harness.MemberForm(p, "dave", "email", "nope"), sheetTarget)
 	d = fragmentDoc(t, r)
-	if r.StatusCode != 422 || d.Find("form#member-form input[name=email]").AttrOr("value", "") != "nope" || d.Find("[data-actions]").Length() != 1 {
+	if r.StatusCode != 422 || d.Find(`input[name=email][form="member-form"]`).AttrOr("value", "") != "nope" || d.Find("[data-state] [data-actions] button").Length() != 1 || d.Find(`details[data-more] button:contains("Delete")`).Length() != 1 {
 		t.Errorf("edit 422: %d %s", r.StatusCode, r.Body)
 	}
 	// Plan.
@@ -481,7 +504,7 @@ func TestE10_17_SheetSuccess(t *testing.T) {
 	if d.Find("[data-sheet-title]").Length() == 0 {
 		t.Error("the card needs a sheet title")
 	}
-	if p := d.Find(`a[href="` + mpath(id) + `/voucher"]`); text(p) != "Print" || p.AttrOr("target", "") != "_blank" {
+	if p := d.Find(`a[href="` + mpath(id) + `/voucher"]`); text(p) != "Print login details" || p.AttrOr("target", "") != "_blank" {
 		t.Error("the card needs a Print link to the voucher")
 	}
 	if got := text(d.Find(`[data-key="devices"]`)); got == "" {
@@ -735,5 +758,62 @@ func TestE10_19_ListActions(t *testing.T) {
 	g := f.member(p, "gone")
 	if r := f.c.Send("DELETE", mpath(g), nil); r.Header.Get("HX-Redirect") != "/admin/members" {
 		t.Errorf("delete without target: %v", r.Header)
+	}
+}
+
+// E10.25 the add sheet shows the plan summary and keeps the rare fields in More options; the edit sheet changes the password.
+func TestE10_25_SheetSummaryAndPassword(t *testing.T) {
+	f := newP2(t)
+	p := f.plan("Basic")
+	d := fragmentDoc(t, f.c.GetHX("/admin/members/new", sheetTarget))
+	sel := d.Find("select[name=plan_id]")
+	if sel.AttrOr("data-summary-for", "") != "plan-summary" || sel.Find("option[data-summary]").Length() != 1 {
+		t.Errorf("plan select: %v", sel.Nodes)
+	}
+	if got := sel.Find("option[data-summary]").AttrOr("data-summary", ""); !strings.Contains(got, "days") || !strings.Contains(got, "device") {
+		t.Errorf("plan summary %q", got)
+	}
+	if d.Find("p#plan-summary").Length() != 1 {
+		t.Error("the summary line is missing")
+	}
+	more := d.Find("details.c-more")
+	if more.Length() != 1 || more.AttrOr("open", "x") != "x" || more.Find("input[name=email], input[name=expires_at], input[name=active]").Length() != 3 {
+		t.Error("More options must be closed and hold the rare fields")
+	}
+	// A field error inside More options opens it.
+	r := f.c.SendHX("POST", "/admin/members", harness.MemberForm(p, "carol", "email", "nope"), sheetTarget)
+	if fragmentDoc(t, r).Find("details.c-more").AttrOr("open", "x") == "x" {
+		t.Error("More options must be open when one of its fields has an error")
+	}
+	// Edit sheet: a new password is stored; a bad one is refused and nothing else breaks.
+	id := f.member(p, "dave")
+	r = f.c.SendHX("PUT", mpath(id), harness.MemberForm(p, "dave", "password", "newpass1"), sheetTarget)
+	if r.StatusCode != 200 || text(f.c.Get(mpath(id)+"/password").Doc(t).Find("[data-password]")) != "newpass1" {
+		t.Errorf("new password: %d", r.StatusCode)
+	}
+	r = f.c.SendHX("PUT", mpath(id), harness.MemberForm(p, "dave", "password", "bad\x01pw"), sheetTarget)
+	if r.StatusCode != 422 || fragmentDoc(t, r).Find(`[data-error-for="password"]`).Length() != 1 {
+		t.Errorf("bad password: %d", r.StatusCode)
+	}
+	// A refused password saves nothing: the rename and the disable in the same form are dropped too.
+	r = f.c.SendHX("PUT", mpath(id), harness.MemberForm(p, "dave9", "active", "-", "password", "bad\x01pw"), sheetTarget)
+	if r.StatusCode != 422 || scalar[string](t, f.db, `SELECT username FROM member WHERE id=?`, id) != "dave" || scalar[int64](t, f.db, `SELECT active FROM member WHERE id=?`, id) != 1 {
+		t.Errorf("a bad password must change nothing else: %d", r.StatusCode)
+	}
+	if text(f.c.Get(mpath(id)+"/password").Doc(t).Find("[data-password]")) != "newpass1" {
+		t.Error("a refused password must not change the stored one")
+	}
+	// Renaming works from the sheet; a taken name shows its error under the username field.
+	f.member(p, "taken1")
+	if r = f.c.SendHX("PUT", mpath(id), harness.MemberForm(p, "taken1"), sheetTarget); r.StatusCode != 422 || fragmentDoc(t, r).Find(`form#member-form [data-error-for="username"]`).Length() != 1 {
+		t.Errorf("taken username: %d", r.StatusCode)
+	}
+	if r = f.c.SendHX("PUT", mpath(id), harness.MemberForm(p, "dave2"), sheetTarget); r.StatusCode != 200 || scalar[string](t, f.db, `SELECT username FROM member WHERE id=?`, id) != "dave2" {
+		t.Errorf("rename: %d", r.StatusCode)
+	}
+	// The member page form has no password: a posted one is ignored.
+	f.c.Send("PUT", mpath(id), harness.MemberForm(p, "dave2", "password", "ignored1"))
+	if text(f.c.Get(mpath(id)+"/password").Doc(t).Find("[data-password]")) != "newpass1" {
+		t.Error("the page form must not set the password")
 	}
 }

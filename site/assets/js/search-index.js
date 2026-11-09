@@ -154,7 +154,7 @@ export default [
   "page": "First login",
   "heading": "Create a member",
   "url": "docs/first-login/#member",
-  "keywords": "Open Members and choose Add member . A side panel opens. Pick a plan. The Generate button puts a random 6-digit password in the field. A user name has English letters and digits only (up to 64) and is not case-sensitive; if you leave it empty, the mobile numbe"
+  "keywords": "Open Members and choose Add member . A side panel opens with a user name, a password and a plan. Under the plan, a short line shows what it gives: data, days, speed and devices. The Generate button puts a random 6-digit password in the field. A user name has E"
  },
  {
   "page": "First login",

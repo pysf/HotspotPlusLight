@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -174,6 +175,10 @@ func (h handlers) memberPage(w http.ResponseWriter, r *http.Request) {
 	p.URL = memberURL(id)
 	if inSheet(r) { // the edit sheet is this same resource (GET /admin/members/{id}) as a fragment
 		p.Sheet = true
+		if p.Form.Password, err = h.Members.RevealPassword(r.Context(), id); err != nil {
+			h.serverError(w, r, err)
+			return
+		}
 		h.render(w, r, http.StatusOK, MemberEditSheet(p, newVM(v)))
 		return
 	}
@@ -188,7 +193,16 @@ func (h handlers) memberUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := memberForm(r)
-	errs, kick, err := h.Members.Update(r.Context(), id, f)
+	sheet := inSheet(r)
+	var errs domain.FieldErrors
+	var kick member.KickResult
+	var err error
+	// A bad password is checked first, so a refused save changes nothing.
+	if msg := domain.ValidateMemberPassword(f.Password); sheet && f.Password != "" && msg != "" {
+		errs = domain.FieldErrors{"password": msg}
+	} else {
+		errs, kick, err = h.Members.Update(r.Context(), id, f)
+	}
 	if errors.Is(err, domain.ErrNotFound) {
 		h.notFound(w, r, "Member")
 		return
@@ -197,7 +211,13 @@ func (h handlers) memberUpdate(w http.ResponseWriter, r *http.Request) {
 		h.serverError(w, r, err)
 		return
 	}
-	sheet := inSheet(r)
+	if len(errs) == 0 && sheet {
+		errs, err = h.applySheetPassword(r, id, f.Password)
+		if err != nil {
+			h.serverError(w, r, err)
+			return
+		}
+	}
 	if len(errs) == 0 && kick.Failed == 0 {
 		if sheet {
 			h.appDone(w, r, http.StatusOK, membersChanged, "Member saved.")
@@ -223,6 +243,23 @@ func (h handlers) memberUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.renderMemberForm(w, r, status, id, p)
+}
+
+// applySheetPassword sets the password typed in the edit sheet. The field starts with the current
+// password, so an empty or unchanged value changes nothing. A bad password comes back as a field error.
+func (h handlers) applySheetPassword(r *http.Request, id int64, typed string) (domain.FieldErrors, error) {
+	if typed == "" {
+		return nil, nil
+	}
+	current, err := h.Members.RevealPassword(r.Context(), id)
+	if err != nil || typed == current {
+		return nil, err
+	}
+	msg, err := h.Members.SetPassword(r.Context(), id, typed)
+	if err != nil || msg == "" {
+		return nil, err
+	}
+	return domain.FieldErrors{"password": msg}, nil
 }
 
 // renderMemberForm answers with the member form. In the sheet it is the whole edit sheet.
@@ -506,7 +543,34 @@ type memberVM struct {
 	PlanUnit                    string
 	UnlimitedData               bool
 	RenewalText                 string
+	Since                       string // "14 Oct": when the member was created
 	Member                      domain.Member
+}
+
+// planSummary returns the one-line summary of a plan under the plan select: limits, days, speed, devices.
+func planSummary(p domain.Plan) string {
+	data, speed := "Unlimited data", "Unlimited speed"
+	if p.BulkValue > 0 {
+		data = limit(p.BulkValue, p.BulkUnit)
+	}
+	if p.SpeedValue > 0 {
+		speed = limit(p.SpeedValue, p.SpeedUnit)
+	}
+	parts := []string{data, plural(p.DurationDays, "day"), speed}
+	if p.TimeLimitMinutes > 0 {
+		parts = append(parts, timeText(p.TimeLimitMinutes)+" online")
+	}
+	parts = append(parts, plural(p.MaxSessions, "device"))
+	return strings.Join(parts, " · ")
+}
+
+// memberSince returns the date a member was created as "14 Oct", with the year when it is not this year.
+func memberSince(created, now time.Time, loc *time.Location) string {
+	created = created.In(loc)
+	if created.Year() == now.In(loc).Year() {
+		return created.Format("2 Jan")
+	}
+	return created.Format("2 Jan 2006")
 }
 
 // fmtTime returns t in loc as date and time.
@@ -530,6 +594,7 @@ func newVM(v member.View) memberVM {
 	if !s.Quota.DataUnlimited && s.Quota.AllowedBytes > 0 {
 		vm.HasMeter, vm.MeterUsed, vm.MeterMax = true, float64(s.Quota.UsedBytes), float64(s.Quota.AllowedBytes)
 	}
+	vm.Since = memberSince(m.CreatedAt, v.Now, v.Loc)
 	vm.Expires, vm.ExpiresFull = "—", "No expiry"
 	if m.ExpiresAt != nil {
 		vm.Expires = m.ExpiresAt.In(v.Loc).Format("2006-01-02")
@@ -563,6 +628,14 @@ func (m memberVM) Sub() string {
 		return m.Name
 	}
 	return m.Name + " · " + m.Mobile
+}
+
+// SheetSub is the line under the edit sheet title: the name and when the member was created.
+func (m memberVM) SheetSub() string {
+	if m.Name == "" {
+		return "Member since " + m.Since
+	}
+	return m.Name + " · member since " + m.Since
 }
 
 // trimJoin returns a and b joined by a space, leaving out an empty one.

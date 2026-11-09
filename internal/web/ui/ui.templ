@@ -735,7 +735,19 @@ templ FieldHint(h string) {
 }
 
 // Option is one entry of a select.
-type Option struct{ Value, Label string }
+type Option struct {
+	Value, Label string
+	// Summary, when set, is kept in data-summary; forms.js shows it in the element named by the select's data-summary-for.
+	Summary string
+}
+
+// summaryAttrs returns the data-summary attribute of an option, or nothing for an empty summary.
+func summaryAttrs(s string) templ.Attributes {
+	if s == "" {
+		return nil
+	}
+	return templ.Attributes{"data-summary": s}
+}
 
 // SelectProps describes a Select.
 type SelectProps struct {
@@ -743,6 +755,8 @@ type SelectProps struct {
 	// AriaLabel names a select that has no visible label (a toolbar filter).
 	AriaLabel string
 	Options   []Option
+	// Attrs add attributes to the <select>.
+	Attrs templ.Attributes
 	// Auto sizes the select to its text (a toolbar filter) instead of the width of its field.
 	Auto bool
 }
@@ -776,9 +790,9 @@ func ariaLabelAttrs(label string) templ.Attributes {
 // SelectControl is the bare <select>, reused inside composite fields.
 templ SelectControl(p SelectProps) {
 	<span class="c-select-wrap" { autoAttrs(p.Auto)... }>
-		<select id={ p.Name } name={ p.Name } class="c-select" { invalidAttrs(p.Name, p.Error)... } { ariaLabelAttrs(p.AriaLabel)... }>
+		<select id={ p.Name } name={ p.Name } class="c-select" { invalidAttrs(p.Name, p.Error)... } { ariaLabelAttrs(p.AriaLabel)... } { p.Attrs... }>
 			for _, o := range p.Options {
-				<option value={ o.Value } selected?={ o.Value == p.Value }>{ o.Label }</option>
+				<option value={ o.Value } selected?={ o.Value == p.Value } { summaryAttrs(o.Summary)... }>{ o.Label }</option>
 			}
 		</select>
 		@IconAs("chevron-down", "s", "c-select-wrap__icon")
@@ -802,6 +816,8 @@ templ Textarea(p TextareaProps) {
 type CheckboxProps struct {
 	Label, Name, Hint string
 	Checked           bool
+	// Attrs add attributes to the <input> (for example form, to tie it to a form elsewhere).
+	Attrs templ.Attributes
 }
 
 // Checkbox is a labelled checkbox.
@@ -824,7 +840,7 @@ templ SwitchRow(p CheckboxProps) {
 				<span class="c-field__hint">{ p.Hint }</span>
 			}
 		</label>
-		<input type="checkbox" role="switch" class="c-switch" id={ "f-" + p.Name } name={ p.Name } value="on" checked?={ p.Checked }/>
+		<input type="checkbox" role="switch" class="c-switch" id={ "f-" + p.Name } name={ p.Name } value="on" checked?={ p.Checked } { p.Attrs... }/>
 	</div>
 }
 
@@ -1071,13 +1087,40 @@ templ Sheet(id, title string) {
 templ SheetHost(id string) {
 	<dialog id={ id } class="c-sheet" data-sheet-host aria-labelledby={ id + "-title" }>
 		<div class="c-sheet__head">
-			<h2 class="c-sheet__title" id={ id + "-title" }></h2>
+			<div class="c-sheet__titles">
+				<h2 class="c-sheet__title" id={ id + "-title" }></h2>
+				<p class="c-sheet__sub" id={ id + "-sub" } hidden></p>
+			</div>
 			<button type="button" class="c-icon-btn" data-close aria-label="Close">
 				@Icon("x")
 			</button>
 		</div>
 		<div class="c-sheet__host" id={ id + "-body" }></div>
 	</dialog>
+}
+
+// More is a closed "More options" block (a native details element). open shows it at once, for a field with an error. attrs add data hooks.
+templ More(open bool, attrs templ.Attributes) {
+	<details class="c-more" open?={ open } { attrs... }>
+		<summary>
+			More options
+			@IconAs("chevron-down", "s", "")
+		</summary>
+		<div class="c-more__body">
+			{ children... }
+		</div>
+	</details>
+}
+
+// ActionRow is a bold title with a hint on the left and a button (the children) on the right.
+templ ActionRow(title, hint string) {
+	<div class="c-action-row">
+		<div>
+			<b>{ title }</b>
+			<span class="c-field__hint">{ hint }</span>
+		</div>
+		{ children... }
+	</div>
 }
 
 // SheetSection is a titled block inside a sheet body, set off by a line. attrs add data hooks.

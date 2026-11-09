@@ -43,6 +43,19 @@ details, unless the design is wrong for the product.
    - Usage: the 7/30/90 switch is a row of links (`c-seg` with `aria-current`), not radio buttons, and it now sets the chart, the three figures and the top list together (before, the chart was always 30 days). The chart is `ui.Plot` with the new kind `PlotWide`; the old `BarChart` is removed. The axis top and labels come from `domain.NewChartAxis` (round steps in the unit that fits). Bars get thinner for 90 days (`data-size`). Day labels are "11 Oct".
    - The top list shows a rank, the name (link), a meter (`ui.MeterPlain`, never turns warning), a small line "Down, Up, time" and the total with its unit (the design has bare numbers under a "GB used" title). Test hooks: `li[data-top]` with `[data-col=total|down|up|time]` (were `tr` and `td`).
    - Sizes of 1 TB and more print as "1.34 TB" (`FormatSize` gained a TB step).
+11. Member sheets follow design 4 and 4b (`MemberSheet`, `MemberEdit`, 2026-11-09), where the product has more or less than the design:
+   - New `ui.More` ("More options", a native `details`, CSS `components/more.css`, opens by itself when one of its fields has an error) and `ui.ActionRow`. The sheet head has a sub line (`data-sheet-sub`, set by `dialog.js`).
+   - Add sheet: Username, Password, Plan and a summary line ("10 GB · 30 days · 10 Mbps · 2 devices", plus the time limit if the plan has one). The line follows the plan select (`data-summary` on each option, `data-summary-for` on the select, `forms.js`). It has no "Valid until <date>": in the product "Valid until" is an optional hard stop and empty by default; the plan days count from creation (BR-5a).
+   - "More options" of the add sheet holds Valid until, first name, last name, mobile, email, national code, MAC and the Account enabled switch (the design has one "Name or note" field; deviation 8).
+   - Credentials card: block "Print login details" button under the details, footer is Add another and Done. Copy buttons and "Copy all details" stay (deviation 8).
+   - Edit sheet: title is the username, sub line "<name> · member since <date>" (year only if not this year). Order: Current state card (status pill with the word only, online dot, usage, Account enabled switch, Kick now, Print login details), then Username, Password, Plan, Valid until, then More options.
+   - Username stays editable (the product allows a rename while the member is offline; the board's "can't be changed" is wrong). The server error shows under the field (an online member gets "This member is online: disconnect the member before renaming."). The field is in the form, not in More options.
+   - Password: hidden field with the current password (the admin may view it); "New" makes a 6-digit number and shows it. Saving a changed value sets it (`PUT /password` rules, BR-20 limits); unchanged or empty keeps it. A bad value is checked before anything is saved and gives a 422 with the error under the field; nothing else changes. Only the sheet does this; the member page form has no password field.
+   - Kick now is the old Disconnect (same route and confirm). It is disabled while the member is offline.
+   - Disable and Enable: the Account enabled switch is saved with "Save changes" (Update disconnects when it turns off, BR-18). There is no separate Disable button in the sheet; the row menu keeps Disable and Enable.
+   - Renew (clears usage), Open details and Delete are rows in More options. They sit outside the `form` element, so htmx sends no form fields with them (the step 3 notes are fixed). The state card switch and the More fields belong to the form through the `form="member-form"` attribute; the Save changes button too. A 422 re-renders the whole sheet, so the actions stay.
+   - The list (`Members.dc.html`, unchanged) was checked again. Known differences, all product facts: the data cell reads "7.9 GB / 10 GB" with a "left" line (the board has "7.9 of 10 GB"); the search hint mentions mobile; Expires column; bulk bar has Delete only; chip "Expiring soon" (deviation 8).
+   - `dialog.js`: the `close-sheet` event now empties the sheet host first. Before, a saved edit could reopen the sheet, because the old form was still in the host when the empty answer was swapped in.
 
 ## Steps
 Each step: a sonnet agent builds it (tests first where logic changes), a separate sonnet agent
@@ -60,6 +73,7 @@ it, and keep each test's intent. No inline style or script (CSP).
 | 4 | Plans (cards + edit form, delete-blocked reason), Online sessions (kick + confirm) | DONE |
 | 5 | Vouchers/batches (form, list, A4 print sheet 3x6), Usage (7/30/90 switch, chart, top 10) | DONE |
 | 6 | Router (8 download cards, script, link status) and Settings (grouped form) | todo |
+| 7 | Change the admin username (added 2026-11-09, owner request). Design: board `docs/design/Account.dc.html` ("1b Password and username", the page behind the Password link: a Username card and a Password card, each with its own Save button, current password required) and the Set new password screen in `Login.dc.html` (new Username field, pre-filled with the current name, hint "Keep admin or choose your own."). Server: username rules as for other usernames, other admin sessions end, e2e tests, README and site first-login page | todo |
 
 ## How to continue from another machine
 1. Get the branch:
@@ -99,6 +113,5 @@ Router login bug (reply leaves, router times out; see `docs/radius-reply-bug.md`
 `docs/review-findings.md`, GitHub Pages setup, hardware lab checks (`PLAN.md` section 13).
 
 ## Known notes from step 3
-- The edit sheet actions (Renew, Disable, Disconnect, Delete) sit inside the edit form, so htmx sends the form fields with them. Delete puts them in the query string. Move the actions out of the form when the sheets are reworked.
-- After a failed edit (422) the actions section is not shown until the sheet is opened again (as before).
+- Fixed by deviation 11: the edit sheet actions now sit outside the form, and they stay after a 422.
 - The bulk bar has a danger Delete selected button with a trash icon and a Clear button (part of deviation 8).

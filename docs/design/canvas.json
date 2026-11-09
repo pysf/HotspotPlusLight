@@ -13,9 +13,11 @@
     "Tokens.dc.html": { "x": 1080, "y": 0, "w": 1280, "h": 2500, "title": "Design tokens", "page": "base" },
     "Components.dc.html": { "x": 2480, "y": 0, "w": 2736, "h": 3600, "title": "Component sheet", "page": "base" },
     "Login.dc.html": { "x": 0, "y": 0, "w": 2736, "h": 2900, "title": "1 Login and set new password", "page": "screens" },
+    "Account.dc.html": { "x": 2836, "y": 0, "w": 2736, "h": 2300, "title": "1b Password and username", "page": "screens" },
     "Dashboard.dc.html": { "x": 0, "y": 3020, "w": 2736, "h": 3800, "title": "2 Dashboard", "page": "screens" },
     "Members.dc.html": { "x": 0, "y": 6940, "w": 2736, "h": 3500, "title": "3 Members", "page": "screens" },
     "MemberSheet.dc.html": { "x": 0, "y": 10560, "w": 2736, "h": 3400, "title": "4 Add and edit member, credentials card", "page": "screens" },
+    "MemberEdit.dc.html": { "x": 2836, "y": 10560, "w": 2736, "h": 2000, "title": "4b Edit existing member", "page": "screens" },
     "Plans.dc.html": { "x": 0, "y": 14080, "w": 2736, "h": 4200, "title": "5 Plans", "page": "screens" },
     "Sessions.dc.html": { "x": 0, "y": 18400, "w": 2736, "h": 3200, "title": "6 Online sessions", "page": "screens" },
     "Vouchers.dc.html": { "x": 0, "y": 21720, "w": 2736, "h": 3900, "title": "7 Batches and vouchers", "page": "screens" },
@@ -27,7 +29,7 @@
   },
   "order": [
     "Main.dc.html", "Tokens.dc.html", "Components.dc.html",
-    "Login.dc.html", "Dashboard.dc.html", "Members.dc.html", "MemberSheet.dc.html", "Plans.dc.html",
+    "Login.dc.html", "Account.dc.html", "Dashboard.dc.html", "Members.dc.html", "MemberSheet.dc.html", "MemberEdit.dc.html", "Plans.dc.html",
     "Sessions.dc.html", "Vouchers.dc.html", "Usage.dc.html", "Router.dc.html", "Settings.dc.html",
     "Print.dc.html", "DevNotes.dc.html"
   ],

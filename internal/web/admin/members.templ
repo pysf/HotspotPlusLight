@@ -40,9 +40,19 @@ func planChoiceOptions(plans []domain.Plan) []ui.Option {
 	o := []ui.Option{{Value: "", Label: "Choose a plan"}}
 	for _, p := range plans {
 		label := p.Name + " · " + limit(p.BulkValue, p.BulkUnit) + " · " + strconv.Itoa(p.DurationDays) + " days"
-		o = append(o, ui.Option{Value: strconv.FormatInt(p.ID, 10), Label: label})
+		o = append(o, ui.Option{Value: strconv.FormatInt(p.ID, 10), Label: label, Summary: planSummary(p)})
 	}
 	return o
+}
+
+// selectedPlanSummary returns the summary of the plan with the given id text, or "" if none is chosen.
+func selectedPlanSummary(plans []domain.Plan, id string) string {
+	for _, p := range plans {
+		if strconv.FormatInt(p.ID, 10) == id {
+			return planSummary(p)
+		}
+	}
+	return ""
 }
 
 // pageSizeOptions returns the select options for the page size.
@@ -211,16 +221,7 @@ templ MemberRow(m memberVM) {
 		</td>
 		<td data-col="data" data-label="Data used" class="u-nums">
 			<div class="c-table__v">
-				<div class="c-usage">
-					<span>{ m.DataMain }</span>
-					if m.HasMeter {
-						@ui.Meter(m.MeterUsed, m.MeterMax, m.DataMain)
-					}
-					if m.DataLeft != "" {
-						{ " " }
-						<span data-col="data-left">{ m.DataLeft }</span>
-					}
-				</div>
+				@UsageCell(m)
 			</div>
 		</td>
 		<td data-label="Expires" data-nowrap>
@@ -351,7 +352,6 @@ func memberFormAttrs(p MemberFormProps) templ.Attributes {
 	a := templ.Attributes{"id": "member-form", "hx-target": "this", "hx-swap": "outerHTML"}
 	if p.Sheet {
 		a["hx-target"], a["hx-swap"] = "#"+sheetBodyID, "innerHTML"
-		a["data-sheet-title"] = "Edit member"
 		if p.Create {
 			a["data-sheet-title"] = "Add member"
 		}
@@ -364,14 +364,16 @@ func memberFormAttrs(p MemberFormProps) templ.Attributes {
 	return a
 }
 
-// MemberFormView is both the new and edit form and the 422 response body. In the sheet the fields scroll
-// and the buttons stay at the bottom; the children (the edit actions) come after the fields.
+// formAttr ties an input that sits outside the member form to it (the edit sheet keeps its More options below the form).
+var formAttr = templ.Attributes{"form": "member-form"}
+
+// MemberFormView is both the new and edit form (the page form and the add sheet) and the 422 response
+// body. In the sheet the fields scroll and the buttons stay at the bottom. The edit sheet is MemberEditSheet.
 templ MemberFormView(p MemberFormProps) {
 	if p.Sheet {
 		@ui.SheetFormPane(memberFormAttrs(p)) {
 			@ui.SheetBody() {
-				@memberFields(p)
-				{ children... }
+				@memberCreateFields(p)
 			}
 			@ui.SheetFoot() {
 				@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
@@ -389,30 +391,126 @@ templ MemberFormView(p MemberFormProps) {
 	}
 }
 
-// memberFields are the fields of the member form.
-templ memberFields(p MemberFormProps) {
+// formWarning shows the warning above a member form (for example a failed kick).
+templ formWarning(p MemberFormProps) {
 	if p.Warning != "" {
 		@ui.Flash("warn", p.Warning)
 	}
-	@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: p.Form.Username, Error: p.Errors["username"], Hint: "English letters and digits, up to 64. Case-insensitive. Empty = use the mobile number.", Attrs: templ.Attributes{"data-mono": true, "autocomplete": "off"}})
-	if p.Create {
-		@ui.FieldPair(ui.PairProps{Label: "Password", For: "password", Hint: "Empty = a random 6-digit number.", Errors: []ui.NamedError{{Name: "password", Msg: p.Errors["password"]}}}) {
-			@ui.InputControl(ui.FieldProps{Name: "password", Value: p.Form.Password, Error: p.Errors["password"], Attrs: templ.Attributes{"data-mono": true, "autocomplete": "off"}})
-			@ui.RevealToggle("password", true)
-			@ui.ButtonIcon("secondary", "wand", "Generate", templ.Attributes{"data-size": "sm", "data-generate-digits": "password"})
+}
+
+// usernameField is the username input. Empty on a new member means "use the mobile number".
+templ usernameField(p MemberFormProps, attrs templ.Attributes) {
+	@ui.Field(ui.FieldProps{Label: "Username", Name: "username", Value: p.Form.Username, Error: p.Errors["username"], Hint: usernameHint(p.Create), Attrs: monoAttrs(attrs)})
+}
+
+// usernameHint is the hint under the username field.
+func usernameHint(create bool) string {
+	if create {
+		return "English letters and digits, up to 64. Case-insensitive. Empty = use the mobile number."
+	}
+	return "You can change the username only while the member is offline."
+}
+
+// monoAttrs returns the attributes of a mono text input that is not auto-filled, plus extra.
+func monoAttrs(extra templ.Attributes) templ.Attributes {
+	a := templ.Attributes{"data-mono": true, "autocomplete": "off"}
+	for k, v := range extra {
+		a[k] = v
+	}
+	return a
+}
+
+// passwordNewField is the password of a new member: empty = a random 6-digit number.
+templ passwordNewField(p MemberFormProps) {
+	@ui.FieldPair(ui.PairProps{Label: "Password", For: "password", Hint: "Empty = a random 6-digit number.", Errors: []ui.NamedError{{Name: "password", Msg: p.Errors["password"]}}}) {
+		@ui.InputControl(ui.FieldProps{Name: "password", Value: p.Form.Password, Error: p.Errors["password"], Attrs: monoAttrs(nil)})
+		@ui.RevealToggle("password", true)
+		@ui.ButtonIcon("secondary", "wand", "Generate", templ.Attributes{"data-size": "sm", "data-generate-digits": "password"})
+	}
+}
+
+// passwordEditField is the password of an existing member. It starts hidden with the current password.
+templ passwordEditField(p MemberFormProps) {
+	@ui.FieldPair(ui.PairProps{Label: "Password", For: "password", Hint: "Leave it as it is to keep the current password.", Errors: []ui.NamedError{{Name: "password", Msg: p.Errors["password"]}}}) {
+		@ui.InputControl(ui.FieldProps{Name: "password", Type: "password", Value: p.Form.Password, Error: p.Errors["password"], Attrs: monoAttrs(templ.Attributes{"autocomplete": "new-password"})})
+		@ui.RevealToggle("password", false)
+		@ui.ButtonIcon("secondary", "wand", "New", templ.Attributes{"data-size": "sm", "data-generate-digits": "password"})
+	}
+}
+
+// planField is the plan select. With summary it names the line that shows the chosen plan's summary.
+templ planField(p MemberFormProps, summaryID string) {
+	@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan_id", Value: p.Form.PlanID, Options: planChoiceOptions(p.Plans), Error: p.Errors["plan_id"], Attrs: summaryAttrsFor(summaryID)})
+}
+
+// summaryAttrsFor makes a select write the plan summary into the element with id ("" = none).
+func summaryAttrsFor(id string) templ.Attributes {
+	if id == "" {
+		return nil
+	}
+	return templ.Attributes{"data-summary-for": id}
+}
+
+// validUntilField is the optional hard stop date.
+templ validUntilField(p MemberFormProps, hint string) {
+	@ui.Field(ui.FieldProps{Label: "Valid until", Name: "expires_at", Type: "datetime-local", Value: p.Form.ExpiresAt, Error: p.Errors["expires_at"], Hint: hint})
+}
+
+// profileFields are the personal fields: first and last name, mobile, email, national code and MAC.
+templ profileFields(p MemberFormProps, attrs templ.Attributes) {
+	<div class="c-form-grid">
+		@ui.Field(ui.FieldProps{Label: "First name", Name: "first_name", Value: p.Form.FirstName, Error: p.Errors["first_name"], Attrs: attrs})
+		@ui.Field(ui.FieldProps{Label: "Last name", Name: "last_name", Value: p.Form.LastName, Error: p.Errors["last_name"], Attrs: attrs})
+	</div>
+	@ui.Field(ui.FieldProps{Label: "Mobile", Name: "mobile", Value: p.Form.Mobile, Error: p.Errors["mobile"], Hint: "The last 10 digits are kept.", Attrs: attrs})
+	@ui.Field(ui.FieldProps{Label: "Email", Name: "email", Value: p.Form.Email, Error: p.Errors["email"], Attrs: attrs})
+	@ui.Field(ui.FieldProps{Label: "National code", Name: "national_code", Value: p.Form.NationalCode, Error: p.Errors["national_code"], Attrs: attrs})
+	@ui.Field(ui.FieldProps{Label: "MAC address", Name: "mac", Value: p.Form.MAC, Error: p.Errors["mac"], Hint: "Optional. Filled in automatically from the first session.", Attrs: attrs})
+}
+
+// activeSwitch is the "Account enabled" switch row.
+templ activeSwitch(p MemberFormProps, hint string, attrs templ.Attributes) {
+	@ui.SwitchRow(ui.CheckboxProps{Label: "Account enabled", Name: "active", Checked: p.Form.Active, Hint: hint, Attrs: attrs})
+}
+
+// hasError reports whether one of the named fields has an error.
+func hasError(errs domain.FieldErrors, names ...string) bool {
+	for _, n := range names {
+		if errs[n] != "" {
+			return true
 		}
 	}
-	@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan_id", Value: p.Form.PlanID, Options: planChoiceOptions(p.Plans), Error: p.Errors["plan_id"]})
-	@ui.Field(ui.FieldProps{Label: "Valid until", Name: "expires_at", Type: "datetime-local", Value: p.Form.ExpiresAt, Error: p.Errors["expires_at"], Hint: "Optional. Logins after this moment are refused. Settings time zone."})
-	<div class="c-form-grid">
-		@ui.Field(ui.FieldProps{Label: "First name", Name: "first_name", Value: p.Form.FirstName, Error: p.Errors["first_name"]})
-		@ui.Field(ui.FieldProps{Label: "Last name", Name: "last_name", Value: p.Form.LastName, Error: p.Errors["last_name"]})
-	</div>
-	@ui.Field(ui.FieldProps{Label: "Mobile", Name: "mobile", Value: p.Form.Mobile, Error: p.Errors["mobile"], Hint: "The last 10 digits are kept."})
-	@ui.Field(ui.FieldProps{Label: "Email", Name: "email", Value: p.Form.Email, Error: p.Errors["email"]})
-	@ui.Field(ui.FieldProps{Label: "National code", Name: "national_code", Value: p.Form.NationalCode, Error: p.Errors["national_code"]})
-	@ui.Field(ui.FieldProps{Label: "MAC address", Name: "mac", Value: p.Form.MAC, Error: p.Errors["mac"], Hint: "Optional. Filled in automatically from the first session."})
-	@ui.SwitchRow(ui.CheckboxProps{Label: "Account enabled", Name: "active", Checked: p.Form.Active, Hint: "Turning it off disconnects the member's open sessions."})
+	return false
+}
+
+// profileNames are the fields of profileFields.
+var profileNames = []string{"first_name", "last_name", "mobile", "email", "national_code", "mac"}
+
+// memberFields are the fields of the member form on a page: all in the open.
+templ memberFields(p MemberFormProps) {
+	@formWarning(p)
+	@usernameField(p, nil)
+	if p.Create {
+		@passwordNewField(p)
+	}
+	@planField(p, "")
+	@validUntilField(p, "Optional. Logins after this moment are refused. Settings time zone.")
+	@profileFields(p, nil)
+	@activeSwitch(p, "Turning it off disconnects the member's open sessions.", nil)
+}
+
+// memberCreateFields are the fields of the add sheet: the main ones, then "More options" (design sheet 4).
+templ memberCreateFields(p MemberFormProps) {
+	@formWarning(p)
+	@usernameField(p, nil)
+	@passwordNewField(p)
+	@planField(p, "plan-summary")
+	<p class="c-hint" id="plan-summary" aria-live="polite" data-plan-summary>{ selectedPlanSummary(p.Plans, p.Form.PlanID) }</p>
+	@ui.More(hasError(p.Errors, append([]string{"expires_at"}, profileNames...)...), templ.Attributes{"data-more": "create"}) {
+		@validUntilField(p, "Optional. Logins after this moment are refused. Settings time zone.")
+		@profileFields(p, nil)
+		@activeSwitch(p, "Turning it off blocks login.", nil)
+	}
 }
 
 // MemberNewSheet is the new-member form for the sheet (or a hint when there is no plan to choose).
@@ -428,21 +526,85 @@ templ MemberNewSheet(p MemberFormProps) {
 	}
 }
 
-// MemberEditSheet is the edit form plus the member's actions. "Open details" is the member page,
-// which keeps the usage summary, extra data and the password.
+// sheetAction is a button in the edit sheet that changes the member and sends the answer to the toasts and the list refresh.
+func sheetAction(method, url, confirm string, extra templ.Attributes) templ.Attributes {
+	a := rowAction(method, url, sheetBodyID, confirm)
+	a["data-size"] = "sm"
+	for k, v := range extra {
+		a[k] = v
+	}
+	return a
+}
+
+// MemberEditSheet is the edit sheet (design sheet 4b): the current state, the form (username, password, plan, valid until), then "More options".
+// The action buttons sit outside the form element, so htmx sends no form fields with them. The state
+// card holds the "Account enabled" switch and Kick now; More options holds Renew, Open details and Delete.
+// The switch and the More fields (the personal fields) belong to the form through the form attribute.
 templ MemberEditSheet(p MemberFormProps, m memberVM) {
-	{{ toggleLabel, toggle := toggleAction(m, sheetBodyID) }}
-	@MemberFormView(p) {
-		@ui.SheetSection("Actions", templ.Attributes{"data-actions": true}) {
-			@ui.Actions() {
-				@ui.ButtonIcon("secondary", "clock", "Renew", rowAction("post", memberURL(m.ID)+"/renewals", sheetBodyID, confirmRenew))
-				@ui.ButtonIcon("secondary", toggleIcon(m), toggleLabel, toggle)
-				@ui.ButtonIcon("secondary", "power", "Disconnect", rowAction("post", memberURL(m.ID)+"/disconnections", sheetBodyID, confirmDisconnect))
-				@ui.ButtonIcon("danger", "trash", "Delete", rowAction("delete", memberURL(m.ID), sheetBodyID, confirmDelete))
-				@ui.LinkButton("ghost", memberURL(m.ID), "Open details", nil)
+	@ui.SheetPane(templ.Attributes{"data-sheet-title": m.Username, "data-sheet-sub": m.SheetSub()}) {
+		@ui.SheetBody() {
+			@formWarning(p)
+			<div class="c-card l-stack" data-pad="s" role="group" aria-label="Current state" data-state>
+				<div class="c-between">
+					@ui.Pill(statusPill(m.Status), statusLabel(m.Status))
+					@ui.OnlineState(m.Online)
+				</div>
+				@UsageCell(m)
+				@activeSwitch(p, "", formAttr)
+				<div class="l-cluster" data-actions>
+					@ui.ButtonIcon("danger", "power", "Kick now", sheetAction("post", memberURL(m.ID)+"/disconnections", confirmDisconnect, kickNowAttrs(m.Online)))
+					if !m.Online {
+						<span class="c-hint">Offline</span>
+					}
+					@ui.LinkButtonIcon("secondary", "printer", memberURL(m.ID)+"/voucher", "Print login details", templ.Attributes{"target": "_blank", "rel": "noopener", "data-size": "sm"})
+				</div>
+			</div>
+			<form class="c-sheet__form" { memberFormAttrs(p)... }>
+				@usernameField(p, nil)
+				@passwordEditField(p)
+				@planField(p, "")
+				@validUntilField(p, "Change this date to extend the stay.")
+			</form>
+			@ui.More(hasError(p.Errors, profileNames...), templ.Attributes{"data-more": "edit"}) {
+				@profileFields(p, formAttr)
+				@ui.ActionRow("Renew now", "Restarts the validity window. Used data, time and extra data are cleared.") {
+					@ui.ButtonIcon("secondary", "clock", "Renew", sheetAction("post", memberURL(m.ID)+"/renewals", confirmRenew, nil))
+				}
+				@ui.ActionRow("Open details", "Extra data and the usage summary.") {
+					@ui.LinkButton("ghost", memberURL(m.ID), "Open details", templ.Attributes{"data-size": "sm"})
+				}
+				@ui.ActionRow("Delete member", "Removes the login and its usage history.") {
+					@ui.ButtonIcon("danger", "trash", "Delete", sheetAction("delete", memberURL(m.ID), confirmDelete, nil))
+				}
 			}
 		}
+		@ui.SheetFoot() {
+			@ui.Button("secondary", "Cancel", templ.Attributes{"data-close": true})
+			@ui.Button("primary", "Save changes", templ.Attributes{"type": "submit", "form": "member-form"})
+		}
 	}
+}
+
+// kickNowAttrs disables Kick now when the member is not online.
+func kickNowAttrs(online bool) templ.Attributes {
+	if online {
+		return nil
+	}
+	return templ.Attributes{"disabled": true}
+}
+
+// UsageCell is the data used figures, the bar and the "left" line (list row and edit sheet).
+templ UsageCell(m memberVM) {
+	<div class="c-usage" data-usage>
+		<span>{ m.DataMain }</span>
+		if m.HasMeter {
+			@ui.Meter(m.MeterUsed, m.MeterMax, m.DataMain)
+		}
+		if m.DataLeft != "" {
+			{ " " }
+			<span data-col="data-left">{ m.DataLeft }</span>
+		}
+	</div>
 }
 
 // createdVM is the data of the credentials card.
@@ -466,10 +628,10 @@ templ MemberCreated(c createdVM) {
 				{Label: "Devices", Value: c.Devices, Key: "devices"},
 			})
 			@ui.ButtonIcon("ghost", "copy", "Copy all details", templ.Attributes{"data-copy-all": true, "data-copy-text": "Username: " + c.Username + "\nPassword: " + c.Password + "\nPlan: " + c.Plan + "\nValid until: " + c.Expires})
+			@ui.LinkButtonIcon("secondary", "printer", memberURL(c.ID)+"/voucher", "Print login details", templ.Attributes{"target": "_blank", "rel": "noopener", "data-size": "block"})
 		}
 		@ui.SheetFoot() {
 			@ui.ButtonIcon("ghost", "plus", "Add another", sheetOpen("/admin/members/new"))
-			@ui.LinkButtonIcon("secondary", "printer", memberURL(c.ID)+"/voucher", "Print", templ.Attributes{"target": "_blank", "rel": "noopener"})
 			@ui.Button("primary", "Done", templ.Attributes{"data-close": true})
 		}
 	}

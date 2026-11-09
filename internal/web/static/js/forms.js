@@ -2,7 +2,8 @@
 //   [data-reveal="id"]       toggles the password field #id between hidden and visible (an eye button with
 //                            aria-pressed keeps its icon and changes aria-pressed and aria-label; a text button changes its text)
 //   [data-select-all="sel"]  a checkbox that ticks every checkbox matching sel
-//   [data-generate-digits="id"]  a button that puts a random 6-digit number into the field #id
+//   [data-generate-digits="id"]  a button that puts a random 6-digit number into the field #id and shows it
+//   select[data-summary-for="id"]  a select: the data-summary of the chosen option is written into the element #id
 //   [data-bulk-bar]          the bar of a [data-bulk-guard] form: shown with the count while something is ticked;
 //                            [data-bulk-clear] unticks everything
 //   [data-clear="id"]        a button that empties the element #id
@@ -33,25 +34,33 @@ function syncBulk(form) {
   bar.querySelector("[data-bulk-count]").textContent = count + " selected";
 }
 
+// setShown shows or hides the password in input and updates its reveal button.
+function setShown(input, reveal, shown) {
+  input.type = shown ? "text" : "password";
+  if (!reveal) { return; }
+  if (reveal.hasAttribute("aria-pressed")) {
+    reveal.setAttribute("aria-pressed", String(shown));
+    reveal.setAttribute("aria-label", shown ? "Hide password" : "Show password");
+  } else {
+    reveal.textContent = shown ? "Hide" : "Reveal";
+  }
+}
+
 document.addEventListener("click", (e) => {
   const reveal = e.target.closest("[data-reveal]");
   if (reveal) {
     const input = document.getElementById(reveal.getAttribute("data-reveal"));
-    if (!input) { return; }
-    input.type = input.type === "password" ? "text" : "password";
-    const shown = input.type !== "password";
-    if (reveal.hasAttribute("aria-pressed")) {
-      reveal.setAttribute("aria-pressed", String(shown));
-      reveal.setAttribute("aria-label", shown ? "Hide password" : "Show password");
-    } else {
-      reveal.textContent = shown ? "Hide" : "Reveal";
-    }
+    if (input) { setShown(input, reveal, input.type === "password"); }
     return;
   }
   const gen = e.target.closest("[data-generate-digits]");
   if (gen) {
     const field = document.getElementById(gen.getAttribute("data-generate-digits"));
-    if (field) { field.value = randomDigits(6); field.dispatchEvent(new Event("input", { bubbles: true })); }
+    if (field) {
+      field.value = randomDigits(6);
+      setShown(field, document.querySelector('[data-reveal="' + field.id + '"]'), true);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     return;
   }
   const clearBulk = e.target.closest("[data-bulk-clear]");
@@ -66,6 +75,11 @@ document.addEventListener("click", (e) => {
 });
 
 document.addEventListener("change", (e) => {
+  const pick = e.target.closest("select[data-summary-for]");
+  if (pick) {
+    const out = document.getElementById(pick.getAttribute("data-summary-for"));
+    if (out) { out.textContent = pick.selectedOptions[0]?.getAttribute("data-summary") || ""; }
+  }
   const all = e.target.closest("[data-select-all]");
   if (all) {
     for (const box of document.querySelectorAll(all.getAttribute("data-select-all"))) { box.checked = all.checked; }

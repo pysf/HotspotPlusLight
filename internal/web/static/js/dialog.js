@@ -59,7 +59,7 @@ document.addEventListener("click", (e) => {
 });
 
 // The sheet: pages load a form into <dialog id="sheet"> by targeting #sheet-body. When that swap
-// brings content, set the title from its data-sheet-title and open the dialog. A fragment is one
+// brings content, set the title from its data-sheet-title (and the line under it from data-sheet-sub) and open the dialog. A fragment is one
 // root with data-sheet-title; an empty answer (a saved form) leaves the sheet as it is.
 document.body.addEventListener("htmx:afterSwap", (e) => {
   const body = e.detail.target;
@@ -69,6 +69,9 @@ document.body.addEventListener("htmx:afterSwap", (e) => {
   const title = body.querySelector("[data-sheet-title]");
   const head = document.getElementById(dlg.id + "-title");
   if (head) { head.textContent = title ? title.getAttribute("data-sheet-title") : "Details"; }
+  const sub = document.getElementById(dlg.id + "-sub");
+  const subText = title ? title.getAttribute("data-sheet-sub") || "" : "";
+  if (sub) { sub.textContent = subText; sub.hidden = subText === ""; }
   if (!dlg.open) { dlg.showModal(); }
 });
 
@@ -94,5 +97,9 @@ document.addEventListener("close", (e) => {
 
 // Server events: HX-Trigger "close-sheet" closes every open sheet.
 document.body.addEventListener("close-sheet", () => {
-  for (const d of document.querySelectorAll("dialog.c-sheet[open]")) { d.close(); }
+  for (const d of document.querySelectorAll("dialog.c-sheet[open]")) {
+    // The answer is swapped in after this event; an old form left in the host would reopen the sheet.
+    d.querySelector(".c-sheet__host")?.replaceChildren();
+    d.close();
+  }
 });
