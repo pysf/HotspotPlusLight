@@ -8,36 +8,83 @@ import (
 	"hotspotpluslight/internal/web/ui"
 )
 
-// UsagePage shows the usage history: a daily chart and the top members.
+// UsagePage shows the usage history: the range switch, three figures, the daily chart and the top members.
 templ UsagePage(l ui.LayoutData, v usage.View) {
 	@ui.Layout(l) {
-		@ui.PageHeader("Usage")
-		<section class="l-stack">
-			<h2>Daily traffic, last { strconv.Itoa(len(v.Days)) } days</h2>
-			@ui.BarChart(usageBars(v), v.MaxTotal, "download + upload, all members; peak "+domain.FormatSize(v.MaxTotal))
-		</section>
-		<section class="l-stack">
-			<h2>Top members</h2>
-			<nav class="l-toolbar" aria-label="Range">
+		@ui.PageHeaderSub("Usage", "How much data your guests used.") {
+			@ui.Seg("Time range") {
 				for _, d := range domain.UsageRanges {
-					@ui.Chip(ui.ChipProps{Label: strconv.Itoa(d) + " days", Href: usageHref(d), Selected: d == v.Range, Attrs: templ.Attributes{"data-range": strconv.Itoa(d)}})
+					@ui.SegLink(strconv.Itoa(d)+" days", usageHref(d), d == v.Range, templ.Attributes{"data-range": strconv.Itoa(d)})
 				}
-			</nav>
-			if len(v.Top) == 0 {
-				@ui.EmptyState("No traffic yet", "No traffic recorded in the last "+strconv.Itoa(v.Range)+" days.")
-			} else {
-				@ui.Table("Top members", []string{"Username", "Total", "Download", "Upload", "Time"}) {
-					for _, u := range v.Top {
-						<tr data-top data-username={ u.Username }>
-							<td data-col="username" data-label="Username"><a href={ templ.SafeURL(memberURL(u.MemberID)) }>{ u.Username }</a></td>
-							<td data-col="total" data-label="Total" class="u-nums">{ domain.FormatSize(u.Total()) }</td>
-							<td data-col="down" data-label="Download" class="u-nums">{ domain.FormatSize(u.Down) }</td>
-							<td data-col="up" data-label="Upload" class="u-nums">{ domain.FormatSize(u.Up) }</td>
-							<td data-col="time" data-label="Time" class="u-nums">{ domain.FormatDuration(u.Seconds) }</td>
-						</tr>
-					}
+			}
+		}
+		<section class="l-cols" data-cols="3" aria-label="Summary">
+			@ui.Tile("Total traffic", templ.Attributes{"data-tile": "total"}) {
+				@ui.TileValueUnit(sizeNumber(domain.FormatSize(v.Summary.Total)), sizeUnit(domain.FormatSize(v.Summary.Total)), nil)
+				@ui.TileNote(usagePeriod(v), nil)
+			}
+			@ui.Tile("Daily average", templ.Attributes{"data-tile": "average"}) {
+				@ui.TileValueUnit(sizeNumber(domain.FormatSize(v.Summary.Average)), sizeUnit(domain.FormatSize(v.Summary.Average)), nil)
+				@ui.TileNote("per day", nil)
+			}
+			@ui.Tile("Busiest day", templ.Attributes{"data-tile": "busiest"}) {
+				if v.Summary.PeakDay == "" {
+					@ui.TileValue("None", nil)
+					@ui.TileNote("No traffic yet", nil)
+				} else {
+					@ui.TileValueUnit(sizeNumber(domain.FormatSize(v.Summary.PeakBytes)), sizeUnit(domain.FormatSize(v.Summary.PeakBytes)), nil)
+					@ui.TileNote(dayLong(v.Summary.PeakDay), nil)
 				}
 			}
 		</section>
+		<div class="l-cols" data-cols="2-1">
+			@UsageChartCard(v)
+			@TopMembersCard(v)
+		</div>
 	}
+}
+
+// UsageChartCard is the card with the daily traffic chart.
+templ UsageChartCard(v usage.View) {
+	<section class="c-card" data-pad aria-labelledby="usage-chart-h">
+		<div class="c-card__head">
+			<h2 class="c-card__title" id="usage-chart-h">Traffic per day</h2>
+			if v.MaxTotal > 0 {
+				<span class="u-small u-muted">Last { strconv.Itoa(v.Range) } days, { v.Axis.Unit }</span>
+			}
+		</div>
+		if v.MaxTotal == 0 {
+			<p class="u-muted" data-empty>No traffic recorded in the last { strconv.Itoa(v.Range) } days.</p>
+		} else {
+			@ui.PlotWith(ui.PlotProps{Kind: ui.PlotWide, Bars: usageBars(v), Top: v.Axis.Top, Label: usageChartLabel(v), YLabels: v.Axis.Labels, PeakLabel: domain.FormatSize(v.Summary.PeakBytes)})
+			<p class="u-small u-muted">The darker bar is the busiest day.</p>
+		}
+	</section>
+}
+
+// TopMembersCard is the ranked list of the members who used the most data.
+templ TopMembersCard(v usage.View) {
+	<section class="c-card" data-pad aria-labelledby="usage-top-h">
+		<div class="c-card__head">
+			<h2 class="c-card__title" id="usage-top-h">Top 10 members</h2>
+			<span class="u-small u-muted">Downloaded and uploaded</span>
+		</div>
+		if len(v.Top) == 0 {
+			<p class="u-muted" data-empty>No traffic recorded in the last { strconv.Itoa(v.Range) } days.</p>
+		} else {
+			<ol>
+				for i, u := range v.Top {
+					<li class="c-li" data-top data-username={ u.Username }>
+						<span class="c-rank">{ strconv.Itoa(i + 1) }</span>
+						<div class="u-grow">
+							<b><a href={ templ.SafeURL(memberURL(u.MemberID)) }>{ u.Username }</a></b>
+							@ui.MeterPlain(float64(u.Total()), float64(v.Top[0].Total()), u.Username+" used "+domain.FormatSize(u.Total()))
+							<small><span>Down <span data-col="down">{ domain.FormatSize(u.Down) }</span></span> &middot; <span>Up <span data-col="up">{ domain.FormatSize(u.Up) }</span></span> &middot; <span data-col="time">{ domain.FormatDuration(u.Seconds) }</span></small>
+						</div>
+						<b class="c-li__value u-nums" data-col="total">{ domain.FormatSize(u.Total()) }</b>
+					</li>
+				}
+			</ol>
+		}
+	</section>
 }

@@ -37,36 +37,31 @@ func batchForm(r *http.Request) domain.BatchForm {
 	return domain.BatchForm{Label: v("label"), PlanID: v("plan_id"), Count: v("count"), DurationDays: v("duration_days")}
 }
 
-// batches shows the batch list.
-func (h handlers) batches(w http.ResponseWriter, r *http.Request) {
+// batchesPage shows the vouchers page: the batch list and the new-batch form with its defaults.
+func (h handlers) batchesPage(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	res, err := h.Batches.List(r.Context(), atoi(q.Get("page")), atoi(q.Get("per")))
+	list, err := h.Batches.List(r.Context(), atoi(q.Get("page")), atoi(q.Get("per")))
 	if err != nil {
 		h.serverError(w, r, err)
 		return
 	}
-	h.render(w, r, http.StatusOK, BatchesPage(layout(r, "Vouchers", batchesHome), res))
+	f, err := h.Batches.NewForm(r.Context())
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	form, err := h.batchFormProps(r, f, nil)
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	h.render(w, r, http.StatusOK, BatchesPage(layout(r, "Vouchers", batchesHome), BatchesProps{List: list, Form: form}))
 }
 
 // batchFormProps returns the props of the batch form.
 func (h handlers) batchFormProps(r *http.Request, f domain.BatchForm, errs domain.FieldErrors) (BatchFormProps, error) {
 	plans, err := h.Plans.List(r.Context())
 	return BatchFormProps{Form: f, Errors: errs, Plans: plans}, err
-}
-
-// batchNew shows the new batch form.
-func (h handlers) batchNew(w http.ResponseWriter, r *http.Request) {
-	f, err := h.Batches.NewForm(r.Context())
-	if err != nil {
-		h.serverError(w, r, err)
-		return
-	}
-	p, err := h.batchFormProps(r, f, nil)
-	if err != nil {
-		h.serverError(w, r, err)
-		return
-	}
-	h.render(w, r, http.StatusOK, BatchNewPage(layout(r, "New batch", batchesHome), p))
 }
 
 // batchCreate creates a batch and goes to its voucher page. A taken username answers 409.
@@ -146,7 +141,7 @@ func (h handlers) batchPrint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, err := h.Batches.PrintBatch(r.Context(), id)
-	h.printed(w, r, p, err, "Batch", batchesHome)
+	h.printed(w, r, p, err, "Batch", batchesHome, "Back to vouchers")
 }
 
 // memberPrint shows the print page of one member's voucher (BR-16, Q24).
@@ -157,18 +152,18 @@ func (h handlers) memberPrint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, err := h.Batches.PrintMember(r.Context(), id)
-	h.printed(w, r, p, err, "Member", memberURL(id))
+	h.printed(w, r, p, err, "Member", memberURL(id), "Back to member")
 }
 
-// printed shows the voucher sheets for p, or the error for err. back is the link of the back button.
-func (h handlers) printed(w http.ResponseWriter, r *http.Request, p voucher.Print, err error, what, back string) {
+// printed shows the voucher sheets for p, or the error for err. back and backLabel are the link and text of the back button.
+func (h handlers) printed(w http.ResponseWriter, r *http.Request, p voucher.Print, err error, what, back, backLabel string) {
 	switch {
 	case errors.Is(err, domain.ErrNotFound):
 		h.notFound(w, r, what)
 	case err != nil:
 		h.serverError(w, r, err)
 	default:
-		h.render(w, r, http.StatusOK, VoucherSheets(p, back))
+		h.render(w, r, http.StatusOK, VoucherSheets(p, back, backLabel))
 	}
 }
 

@@ -158,7 +158,7 @@ func TestE10_04_GalleryOnlyInDev(t *testing.T) {
 		t.Fatalf("with HSP_DEV=1: %d", r.StatusCode)
 	}
 	d := r.Doc(t)
-	for _, want := range []string{".c-btn", ".c-icon-btn", ".c-field", ".c-input", ".c-select", ".c-search", ".c-chip", ".c-card", ".c-table", ".c-meter", ".c-pill", ".c-pager", ".c-empty", ".c-menu", ".c-sheet", ".c-modal", ".c-credentials", ".c-code", ".c-chart"} {
+	for _, want := range []string{".c-btn", ".c-icon-btn", ".c-field", ".c-input", ".c-select", ".c-search", ".c-chip", ".c-card", ".c-table", ".c-meter", ".c-pill", ".c-pager", ".c-empty", ".c-menu", ".c-sheet", ".c-modal", ".c-credentials", ".c-code", ".c-chart__plot"} {
 		if d.Find(want).Length() == 0 {
 			t.Errorf("gallery lacks %s", want)
 		}

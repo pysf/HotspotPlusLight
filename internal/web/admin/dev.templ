@@ -56,11 +56,11 @@ templ DevComponentsPage(l ui.LayoutData) {
 			<div class="l-narrow">
 				@ui.SwitchRow(ui.CheckboxProps{Label: "Account enabled", Name: "g_enabled", Checked: true, Hint: "Turning it off disconnects the member's open sessions."})
 			</div>
-			<span class="c-seg" role="radiogroup" aria-label="Range">
-				<button type="button" role="radio" aria-checked="false">7</button>
-				<button type="button" role="radio" aria-checked="true">30</button>
-				<button type="button" role="radio" aria-checked="false">90</button>
-			</span>
+			@ui.Seg("Range") {
+				@ui.SegLink("7 days", "#", false, nil)
+				@ui.SegLink("30 days", "#", true, nil)
+				@ui.SegLink("90 days", "#", false, nil)
+			}
 		}
 		@galleryItem("Input states") {
 			<div class="l-stack l-narrow">
@@ -97,6 +97,13 @@ templ DevComponentsPage(l ui.LayoutData) {
 			@ui.OnlineDot(false)
 			@ui.LiveStatus("Live, updated 4 s ago")
 			<span class="c-badge u-nums">24</span>
+		}
+		@galleryItem("Meter (plain, for rank lists)") {
+			<div class="l-narrow l-stack">
+				@ui.MeterPlain(100, 100, "First")
+				@ui.MeterPlain(60, 100, "Second")
+				@ui.MeterPlain(15, 100, "Tenth")
+			</div>
 		}
 		@galleryItem("Meter") {
 			<div class="l-narrow">
@@ -223,9 +230,9 @@ templ DevComponentsPage(l ui.LayoutData) {
 				@ui.CodeBlock("g-code", "/ip hotspot print")
 			</div>
 		}
-		@galleryItem("Bar chart") {
-			<div class="l-narrow">
-				@ui.BarChart([]ui.Bar{{Label: "Mon", Value: 3}, {Label: "Tue", Value: 8}, {Label: "Wed", Value: 5}, {Label: "Thu", Value: 10}}, 10, "sample")
+		@galleryItem("Wide plot (usage chart)") {
+			<div class="c-card" data-pad>
+				@ui.PlotWith(ui.PlotProps{Kind: ui.PlotWide, Bars: galleryBars(30, "1 Nov"), Top: 12, Label: "Wide sample", YLabels: []string{"0", "4", "8", "12"}, PeakLabel: "10 GB"})
 			</div>
 		}
 		@galleryItem("Plots (dashboard charts)") {

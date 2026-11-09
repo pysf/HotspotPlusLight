@@ -160,7 +160,7 @@ export default [
   "page": "First login",
   "heading": "Print vouchers",
   "url": "docs/first-login/#vouchers",
-  "keywords": "Open Batches and choose a new batch. Choose a plan, how many vouchers (up to the maximum in Settings, 30 by default), and an optional label. Each voucher is a member with a user name made from the prefix and a number (for example wifi1360 ) and a random passwo"
+  "keywords": "Open Vouchers . The form is on the left and the list of batches is on the right. Choose a plan, how many vouchers (up to the maximum in Settings, 30 by default), and an optional batch name. Each voucher is a member with a user name made from the prefix and a n"
  },
  {
   "page": "First login",
@@ -196,7 +196,7 @@ export default [
   "page": "Dashboard",
   "heading": "The three charts",
   "url": "docs/dashboard/#charts",
-  "keywords": "Traffic, last 14 days : download plus upload for all members, one bar per day. The Usage page has longer ranges and the top members. Busy hours : for each hour of the day, the average number of people online over the last 14 days. Use it to see when the Wi-Fi "
+  "keywords": "Traffic, last 14 days : download plus upload for all members, one bar per day. The Usage page has 7, 30 and 90 day ranges and the top members. Busy hours : for each hour of the day, the average number of people online over the last 14 days. Use it to see when "
  },
  {
   "page": "Dashboard",

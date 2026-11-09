@@ -157,9 +157,9 @@ func Handler(d Deps) http.Handler {
 					})
 				})
 				r.Route("/batches", func(r chi.Router) {
-					r.Get("/", h.batches)
+					r.Get("/", h.batchesPage)
 					r.Post("/", h.batchCreate)
-					r.Get("/new", h.batchNew)
+					r.Get("/new", h.batchesPage)
 					r.Route("/{id:[0-9]+}", func(r chi.Router) {
 						r.Put("/", h.batchRename)
 						r.Delete("/", h.batchDelete)

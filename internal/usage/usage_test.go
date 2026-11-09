@@ -34,13 +34,18 @@ func TestReportWindows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.from != "2026-10-03" || r.to != "2026-11-01" || r.topFrom != "2026-10-26" || r.topTo != "2026-11-01" || r.limit != TopN {
+	// The chart, the summary and the top list all cover the chosen range.
+	if r.from != "2026-10-26" || r.to != "2026-11-01" || r.topFrom != "2026-10-26" || r.topTo != "2026-11-01" || r.limit != TopN {
 		t.Fatalf("%+v", r)
 	}
-	if len(v.Days) != ChartDays || v.MaxTotal != 40 || v.Range != 7 || v.Days[29].Total() != 15 {
+	if len(v.Days) != 7 || v.MaxTotal != 15 || v.Range != 7 || v.Days[6].Total() != 15 {
 		t.Fatalf("%+v", v)
 	}
-	if v, _ := s.Report(context.Background(), 12); v.Range != 30 {
+	if v.Summary.Total != 15 || v.Summary.Average != 2 || v.Summary.PeakDay != "2026-11-01" || v.Axis.Top < 15 {
+		t.Fatalf("%+v", v)
+	}
+	v, _ = s.Report(context.Background(), 12)
+	if v.Range != 30 || len(v.Days) != 30 || v.MaxTotal != 40 {
 		t.Fatal("bad range not defaulted")
 	}
 }

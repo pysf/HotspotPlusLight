@@ -47,7 +47,7 @@ func TestBatchExpiry(t *testing.T) {
 }
 
 func TestVoucherPages(t *testing.T) {
-	for n, want := range map[int][]int{0: nil, 1: {1}, 14: {14}, 15: {14, 1}, 29: {14, 14, 1}, 30: {14, 14, 2}} {
+	for n, want := range map[int][]int{0: nil, 1: {1}, 18: {18}, 19: {18, 1}, 37: {18, 18, 1}, 38: {18, 18, 2}} {
 		var got []int
 		for _, p := range VoucherPages(make([]Voucher, n)) {
 			got = append(got, len(p))

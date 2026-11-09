@@ -24,12 +24,15 @@
   .c-table tbody tr[aria-selected="true"], .c-table tbody tr:has(.c-check:checked) { background: var(--c-accent-soft); }
   .c-table :is(th, td)[data-slot="select"] { inline-size: var(--w-chk); padding-inline-end: 0; }
   .c-table :is(th, td)[data-slot="actions"] { inline-size: var(--w-act); text-align: end; }
+  .c-table :is(th, td)[data-slot="actions"][data-wide] { inline-size: calc(var(--w-act) * 1.75); padding-inline-start: 0; white-space: nowrap; }
+  .c-table td[data-slot="actions"][data-wide] .l-cluster { flex-wrap: nowrap; justify-content: flex-end; }
   .c-table__main { display: block; color: var(--c-text); font-weight: var(--fw-semibold); }
   .c-table__v { display: block; }
   .c-online { display: inline-flex; align-items: center; gap: var(--s-3); }
   .c-table td[data-nowrap] { white-space: nowrap; }
   .c-table__sub { display: block; margin-block-start: 1px; color: var(--c-text-3); font-size: var(--fs-sm); font-weight: 400; }
   .c-table td, .c-table__sub { overflow-wrap: anywhere; }
+  .c-table td[data-words] { overflow-wrap: normal; } /* a short text that wraps at spaces only, such as a plan name */
 
   .c-bulk {
     display: flex;

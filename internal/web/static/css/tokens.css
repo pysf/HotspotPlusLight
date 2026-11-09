@@ -138,7 +138,7 @@
     --size-check: 22px;
     --w-switch: 48px; --h-switch: 28px; --size-knob: 19px;
     --h-pill: 26px;
-    --h-meter: 8px; --w-meter: 64px; --w-usage: 150px; --w-usage-max: 240px;
+    --h-meter: 8px; --w-meter: 64px; --w-usage: 150px; --w-usage-s: 104px; --w-usage-max: 240px;
     --h-btn-sm: 34px;
     --btn-pad-x: 18px; --btn-pad-x-sm: 14px; --input-pad-x: 14px;
     --pad-dialog: 28px;
@@ -150,7 +150,6 @@
     --h-tab: 48px;
     --h-row: 56px;
     --h-tile: 128px;
-    --h-chart: 160px;
     --h-code: 352px;
     --h-pack-frame: 384px;
     --h-skel: 14px; --h-skel-lg: 28px;

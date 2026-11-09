@@ -35,6 +35,15 @@ details, unless the design is wrong for the product.
    - The page head, with the Live line ("Live · updates every 10 s", deviation 7), is inside the polled fragment so the device count stays current. The "Updated by the router every N s" note stays under the table.
    - `plural` now adds "es" after "ch" ("2 batches"; it said "batchs").
 
+10. Vouchers, print sheet and Usage (step 5), where the product has more or less than the design:
+   - The form has no "Username start" and "Password length" fields: the prefix, the next number and the password length are settings (Settings page, BR-15), not per batch. It has "Batch name" (optional), "How many", "Plan" and "Valid for (days)" (product fields). The button says "Create and print" and has no live count, because a created batch goes straight to its print sheet (current behavior, E7.01); so the design's green "ready" alert with the Print sheet button is not shown.
+   - `GET /admin/batches/new` is kept and shows the same page as `/admin/batches` (form and list together).
+   - The batch table keeps the product facts: a Rename disclosure under the name, a Delete icon button next to Print (with the confirm of BR-23b, in the shared dialog), "Used" as "27 of 40" with a meter and an "N unused" line, and Created with date and time (the design has a short date). The icon button is a link with `data-reprint`.
+   - The print sheet keeps one stylesheet (`voucher.css`) and no admin chrome (E7.06): the sheet header is a `div`, not a `header`, and the toolbar buttons are drawn by that file. Each card shows business name, "Wi-Fi", username, password and the help text from Settings (cut at 3 lines), not "Join <network>" (the Wi-Fi name is not stored). The sheet sub line is "Wi-Fi vouchers · batch name" (the plan summary of the design is not in the print data). 18 per page (`domain.VouchersPerPage`).
+   - Usage: the 7/30/90 switch is a row of links (`c-seg` with `aria-current`), not radio buttons, and it now sets the chart, the three figures and the top list together (before, the chart was always 30 days). The chart is `ui.Plot` with the new kind `PlotWide`; the old `BarChart` is removed. The axis top and labels come from `domain.NewChartAxis` (round steps in the unit that fits). Bars get thinner for 90 days (`data-size`). Day labels are "11 Oct".
+   - The top list shows a rank, the name (link), a meter (`ui.MeterPlain`, never turns warning), a small line "Down, Up, time" and the total with its unit (the design has bare numbers under a "GB used" title). Test hooks: `li[data-top]` with `[data-col=total|down|up|time]` (were `tr` and `td`).
+   - Sizes of 1 TB and more print as "1.34 TB" (`FormatSize` gained a TB step).
+
 ## Steps
 Each step: a sonnet agent builds it (tests first where logic changes), a separate sonnet agent
 reviews it (`code-review` at high), real findings are fixed, then commit `Design vN: ...`.
@@ -49,7 +58,7 @@ it, and keep each test's intent. No inline style or script (CSP).
 | 2 | Login, Set new password (rules list), Dashboard (tiles, Needs attention, Router link, 3 charts, Live dot, 10 s refresh without jumps) | DONE (commit "Design v2 step 2") |
 | 3 | Members list (chips, bulk bar, stacked cards on phone), Add/edit sheet, credentials card, row menus | DONE (commit "Design v2 step 3") |
 | 4 | Plans (cards + edit form, delete-blocked reason), Online sessions (kick + confirm) | DONE |
-| 5 | Vouchers/batches (form, list, A4 print sheet 3x6), Usage (7/30/90 switch, chart, top 10) | todo |
+| 5 | Vouchers/batches (form, list, A4 print sheet 3x6), Usage (7/30/90 switch, chart, top 10) | DONE |
 | 6 | Router (8 download cards, script, link status) and Settings (grouped form) | todo |
 
 ## How to continue from another machine

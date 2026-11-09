@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -40,5 +41,43 @@ func TestFillDaysAndRanges(t *testing.T) {
 		if g := NormalizeUsageDays(in); g != want {
 			t.Fatalf("%d -> %d", in, g)
 		}
+	}
+}
+
+func TestSummarizeUsage(t *testing.T) {
+	days := []UsageDay{{Day: "a", Down: 10, Up: 2}, {Day: "b", Down: 30}, {Day: "c"}, {Day: "d", Down: 30}}
+	s := SummarizeUsage(days)
+	if s.Total != 72 || s.Average != 18 || s.PeakBytes != 30 || s.PeakDay != "b" {
+		t.Fatalf("%+v", s)
+	}
+	if s := SummarizeUsage(nil); s != (UsageSummary{}) {
+		t.Fatalf("no days: %+v", s)
+	}
+	if s := SummarizeUsage([]UsageDay{{Day: "a"}}); s.PeakDay != "" || s.Total != 0 {
+		t.Fatalf("no traffic: %+v", s)
+	}
+}
+
+func TestNewChartAxis(t *testing.T) {
+	gb := int64(1) << 30
+	a := NewChartAxis(62 * gb) // the design: 0, 25, 50, 75 GB
+	if a.Unit != "GB" || a.Top != 75*gb || strings.Join(a.Labels, ",") != "0,25,50,75" {
+		t.Fatalf("%+v", a)
+	}
+	// The top is never below the peak.
+	a = NewChartAxis(76 * gb)
+	if a.Top < 76*gb {
+		t.Fatalf("%+v", a)
+	}
+	a = NewChartAxis(1536) // 1.5 KB
+	if a.Unit != "KB" || strings.Join(a.Labels, ",") != "0,0.5,1,1.5" || a.Top != 1536 {
+		t.Fatalf("%+v", a)
+	}
+	a = NewChartAxis(900)
+	if a.Unit != "B" || a.Top < 900 || len(a.Labels) != 4 {
+		t.Fatalf("%+v", a)
+	}
+	if a := NewChartAxis(0); a.Top != 0 || len(a.Labels) != 0 {
+		t.Fatalf("empty: %+v", a)
 	}
 }

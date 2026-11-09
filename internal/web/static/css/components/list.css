@@ -24,6 +24,9 @@
   .c-group-title + .c-li { border-block-start: 0; }
   .c-li b { display: block; font-weight: var(--fw-semibold); }
   .c-li small { display: block; color: var(--c-text-3); font-size: var(--fs-sm); }
+  .c-li small > span { white-space: nowrap; }
+  .c-li__value { flex: none; min-inline-size: 5.5em; text-align: end; font-weight: var(--fw-semibold); }
+  .c-li .c-meter { margin-block-start: 6px; }
 
   .c-steps { display: grid; gap: var(--s-3); counter-reset: step; }
   .c-steps > li { counter-increment: step; display: flex; align-items: flex-start; gap: var(--s-3); }

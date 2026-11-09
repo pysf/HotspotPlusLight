@@ -1,7 +1,5 @@
-/* Charts are inline SVG: geometry in attributes, looks in these classes. The bar chart of ui.BarChart uses the first rule. */
+/* Charts are inline SVG (ui.Plot): geometry in attributes, looks in these classes. */
 @layer components {
-  .c-chart { padding: var(--s-4); }
-  .c-chart__svg { display: block; inline-size: 100%; block-size: var(--h-chart); border-block-end: 1px solid var(--c-line); color: var(--c-accent); }
   .c-chart__caption { display: flex; justify-content: space-between; gap: var(--s-2); margin-block-start: var(--s-2); color: var(--c-text-3); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 
   /* The plot of a dashboard card: the view box sets the height, so a refresh never changes the size. */
@@ -14,6 +12,7 @@
   .c-chart__bar { fill: none; stroke: var(--c-accent); stroke-width: 10; stroke-linecap: round; }
   .c-chart__bar[data-dim] { opacity: .38; }
   .c-chart__bar[data-size="lg"] { stroke-width: 14; }
+  .c-chart__bar[data-size="sm"] { stroke-width: 5; }
   .c-chart__dot { fill: var(--c-surface); stroke: var(--c-accent); stroke-width: 2.25; }
   .c-chart__axis { fill: var(--c-text-3); font: 500 11px var(--font); }
 }

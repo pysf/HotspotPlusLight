@@ -1,18 +1,21 @@
-/* Voucher print page: 14 vouchers per A4 sheet, 2 columns x 7 rows, always left-to-right (PLAN BR-16). */
+/* Voucher print page: 18 vouchers per A4 sheet, 3 columns x 6 rows, always left-to-right and black on white (PLAN BR-16).
+   It is the only stylesheet of the page, so it holds its own colors and a few button looks. */
 @page { size: A4; margin: 0; }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: #ccc;
+  background: #d8d8d8;
   color: #000;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
-  line-height: 1.4;
+  font: 400 10pt/1.35 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   direction: ltr;
 }
 
+.c-sprite { position: absolute; inline-size: 0; block-size: 0; overflow: hidden; }
+.c-icon { inline-size: 18px; block-size: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The screen bar with the Back and Print buttons. Print media hides it. */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -21,58 +24,86 @@ body {
   padding: 12px 16px;
   background: #fff;
   border-bottom: 1px solid #999;
+  font-size: 14px;
 }
+.toolbar .count { flex: 1; color: #444; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 40px;
+  padding-inline: 16px;
+  border: 1px solid #999;
+  border-radius: 999px;
+  background: #fff;
+  color: #000;
+  font-weight: 600; font-size: 14px; line-height: 1; font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn:hover { background: #eee; }
+.btn-primary { border-color: #1a56db; background: #1a56db; color: #fff; }
+.btn-primary:hover { background: #1647b8; }
 
 .sheet {
-  width: 210mm;
-  height: 297mm;
+  inline-size: 210mm;
+  min-block-size: 297mm;
   margin: 12px auto;
   padding: 10mm;
   background: #fff;
   box-shadow: 0 0 6px rgba(0, 0, 0, .4);
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(7, 1fr);
 }
 
-.voucher {
+.sheet-head {
   display: flex;
-  flex-direction: column;
   justify-content: space-between;
-  border: 1px dashed #666;
+  align-items: flex-end;
+  padding-block-end: 4mm;
+  margin-block-end: 4mm;
+  border-block-end: .4mm solid #000;
+}
+.sheet-head h1 { margin: 0; font-size: 20pt; line-height: 1.1; letter-spacing: -.01em; }
+.sheet-head p { margin: 0; font-size: 9pt; color: #333; }
+
+.sheet-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(6, 42mm); }
+
+.voucher {
+  display: grid;
+  align-content: space-between;
+  margin: -.125mm; /* neighbours share one dashed cut line */
+  padding: 4mm 4.5mm;
+  border: .25mm dashed #777;
   direction: ltr;
   text-align: left;
   overflow: hidden;
+  break-inside: avoid;
 }
-
-.voucher .title {
-  margin: 0;
-  padding: 6px 10px 0;
-  font-weight: bold;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.voucher-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 2mm;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #333;
 }
-
-/* Long help text is cut so that title, help and credentials always fit one cell (7 rows per A4). */
+.voucher-top span:first-child { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voucher dl { display: grid; gap: 1.5mm; margin: 0; }
+.voucher dt { font-size: 7.5pt; color: #444; text-transform: uppercase; letter-spacing: .05em; }
+/* Monospace and bold, so 0 / O and l / 1 are easy to tell apart. */
+.voucher dd { margin: 0; font: 700 12pt/1.1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+/* A long help text is cut at 3 lines so that title, credentials and help always fit the 42 mm card. */
 .voucher .help {
   margin: 0;
-  max-height: 68px; /* 3 lines plus padding; the fallback where line-clamp is missing */
-  overflow: hidden;
+  font-size: 8pt;
+  line-height: 1.3;
+  color: #222;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
-  padding: 8px 10px;
-  border-bottom: 1px dotted #666;
-  white-space: pre-line;
-  text-align: justify;
-}
-
-.voucher .credentials {
-  margin: 0;
-  padding: 8px 10px;
-  text-align: center;
-  font-size: 13px;
+  overflow: hidden;
+  max-block-size: 3.9em; /* the fallback where line-clamp is missing */
 }
 
 .empty { padding: 24px; text-align: center; }
@@ -82,7 +113,8 @@ body {
   .toolbar { display: none; }
   .sheet {
     margin: 0;
-    height: 296mm; /* 1 mm under A4: browser rounding must not spill an empty page after the last sheet */
+    block-size: 296mm; /* 1 mm under A4: browser rounding must not spill an empty page after the last sheet */
+    min-block-size: 0;
     overflow: hidden;
     box-shadow: none;
     break-after: page;
@@ -92,4 +124,5 @@ body {
     break-after: auto;
     page-break-after: auto;
   }
+  .sheet, .sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

@@ -72,6 +72,7 @@
     font-size: var(--fs-sm);
     font-weight: var(--fw-semibold);
     cursor: pointer;
+    text-decoration: none;
   }
   .c-seg > [aria-checked="true"], .c-seg > [aria-current] { background: var(--c-surface); color: var(--c-text); box-shadow: var(--sh-1); text-decoration: none; }
 }

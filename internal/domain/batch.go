@@ -109,8 +109,8 @@ func (e *UsernameConflictError) Is(target error) bool { return target == ErrUser
 // Voucher is what one printed voucher shows (BR-16).
 type Voucher struct{ Username, Password string }
 
-// VouchersPerPage is 14 on an A4 sheet: 2 columns of 7 (BR-16).
-const VouchersPerPage = 14
+// VouchersPerPage is 18 on an A4 sheet: 3 columns of 6 (BR-16).
+const VouchersPerPage = 18
 
 // DefaultVoucherHelp is printed when settings.voucher_help is empty (O21).
 const DefaultVoucherHelp = "To use the internet, connect to the Wi-Fi network, open any web page and sign in with the username and password below."

@@ -13,3 +13,5 @@ The setting "Site title" is now "Business name" (`settings.business_name`, `doma
 
 ## Voucher help limit
 The business name adds one title line to each voucher. A long help text could push the credentials out of the cell, so `.help` is cut at 3 lines (`max-height` plus line-clamp in `voucher.css`). Manual check: set a very long voucher help, open the print preview, and confirm that 14 vouchers fit on A4 and every one shows its username and password.
+
+Note (2026-11-09): vouchers are now 18 per page, see BR-16.

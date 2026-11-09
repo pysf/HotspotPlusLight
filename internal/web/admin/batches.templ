@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"hotspotpluslight/internal/domain"
 	"hotspotpluslight/internal/voucher"
@@ -26,6 +27,11 @@ func deleteBatchConfirm(r domain.BatchRow) string {
 	return fmt.Sprintf("Delete this batch? %s will be deleted (%d online, disconnected first).", plural(r.Members, "member"), r.Online)
 }
 
+// fmtDay and fmtClock are the two halves of fmtTime: the date, and the time of day.
+func fmtDay(t time.Time, loc *time.Location) string { return t.In(loc).Format("2006-01-02") }
+
+func fmtClock(t time.Time, loc *time.Location) string { return t.In(loc).Format("15:04") }
+
 // labelText returns the batch label, or a placeholder when it is empty.
 func labelText(l string) string {
 	if l == "" {
@@ -34,59 +40,99 @@ func labelText(l string) string {
 	return l
 }
 
-// BatchesPage lists the batches.
-templ BatchesPage(l ui.LayoutData, res voucher.ListResult) {
-	@ui.Layout(l) {
-		@ui.PageHeader("Vouchers") {
-			@ui.LinkButton("primary", "/admin/batches/new", "New batch", nil)
-		}
-		if res.Total == 0 {
-			@ui.EmptyState("No batches yet", "Create the first one.")
-		} else {
-			@ui.TablePaged("Batches", []string{"Label", "Rename", "Plan", "Created", "Members", "Unused", ""}, ui.PageProps{Page: res.Page, Pages: res.Pages, Href: batchesHref(res.Per), Total: res.Total, Per: res.Per}) {
-				for _, r := range res.Rows {
-					@BatchRow(r, res)
-				}
-			}
-		}
+// batchName returns the batch label for a sentence, or "this batch" when it is empty.
+func batchName(l string) string {
+	if l == "" {
+		return "this batch"
 	}
+	return l
+}
+
+// BatchesProps holds what the vouchers page shows: the batch list and the new-batch form.
+type BatchesProps struct {
+	List voucher.ListResult
+	Form BatchFormProps
+}
+
+// BatchesPage is the vouchers page: the new-batch form next to the batch list. GET /admin/batches/new shows the same page.
+templ BatchesPage(l ui.LayoutData, p BatchesProps) {
+	@ui.Layout(l) {
+		@ui.PageHeaderSub("Vouchers", "Make a batch, then print the sheet.")
+		<div class="l-cols" data-cols="1-1.5">
+			if len(p.Form.Plans) == 0 {
+				@ui.EmptyState("No plans yet", "No plans exist yet. Create a plan first, then create batches.") {
+					@ui.LinkButton("primary", "/admin/plans/new", "New plan", nil)
+				}
+			} else {
+				@BatchFormView(p.Form)
+			}
+			<div class="l-stack">
+				if p.List.Total == 0 {
+					@ui.EmptyState("No batches yet", "Create the first one.")
+				} else {
+					@ui.TablePagedHead("Recent batches", batchHead(), ui.PageProps{Page: p.List.Page, Pages: p.List.Pages, Href: batchesHref(p.List.Per), Total: p.List.Total, Per: p.List.Per}) {
+						for _, r := range p.List.Rows {
+							@BatchRow(r, p.List)
+						}
+					}
+				}
+			</div>
+		</div>
+	}
+}
+
+// batchHead is the header row of the batch table.
+templ batchHead() {
+	<th scope="col">Batch</th>
+	<th scope="col">Plan</th>
+	<th scope="col">Used</th>
+	<th scope="col">Created</th>
+	<th scope="col" data-slot="actions" data-wide><span class="u-sr-only">Print and delete</span></th>
+}
+
+// batchUsed returns how many members of the batch have used it.
+func batchUsed(r domain.BatchRow) int { return r.Members - r.Unused }
+
+// deleteBatchAttrs makes the delete button ask first, with the counts of BR-23b in the text.
+func deleteBatchAttrs(r domain.BatchRow) templ.Attributes {
+	a := ui.ConfirmAttrs("delete", batchURL(r.Batch.ID), deleteBatchConfirm(r))
+	a["data-confirm-title"] = "Delete " + batchName(r.Batch.Label) + "?"
+	a["data-confirm-ok"] = "Delete batch"
+	a["data-confirm-icon"] = "trash"
+	return a
 }
 
 // BatchRow is one row of the batch list.
 templ BatchRow(r domain.BatchRow, res voucher.ListResult) {
 	<tr data-batch data-id={ strconv.FormatInt(r.Batch.ID, 10) } data-members={ strconv.Itoa(r.Members) } data-online={ strconv.Itoa(r.Online) }>
-		<td data-col="label" data-label="Label">{ labelText(r.Batch.Label) }</td>
-		<td data-col="rename" data-label="Rename">
-			<form class="l-split" hx-put={ batchURL(r.Batch.ID) } hx-target="#flash" hx-swap="innerHTML">
-				<input name="label" class="c-input" value={ r.Batch.Label } maxlength="100" aria-label="Label"/>
-				@ui.Button("secondary", "Save", templ.Attributes{"type": "submit"})
-			</form>
-		</td>
-		<td data-col="plan" data-label="Plan">{ r.PlanName }</td>
-		<td data-col="created" data-label="Created" class="u-nums">{ fmtTime(r.Batch.CreatedAt, res.Loc) }</td>
-		<td data-col="members" data-label="Members" class="u-nums">{ strconv.Itoa(r.Members) }</td>
-		<td data-col="unused" data-label="Unused" class="u-nums">{ strconv.Itoa(r.Unused) }</td>
-		<td data-slot="actions">
-			@ui.Actions() {
-				@ui.LinkButton("secondary", batchURL(r.Batch.ID)+"/vouchers", "Reprint", templ.Attributes{"data-reprint": true, "target": "_blank", "rel": "noopener"})
-				@ui.ConfirmDelete("Delete", batchURL(r.Batch.ID), deleteBatchConfirm(r))
+		<td data-label="Batch">
+			<b class="c-table__main" data-col="label">{ labelText(r.Batch.Label) }</b>
+			<span class="c-table__sub">{ plural(r.Members, "voucher") }</span>
+			@ui.Disclose("Rename") {
+				<form class="l-stack" hx-put={ batchURL(r.Batch.ID) } hx-target="#flash" hx-swap="innerHTML">
+					<input name="label" class="c-input" value={ r.Batch.Label } maxlength="100" aria-label="Label"/>
+					@ui.Button("secondary", "Save", templ.Attributes{"type": "submit", "data-size": "sm"})
+				</form>
 			}
+		</td>
+		<td data-label="Plan" data-words><div class="c-table__v" data-col="plan">{ r.PlanName }</div></td>
+		<td data-label="Used">
+			<div class="c-table__v">
+				<div class="c-usage" data-compact>
+					<span><strong data-col="used">{ strconv.Itoa(batchUsed(r)) }</strong> of <span data-col="members">{ strconv.Itoa(r.Members) }</span></span>
+					@ui.MeterPlain(float64(batchUsed(r)), float64(max(r.Members, 1)), strconv.Itoa(batchUsed(r))+" of "+strconv.Itoa(r.Members)+" used")
+					<span><span data-col="unused">{ strconv.Itoa(r.Unused) }</span> unused</span>
+				</div>
+			</div>
+		</td>
+		<td data-label="Created" data-nowrap><div class="c-table__v u-nums" data-col="created">{ fmtDay(r.Batch.CreatedAt, res.Loc) } <span class="c-table__sub">{ fmtClock(r.Batch.CreatedAt, res.Loc) }</span></div></td>
+		<td data-slot="actions" data-wide>
+			<div class="l-cluster">
+				@ui.IconLink("printer", batchURL(r.Batch.ID)+"/vouchers", "Print sheet for "+labelText(r.Batch.Label), templ.Attributes{"data-reprint": true, "target": "_blank", "rel": "noopener"})
+				@ui.IconButton("trash", "Delete "+labelText(r.Batch.Label), deleteBatchAttrs(r))
+			</div>
 		</td>
 	</tr>
-}
-
-// BatchNewPage shows the new batch form.
-templ BatchNewPage(l ui.LayoutData, p BatchFormProps) {
-	@ui.Layout(l) {
-		@ui.PageHeader("New batch")
-		if len(p.Plans) == 0 {
-			@ui.EmptyState("No plans yet", "No plans exist yet. Create a plan first, then create batches.") {
-				@ui.LinkButton("primary", "/admin/plans/new", "New plan", nil)
-			}
-		} else {
-			@BatchFormView(p)
-		}
-	}
 }
 
 // BatchFormProps holds what the batch form shows.
@@ -99,17 +145,19 @@ type BatchFormProps struct {
 
 // BatchFormView is the new-batch form and its 422 / 409 response body.
 templ BatchFormView(p BatchFormProps) {
-	@ui.FormCard(templ.Attributes{"id": "batch-form", "hx-post": "/admin/batches", "hx-target": "this", "hx-swap": "outerHTML"}) {
+	@ui.FormCard(templ.Attributes{"id": "batch-form", "hx-post": "/admin/batches", "hx-target": "this", "hx-swap": "outerHTML", "aria-labelledby": "batch-form-h"}) {
+		<h2 class="c-card__title" id="batch-form-h">Create vouchers</h2>
 		if p.Conflict != "" {
 			@ui.Flash("error", p.Conflict)
 		}
-		@ui.Field(ui.FieldProps{Label: "Label", Name: "label", Value: p.Form.Label, Error: p.Errors["label"], Hint: "Optional, for your own reference."})
-		@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan_id", Value: p.Form.PlanID, Options: planFilterOptions(p.Plans, "Choose a plan"), Error: p.Errors["plan_id"]})
-		@ui.Field(ui.FieldProps{Label: "How many vouchers", Name: "count", Value: p.Form.Count, Error: p.Errors["count"], Hint: "From 1 to the maximum set in Settings.", Attrs: templ.Attributes{"inputmode": "numeric"}})
-		@ui.Field(ui.FieldProps{Label: "Valid for (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Optional. Empty = the plan's validity. Vouchers expire at midnight after this many days plus one, in the Settings time zone.", Attrs: templ.Attributes{"inputmode": "numeric"}})
-		@ui.Actions() {
-			@ui.Button("primary", "Create and print", templ.Attributes{"type": "submit"})
-			@ui.LinkButton("secondary", "/admin/batches", "Cancel", nil)
-		}
+		@ui.Field(ui.FieldProps{Label: "Batch name", Name: "label", Value: p.Form.Label, Error: p.Errors["label"], Hint: "Optional, for your own reference."})
+		<div class="c-form-grid">
+			@ui.Field(ui.FieldProps{Label: "How many", Name: "count", Value: p.Form.Count, Error: p.Errors["count"], Hint: "From 1 to the maximum set in Settings. 18 fit one A4 page.", Attrs: templ.Attributes{"inputmode": "numeric"}})
+			@ui.Select(ui.SelectProps{Label: "Plan", Name: "plan_id", Value: p.Form.PlanID, Options: planFilterOptions(p.Plans, "Choose a plan"), Error: p.Errors["plan_id"]})
+			<div data-span="2">
+				@ui.Field(ui.FieldProps{Label: "Valid for (days)", Name: "duration_days", Value: p.Form.DurationDays, Error: p.Errors["duration_days"], Hint: "Optional. Empty = the plan's validity. Vouchers expire at midnight after this many days plus one, in the Settings time zone.", Attrs: templ.Attributes{"inputmode": "numeric"}})
+			</div>
+		</div>
+		@ui.ButtonIcon("primary", "ticket", "Create and print", templ.Attributes{"type": "submit", "data-size": "block"})
 	}
 }

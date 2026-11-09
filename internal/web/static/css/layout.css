@@ -121,6 +121,8 @@
   .l-toolbar > .c-chips { flex: 1 1 100%; }
   .l-cols { display: grid; gap: var(--s-4); grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .l-cols[data-cols="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .l-cols[data-cols="2-1"] { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; }
+  .l-cols[data-cols="1-1.5"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); align-items: start; }
   .l-grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(var(--w-grid), 1fr)); }
 
   /* Login and the forced password change: one centered column. */
@@ -163,7 +165,7 @@
 
   /* Phone. */
   @media (max-width: 699px) {
-    .l-cols, .l-cols[data-cols="3"] { grid-template-columns: minmax(0, 1fr); }
+    .l-cols, .l-cols[data-cols] { grid-template-columns: minmax(0, 1fr); }
     .l-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr auto; }
     .l-sidebar { display: none; }
     .l-topbar__brand { display: flex; }
