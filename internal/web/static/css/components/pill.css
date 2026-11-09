@@ -1,4 +1,4 @@
-/* Status: dot plus text. data-status: active | expiring | expired | disabled. Also the online dot. */
+/* Status: coloured text. data-status: active | expiring | expired | disabled. Also the online dot. */
 @layer components {
   .c-pill {
     display: inline-flex;
@@ -8,13 +8,6 @@
     font-size: var(--fs-small);
     font-weight: var(--fw-medium);
     white-space: nowrap;
-  }
-  .c-pill::before {
-    content: "";
-    inline-size: var(--size-dot);
-    block-size: var(--size-dot);
-    border-radius: var(--r-dot);
-    background: currentcolor;
   }
   .c-pill[data-status="active"] { color: var(--ok); }
   .c-pill[data-status="expiring"] { color: var(--warn); }

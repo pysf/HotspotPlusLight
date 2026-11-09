@@ -1369,7 +1369,7 @@ func Refresher(url, event, target string) templ.Component {
 	})
 }
 
-// Pill is a status: a dot and a text. status is "active", "expiring", "expired" or "disabled".
+// Pill is a status shown as coloured text. status is "active", "expiring", "expired" or "disabled".
 func Pill(status, text string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

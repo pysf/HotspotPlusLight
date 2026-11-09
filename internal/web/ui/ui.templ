@@ -342,7 +342,7 @@ templ Refresher(url, event, target string) {
 	<div hidden hx-get={ url } hx-trigger={ event + " from:body" } hx-target={ target } hx-swap="innerHTML"></div>
 }
 
-// Pill is a status: a dot and a text. status is "active", "expiring", "expired" or "disabled".
+// Pill is a status shown as coloured text. status is "active", "expiring", "expired" or "disabled".
 templ Pill(status, text string) {
 	<span class="c-pill" data-status={ status }>{ text }</span>
 }

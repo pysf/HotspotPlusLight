@@ -92,7 +92,7 @@ Each component is one Go template partial (`components/<name>`) plus one CSS fil
 | `c-card` | panel bg, `--r-card`, 1px line border (Air: none + `--shadow-card`), overflow hidden. |
 | `c-table` | header 12px muted; cell padding `--cell-y` `--cell-x`; row hairline dividers; row hover elev; whole row opens edit. Columns (Users): User (name + mobile below), Plan (+ speed), Usage, Expires (+ relative), Devices, Status, actions. |
 | `c-meter` | usage bar: **native `<progress>`/`<meter>`** styled with CSS (no inline `style` attributes). 4–5px high, rounded; accent, warn ≥80%, bad at 100%. Text above: `used / total GB`. |
-| `c-pill` | status: 7px dot + 12px/500 label. `data-status`: `active` (ok), `expiring` (warn, ≤3 days), `expired` (bad), `disabled` (faint). |
+| `c-pill` | status: 12px/500 coloured label, no dot. `data-status`: `active` (ok), `expiring` (warn, ≤3 days), `expired` (bad), `disabled` (faint). |
 | `c-menu` | row actions via native `popover`. Min-width 176px, 5px padding, items 8px 10px, destructive item in `--bad` after a divider. Esc/outside-click close for free. |
 | `c-sheet` | right-side drawer built on native `<dialog>`: 430px (full width ≤560px), header, scrolling body, sticky footer (Cancel + primary). `::backdrop` 50% black + 2px blur. Radius `--r-sheet` on the left corners (0 on mobile). Slide-in with `@starting-style`/`transition-behavior: allow-discrete` as progressive enhancement. |
 | `c-modal` | confirm dialog, native `<dialog>`, 380px, centered, 22px padding. Required for every reset/delete; destructive confirm uses `danger`. Content is server-rendered. |
