@@ -534,11 +534,11 @@ func TestE8_04_PackContents(t *testing.T) {
 	}
 }
 
-// E8.07 the router link status panel: last Access-Request / Accounting / Disconnect with time and source, bad
-// shared secrets counted with their source; in memory only (no DB writes, gone after a restart).
+// E8.07 the router link status panel (on the dashboard since Phase 18, D28): last Access-Request / Accounting /
+// Disconnect with time and source, bad shared secrets counted with their source; in memory only (no DB writes, gone after a restart).
 func TestE8_07_LinkStatusPanel(t *testing.T) {
 	f := newP8(t)
-	panel := func() *goquery.Document { return f.c.Get("/admin/router").Doc(t) }
+	panel := func() *goquery.Document { return f.c.Get("/admin").Doc(t) }
 
 	d := panel()
 	for _, k := range []string{"access-request", "accounting", "disconnect"} {
@@ -554,13 +554,33 @@ func TestE8_07_LinkStatusPanel(t *testing.T) {
 	f.db.SetMaxOpenConns(1) // data_version is per connection
 	version := func() int64 { return scalar[int64](t, f.db, `PRAGMA data_version`) }
 	_ = version() // data_version only reports commits of OTHER connections once it has been read once
-	before := version()
+	// The admin session row moves its sliding expiry on every admin request, so that one table is left out of the comparisons.
+	const sliding = "admin_session"
 
-	// packets that change nothing in the database: an unknown user, a bad accounting authenticator, a wrong secret
+	// Reading the panel and its fragment writes nothing.
+	reads := dbSnapshot(t, f.db, sliding)
+	panel()
+	f.c.Get("/admin/dashboard/content")
+	if diff := snapshotDiff(reads, dbSnapshot(t, f.db, sliding)); diff != "" {
+		t.Errorf("reading the panel changed: %s", diff)
+	}
+
+	// A rejected login writes its failed-login count (D27, Phase 17) and nothing else.
+	failures := func() int64 { return scalar[int64](t, f.db, `SELECT coalesce(sum(count), 0) FROM login_failure_daily`) }
+	others, nFail := dbSnapshot(t, f.db, sliding, "login_failure_daily"), failures()
 	f.fc.Advance(time.Minute) // 12:01:00
 	if r, err := f.nas.Authenticate("nobody", "x"); err != nil || r.Code != radius.CodeAccessReject {
 		t.Fatalf("login: %v %v", r, err)
 	}
+	if diff := snapshotDiff(others, dbSnapshot(t, f.db, sliding, "login_failure_daily")); diff != "" {
+		t.Errorf("a rejected login changed more than login_failure_daily: %s", diff)
+	}
+	if got := failures(); got != nFail+1 {
+		t.Errorf("failed-login count %d, want %d", got, nFail+1)
+	}
+
+	// Packets that change nothing in the database: a bad accounting authenticator, a wrong secret, an interim of an unknown session.
+	quiet, before := dbSnapshot(t, f.db, sliding), version()
 	f.fc.Advance(time.Minute) // 12:02:00
 	badAcct := fakenas.New(f.s.Addrs.RadiusAuth, "wrong-secret")
 	badAcct.AcctAddr, badAcct.Timeout = f.s.Addrs.RadiusAcct, 300*time.Millisecond
@@ -585,6 +605,9 @@ func TestE8_07_LinkStatusPanel(t *testing.T) {
 	}
 	if after := version(); after != before {
 		t.Errorf("the database changed (data_version %d -> %d): link status must be in memory only", before, after)
+	}
+	if diff := snapshotDiff(quiet, dbSnapshot(t, f.db, sliding)); diff != "" {
+		t.Errorf("bad-secret, bad-accounting and unknown-session packets changed: %s", diff)
 	}
 
 	d = panel()
@@ -619,7 +642,7 @@ func TestE8_07_LinkStatusPanel(t *testing.T) {
 	}
 }
 
-// E8.07b the panel is empty again after a restart.
+// E8.07b the panel (on the dashboard) is empty again after a restart.
 func TestE8_07b_PanelResetsOnRestart(t *testing.T) {
 	fc := clock.NewFake(t0)
 	s := harness.Start(t, harness.Options{Clock: fc})
@@ -630,14 +653,14 @@ func TestE8_07b_PanelResetsOnRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := harness.LoginAsAdmin(t, s)
-	if got := link(t, c.Get("/admin/router").Doc(t), "access-request"); got.from != "127.0.0.1" {
+	if got := link(t, c.Get("/admin").Doc(t), "access-request"); got.from != "127.0.0.1" {
 		t.Fatalf("before restart: %+v", got)
 	}
 	s.Stop()
 	s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey, Clock: fc})
 	c2 := harness.NewAdminClient(t, s2)
 	c2.Login("admin", harness.AdminPassword)
-	if got := link(t, c2.Get("/admin/router").Doc(t), "access-request"); got.at != "never" {
+	if got := link(t, c2.Get("/admin").Doc(t), "access-request"); got.at != "never" {
 		t.Errorf("after restart: %+v", got)
 	}
 }
@@ -670,5 +693,34 @@ func TestE8_12_RouterPageAssets(t *testing.T) {
 	js := f.c.Get(clip)
 	if js.StatusCode != 200 || !strings.Contains(js.Body, "data-copy-target") {
 		t.Errorf("clipboard.js: %d", js.StatusCode)
+	}
+}
+
+// E8.13 the router status panel refreshes with the whole dashboard: the content fragment has the three rows and shows
+// a new packet without a full page load.
+func TestE8_13_LinkStatusPolling(t *testing.T) {
+	f := newP8(t)
+	const path = "/admin/dashboard/content"
+
+	r := f.c.Get(path)
+	if r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("fragment: %d Cache-Control %q", r.StatusCode, r.Header.Get("Cache-Control"))
+	}
+	d := r.Doc(t)
+	if strings.Contains(strings.ToLower(r.Body), "<html") || d.Find("[data-link-status]").Length() != 1 {
+		t.Error("the response must be the dashboard fragment with one router status panel, not a full page")
+	}
+	for _, k := range []string{"access-request", "accounting", "disconnect"} {
+		if got := link(t, d, k); got.at != "never" {
+			t.Errorf("%s before any traffic: %+v", k, got)
+		}
+	}
+
+	// A new Access-Request shows up in the fragment without loading the full page again.
+	if _, err := f.nas.Authenticate("nobody", "x"); err != nil {
+		t.Fatal(err)
+	}
+	if got := link(t, f.c.Get(path).Doc(t), "access-request"); got.at == "never" || got.from != "127.0.0.1" {
+		t.Errorf("after an Access-Request: %+v", got)
 	}
 }

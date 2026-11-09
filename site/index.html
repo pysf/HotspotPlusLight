@@ -67,12 +67,8 @@
    <div class="cta"><a class="btn primary" href="docs/installation/">Read the docs</a><a class="btn" href="https://github.com/pysf/HotspotPlusLight" rel="noopener">View on GitHub</a></div>
   </div>
   <div class="term" role="group" aria-label="The first start in a terminal"><div class="bar" aria-hidden="true"><i></i><i></i><i></i><span>~/hotspotpluslight</span></div>
-<pre><code><span class="c"># make a secret key and keep it safe</span>
-<span class="p">$</span> hotspotpluslight gen-key
-y7P0USSXMOGKk+IPoo6HGxRapuvIL16B6c6itYRW5HQ=
-
-<span class="c"># start the server</span>
-<span class="p">$</span> HSP_SECRET_KEY=y7P0USSXMOGKk+IPoo6HGxRapuvIL16B6c6itYRW5HQ= hotspotpluslight serve
+<pre><code><span class="c"># start the server (the secret key is created automatically)</span>
+<span class="p">$</span> hotspotpluslight serve
 time=2026-11-04T17:44:47.540+01:00 level=INFO msg="migrations applied" count=4
 <span class="g">=== HotspotPlus Lite first start ===</span>
 Log in with username: admin  password: admin

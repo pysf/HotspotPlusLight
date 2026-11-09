@@ -131,14 +131,14 @@ func (c *AdminClient) PostLogin(username, password string) Resp {
 	return c.Do("POST", "/admin/login", url.Values{"username": {username}, "password": {password}}, "")
 }
 
-// Login logs in and loads the CSRF token from the landing page: the members page, or
+// Login logs in and loads the CSRF token from the landing page: the dashboard, or
 // the password page while the first-start password is still in use. Any other outcome
 // fails the test.
 func (c *AdminClient) Login(username, password string) {
 	c.t.Helper()
 	r := c.PostLogin(username, password)
 	loc := r.Header.Get("Location")
-	if r.StatusCode != http.StatusSeeOther || (loc != "/admin/members" && loc != "/admin/password") {
+	if r.StatusCode != http.StatusSeeOther || (loc != "/admin" && loc != "/admin/password") {
 		c.t.Fatalf("login: status %d location %q", r.StatusCode, loc)
 	}
 	c.loadCSRF(loc)

@@ -120,13 +120,6 @@ func (t *AcctTx) AddDailyUsage(ctx context.Context, memberID int64, day string, 
 	return err
 }
 
-// SessionRetentionDays returns the session retention setting (O18). It is read at each pruning run, so a change applies without restart.
-func (s *Store) SessionRetentionDays(ctx context.Context) (int, error) {
-	var n int
-	err := s.r.QueryRowContext(ctx, `SELECT session_retention_days FROM settings WHERE id=1`).Scan(&n)
-	return n, err
-}
-
 // pruneChunk is how many rows one pruning statement deletes. Small chunks let
 // accounting writes in between, because the write connection is the only one.
 const pruneChunk = 1000

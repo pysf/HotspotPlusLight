@@ -1,4 +1,4 @@
-// Hand-made search index, built from the h2 sections of the docs pages (a test keeps it in step).
+// Search index of the docs. Each entry is one h2 section: its heading and the first 260 characters of its text, with links removed. Rebuild it after you change a docs section; E13.15 checks that every entry still matches its section.
 export default [
  {
   "page": "Introduction",
@@ -46,7 +46,7 @@ export default [
   "page": "Installation",
   "heading": "Linux",
   "url": "docs/installation/#linux",
-  "keywords": "Download, unpack and install the program: curl -LO  tar -xzf hotspotpluslight-linux-amd64.tar.gz sudo install -m 755 hotspotpluslight /usr/local/bin/ hotspotpluslight version Make a settings file with a new secret key. The key encrypts the member passwords, so"
+  "keywords": "Download, unpack and install the program: curl -LO  tar -xzf hotspotpluslight-linux-amd64.tar.gz sudo install -m 755 hotspotpluslight /usr/local/bin/ hotspotpluslight version Start the server from the same folder. It creates the secret key and the database on "
  },
  {
   "page": "Installation",
@@ -58,7 +58,7 @@ export default [
   "page": "Installation",
   "heading": "Windows",
   "url": "docs/installation/#windows",
-  "keywords": "Open PowerShell, then download and unpack the zip: curl.exe -LO  Expand-Archive hotspotpluslight-windows-amd64.zip -DestinationPath C:\\hotspotpluslight cd C:\\hotspotpluslight .\\hotspotpluslight.exe version To try it in the window, set a key and start it: $env:"
+  "keywords": "Open PowerShell, then download and unpack the zip: curl.exe -LO  Expand-Archive hotspotpluslight-windows-amd64.zip -DestinationPath C:\\hotspotpluslight cd C:\\hotspotpluslight .\\hotspotpluslight.exe version To try it in the window, start it: .\\hotspotpluslight."
  },
  {
   "page": "Installation",
@@ -82,7 +82,7 @@ export default [
   "page": "Run as a service",
   "heading": "Linux (systemd)",
   "url": "docs/running-as-a-service/#systemd",
-  "keywords": "Create a user for the service, and a settings file that only root and that user can read. It holds the secret key. sudo useradd --system --no-create-home --shell /usr/sbin/nologin hsp printf 'HSP_SECRET_KEY=%s\\nHSP_DATA_DIR=/var/lib/hotspotpluslight\\n' \"$(hots"
+  "keywords": "Create a user for the service and a settings file that only root and that user can read: sudo useradd --system --no-create-home --shell /usr/sbin/nologin hsp printf 'HSP_DATA_DIR=/var/lib/hotspotpluslight\\n' | sudo tee /etc/hotspotpluslight.env >/dev/null sudo"
  },
  {
   "page": "Run as a service",
@@ -94,7 +94,7 @@ export default [
   "page": "Run as a service",
   "heading": "macOS (launchd)",
   "url": "docs/running-as-a-service/#macos",
-  "keywords": "The service commands work only on Windows. On macOS, use launchd. Put the settings in /usr/local/etc/hotspotpluslight.env (same format as above, readable only by root) and create /Library/LaunchDaemons/local.hotspotpluslight.plist : <?xml version=\"1.0\" encodin"
+  "keywords": "The service commands work only on Windows. On macOS, use launchd. Put settings such as HSP_DATA_DIR in /usr/local/etc/hotspotpluslight.env (readable only by root) and create /Library/LaunchDaemons/local.hotspotpluslight.plist : <?xml version=\"1.0\" encoding=\"UT"
  },
  {
   "page": "Run as a service",
@@ -106,31 +106,31 @@ export default [
   "page": "Configuration",
   "heading": "Environment variables",
   "url": "docs/configuration/#env",
-  "keywords": "The server reads these variables when it starts. Everything else is on the Settings page . Variable Default Meaning HSP_SECRET_KEY (required) Base64 of 32 random bytes. It is the AES-GCM key for the stored member passwords. The server will not start without it"
+  "keywords": "These variables set bootstrap options. Some of them only seed the first start: after that, the Settings page is the one place to change them, and the env var is ignored. If an env var is set but differs from the saved setting, the server writes a warning to it"
  },
  {
   "page": "Configuration",
   "heading": "The env file",
   "url": "docs/configuration/#env-file",
-  "keywords": "Instead of setting variables, put them in a file and start with --env-file . The option works for serve and for admin set-password : # hsp.env HSP_SECRET_KEY=your-key-here HSP_DATA_DIR=/var/lib/hotspotpluslight HSP_LOG_LEVEL=info # a space and a hash start a c"
+  "keywords": "Instead of setting variables, put them in a file and start with --env-file . The option works for serve and for admin set-password : # hsp.env HSP_DATA_DIR=/var/lib/hotspotpluslight HSP_LOG_LEVEL=info # a space and a hash start a comment hotspotpluslight --env"
  },
  {
   "page": "Configuration",
   "heading": "Commands",
   "url": "docs/configuration/#commands",
-  "keywords": "Command What it does hotspotpluslight serve Starts the server: the admin panel and both RADIUS listeners. hotspotpluslight gen-key Prints a new HSP_SECRET_KEY (base64 of 32 random bytes). It needs no database. hotspotpluslight admin set-password [--stdin] Sets"
+  "keywords": "Command What it does hotspotpluslight serve Starts the server: the admin panel and both RADIUS listeners. hotspotpluslight gen-key Prints a new key (base64 of 32 random bytes). The key is auto-generated on first start; use this only to rotate it or to manage i"
  },
  {
   "page": "Configuration",
   "heading": "The Settings page",
   "url": "docs/configuration/#settings-page",
-  "keywords": "These are saved in the database and edited on the Settings page of the admin panel. They apply without a restart. Setting Default Meaning Business name (empty) Your business name. It is printed at the top of every voucher and shown in the admin header and the browser tab. Leave it empty to hide it. Time zone UTC An IANA name such as E"
+  "keywords": "These are saved in the database and edited on the Settings page of the admin panel. Settings marked restart required take effect on the next server start. After you save one, the page shows a notice until you restart the server yourself. The listen addresses a"
  },
  {
   "page": "First login",
   "heading": "Log in",
   "url": "docs/first-login/#login",
-  "keywords": "Open  . On the first start the account is admin with the password admin (you can change the user name with HSP_ADMIN_USERNAME before the first start). The first-start block printed by the server says the same. Do this at once: until the password is changed, an"
+  "keywords": "Open  . Once your password is set, the admin panel opens on the Dashboard . On the first start the account is admin with the password admin (you can change the user name with HSP_ADMIN_USERNAME before the first start). The first-start block printed by the serv"
  },
  {
   "page": "First login",
@@ -166,7 +166,43 @@ export default [
   "page": "First login",
   "heading": "See who is online",
   "url": "docs/first-login/#online",
-  "keywords": "The Online page lists the open sessions and refreshes every 10 seconds. Disconnect sends a RADIUS Disconnect request to the router. The Usage page shows traffic per day for 30 days and the top 10 members for 7, 30 or 90 days. Next: Router setup ."
+  "keywords": "The Dashboard shows how many are online now, today's traffic and the router status. The Online page lists the open sessions and refreshes every 10 seconds. Disconnect sends a RADIUS Disconnect request to the router. The Usage page shows traffic per day for 30 "
+ },
+ {
+  "page": "Dashboard",
+  "heading": "Open the dashboard",
+  "url": "docs/dashboard/#open",
+  "keywords": "After you log in, the Dashboard is the first page. It is also the first item in the sidebar. The brand name in the top bar takes you back to it. The whole page refreshes by itself every 10 seconds, so you can leave it open. All times and days follow the time z"
+ },
+ {
+  "page": "Dashboard",
+  "heading": "The three tiles",
+  "url": "docs/dashboard/#tiles",
+  "keywords": "Tile What it shows Online now The open sessions that the router still reports. It is the same number as on the Online page, so one member on two devices counts twice. The note shows the peak today : the most sessions online at one moment since midnight. Traffi"
+ },
+ {
+  "page": "Dashboard",
+  "heading": "Router status",
+  "url": "docs/dashboard/#router-status",
+  "keywords": "This panel shows what the router last sent to the server: the time and source address of the last login request, the last accounting packet and the last Disconnect result, and how many packets had a wrong shared secret. It lives in memory and starts empty afte"
+ },
+ {
+  "page": "Dashboard",
+  "heading": "Needs attention",
+  "url": "docs/dashboard/#attention",
+  "keywords": "Two short lists, with the full count in the heading and at most five members shown: Expiring in 3 days : active members whose expiry date is in the next 3 days. They are good people to renew. It is the same rule as the Expiring filter on the Members page. Near"
+ },
+ {
+  "page": "Dashboard",
+  "heading": "The three charts",
+  "url": "docs/dashboard/#charts",
+  "keywords": "Traffic, last 14 days : download plus upload for all members, one bar per day. The Usage page has longer ranges and the top members. Busy hours : for each hour of the day, the average number of people online over the last 14 days. Use it to see when the Wi-Fi "
+ },
+ {
+  "page": "Dashboard",
+  "heading": "How failed logins are counted",
+  "url": "docs/dashboard/#failed-logins",
+  "keywords": "A failed login is one refusal that the server sends back to the router, for any reason: wrong user name or password, expired, out of data, no plan, too many devices, and so on. The server adds 1 to a counter for that day and that reason. No personal data. Only"
  },
  {
   "page": "Router setup",
@@ -178,7 +214,7 @@ export default [
   "page": "Router setup",
   "heading": "Step 1: the shared secret",
   "url": "docs/router-setup/#settings",
-  "keywords": "In the admin panel open Settings . Note the RADIUS shared secret (a random one was made at the first start, or the value of HSP_RADIUS_SHARED_SECRET ). You can change it. Note also the Disconnect (CoA) port , 3799 by default."
+  "keywords": "In the admin panel open Settings . Note the RADIUS shared secret (a random one was made at the first start, or the value of HSP_RADIUS_SHARED_SECRET ). You can change it: use letters and digits only (no spaces or symbols), and make it long and random, 20 or mo"
  },
  {
   "page": "Router setup",
@@ -202,7 +238,7 @@ export default [
   "page": "Router setup",
   "heading": "Test it",
   "url": "docs/router-setup/#test",
-  "keywords": "Make a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the Online page. The Router page also has a link status panel: the time and source address of the last login request, the last accounting packet and "
+  "keywords": "Make a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the Online page. The Dashboard has a Router status panel: the time and source address of the last login request, the last accounting packet and the l"
  },
  {
   "page": "Hotspot login pages",
@@ -310,7 +346,7 @@ export default [
   "page": "Backup and upgrade",
   "heading": "What to back up",
   "url": "docs/backup-and-upgrade/#what",
-  "keywords": "The state is two things: The database , hsp.db in the data folder. The secret key , HSP_SECRET_KEY (in your env file, for example hsp.env ). Keep the key If the key is lost, the stored member passwords are unrecoverable , and the server will not start on that "
+  "keywords": "The state is two things: The database , hsp.db in the data folder. The secret key , hsp.key in the data folder (or HSP_SECRET_KEY in your env file, if you set it manually). Keep the key If the key is lost, the stored member passwords are unrecoverable , and th"
  },
  {
   "page": "Backup and upgrade",
@@ -322,7 +358,7 @@ export default [
   "page": "Backup and upgrade",
   "heading": "Restore",
   "url": "docs/backup-and-upgrade/#restore",
-  "keywords": "Stop the server. Put the backup file in the data folder as hsp.db , and delete old hsp.db-wal and hsp.db-shm files there. Start the server with the same HSP_SECRET_KEY that the database was made with. To move to a new machine, copy the database (from a backup)"
+  "keywords": "Stop the server. Put the backup file in the data folder as hsp.db , and delete old hsp.db-wal and hsp.db-shm files there. Start the server with the data folder that holds both hsp.db and hsp.key . If you use an env file with HSP_SECRET_KEY , use the same key. "
  },
  {
   "page": "Backup and upgrade",
@@ -340,7 +376,7 @@ export default [
   "page": "Troubleshooting",
   "heading": "Logins fail",
   "url": "docs/troubleshooting/#login-problems",
-  "keywords": "Nobody can log in, and the login page waits or fails Check in this order: Open the Router page and look at the link status panel. If no login request arrived, the router does not reach the server: check <SERVER-IP> in /radius and that UDP 1812 and 1813 are ope"
+  "keywords": "Nobody can log in, and the login page waits or fails Check in this order: Open the Dashboard and look at the Router status panel. If no login request arrived, the router does not reach the server: check <SERVER-IP> in /radius and that UDP 1812 and 1813 are ope"
  },
  {
   "page": "Troubleshooting",

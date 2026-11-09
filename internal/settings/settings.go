@@ -34,7 +34,11 @@ func (s *Service) Get(ctx context.Context) (domain.Settings, error) { return s.r
 // Update validates and stores the form. A non-empty FieldErrors means nothing was stored.
 // The RADIUS shared secret is read per packet, so it applies without a restart (PLAN 7.1).
 func (s *Service) Update(ctx context.Context, f domain.SettingsForm) (domain.FieldErrors, error) {
-	st, errs := domain.ParseSettings(f)
+	cur, err := s.repo.GetSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	st, errs := domain.ParseSettingsKeeping(f, cur.RadiusSharedSecret)
 	if _, bad := errs["timezone"]; !bad {
 		// LoadLocation accepts "" and "Local" (the host zone), which are not IANA names.
 		if _, err := time.LoadLocation(st.Timezone); err != nil || st.Timezone == "Local" {
@@ -53,7 +57,7 @@ func (s *Service) Update(ctx context.Context, f domain.SettingsForm) (domain.Fie
 	if len(errs) > 0 {
 		return errs, nil
 	}
-	err := s.repo.UpdateSettings(ctx, st, s.clock.Now())
+	err = s.repo.UpdateSettings(ctx, st, s.clock.Now())
 	if errors.Is(err, domain.ErrPlanGone) { // deleted between the check and the write
 		return domain.FieldErrors{"default_plan_id": "Choose a plan from the list."}, nil
 	}

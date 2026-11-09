@@ -4,9 +4,12 @@
 package e2e
 
 import (
+	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/url"
@@ -14,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,7 +32,10 @@ import (
 
 	"hotspotpluslight/e2e/fakenas"
 	"hotspotpluslight/e2e/harness"
+	"hotspotpluslight/internal/auth"
 	"hotspotpluslight/internal/clock"
+	"hotspotpluslight/internal/secret"
+	"hotspotpluslight/internal/store"
 )
 
 func scalar[T any](t *testing.T, db *sql.DB, q string, args ...any) T {
@@ -40,8 +47,8 @@ func scalar[T any](t *testing.T, db *sql.DB, q string, args ...any) T {
 	return v
 }
 
-// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily, 0003_admin_must_change, 0004_drop_page_api_settings, 0005_business_name, 0006_session_indexes).
-const wantMigrations = 6
+// wantMigrations is the number of shipped migrations (0001_init, 0002_usage_daily, 0003_admin_must_change, 0004_drop_page_api_settings, 0005_business_name, 0006_server_settings, 0007_login_failure_daily, 0008_session_indexes).
+const wantMigrations = 8
 
 // pageIsClean reports inline style, inline handlers, hx-on and inline scripts/styles in a page.
 func pageIsClean(d *goquery.Document) []string {
@@ -666,4 +673,132 @@ func link(t *testing.T, d *goquery.Document, kind string) linkRow {
 		t.Fatalf("panel row %q: %d matches", kind, row.Length())
 	}
 	return linkRow{text(row.Find("[data-at]")), text(row.Find("[data-from]"))}
+}
+
+// oldInstall is a database created by an older release, before the current migrations.
+type oldInstall struct {
+	DataDir, Key string
+}
+
+// seedOldDB builds a first-boot database at the schema of the old migrations (0003 or later).
+// The app cannot do this itself, because its seeding writes columns the old schema lacks.
+func seedOldDB(t *testing.T, old fs.FS) oldInstall {
+	t.Helper()
+	in := oldInstall{DataDir: t.TempDir(), Key: harness.NewKey()}
+	st, err := store.Open(filepath.Join(in.DataDir, "hsp.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Migrate(context.Background(), old, time.Now); err != nil {
+		st.Close()
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := secret.ParseKey(in.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	box, err := secret.NewBox(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kc, err := box.KeyCheck()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash, err := auth.HashPassword("admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := harness.DB(t, in.DataDir)
+	now := time.Now().Unix()
+	if _, err := db.Exec(`INSERT INTO admin(id, username, password_hash, must_change_password, updated_at) VALUES (1, 'admin', ?, 1, ?)`, hash, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO settings(id, key_check, radius_shared_secret, updated_at) VALUES (1, ?, 'old-secret', ?)`, kc, now); err != nil {
+		t.Fatal(err)
+	}
+	return in
+}
+
+// startUpgraded applies the shipped migrations to an old install and starts the app on it.
+// The migrations run before the app starts, because the harness addresses (127.0.0.1:0) only seed a
+// first boot. Without the UPDATE, the upgraded row would hold the 0006 defaults and bind :8081, :1812 and :1813.
+func startUpgraded(t *testing.T, in oldInstall) *harness.Server {
+	t.Helper()
+	st, err := store.Open(filepath.Join(in.DataDir, "hsp.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Migrate(context.Background(), store.EmbeddedMigrations(), time.Now); err != nil {
+		st.Close()
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := harness.DB(t, in.DataDir).Exec(`UPDATE settings SET admin_addr='127.0.0.1:0', radius_auth_addr='127.0.0.1:0', radius_acct_addr='127.0.0.1:0'`); err != nil {
+		t.Fatal(err)
+	}
+	return harness.Start(t, harness.Options{DataDir: in.DataDir, SecretKey: in.Key})
+}
+
+// dbSnapshot returns a checksum of the rows of every table except the ones in skip, keyed by table name.
+// It tells a test that a request changed no row (or only the rows it expects).
+func dbSnapshot(t *testing.T, db *sql.DB, skip ...string) map[string]string {
+	t.Helper()
+	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tables []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(skip, n) {
+			tables = append(tables, n)
+		}
+	}
+	rows.Close()
+	out := map[string]string{}
+	for _, tbl := range tables {
+		r, err := db.Query(`SELECT * FROM "` + tbl + `"`) // the name comes from sqlite_master, not from input
+		if err != nil {
+			t.Fatal(err)
+		}
+		cols, _ := r.Columns()
+		var lines []string
+		for r.Next() {
+			vals := make([]any, len(cols))
+			ptrs := make([]any, len(cols))
+			for i := range vals {
+				ptrs[i] = &vals[i]
+			}
+			if err := r.Scan(ptrs...); err != nil {
+				t.Fatal(err)
+			}
+			lines = append(lines, fmt.Sprint(vals...))
+		}
+		r.Close()
+		sort.Strings(lines)
+		sum := sha256.Sum256([]byte(strings.Join(lines, "\n")))
+		out[tbl] = fmt.Sprintf("%d rows, %x", len(lines), sum[:8])
+	}
+	return out
+}
+
+// snapshotDiff names the tables that differ between two snapshots ("" = identical).
+func snapshotDiff(a, b map[string]string) string {
+	var diff []string
+	for k, v := range a {
+		if b[k] != v {
+			diff = append(diff, k)
+		}
+	}
+	sort.Strings(diff)
+	return strings.Join(diff, ", ")
 }

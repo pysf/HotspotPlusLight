@@ -125,7 +125,7 @@ func TestE11_23_ChangeSucceeds(t *testing.T) {
 	}
 
 	r := c.SetPassword("admin", goodNew, goodNew)
-	if r.StatusCode != 200 || r.Header.Get("HX-Redirect") != "/admin/members" {
+	if r.StatusCode != 200 || r.Header.Get("HX-Redirect") != "/admin" {
 		t.Fatalf("change: %d HX-Redirect %q", r.StatusCode, r.Header.Get("HX-Redirect"))
 	}
 	toast := false
@@ -157,7 +157,7 @@ func TestE11_23_ChangeSucceeds(t *testing.T) {
 	if r := fresh.PostLogin("admin", "admin"); r.StatusCode != 401 {
 		t.Errorf("old password: %d", r.StatusCode)
 	}
-	if r := fresh.PostLogin("admin", goodNew); r.StatusCode != 303 || r.Header.Get("Location") != "/admin/members" {
+	if r := fresh.PostLogin("admin", goodNew); r.StatusCode != 303 || r.Header.Get("Location") != "/admin" {
 		t.Errorf("new password: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
 	// A later change from the same page works with the new current password.
@@ -179,7 +179,7 @@ func TestE11_24_ExistingInstallNotForced(t *testing.T) {
 	}
 	c := harness.NewAdminClient(t, s)
 	r := c.PostLogin("admin", "admin")
-	if r.StatusCode != 303 || r.Header.Get("Location") != "/admin/members" {
+	if r.StatusCode != 303 || r.Header.Get("Location") != "/admin" {
 		t.Fatalf("login: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
 	if r := c.Get("/admin/members"); r.StatusCode != 200 {
@@ -252,7 +252,7 @@ func TestE11_25_CLIClearsFlag(t *testing.T) {
 		t.Fatal("flag not cleared by the CLI")
 	}
 	c := harness.NewAdminClient(t, s)
-	if r := c.PostLogin("admin", goodNew); r.StatusCode != 303 || r.Header.Get("Location") != "/admin/members" {
+	if r := c.PostLogin("admin", goodNew); r.StatusCode != 303 || r.Header.Get("Location") != "/admin" {
 		t.Fatalf("login after the CLI change: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
 }

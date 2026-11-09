@@ -63,7 +63,7 @@ func TestE0_10_Layering(t *testing.T) {
 			}
 		}
 	}
-	for _, svc := range []string{"auth", "member", "plan", "session", "settings", "voucher"} {
+	for _, svc := range []string{"auth", "dashboard", "member", "plan", "session", "settings", "voucher"} {
 		forbid("internal/"+svc, "internal/web", "internal/radius", "internal/store")
 	}
 	forbid("internal/radius", "internal/store")

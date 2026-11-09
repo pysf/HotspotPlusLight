@@ -133,6 +133,21 @@ const (
 	symbols = "!@#$%^&*-_=+?"
 )
 
+// GenerateSecret returns n random letters and digits (crypto/rand), the only
+// characters a RADIUS shared secret may have.
+func GenerateSecret(n int) (string, error) {
+	set := upper + lower + digits
+	out := make([]byte, n)
+	for i := range out {
+		c, err := pick(set)
+		if err != nil {
+			return "", err
+		}
+		out[i] = c
+	}
+	return string(out), nil
+}
+
 // GeneratePassword returns n random characters (crypto/rand) that always
 // satisfy BR-20: at least one upper, lower, digit and symbol.
 func GeneratePassword(n int) (string, error) {

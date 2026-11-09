@@ -1,0 +1,130 @@
+package admin
+
+import (
+	"strconv"
+
+	"hotspotpluslight/internal/dashboard"
+	"hotspotpluslight/internal/web/ui"
+)
+
+// DashboardPage is the home page: three tiles, the router status, what needs attention and three charts.
+templ DashboardPage(l ui.LayoutData, v dashboardView) {
+	@ui.Layout(l) {
+		@ui.PageHeader("Dashboard")
+		<p class="u-muted l-gap-bottom">Updates every 10 seconds.</p>
+		@DashboardContent(v)
+	}
+}
+
+// DashboardContent is everything under the page title. It is the polled fragment: it re-fetches itself every 10 s (htmx), keeping the page.
+templ DashboardContent(v dashboardView) {
+	<div data-dashboard hx-get={ dashboardContentURL } hx-trigger="every 10s" hx-swap="outerHTML">
+		@ui.Tiles() {
+			@OnlineTile(v.Online)
+			@ui.Tile("Traffic today (so far)", templ.Attributes{"data-tile": "traffic"}) {
+				@ui.TileValue(v.Traffic.Today, templ.Attributes{"data-traffic-today": strconv.FormatInt(v.Traffic.TodayBytes, 10)})
+				@ui.TileNote("Yesterday "+v.Traffic.Yesterday+": "+v.Traffic.VsYesterday, templ.Attributes{"data-vs-yesterday": v.Traffic.VsYesterday})
+				@ui.TileNote("Same day last week "+v.Traffic.LastWeek+": "+v.Traffic.VsLastWeek, templ.Attributes{"data-vs-lastweek": v.Traffic.VsLastWeek})
+			}
+			@ui.Tile("Failed logins today", templ.Attributes{"data-tile": "failed"}) {
+				@ui.TileValue(strconv.FormatInt(v.Failed.Total, 10), templ.Attributes{"data-failed-total": strconv.FormatInt(v.Failed.Total, 10)})
+				if v.Failed.HasTop {
+					@ui.TileNote("Most common: "+v.Failed.Text+" ("+strconv.FormatInt(v.Failed.Count, 10)+")", templ.Attributes{"data-failed-top": v.Failed.Code})
+				} else {
+					@ui.TileNote("No failed logins today.", templ.Attributes{"data-failed-empty": true})
+				}
+			}
+		}
+		<div class="l-gap-bottom">
+			@LinkStatusPanel(v.Link)
+		</div>
+		<section class="l-gap-bottom" aria-label="Needs attention">
+			@AttentionSection(v.Expiring)
+			@AttentionSection(v.NearLimit)
+		</section>
+		for _, c := range v.Charts {
+			@ChartSection(c)
+		}
+	</div>
+}
+
+// OnlineTile is the Online now tile.
+templ OnlineTile(o dashboard.OnlineNow) {
+	@ui.Tile("Online now", templ.Attributes{"data-tile": "online"}) {
+		@ui.TileValue(strconv.Itoa(o.Now), templ.Attributes{"data-online-now": strconv.Itoa(o.Now)})
+		@ui.TileNote("Peak today: "+strconv.Itoa(o.PeakToday), templ.Attributes{"data-peak-today": strconv.Itoa(o.PeakToday)})
+	}
+}
+
+// AttentionSection is one Needs attention list: a heading with the full count, at most five members, or an empty text.
+templ AttentionSection(a attentionView) {
+	<div class="l-gap-bottom" data-attention={ a.Key } data-count={ strconv.Itoa(a.Count) }>
+		<h2 class="l-gap-bottom">{ a.Title } ({ strconv.Itoa(a.Count) })</h2>
+		if len(a.Rows) == 0 {
+			<div data-empty>
+				@ui.EmptyState(a.Empty)
+			</div>
+		} else {
+			@ui.Table(a.Title, []string{"Member", a.Column}) {
+				for _, r := range a.Rows {
+					<tr data-attention-row data-member-id={ strconv.FormatInt(r.ID, 10) } data-username={ r.Username }>
+						<td data-label="Member"><a href={ templ.SafeURL(memberURL(r.ID)) }>{ r.Username }</a></td>
+						<td data-detail data-label={ a.Column }>{ r.Detail }</td>
+					</tr>
+				}
+			}
+			if a.Count > len(a.Rows) {
+				<p class="u-muted" data-more>and { strconv.Itoa(a.Count - len(a.Rows)) } more</p>
+			}
+		}
+	</div>
+}
+
+// ChartSection is one chart with its heading. When every bar is 0 it shows the empty text instead.
+templ ChartSection(c chartView) {
+	<section class="l-gap-bottom" data-chart={ c.Key } aria-label={ c.Title }>
+		<h2 class="l-gap-bottom">{ c.Title }</h2>
+		if c.Top == 0 {
+			<div data-empty>
+				@ui.EmptyState(c.Empty)
+			</div>
+		} else {
+			@ui.BarChart(c.Bars, c.Top, c.Caption)
+		}
+		if c.More != "" {
+			<p><a href={ templ.SafeURL(c.MoreHref) }>{ c.More }</a></p>
+		}
+	</section>
+}
+
+// LinkStatusPanel shows what the router last sent. It lives in memory and starts empty after a restart.
+templ LinkStatusPanel(v linkView) {
+	<div data-link-status>
+		<h2 class="l-gap-bottom">Router status</h2>
+		<p class="u-muted l-gap-bottom">Since the server started. A wrong shared secret on the router shows up as bad-secret packets.</p>
+		@ui.Table("Router status", []string{"", "When", "Router address", "Result"}) {
+			for _, e := range v.Events {
+				<tr data-link={ e.Key }>
+					<td data-label="Event">{ e.Label }</td>
+					<td data-at data-label="When" class="u-nums">{ e.At }</td>
+					<td data-from data-label="Router address">{ e.From }</td>
+					<td data-detail data-label="Result">{ e.Detail }</td>
+				</tr>
+			}
+		}
+		<p class="l-gap-bottom">Packets with a wrong shared secret: <strong class="u-nums" data-bad-secret-count>{ v.BadTotal }</strong></p>
+		if len(v.BadSources) > 0 {
+			<div data-bad-secret-sources>
+				@ui.Table("Wrong shared secret sources", []string{"Source address", "Packets", "Last seen"}) {
+					for _, b := range v.BadSources {
+						<tr data-bad-secret-from={ b.From }>
+							<td data-label="Source address">{ b.From }</td>
+							<td data-count data-label="Packets" class="u-nums">{ b.Count }</td>
+							<td data-at data-label="Last seen" class="u-nums">{ b.At }</td>
+						</tr>
+					}
+				}
+			</div>
+		}
+	</div>
+}

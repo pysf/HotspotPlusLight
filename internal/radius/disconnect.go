@@ -98,7 +98,14 @@ func (d *Disconnector) Disconnect(ctx context.Context, t domain.SessionTarget) e
 	// MONITOR: the panel's outcome is best effort. A cancelled context shows as "no answer",
 	// and a failure before the packet is built is not recorded.
 	outcome := "no answer"
-	defer func() { d.link.Disconnect(addr, outcome) }()
+	defer func() {
+		d.link.Disconnect(addr, outcome)
+		level := slog.LevelWarn // anything but an ACK or "session not found" means the member may still be online
+		if outcome == "ACK" || outcome == "NAK (session not found)" {
+			level = slog.LevelInfo
+		}
+		d.log.Log(ctx, level, "disconnect", "addr", addr, "user", t.Username, "session", t.AcctSessionID, "outcome", outcome)
+	}()
 	for range attempts {
 		actx, cancel := context.WithTimeout(ctx, attemptTimeout)
 		reply, err := client.Exchange(actx, p, addr)

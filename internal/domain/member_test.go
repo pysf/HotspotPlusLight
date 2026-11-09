@@ -58,7 +58,7 @@ func TestParseMember(t *testing.T) {
 
 func TestMemberStatusBoundary(t *testing.T) {
 	now := time.Unix(1000, 0)
-	soon := int64(ExpiringSoon / time.Second)
+	soon := ExpiryLimit(now, ExpiringDays) - now.Unix()
 	at := func(s int64) *time.Time { v := time.Unix(s, 0); return &v }
 	for _, tc := range []struct {
 		name   string

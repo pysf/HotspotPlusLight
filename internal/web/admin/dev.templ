@@ -156,8 +156,20 @@ templ DevComponentsPage(l ui.LayoutData) {
 				@ui.BarChart([]ui.Bar{{Label: "Mon", Value: 3}, {Label: "Tue", Value: 8}, {Label: "Wed", Value: 5}, {Label: "Thu", Value: 10}}, 10, "sample")
 			</div>
 		}
+		@galleryItem("Tiles") {
+			@ui.Tiles() {
+				@ui.Tile("Online now", nil) {
+					@ui.TileValue("12", nil)
+					@ui.TileNote("Peak today: 18", nil)
+				}
+				@ui.Tile("Traffic today (so far)", nil) {
+					@ui.TileValue("3.4 GB", nil)
+					@ui.TileNote("Yesterday 4.1 GB: -17%", nil)
+				}
+			}
+		}
 		@galleryItem("Icons") {
-			for _, n := range []string{"users", "ticket", "wifi", "chart", "layers", "router", "settings", "logout", "menu", "search", "plus", "more", "sun", "close", "copy", "check"} {
+			for _, n := range []string{"home", "users", "ticket", "wifi", "chart", "layers", "router", "settings", "logout", "menu", "search", "plus", "more", "sun", "close", "copy", "check"} {
 				@ui.Icon(n)
 			}
 		}

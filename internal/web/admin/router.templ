@@ -2,7 +2,7 @@ package admin
 
 import "hotspotpluslight/internal/web/ui"
 
-// RouterPage shows the page designs, the setup script and the link status.
+// RouterPage shows the page designs and the setup script.
 templ RouterPage(l ui.LayoutData, p RouterProps) {
 	@ui.Layout(l) {
 		@ui.PageHeader("Router")
@@ -49,38 +49,5 @@ templ RouterPage(l ui.LayoutData, p RouterProps) {
 				@ui.CodeBlock("setup-script", p.Script)
 			}
 		</div>
-		@LinkStatusPanel(p.Link)
 	}
-}
-
-// LinkStatusPanel shows what the router last sent. It lives in memory and starts empty after a restart.
-templ LinkStatusPanel(v linkView) {
-	<div data-link-status>
-		<h2 class="l-gap-bottom">Router link status</h2>
-		<p class="u-muted l-gap-bottom">Since the server started. A wrong shared secret on the router shows up as bad-secret packets.</p>
-		@ui.Table("Router link status", []string{"", "When", "Router address", "Result"}) {
-			for _, e := range v.Events {
-				<tr data-link={ e.Key }>
-					<td data-label="Event">{ e.Label }</td>
-					<td data-at data-label="When" class="u-nums">{ e.At }</td>
-					<td data-from data-label="Router address">{ e.From }</td>
-					<td data-detail data-label="Result">{ e.Detail }</td>
-				</tr>
-			}
-		}
-		<p class="l-gap-bottom">Packets with a wrong shared secret: <strong class="u-nums" data-bad-secret-count>{ v.BadTotal }</strong></p>
-		if len(v.BadSources) > 0 {
-			<div data-bad-secret-sources>
-				@ui.Table("Wrong shared secret sources", []string{"Source address", "Packets", "Last seen"}) {
-					for _, b := range v.BadSources {
-						<tr data-bad-secret-from={ b.From }>
-							<td data-label="Source address">{ b.From }</td>
-							<td data-count data-label="Packets" class="u-nums">{ b.Count }</td>
-							<td data-at data-label="Last seen" class="u-nums">{ b.At }</td>
-						</tr>
-					}
-				}
-			</div>
-		}
-	</div>
 }

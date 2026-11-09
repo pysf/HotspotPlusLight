@@ -45,7 +45,7 @@
   <a class="btn primary sm" href="./">Get started</a>
 </div></header>
 <main id="main" class="docs"><div class="wrap">
-<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="./" aria-current="page">Installation</a><ul class="sub"><li><a href="#download">Download</a></li><li><a href="#linux">Linux</a></li><li><a href="#macos">macOS</a></li><li><a href="#windows">Windows</a></li><li><a href="#first-run">The first start</a></li><li><a href="#build">Build from source</a></li><li><a href="#ports">Ports</a></li></ul></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
+<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="./" aria-current="page">Installation</a><ul class="sub"><li><a href="#download">Download</a></li><li><a href="#linux">Linux</a></li><li><a href="#macos">macOS</a></li><li><a href="#windows">Windows</a></li><li><a href="#first-run">The first start</a></li><li><a href="#build">Build from source</a></li><li><a href="#ports">Ports</a></li></ul></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../dashboard/">Dashboard</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
 <article class="doc"><span class="kick">Documentation</span><h1>Installation</h1><p class="intro">Download the program for your system, start it once, and open the admin panel. Building from source is also easy.</p>
 <section><h2 id="download"><a href="#download">Download</a></h2>
 <p>Every release has nine files. Each holds the program, <code>README.md</code> and <code>LICENSE</code>. The file names have no version, so these links always give the newest release.</p>
@@ -58,12 +58,9 @@
 tar -xzf hotspotpluslight-linux-amd64.tar.gz
 sudo install -m 755 hotspotpluslight /usr/local/bin/
 hotspotpluslight version</code></pre>
-<p>Make a settings file with a new secret key. The key encrypts the member passwords, so keep a copy (see <a href="../backup-and-upgrade/">Backup and upgrade</a>):</p>
-<pre><code>printf 'HSP_SECRET_KEY=%s\n' "$(hotspotpluslight gen-key)" &gt; hsp.env
-chmod 600 hsp.env</code></pre>
-<p>Start the server from the same folder:</p>
-<pre><code>hotspotpluslight --env-file hsp.env serve</code></pre>
-<p>By default the database goes in a folder called <code>data</code> next to where you run the command. Set <code>HSP_DATA_DIR</code> to put it somewhere else. To start at boot, see <a href="../running-as-a-service/">Running as a service</a>.</p></section>
+<p>Start the server from the same folder. It creates the secret key and the database on first start:</p>
+<pre><code>hotspotpluslight serve</code></pre>
+<p>By default the database and the key file go in a folder called <code>data</code> next to where you run the command. Back up that folder: it holds both <code>hsp.db</code> and <code>hsp.key</code>. Set <code>HSP_DATA_DIR</code> to use a different folder; set <code>HSP_SECRET_KEY</code> to manage the key yourself instead of auto-generating it. A key is only generated for a new data folder; if <code>hsp.db</code> exists and the key is missing, the server will not start. To start at boot, see <a href="../running-as-a-service/">Running as a service</a>.</p></section>
 <section><h2 id="macos"><a href="#macos">macOS</a></h2>
 <p>Use <code>darwin-arm64</code> on Apple silicon or <code>darwin-amd64</code> on an Intel Mac:</p>
 <pre><code>curl -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-darwin-arm64.tar.gz
@@ -76,9 +73,8 @@ tar -xzf hotspotpluslight-darwin-arm64.tar.gz
 Expand-Archive hotspotpluslight-windows-amd64.zip -DestinationPath C:\hotspotpluslight
 cd C:\hotspotpluslight
 .\hotspotpluslight.exe version</code></pre>
-<p>To try it in the window, set a key and start it:</p>
-<pre><code>$env:HSP_SECRET_KEY = (.\hotspotpluslight.exe gen-key)
-.\hotspotpluslight.exe serve</code></pre>
+<p>To try it in the window, start it:</p>
+<pre><code>.\hotspotpluslight.exe serve</code></pre>
 <p>For daily use, install the Windows service instead. It makes the settings file and the key for you. See <a href="../running-as-a-service/#windows">Running as a service</a>.</p></section>
 <section><h2 id="first-run"><a href="#first-run">The first start</a></h2>
 <p>On the first start the server creates the database, creates the admin account and prints this block. The log lines go to stderr and the block goes to stdout. This is the real output:</p>
@@ -97,10 +93,10 @@ time=2026-11-04T17:44:47.594+01:00 level=INFO msg=listening admin=[::]:8081 radi
 <pre><code>git clone https://github.com/pysf/HotspotPlusLight.git
 cd HotspotPlusLight
 make build</code></pre>
-<p><code>make build</code> writes <code>bin/hotspotpluslight</code>. For a 64-bit Windows program use <code>make build-windows</code>, which writes <code>bin/hotspotpluslight.exe</code>. <code>make run</code> builds and starts the server with data in <code>./data</code>, using a development key kept in the git-ignored file <code>.dev-secret-key</code>.</p></section>
+<p><code>make build</code> writes <code>bin/hotspotpluslight</code>. For a 64-bit Windows program use <code>make build-windows</code>, which writes <code>bin/hotspotpluslight.exe</code>. <code>make run</code> builds and starts the server with data in <code>./data</code>; the key is auto-generated to <code>data/hsp.key</code> on first start.</p></section>
 <section><h2 id="ports"><a href="#ports">Ports</a></h2>
 <div class="tbl" tabindex="0" role="region" aria-label="Ports"><table><thead><tr><th scope="col">Port</th><th scope="col">Direction</th><th scope="col">Used for</th></tr></thead><tbody><tr><td>TCP 8081</td><td>to the server, from your computer</td><td>The admin panel and <code>/healthz</code> (plain HTTP).</td></tr><tr><td>UDP 1812</td><td>to the server, from the router</td><td>RADIUS login requests.</td></tr><tr><td>UDP 1813</td><td>to the server, from the router</td><td>RADIUS accounting.</td></tr><tr><td>UDP 3799</td><td>to the router, from the server</td><td>Disconnect requests (the port is a setting).</td></tr></tbody></table></div>
-<p>The addresses and ports of the server can be changed with <code>HSP_ADMIN_ADDR</code>, <code>HSP_RADIUS_AUTH_ADDR</code> and <code>HSP_RADIUS_ACCT_ADDR</code>, see <a href="../configuration/">Configuration</a>. The firewall rules are on the <a href="../router-setup/#firewall">Router setup</a> page.</p></section>
+<p>The addresses and ports of the server can be changed on the <strong>Settings</strong> page. A restart is needed. The env vars <code>HSP_ADMIN_ADDR</code>, <code>HSP_RADIUS_AUTH_ADDR</code> and <code>HSP_RADIUS_ACCT_ADDR</code> only set the first start; after that the page is used. See <a href="../configuration/">Configuration</a>. The firewall rules are on the <a href="../router-setup/#firewall">Router setup</a> page.</p></section>
 <nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../"><small>Previous</small>Introduction</a><a class="next" rel="next" href="../running-as-a-service/"><small>Next</small>Run as a service</a></nav></article>
 </div></main>
 <footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a></span>

@@ -71,7 +71,7 @@ func TestE1_01_AdminLogin(t *testing.T) {
 		t.Fatalf("change: %d", r.StatusCode)
 	}
 	again := harness.NewAdminClient(t, s)
-	if r := again.PostLogin("admin", harness.AdminPassword); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/members" {
+	if r := again.PostLogin("admin", harness.AdminPassword); r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin" {
 		t.Fatalf("login after change: %d %q", r.StatusCode, r.Header.Get("Location"))
 	}
 }
@@ -103,7 +103,7 @@ func TestE1_02_LoginThrottle(t *testing.T) {
 	}
 }
 
-// E1.03 protected pages redirect to login; login lands on /admin/members; GET /admin redirects there.
+// E1.03 protected pages redirect to login; login lands on /admin, the dashboard, which answers 200 (Phase 18, D25).
 func TestE1_03_ProtectedPagesAndLanding(t *testing.T) {
 	s := harness.Start(t, harness.Options{})
 	anon := harness.NewAdminClient(t, s)
@@ -120,11 +120,11 @@ func TestE1_03_ProtectedPagesAndLanding(t *testing.T) {
 	}
 	c := harness.LoginAsAdmin(t, s)
 	r = c.Get("/admin")
-	if r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/admin/members" {
-		t.Fatalf("GET /admin: %d %q", r.StatusCode, r.Header.Get("Location"))
+	if r.StatusCode != 200 || r.Header.Get("Location") != "" {
+		t.Fatalf("GET /admin: %d %q (want 200, the dashboard)", r.StatusCode, r.Header.Get("Location"))
 	}
 	if r := c.Get("/admin/members"); r.StatusCode != 200 {
-		t.Fatalf("landing: %d", r.StatusCode)
+		t.Fatalf("members: %d", r.StatusCode)
 	}
 }
 

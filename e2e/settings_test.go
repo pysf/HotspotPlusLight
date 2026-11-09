@@ -149,8 +149,8 @@ func TestE14_03_Migration0005(t *testing.T) {
 		old[n] = &fstest.MapFile{Data: read(n)}
 	}
 	for _, c := range []struct{ before, after string }{{"HotspotPlus", ""}, {"Hotel Aria", "Hotel Aria"}} {
-		s := harness.Start(t, harness.Options{Migrations: old})
-		db := harness.DB(t, s.DataDir)
+		in := seedOldDB(t, old)
+		db := harness.DB(t, in.DataDir)
 		if scalar[int](t, db, `SELECT count(*) FROM pragma_table_info('settings') WHERE name='site_title'`) != 1 {
 			t.Fatal("before 0005 the column site_title should exist")
 		}
@@ -158,9 +158,8 @@ func TestE14_03_Migration0005(t *testing.T) {
 			t.Fatal(err)
 		}
 		secret := scalar[string](t, db, `SELECT radius_shared_secret FROM settings`)
-		s.Stop()
 
-		s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey})
+		s2 := startUpgraded(t, in)
 		if n := scalar[int](t, db, `SELECT count(*) FROM schema_migrations`); n != wantMigrations {
 			t.Errorf("%d migrations, want %d", n, wantMigrations)
 		}
@@ -259,7 +258,7 @@ func TestE1_10_Settings(t *testing.T) {
 	// Valid update persists every column.
 	f := harness.FormValues(t, d, "form#settings-form")
 	for k, v := range map[string]string{
-		"business_name": "My Cafe", "timezone": "Asia/Tehran", "radius_shared_secret": "s3cret-value", "coa_port": "3800",
+		"business_name": "My Cafe", "timezone": "Asia/Tehran", "radius_shared_secret": "s3cretvalue", "coa_port": "3800",
 		"accounting_interval_seconds": "120", "default_plan_id": fmt.Sprint(plan),
 		"batch_username_prefix": "cafe", "batch_counter": "2000",
 		"batch_max_count": "50", "voucher_password_length": "8", "voucher_help": "Connect to the WiFi and sign in.",
@@ -280,7 +279,7 @@ func TestE1_10_Settings(t *testing.T) {
 	if err := row.Scan(&title, &tz, &sec, &coa, &interval, &def, &prefix, &counter, &maxc, &vlen, &help, &retain); err != nil {
 		t.Fatal(err)
 	}
-	if title != "My Cafe" || tz != "Asia/Tehran" || sec != "s3cret-value" || coa != 3800 || interval != 120 || !def.Valid || def.Int64 != plan ||
+	if title != "My Cafe" || tz != "Asia/Tehran" || sec != "s3cretvalue" || coa != 3800 || interval != 120 || !def.Valid || def.Int64 != plan ||
 		prefix != "cafe" || counter != 2000 || maxc != 50 || vlen != 8 ||
 		help != "Connect to the WiFi and sign in." || retain != 0 {
 		t.Fatalf("stored: %v", []any{title, tz, sec, coa, interval, def, prefix, counter, maxc, vlen, help, retain})
@@ -309,7 +308,7 @@ func TestE1_11_SharedSecretAppliesWithoutRestart(t *testing.T) {
 	if r, err := fakenas.New(s.Addrs.RadiusAuth, oldSecret).Authenticate("u", "p"); err != nil || r.Code != radius.CodeAccessReject {
 		t.Fatalf("before change: %v %v", r, err)
 	}
-	const newSecret = "a-completely-new-shared-secret"
+	const newSecret = "ACompletelyNewSharedSecret42"
 	f := harness.FormValues(t, c.Get("/admin/settings").Doc(t), "form#settings-form")
 	f.Set("radius_shared_secret", newSecret)
 	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 200 {
@@ -323,6 +322,252 @@ func TestE1_11_SharedSecretAppliesWithoutRestart(t *testing.T) {
 	stale.Timeout = 1500 * time.Millisecond
 	if r, err := stale.Authenticate("u", "p"); err == nil {
 		t.Fatalf("old secret still verifies replies: %v", r.Code)
+	}
+}
+
+// E16.01 the settings form shows server config fields; invalid addresses/log values are rejected; valid values persist.
+func TestE16_01_ServerSettingsForm(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	db := harness.DB(t, s.DataDir)
+
+	d := c.Get("/admin/settings").Doc(t)
+	for _, f := range []string{"admin_addr", "radius_auth_addr", "radius_acct_addr", "log_level", "log_format"} {
+		if d.Find(`form#settings-form [name="`+f+`"]`).Length() != 1 {
+			t.Errorf("settings form lacks %s", f)
+		}
+	}
+	// The harness seeds the addresses from env on first boot, and the form shows what is stored.
+	form := harness.FormValues(t, d, "form#settings-form")
+	if v := form.Get("admin_addr"); v != "127.0.0.1:0" {
+		t.Errorf("seeded admin_addr %q", v)
+	}
+	if v := form.Get("log_level"); v != "info" {
+		t.Errorf("default log_level %q", v)
+	}
+
+	// Invalid values: bad address format, bad log level.
+	for _, iv := range []struct{ field, val string }{
+		{"admin_addr", "8081"},          // missing colon
+		{"radius_auth_addr", ""},        // empty
+		{"radius_acct_addr", ":999999"}, // port out of range
+		{"log_level", "verbose"},        // unknown level
+		{"log_format", "yaml"},          // unknown format
+	} {
+		f := harness.FormValues(t, d, "form#settings-form")
+		f.Set(iv.field, iv.val)
+		r := c.Send("PUT", "/admin/settings", f)
+		if r.StatusCode != 422 || fieldError(r, t, iv.field) == "" {
+			t.Errorf("%s=%q: status %d err %q", iv.field, iv.val, r.StatusCode, fieldError(r, t, iv.field))
+		}
+	}
+
+	// Two listeners on the same port are rejected.
+	dup := harness.FormValues(t, d, "form#settings-form")
+	dup.Set("admin_addr", ":9090")
+	dup.Set("radius_auth_addr", ":9090")
+	if r := c.Send("PUT", "/admin/settings", dup); r.StatusCode != 422 || (fieldError(r, t, "admin_addr") == "" && fieldError(r, t, "radius_auth_addr") == "") {
+		t.Errorf("duplicate ports: status %d", r.StatusCode)
+	}
+
+	// A PUT without the server fields keeps the stored values.
+	before := scalar[string](t, db, `SELECT admin_addr||'|'||radius_auth_addr||'|'||radius_acct_addr||'|'||log_level||'|'||log_format FROM settings`)
+	partial := harness.FormValues(t, d, "form#settings-form")
+	for _, k := range []string{"admin_addr", "radius_auth_addr", "radius_acct_addr", "log_level", "log_format"} {
+		partial.Del(k)
+	}
+	if r := c.Send("PUT", "/admin/settings", partial); r.StatusCode != 200 {
+		t.Fatalf("partial save: %d", r.StatusCode)
+	}
+	if after := scalar[string](t, db, `SELECT admin_addr||'|'||radius_auth_addr||'|'||radius_acct_addr||'|'||log_level||'|'||log_format FROM settings`); after != before {
+		t.Errorf("server settings changed: %q -> %q", before, after)
+	}
+
+	// Valid update: save new values and verify they persist.
+	f := harness.FormValues(t, d, "form#settings-form")
+	f.Set("admin_addr", ":9090")
+	f.Set("radius_auth_addr", ":1812")
+	f.Set("radius_acct_addr", ":1813")
+	f.Set("log_level", "debug")
+	f.Set("log_format", "json")
+	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 200 || !strings.Contains(r.Body, "Settings saved") {
+		t.Fatalf("save: %d %s", r.StatusCode, r.Body)
+	}
+	if v := scalar[string](t, db, `SELECT admin_addr FROM settings`); v != ":9090" {
+		t.Errorf("admin_addr %q", v)
+	}
+	if v := scalar[string](t, db, `SELECT log_level FROM settings`); v != "debug" {
+		t.Errorf("log_level %q", v)
+	}
+}
+
+// E16.02 after the first boot the settings row wins over HSP_* env vars for the server settings.
+func TestE16_02_DatabaseWinsOverEnvAfterFirstBoot(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	s.Stop()
+	s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey,
+		Env: map[string]string{"ADMIN_ADDR": "127.0.0.1:1", "LOG_LEVEL": "debug", "LOG_FORMAT": "json"}})
+	db := harness.DB(t, s.DataDir)
+	if v := scalar[string](t, db, `SELECT admin_addr FROM settings`); v != "127.0.0.1:0" {
+		t.Errorf("admin_addr %q changed by env", v)
+	}
+	if v := scalar[string](t, db, `SELECT log_level FROM settings`); v != "info" {
+		t.Errorf("log_level %q changed by env", v)
+	}
+	// Port 1 would fail to bind or be fixed; the DB address picks a free port instead.
+	if strings.HasSuffix(s2.Addrs.Admin, ":1") {
+		t.Errorf("admin bound to the env address %s", s2.Addrs.Admin)
+	}
+}
+
+// E16.03 the first boot stores the HSP_* server settings from env in the settings row.
+func TestE16_03_FirstBootSeedsServerSettingsFromEnv(t *testing.T) {
+	s := harness.Start(t, harness.Options{Env: map[string]string{
+		"ADMIN_ADDR": "127.0.0.1:0", "LOG_LEVEL": "debug", "LOG_FORMAT": "json"}})
+	db := harness.DB(t, s.DataDir)
+	if v := scalar[string](t, db, `SELECT admin_addr FROM settings`); v != "127.0.0.1:0" {
+		t.Errorf("admin_addr %q", v)
+	}
+	if v := scalar[string](t, db, `SELECT log_level FROM settings`); v != "debug" {
+		t.Errorf("log_level %q", v)
+	}
+	if v := scalar[string](t, db, `SELECT log_format FROM settings`); v != "json" {
+		t.Errorf("log_format %q", v)
+	}
+}
+
+// E16.04 the settings page shows a restart notice only when the saved server settings differ from the running ones.
+func TestE16_04_RestartNotice(t *testing.T) {
+	const notice = "Restart the server to apply"
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+
+	d := c.Get("/admin/settings")
+	if strings.Contains(d.Body, notice) {
+		t.Fatal("restart notice shown before any change")
+	}
+	f := harness.FormValues(t, d.Doc(t), "form#settings-form")
+	f.Set("log_level", "debug")
+	r := c.Send("PUT", "/admin/settings", f)
+	if r.StatusCode != 200 || !strings.Contains(r.Body, "Settings saved") || !strings.Contains(r.Body, notice) {
+		t.Fatalf("save: %d %s", r.StatusCode, r.Body)
+	}
+	if !strings.Contains(c.Get("/admin/settings").Body, notice) {
+		t.Error("restart notice missing on the page after a saved change")
+	}
+	// Saving the running value again clears the notice.
+	f.Set("log_level", "info")
+	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 200 || strings.Contains(r.Body, notice) {
+		t.Errorf("notice still shown after restoring the running value: %d", r.StatusCode)
+	}
+}
+
+// E16.05 the time zone is a dropdown with the current value selected; a stored zone that is not in the list still appears.
+func TestE16_05_TimezoneIsADropdown(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	db := harness.DB(t, s.DataDir)
+
+	d := c.Get("/admin/settings").Doc(t)
+	if d.Find(`form#settings-form input[name="timezone"]`).Length() != 0 || d.Find(`form#settings-form select[name="timezone"]`).Length() != 1 {
+		t.Fatal("time zone must be a select, not a text input")
+	}
+	sel := d.Find(`select[name="timezone"]`)
+	for _, want := range []string{"UTC", "Asia/Tehran", "Europe/London"} {
+		if sel.Find(`option[value="`+want+`"]`).Length() != 1 {
+			t.Errorf("option %s missing", want)
+		}
+	}
+	if v := sel.Find("option[selected]").AttrOr("value", ""); v != "UTC" {
+		t.Errorf("selected %q, want the stored UTC", v)
+	}
+
+	// Choosing another listed zone saves it, and the page selects it.
+	f := harness.FormValues(t, d, "form#settings-form")
+	f.Set("timezone", "Asia/Tehran")
+	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 200 {
+		t.Fatalf("save: %d", r.StatusCode)
+	}
+	if v := c.Get("/admin/settings").Doc(t).Find(`select[name="timezone"] option[selected]`).AttrOr("value", ""); v != "Asia/Tehran" {
+		t.Errorf("selected %q after save", v)
+	}
+
+	// A valid IANA zone outside the list (set directly in the database) stays visible and selected, and can be saved again.
+	const odd = "Pacific/Chatham"
+	if _, err := db.Exec(`UPDATE settings SET timezone=?`, odd); err != nil {
+		t.Fatal(err)
+	}
+	d = c.Get("/admin/settings").Doc(t)
+	if v := d.Find(`select[name="timezone"] option[selected]`).AttrOr("value", ""); v != odd {
+		t.Fatalf("selected %q, want the stored %s", v, odd)
+	}
+	f = harness.FormValues(t, d, "form#settings-form")
+	if f.Get("timezone") != odd {
+		t.Fatalf("form posts %q", f.Get("timezone"))
+	}
+	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 200 {
+		t.Fatalf("saving the odd zone again: %d", r.StatusCode)
+	}
+	if scalar[string](t, db, `SELECT timezone FROM settings`) != odd {
+		t.Error("the stored zone changed")
+	}
+
+	// A name that is not an IANA zone is still refused.
+	f.Set("timezone", "Mars/Base")
+	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 422 || fieldError(r, t, "timezone") == "" {
+		t.Errorf("Mars/Base: %d", r.StatusCode)
+	}
+}
+
+// E16.06 the RADIUS secret takes letters and digits only. A space or symbol gets a 422 on the field and nothing is
+// stored; letters and digits save. A stored older secret with symbols can be kept while other settings change.
+func TestE16_06_SecretLettersAndDigitsOnly(t *testing.T) {
+	s := harness.Start(t, harness.Options{})
+	c := harness.LoginAsAdmin(t, s)
+	db := harness.DB(t, s.DataDir)
+	d := c.Get("/admin/settings").Doc(t)
+
+	generated := scalar[string](t, db, `SELECT radius_shared_secret FROM settings`)
+	if len(generated) != 24 || strings.Trim(generated, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") != "" {
+		t.Errorf("the first-start secret %q must be 24 letters and digits", generated)
+	}
+	for _, bad := range []string{"with space", "with-dash", "p@ssw0rd!", "caf\u00e9", ""} {
+		f := harness.FormValues(t, d, "form#settings-form")
+		f.Set("radius_shared_secret", bad)
+		r := c.Send("PUT", "/admin/settings", f)
+		if r.StatusCode != 422 || fieldError(r, t, "radius_shared_secret") == "" {
+			t.Errorf("%q: status %d err %q", bad, r.StatusCode, fieldError(r, t, "radius_shared_secret"))
+		}
+	}
+	if scalar[string](t, db, `SELECT radius_shared_secret FROM settings`) != generated {
+		t.Fatal("a refused secret was stored")
+	}
+	f := harness.FormValues(t, d, "form#settings-form")
+	f.Set("radius_shared_secret", "LongRandomSecret0123456789")
+	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 200 {
+		t.Fatalf("letters and digits: %d", r.StatusCode)
+	}
+	if scalar[string](t, db, `SELECT radius_shared_secret FROM settings`) != "LongRandomSecret0123456789" {
+		t.Error("the secret was not saved")
+	}
+
+	// An older database may hold a secret with symbols. Other settings can still be saved while the form posts it unchanged.
+	const old = `old s3cret-"$`
+	if _, err := db.Exec(`UPDATE settings SET radius_shared_secret=?`, old); err != nil {
+		t.Fatal(err)
+	}
+	d = c.Get("/admin/settings").Doc(t)
+	f = harness.FormValues(t, d, "form#settings-form")
+	f.Set("coa_port", "3801")
+	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 200 {
+		t.Fatalf("saving with the stored old secret: %d %s", r.StatusCode, r.Body)
+	}
+	if scalar[string](t, db, `SELECT radius_shared_secret FROM settings`) != old || scalar[int](t, db, `SELECT coa_port FROM settings`) != 3801 {
+		t.Error("the old secret or the other setting is wrong after the save")
+	}
+	f.Set("radius_shared_secret", old+"x")
+	if r := c.Send("PUT", "/admin/settings", f); r.StatusCode != 422 {
+		t.Errorf("a changed secret with symbols: %d", r.StatusCode)
 	}
 }
 
@@ -400,25 +645,30 @@ func (f *p8) memberIDByName(name string) int64 {
 	return scalar[int64](f.t, f.db, `SELECT id FROM member WHERE username=?`, name)
 }
 
-// E8.10 the shared secret may not contain control characters (a newline would end the quoted string in the
-// pasted RouterOS script and turn the rest into another command); other characters are stored as typed.
-func TestE8_10_SecretControlCharacters(t *testing.T) {
+// E8.10 the shared secret is letters and digits only (owner, 2026-11-07, replacing the older "kept as typed" rule).
+// Control characters stay refused: a newline would end the quoted string in the pasted RouterOS script and turn the
+// rest into another command. Spaces and symbols are refused too. Nothing is stored for a refused value.
+func TestE8_10_SecretLettersAndDigitsOnly(t *testing.T) {
 	f := newP8(t)
 	d := f.c.Get("/admin/settings").Doc(t)
-	for _, bad := range []string{"abc\ndef", "abc\r\n/system reset-configuration", "ab\tc", "ab\x7fc"} {
+	before := scalar[string](t, f.db, `SELECT radius_shared_secret FROM settings`)
+	for _, bad := range []string{"abc\ndef", "abc\r\n/system reset-configuration", "ab\tc", "ab\x7fc", ` sp ace"$\? `, "ab-cd", "ab cd"} {
 		form := harness.FormValues(t, d, "form#settings-form")
 		form.Set("radius_shared_secret", bad)
 		r := f.c.Send("PUT", "/admin/settings", form)
-		if r.StatusCode != 422 || !strings.Contains(r.Body, "control characters") {
+		if r.StatusCode != 422 || fieldError(r, t, "radius_shared_secret") == "" {
 			t.Errorf("secret %q: %d", bad, r.StatusCode)
 		}
 	}
+	if got := scalar[string](t, f.db, `SELECT radius_shared_secret FROM settings`); got != before {
+		t.Errorf("a refused secret was stored: %q", got)
+	}
 	form := harness.FormValues(t, d, "form#settings-form")
-	form.Set("radius_shared_secret", ` sp ace"$\? `)
+	form.Set("radius_shared_secret", "Abc123xyz")
 	if r := f.c.Send("PUT", "/admin/settings", form); r.StatusCode != 200 {
 		t.Fatalf("allowed secret: %d %s", r.StatusCode, r.Body)
 	}
-	if got := scalar[string](t, f.db, `SELECT radius_shared_secret FROM settings`); got != ` sp ace"$\? ` {
+	if got := scalar[string](t, f.db, `SELECT radius_shared_secret FROM settings`); got != "Abc123xyz" {
 		t.Errorf("stored %q, want exactly as typed", got)
 	}
 }

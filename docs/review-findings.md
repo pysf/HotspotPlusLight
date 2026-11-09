@@ -58,7 +58,7 @@ Pieces: 1 domain + auth, 2 radius + linkstatus, 3 session + usage + member + pla
 - **Fix:** reject a value above 0 whose byte result is 0 or less.
 
 ### A7. Old sessions can block the single writer (claim)
-- **Fixed (2026-11-04), tests `TestSessionLookupsUseIndexes`, `TestPruneSessionsInChunks`, `TestPruneLetsOtherWritesIn` (internal/store).** Migration 0006 adds `session_member`, `session_key` and `session_prune` (expression index). `PruneSessions` deletes 1000 rows per statement.
+- **Fixed (2026-11-04), tests `TestSessionLookupsUseIndexes`, `TestPruneSessionsInChunks`, `TestPruneLetsOtherWritesIn` (internal/store).** Migration 0008 adds `session_member`, `session_key` and `session_prune` (expression index). `PruneSessions` deletes 1000 rows per statement.
 - **Slow lookup:** `internal/store/accounting.go:61` (piece 4). `LatestSession` falls back to `ended_at IS NOT NULL AND username=? AND acct_session_id=? AND nas_ip=?` with no useful index. It scans up to 90 days of sessions inside the write transaction. Fix: add an index on `(username, acct_session_id, nas_ip)`, or drop the `ended_at` condition.
 - **Big delete:** `internal/store/accounting.go:133` (piece 4) and `internal/app/app.go` around line 265 (piece 5). `PruneSessions` is one unbatched `DELETE` with no index on `ended_at` or `last_update_at`. After a long stop, or when the retention setting is lowered, it holds the only writer. Fix: delete in chunks of a fixed size and add an index.
 - **Missing index:** `internal/store/migrations/0001_init.sql:107` (piece 4). No full index on `session(member_id)`. Deleting members and listing batches (`NOT EXISTS ... session`) get slow with many sessions. Fix: add a full index.

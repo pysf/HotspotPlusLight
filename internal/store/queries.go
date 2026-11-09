@@ -16,6 +16,11 @@ type SeedInput struct {
 	MustChangePassword bool // first start: admin/admin, set a new password at first login
 	KeyCheck           string
 	RadiusSecret       string
+	AdminAddr          string // the five server settings seed the row; the dashboard owns them after that
+	RadiusAuthAddr     string
+	RadiusAcctAddr     string
+	LogLevel           string
+	LogFormat          string
 	Now                time.Time
 }
 
@@ -49,8 +54,9 @@ func (s *Store) FirstBoot(ctx context.Context, in SeedInput) (bool, error) {
 		in.AdminUsername, in.AdminPasswordHash, boolInt(in.MustChangePassword), now); err != nil {
 		return false, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO settings(id, key_check, radius_shared_secret, updated_at)
-		VALUES (1, ?, ?, ?)`, in.KeyCheck, in.RadiusSecret, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO settings(id, key_check, radius_shared_secret,
+		admin_addr, radius_auth_addr, radius_acct_addr, log_level, log_format, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		in.KeyCheck, in.RadiusSecret, in.AdminAddr, in.RadiusAuthAddr, in.RadiusAcctAddr, in.LogLevel, in.LogFormat, now); err != nil {
 		return false, err
 	}
 	return true, tx.Commit()

@@ -4,11 +4,9 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
-	"hotspotpluslight/internal/linkstatus"
 	"hotspotpluslight/internal/routerpack"
 )
 
@@ -30,14 +28,9 @@ func zipURL(key string) string { return routerHome + "/pages/" + key + ".zip" }
 // previewURL returns the preview path of design key.
 func previewURL(key string) string { return routerHome + "/pages/" + key + "/preview" }
 
-// routerPage shows the page designs, the setup script and the link status.
+// routerPage shows the page designs and the setup script.
 func (h handlers) routerPage(w http.ResponseWriter, r *http.Request) {
 	st, err := h.Settings.Get(r.Context())
-	if err != nil {
-		h.serverError(w, r, err)
-		return
-	}
-	loc, err := st.Location()
 	if err != nil {
 		h.serverError(w, r, err)
 		return
@@ -49,54 +42,13 @@ func (h handlers) routerPage(w http.ResponseWriter, r *http.Request) {
 		Secret: st.RadiusSharedSecret, AuthPort: authPort, AcctPort: acctPort,
 		CoaPort: st.CoaPort, InterimSeconds: st.AccountingIntervalSeconds,
 	})
-	h.render(w, r, http.StatusOK, RouterPage(layout(r, "Router", routerHome), RouterProps{
-		Designs: h.Router.Designs(), Script: script, Link: linkRows(h.Link.Snapshot(), loc),
-	}))
+	h.render(w, r, http.StatusOK, RouterPage(layout(r, "Router", routerHome), RouterProps{Designs: h.Router.Designs(), Script: script}))
 }
 
 // RouterProps holds what the router page shows.
 type RouterProps struct {
 	Designs []routerpack.Design
 	Script  string
-	Link    linkView
-}
-
-// linkEvent is one row of the link status table.
-type linkEvent struct{ Key, Label, At, From, Detail string }
-
-// badSource is one row of the bad-secret table.
-type badSource struct{ From, Count, At string }
-
-// linkView is the link status prepared for display.
-type linkView struct {
-	Events     []linkEvent
-	BadTotal   string
-	BadSources []badSource
-}
-
-// linkTimeFormat is the time format of the link status.
-const linkTimeFormat = "2006-01-02 15:04:05"
-
-// linkRows returns the link status in snapshot s with times in loc.
-func linkRows(s linkstatus.Snapshot, loc *time.Location) linkView {
-	ev := func(key, label string, e linkstatus.Event) linkEvent {
-		if e.At.IsZero() {
-			return linkEvent{Key: key, Label: label, At: "never"}
-		}
-		return linkEvent{key, label, e.At.In(loc).Format(linkTimeFormat), e.From, e.Detail}
-	}
-	v := linkView{
-		Events: []linkEvent{
-			ev("access-request", "Last Access-Request", s.AccessRequest),
-			ev("accounting", "Last Accounting packet", s.Accounting),
-			ev("disconnect", "Last Disconnect", s.Disconnect),
-		},
-		BadTotal: strconv.Itoa(s.BadSecretTotal),
-	}
-	for _, b := range s.BadSecretSources {
-		v.BadSources = append(v.BadSources, badSource{b.From, strconv.Itoa(b.Count), b.Last.In(loc).Format(linkTimeFormat)})
-	}
-	return v
 }
 
 // pack returns the design of {key}. For an unknown design it answers 404 and returns false.

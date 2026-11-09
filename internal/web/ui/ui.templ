@@ -121,7 +121,7 @@ templ Layout(d LayoutData) {
 			} else {
 				<div class="l-shell">
 					<aside id="sidebar" class="l-sidebar">
-						<a class="l-brand" href="/admin/members">
+						<a class="l-brand" href="/admin">
 							<span class="l-brand__mark" aria-hidden="true"></span>
 							HotspotPlus Lite
 							if env.BusinessName != "" {
@@ -197,6 +197,8 @@ templ Layout(d LayoutData) {
 templ Icon(name string) {
 	<svg class="c-icon" viewBox="0 0 24 24" aria-hidden="true">
 		switch name {
+			case "home":
+				<path d="m3 11 9-8 9 8M5 10v10h14V10"></path>
 			case "users":
 				<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
 				<circle cx="9" cy="7" r="4"></circle>
@@ -291,6 +293,31 @@ templ EmptyState(msg string) {
 		<p>{ msg }</p>
 		{ children... }
 	</div>
+}
+
+// Tiles is the row of Tile cards on the dashboard.
+templ Tiles() {
+	<div class="c-tiles l-gap-bottom">
+		{ children... }
+	</div>
+}
+
+// Tile is a small card with one figure: label, then its children (TileValue and TileNote). attrs add data hooks.
+templ Tile(label string, attrs templ.Attributes) {
+	<div class="c-card c-tile" { attrs... }>
+		<p class="c-tile__label">{ label }</p>
+		{ children... }
+	</div>
+}
+
+// TileValue is the big figure of a Tile.
+templ TileValue(value string, attrs templ.Attributes) {
+	<p class="c-tile__value u-nums" { attrs... }>{ value }</p>
+}
+
+// TileNote is a small muted line under the figure of a Tile.
+templ TileNote(note string, attrs templ.Attributes) {
+	<p class="c-tile__note u-muted" { attrs... }>{ note }</p>
 }
 
 // Actions is a row of buttons.

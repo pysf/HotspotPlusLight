@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net"
 	"os"
@@ -121,18 +122,57 @@ func runBinary(t *testing.T, env []string, args ...string) (string, string, int)
 	return so.String(), se.String(), code
 }
 
-// E0.05 missing HSP_SECRET_KEY refuses to start (real binary and app).
-func TestE0_05_MissingSecretKeyRefusesToStart(t *testing.T) {
-	dir := t.TempDir()
-	_, stderr, code := runBinary(t, []string{"HSP_DATA_DIR=" + dir}, "serve")
-	if code == 0 || !strings.Contains(stderr, "HSP_SECRET_KEY") {
-		t.Fatalf("code=%d stderr=%q", code, stderr)
+// E0.05 a missing HSP_SECRET_KEY is generated into hsp.key and reused; a lost or unreadable key file is never replaced.
+func TestE0_05_MissingSecretKeyIsGenerated(t *testing.T) {
+	s := harness.Start(t, harness.Options{NoKey: true})
+	keyFile := filepath.Join(s.DataDir, "hsp.key")
+	info, err := os.Stat(keyFile)
+	if err != nil {
+		t.Fatalf("hsp.key not created: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "hsp.db")); err == nil {
-		t.Fatal("db created despite missing key")
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Errorf("hsp.key mode %v, want 0600", info.Mode().Perm())
 	}
-	if _, err := harness.TryStart(harness.Options{DataDir: t.TempDir(), NoKey: true}); err == nil {
-		t.Fatal("app started without key")
+	raw, _ := os.ReadFile(keyFile)
+	if key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(raw))); err != nil || len(key) != 32 {
+		t.Fatalf("hsp.key is not base64 of 32 bytes: %q", raw)
+	}
+	s.Stop()
+
+	// A restart reuses the same key file, so the key check passes.
+	s2, err := harness.TryStart(harness.Options{DataDir: s.DataDir, NoKey: true})
+	if err != nil {
+		t.Fatalf("restart with the generated key: %v", err)
+	}
+	s2.Stop()
+	if after, _ := os.ReadFile(keyFile); string(after) != string(raw) {
+		t.Fatal("hsp.key changed on restart")
+	}
+
+	// An unreadable key file is an error, and the file is left alone.
+	if runtime.GOOS != "windows" && os.Getuid() != 0 {
+		if err := os.Chmod(keyFile, 0); err != nil {
+			t.Fatal(err)
+		}
+		_, err := harness.TryStart(harness.Options{DataDir: s.DataDir, NoKey: true})
+		os.Chmod(keyFile, 0o600)
+		if err == nil || !strings.Contains(err.Error(), "key file") {
+			t.Fatalf("unreadable key: want key file error, got %v", err)
+		}
+		if after, _ := os.ReadFile(keyFile); string(after) != string(raw) {
+			t.Fatal("unreadable hsp.key was overwritten")
+		}
+	}
+
+	// A lost key file with an existing database must not produce a new key.
+	if err := os.Remove(keyFile); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := harness.TryStart(harness.Options{DataDir: s.DataDir, NoKey: true}); err == nil || !strings.Contains(err.Error(), "hsp.key") {
+		t.Fatalf("lost key: want error naming hsp.key, got %v", err)
+	}
+	if _, err := os.Stat(keyFile); err == nil {
+		t.Fatal("a new hsp.key was written next to an existing database")
 	}
 }
 
@@ -194,8 +234,10 @@ func TestE0_09_MigrationsAtStartup(t *testing.T) {
 		"0003_admin_must_change.sql":      {Data: mustRead(t, "internal/store/migrations/0003_admin_must_change.sql")},
 		"0004_drop_page_api_settings.sql": {Data: mustRead(t, "internal/store/migrations/0004_drop_page_api_settings.sql")},
 		"0005_business_name.sql":          {Data: mustRead(t, "internal/store/migrations/0005_business_name.sql")},
-		"0006_session_indexes.sql":        {Data: mustRead(t, "internal/store/migrations/0006_session_indexes.sql")},
-		"0007_bad.sql":                    {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
+		"0006_server_settings.sql":        {Data: mustRead(t, "internal/store/migrations/0006_server_settings.sql")},
+		"0007_login_failure_daily.sql":    {Data: mustRead(t, "internal/store/migrations/0007_login_failure_daily.sql")},
+		"0008_session_indexes.sql":        {Data: mustRead(t, "internal/store/migrations/0008_session_indexes.sql")},
+		"0009_bad.sql":                    {Data: []byte("CREATE TABLE half (id INTEGER); INSERT INTO nope VALUES (1);")},
 	}
 	_, err := harness.TryStart(harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey, Migrations: fsys})
 	if err == nil {
@@ -271,8 +313,8 @@ func TestE12_09_Migration0004(t *testing.T) {
 		"0002_usage_daily.sql":       {Data: read("0002_usage_daily.sql")},
 		"0003_admin_must_change.sql": {Data: read("0003_admin_must_change.sql")},
 	}
-	s := harness.Start(t, harness.Options{Migrations: old})
-	db := harness.DB(t, s.DataDir)
+	in := seedOldDB(t, old)
+	db := harness.DB(t, in.DataDir)
 	cols := func() map[string]bool {
 		rows, err := db.Query(`SELECT name FROM pragma_table_info('settings')`)
 		if err != nil {
@@ -298,9 +340,8 @@ func TestE12_09_Migration0004(t *testing.T) {
 		t.Fatal(err)
 	}
 	secret := scalar[string](t, db, `SELECT radius_shared_secret FROM settings`)
-	s.Stop()
 
-	s2 := harness.Start(t, harness.Options{DataDir: s.DataDir, SecretKey: s.SecretKey})
+	s2 := startUpgraded(t, in)
 	defer s2.Stop()
 	if n := scalar[int](t, db, `SELECT count(*) FROM schema_migrations`); n != wantMigrations {
 		t.Errorf("%d migrations, want %d", n, wantMigrations)
@@ -413,7 +454,7 @@ func TestE8_08_LogFormatAndSignal(t *testing.T) {
 		cmd.Env = []string{
 			"PATH=" + os.Getenv("PATH"), "HSP_DATA_DIR=" + dir, "HSP_SECRET_KEY=" + harness.NewKey(),
 			"HSP_ADMIN_ADDR=127.0.0.1:0", "HSP_RADIUS_AUTH_ADDR=127.0.0.1:0", "HSP_RADIUS_ACCT_ADDR=127.0.0.1:0",
-			"HSP_RADIUS_SHARED_SECRET=Env-Seeded-Secret-77",
+			"HSP_RADIUS_SHARED_SECRET=EnvSeededSecret77",
 		}
 		if format != "" {
 			cmd.Env = append(cmd.Env, "HSP_LOG_FORMAT="+format)
@@ -450,7 +491,7 @@ func TestE8_08_LogFormatAndSignal(t *testing.T) {
 		if runtime.GOOS != "windows" && !strings.Contains(logs, "shutdown complete") {
 			t.Errorf("format %q: no 'shutdown complete' in\n%s", format, logs)
 		}
-		if !strings.Contains(so.String(), "password: admin") || strings.Contains(logs, "password: admin") || strings.Contains(logs, "Env-Seeded-Secret-77") {
+		if !strings.Contains(so.String(), "password: admin") || strings.Contains(logs, "password: admin") || strings.Contains(logs, "EnvSeededSecret77") {
 			t.Errorf("format %q: first-start block missing from stdout, or a password or secret in the log", format)
 		}
 		lines := strings.Split(strings.TrimSpace(logs), "\n")

@@ -69,7 +69,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// genKey prints a new HSP_SECRET_KEY (base64 of 32 random bytes) to w.
+// genKey prints a new key (base64 of 32 random bytes) to w. The key is auto-generated on first start; use gen-key only to rotate it or to manage it manually.
 func genKey(w io.Writer) error {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {

@@ -19,26 +19,35 @@ var t0 = time.Unix(1_700_000_000, 0).UTC()
 
 // fakeDB is an in-memory Repo + AcctTx; InAcctTx rolls back by working on a copy.
 type fakeDB struct {
-	members  map[string]*domain.Member
-	sessions []domain.Session
-	retDays  int
-	endErr   error // EndSession fails with it
-	pruned   time.Time
-	daily    map[string]domain.Counters // "id/day" -> sum
-	tz       string                     // the time zone in the settings; "" means UTC
-	reads    int                        // settings reads outside an accounting transaction
-	txReads  int                        // settings reads inside one
+	members              map[string]*domain.Member
+	sessions             []domain.Session
+	retDays              int
+	endErr               error // EndSession fails with it
+	pruned               time.Time
+	pruneErr             error                      // PruneSessions fails with it
+	prunedFailuresBefore string                     // the day key given to PruneLoginFailures
+	daily                map[string]domain.Counters // "id/day" -> sum
+	tz                   string                     // the time zone in the settings; "" means UTC
+	reads                int                        // settings reads outside an accounting transaction
+	txReads              int                        // settings reads inside one
 }
 
 func newDB() *fakeDB {
 	return &fakeDB{members: map[string]*domain.Member{"alice": {ID: 1, Username: "alice"}}}
 }
 
-func (f *fakeDB) CountOpenSessions(context.Context) (int, error)    { return len(f.sessions), nil }
-func (f *fakeDB) SessionRetentionDays(context.Context) (int, error) { return f.retDays, nil }
+func (f *fakeDB) CountOpenSessions(context.Context) (int, error) { return len(f.sessions), nil }
 func (f *fakeDB) PruneSessions(_ context.Context, c time.Time) (int, error) {
 	f.pruned = c
+	if f.pruneErr != nil {
+		return 0, f.pruneErr
+	}
 	return 3, nil
+}
+
+func (f *fakeDB) PruneLoginFailures(_ context.Context, beforeDay string) (int, error) {
+	f.prunedFailuresBefore = beforeDay
+	return 0, nil
 }
 
 func (f *fakeDB) GetSettings(context.Context) (domain.Settings, error) {
@@ -57,7 +66,7 @@ func (f *fakeDB) settings() domain.Settings {
 	if tz == "" {
 		tz = "UTC"
 	}
-	return domain.Settings{Timezone: tz, AccountingIntervalSeconds: 60}
+	return domain.Settings{Timezone: tz, AccountingIntervalSeconds: 60, SessionRetentionDays: f.retDays}
 }
 
 // online mirrors the SQL predicate: not ended and updated since the cut-off.
@@ -265,12 +274,31 @@ func TestAccountBeforeCommitErrorRollsBack(t *testing.T) {
 func TestPrune(t *testing.T) {
 	db := newDB()
 	s := New(db, &FakeDisconnector{}, clock.NewFake(t0))
-	if n, _ := s.Prune(context.Background()); n != 0 || !db.pruned.IsZero() {
+	if n, _ := s.Prune(context.Background()); n != 0 || !db.pruned.IsZero() || db.prunedFailuresBefore != "" {
 		t.Fatal("retention 0 must keep everything")
 	}
 	db.retDays = 90
 	if n, _ := s.Prune(context.Background()); n != 3 || !db.pruned.Equal(t0.Add(-90*24*time.Hour)) {
 		t.Fatalf("cutoff %v", db.pruned)
+	}
+	// The failed-login counts go with the sessions: the cutoff day is the day key of the same cutoff.
+	if want := domain.DayKey(t0.Add(-90*24*time.Hour), time.UTC); db.prunedFailuresBefore != want {
+		t.Fatalf("failure counts pruned before %q, want %q", db.prunedFailuresBefore, want)
+	}
+}
+
+// A failed session prune must not stop the failed-login prune, and both errors reach the caller.
+func TestPruneRunsBothEvenWhenSessionsFail(t *testing.T) {
+	db := newDB()
+	db.retDays = 90
+	db.pruneErr = errors.New("database is locked")
+	s := New(db, &FakeDisconnector{}, clock.NewFake(t0))
+	_, err := s.Prune(context.Background())
+	if err == nil || !errors.Is(err, db.pruneErr) {
+		t.Fatalf("err %v, want the session prune error", err)
+	}
+	if db.prunedFailuresBefore == "" {
+		t.Fatal("failed-login counts were not pruned after the session prune failed")
 	}
 }
 

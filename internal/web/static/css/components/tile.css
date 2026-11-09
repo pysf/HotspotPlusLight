@@ -1,0 +1,8 @@
+/* Dashboard tiles: a row of small cards, each with one big figure. */
+@layer components {
+  .c-tiles { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fit, minmax(var(--w-select), 1fr)); }
+  .c-tile { padding: var(--s-4); }
+  .c-tile__label { color: var(--muted); font-size: var(--fs-small); }
+  .c-tile__value { font-size: var(--fs-hero); font-weight: 600; margin-block: var(--s-1); }
+  .c-tile__note { font-size: var(--fs-small); }
+}

@@ -2,6 +2,8 @@ package config
 
 import (
 	"encoding/base64"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -36,5 +38,37 @@ func TestDevFlag(t *testing.T) {
 		if err != nil || c.Dev != want {
 			t.Errorf("HSP_DEV=%q: Dev=%v err=%v", v, c.Dev, err)
 		}
+	}
+}
+
+func TestEnsureKeyGeneratesOnceAndNeverReplaces(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "data")
+	first, err := EnsureKey(dir, env(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := EnsureKey(dir, env(nil))
+	if err != nil || again != first {
+		t.Fatalf("second call: %q %v", again, err)
+	}
+	// hsp.db without hsp.key must not get a new key.
+	other := t.TempDir()
+	os.WriteFile(filepath.Join(other, "hsp.db"), nil, 0o600)
+	if _, err := EnsureKey(other, env(nil)); err == nil || !strings.Contains(err.Error(), "hsp.key") {
+		t.Fatalf("want hsp.key error, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(other, "hsp.key")); err == nil {
+		t.Fatal("key file was created next to an existing database")
+	}
+}
+
+func TestRadiusSharedSecretFromEnvMustBeLettersAndDigits(t *testing.T) {
+	key := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	if _, err := Load(env(map[string]string{"HSP_SECRET_KEY": key, "HSP_RADIUS_SHARED_SECRET": "Good123"})); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(env(map[string]string{"HSP_SECRET_KEY": key, "HSP_RADIUS_SHARED_SECRET": "bad secret!"}))
+	if err == nil || !strings.Contains(err.Error(), "HSP_RADIUS_SHARED_SECRET") {
+		t.Fatalf("want a clear error, got %v", err)
 	}
 }

@@ -119,17 +119,43 @@ func (p *parser) line(field, raw string, required bool, maxLen int) string {
 	return raw
 }
 
-// secret keeps the value verbatim (spaces can be part of a shared secret) and
-// rejects empty or whitespace-only input and control characters (a newline would
-// end the quoted string in the pasted router setup script).
-func (p *parser) secret(field, raw string, maxLen int) string {
+// SecretMaxLen is the longest RADIUS shared secret.
+const SecretMaxLen = 128
+
+// SecretProblem returns why raw is not a valid RADIUS shared secret, or "" when it is.
+// A secret is 1 to SecretMaxLen ASCII letters and digits; symbols and spaces break
+// the pasted router script and some routers, so they are not allowed.
+func SecretProblem(raw string) string {
 	switch {
-	case strings.TrimSpace(raw) == "":
-		p.errs.add(field, "Required.")
-	case strings.ContainsFunc(raw, func(r rune) bool { return r < 0x20 || r == 0x7f }):
-		p.errs.add(field, "Must not contain control characters.")
-	case len([]rune(raw)) > maxLen:
-		p.errs.add(field, fmt.Sprintf("At most %d characters.", maxLen))
+	case raw == "":
+		return "Required."
+	case len(raw) > SecretMaxLen:
+		return fmt.Sprintf("At most %d characters.", SecretMaxLen)
+	case strings.ContainsFunc(raw, func(r rune) bool { return !isASCIIAlnum(r) }):
+		return "Use English letters and digits only. No spaces or symbols."
+	}
+	return ""
+}
+
+func isASCIIAlnum(r rune) bool {
+	return r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z'
+}
+
+// secret checks a RADIUS shared secret and returns it unchanged. A secret equal to
+// keep (the stored one) skips the letters-and-digits rule, so an older database
+// with a symbol in its secret can still save its other settings.
+func (p *parser) secret(field, raw, keep string) string {
+	if keep != "" && raw == keep {
+		switch {
+		case strings.ContainsFunc(raw, func(r rune) bool { return r < 0x20 || r == 0x7f }):
+			p.errs.add(field, "Must not contain control characters.")
+		case len(raw) > SecretMaxLen:
+			p.errs.add(field, fmt.Sprintf("At most %d characters.", SecretMaxLen))
+		}
+		return raw
+	}
+	if msg := SecretProblem(raw); msg != "" {
+		p.errs.add(field, msg)
 	}
 	return raw
 }
