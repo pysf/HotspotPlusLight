@@ -69,7 +69,7 @@ func TestE16_05_ValidMADisablesWrongSecretHeuristics(t *testing.T) {
 			t.Fatalf("password %q: want a normal reject, got %v %v", pw, r, err)
 		}
 	}
-	d := f.c.Get("/admin/router").Doc(t)
+	d := f.c.Get("/admin").Doc(t)
 	if n := text(d.Find("[data-bad-secret-count]")); n != "0" {
 		t.Errorf("bad secret count %q, want 0", n)
 	}
@@ -84,7 +84,7 @@ func TestE16_05b_WrongMAWithGarbagePasswordStillAlarms(t *testing.T) {
 	if _, err := bad.Authenticate("nobody", "pw\xff\xfe\t"); err == nil {
 		t.Fatal("a wrong-secret Access-Request was answered")
 	}
-	d := f.c.Get("/admin/router").Doc(t)
+	d := f.c.Get("/admin").Doc(t)
 	if n := text(d.Find("[data-bad-secret-count]")); n != "1" {
 		t.Errorf("bad secret count %q, want 1", n)
 	}
