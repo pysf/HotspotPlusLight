@@ -23,11 +23,11 @@ jobs:
         run: go vet ./...
       - name: test (race)
         if: runner.os == 'Linux'
-        run: go test -race -count=1 ./...
+        run: go test -race -count=1 -timeout 30m ./... # the e2e suite is slow under the race detector
       # The race detector needs cgo on Windows, so it is not used there.
       - name: test
         if: runner.os == 'Windows'
-        run: go test -count=1 ./...
+        run: go test -count=1 -timeout 30m ./...
         env:
           HSP_TEST_WINDOWS_SERVICE: "1" # E11.33: the runner is Administrator
 

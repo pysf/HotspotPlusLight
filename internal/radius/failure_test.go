@@ -89,23 +89,30 @@ func startCounting(t *testing.T, fa *fakeAuth, ff *fakeFailures, clk clock.Clock
 	return ap.LocalAddr().String()
 }
 
-// sendWire writes wire on conn and reads one reply.
+// sendWire writes wire on conn and reads one reply. Like a router it sends the packet again when no
+// reply comes: the library drops a packet with the same source and Identifier while the handler of the
+// previous one is still cleaning up, and a test that resends at once can hit that short window.
 func sendWire(t *testing.T, conn net.Conn, wire []byte) *radius.Packet {
 	t.Helper()
-	if _, err := conn.Write(wire); err != nil {
-		t.Fatal(err)
-	}
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	buf := make([]byte, 4096)
-	n, err := conn.Read(buf)
-	if err != nil {
-		t.Fatalf("no reply: %v", err)
+	end := time.Now().Add(5 * time.Second)
+	for {
+		if _, err := conn.Write(wire); err != nil {
+			t.Fatal(err)
+		}
+		conn.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+		n, err := conn.Read(buf)
+		if err == nil {
+			p, err := radius.Parse(buf[:n], []byte("s3cret"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return p
+		}
+		if time.Now().After(end) {
+			t.Fatalf("no reply: %v", err)
+		}
 	}
-	p, err := radius.Parse(buf[:n], []byte("s3cret"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return p
 }
 
 func TestRetransmittedRejectCountsOnce(t *testing.T) {

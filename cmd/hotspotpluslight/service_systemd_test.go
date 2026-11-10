@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -52,6 +53,9 @@ type sdFixture struct {
 
 func newSdFixture(t *testing.T) *sdFixture {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the Linux install uses Unix paths and modes")
+	}
 	tmp := t.TempDir()
 	exe := filepath.Join(tmp, "src", "hsp-bin")
 	if err := os.MkdirAll(filepath.Dir(exe), 0o755); err != nil {

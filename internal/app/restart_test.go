@@ -177,11 +177,26 @@ func TestRestartProcessErrors(t *testing.T) {
 
 func TestCleanStopDuringHealthWindowIsNotAFailedStart(t *testing.T) {
 	opts, dir, _ := runEnv(t)
-	opts.HealthProbe = func(context.Context, string) error { return errors.New("not yet") }
+	probing := make(chan struct{}, 1) // the first probe means the app is up and the watcher runs
+	opts.HealthProbe = func(context.Context, string) error {
+		select {
+		case probing <- struct{}{}:
+		default:
+		}
+		return errors.New("not yet")
+	}
+	waitProbing := func() {
+		t.Helper()
+		select {
+		case <-probing:
+		case <-time.After(30 * time.Second):
+			t.Fatal("the app did not start probing")
+		}
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- Run(ctx, opts) }()
-	time.Sleep(700 * time.Millisecond) // the app is up and the watcher is probing
+	waitProbing()
 	cancel()
 	if err := <-done; err != nil {
 		t.Fatal(err)
@@ -198,7 +213,7 @@ func TestCleanStopDuringHealthWindowIsNotAFailedStart(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		done := make(chan error, 1)
 		go func() { done <- Run(ctx, opts) }()
-		time.Sleep(500 * time.Millisecond)
+		waitProbing()
 		cancel()
 		if err := <-done; err != nil {
 			t.Fatalf("restart %d: %v", i, err)
