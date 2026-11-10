@@ -105,6 +105,7 @@ WantedBy=multi-user.target</code></pre>
 <li>It registers the service <code>HotspotPlusLight</code> (display name "HotspotPlus Lite"). The service starts with Windows and runs <code>serve --env-file</code> with that file.</li>
 <li>It sets the service to restart after a failure, after 5, 15 and 60 seconds.</li>
 </ul>
+<p>The restart setting is also what restarts the program after <strong>Update now</strong> (the program exits with code 75 and Windows starts the new file).</p>
 <p>The logs and the first-start block are in <code>hsp.log</code> in that folder:</p>
 <pre><code>type C:\ProgramData\HotspotPlusLight\hsp.log</code></pre>
 <p>To stop and remove the service, run the commands below. Your data is kept.</p>

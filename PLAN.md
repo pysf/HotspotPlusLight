@@ -566,7 +566,7 @@ There is **no** server-rendered member page, cookie, language switch, plan list,
 ### 9.1 Layout
 ```
 HotspotPlusLight/
-  cmd/hotspotpluslight/        main.go (subcommands), envfile.go (--env-file), service_windows.go / service_other.go (Windows service, Phase 11c) — only calls internal/app
+  cmd/hotspotpluslight/        main.go (subcommands), envfile.go (--env-file), service_windows.go / service_linux.go / service_systemd.go / service_other.go (Windows service, Phase 11c; Linux systemd, update plan step 5) — only calls internal/app
   internal/app/                composition root: builds config, store, services, servers; lifecycle, graceful shutdown. The ONLY place that wires concrete types; no globals, no init()
   internal/config/             env/flags
   internal/clock/              Clock interface + real and fake implementations
@@ -577,7 +577,7 @@ HotspotPlusLight/
   internal/plan/               Service: CRUD, in-use checks
   internal/session/            Service: accounting (BR-11), online list, kick (BR-18), pruning
   internal/voucher/            Service: batch generation, print data (BR-15/16/23)
-  internal/update/             Checker: asks GitHub for the latest release, stores the result, runs the daily job (D29); Installer: download, hash check, unpack, backup, swap, restart hook (D30); the pure rules (version compare, asset name, SHA256SUMS) are in `internal/domain/update.go`
+  internal/update/             Checker: asks GitHub for the latest release, stores the result, runs the daily job (D29); Installer: download, hash check, unpack, backup, swap, restart hook (D30); Recover, Rollback and the restart helpers handle a new version that does not start (D31); the pure rules (version compare, asset name, SHA256SUMS) are in `internal/domain/update.go` and `updatepending.go`
   internal/dashboard/          Service: read-only numbers for the dashboard (BR-25..BR-30); the pure rules are in `internal/domain`
   internal/radius/             UDP server, handlers, MikroTik attrs, CoA client, message catalog — calls the services
   internal/web/admin/          handlers + templ components (reusable: layout, table, pagination, filter bar, form field, confirm dialog, flash)
@@ -736,7 +736,8 @@ Exit: `gofmt -l .`, `go vet ./...` clean; review agent on the whole phase; the o
 
 ---
 
-### Phase 22 — The server checks for updates (built 2026-11-10, D29)
+### Phase 22 — Automatic release and self-update (built 2026-11-10, D29–D31, `docs/update-plan.md` steps 1 to 6)
+Step 1: `tools/nextversion` (unit tests) and `.github/workflows/autorelease.yml`. Step 5: Linux `service install` (unit text tests in `cmd/hotspotpluslight/service_systemd_test.go`). Step 6: docs and site.
 E2E: **E22.01** a newer release shows the notice and the page · **E22.02** same or older release: no notice · **E22.03** setting off: zero requests, the page says so, turning it on applies at once · **E22.04** Check now shows fresh data · **E22.05** a GitHub error is friendly and the app keeps working · **E22.06** a dev build never calls · **E22.07** the settings switch · **E22.08** login required. Unit tests: `internal/domain/update_test.go`, `internal/update/update_test.go`.
 Step 3 (D30): **E22.09** a good update swaps the files, backs up the database, restarts once · **E22.10** a wrong, missing or empty hash changes nothing · **E22.11** no file for this system: reason, no button, no download · **E22.12** program folder not writable (not run on Windows or as root) · **E22.13** a second install answers 409 · **E22.14** CSRF and login · **E22.15** checks off or a dev build cannot install · **E22.16** the progress block polls only while running · **E22.17** the release is checked again at install time. Unit tests: `internal/update/install_test.go` (unpack including path traversal, swap and undo, plan), `internal/store/backup_test.go`, `internal/domain/update_test.go`. The e2e tests run the app in-process with `Options.ExePath` (a temp file with fake old content), a fake restarter and a fake GitHub that serves a real archive; they also run on Windows.
 Step 4 (D31): **E22.18** the rollback note on every page, dismiss needs CSRF and login · **E22.19** the progress block survives the restart and the new process refreshes the page · **E22.20** the state file is written before the swap and not after a failed install · **E22.21** the real program (built twice with `-ldflags`) with a database it cannot open is rolled back on the third start and the old program runs (not run on Windows) · **E22.22** a new file that does not run is refused before the swap · **E22.23** a failed restart undoes the swap · **E22.24** no install while the state file exists. Unit tests also cover: database first and program file last, re-run after a partial failure, a failed rollback still starts (missing backup, a directory in the way, too many attempts), no age rule, a clean stop does not count, ClearPending retry, the health client ignores proxies. Unit tests: `internal/domain/updatepending_test.go`, `internal/update/recover_test.go` (healthy path, tries, stale file, rollback files, marker, crash loop safety), `internal/app/restart_test.go` (health timeout, restart modes, child start).

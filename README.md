@@ -193,6 +193,10 @@ The version is inside the binary (`hotspotpluslight version`, set with `-X main.
 Pushing a tag `v*` runs `.github/workflows/release.yml`, which builds these files and makes a GitHub Release.
 You do not tag by hand: when `ci` is green on `main`, `.github/workflows/autorelease.yml` reads the commit messages since the last tag and, if needed, tags the commit and calls `release.yml`.
 
+### Releases and versions
+
+Releases are automatic. `v0.9.0` is the base; the next version is computed from it. `feat:` makes a minor release, `fix:` a patch release, and `!` or `BREAKING CHANGE:` a major release. Other types (`docs`, `chore`, `test`, `site`, `ci`, `refactor`, `build`, `style`, `perf`) make none. After `ci` is green on `main` (Linux and Windows), `autorelease.yml` tags the commit and publishes the release. To run a failed release again: GitHub, Actions, **release**, **Run workflow**, and enter the tag (for example `v0.9.1`).
+
 ### Commit messages
 
 Use conventional commits: `type(scope)?!?: text`. `fix:` makes a patch release, `feat:` a minor release, and `type!:` or a `BREAKING CHANGE:` line in the body makes a major release. `docs`, `chore`, `test`, `site`, `ci`, `refactor`, `build`, `style` and `perf` make no release. The `ci` workflow warns (it never fails) when the last subject does not follow this form.

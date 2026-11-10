@@ -364,7 +364,7 @@ export default [
   "page": "Backup and upgrade",
   "heading": "Upgrade",
   "url": "docs/backup-and-upgrade/#upgrade",
-  "keywords": "To upgrade, you replace the program and restart it. The database migrations (changes to the database layout) run by themselves at start and only go forward. Make a backup first. You cannot go back to an older program on a migrated database, but you can restore"
+  "keywords": "You can upgrade from the admin panel (see Update from the admin page ) or by hand. To upgrade by hand, you replace the program and restart it. Both ways always work. The database migrations (changes to the database layout) run by themselves at start and only g"
  },
  {
   "page": "Backup and upgrade",

@@ -1,6 +1,6 @@
 # Automatic release and self-update: plan
 
-Status: Steps 1 to 4 built and hardened after review (database first, program file last; no age rule; a clean stop is not a failed start; the new file is run before the swap; a failed restart undoes the swap) (step 2: the update check, setting, notice and Update page; step 3: download, hash check, unpack, backup, swap and the Restarter hook; step 4: restart by exit code 75 or a child process, the state file, the health check and the automatic rollback, see `PLAN.md` D31). Later steps not built. Decisions are from the owner, 2026-11-10.
+Status: All steps built (1 to 6). Decisions are from the owner, 2026-11-10. The real behavior is in `PLAN.md` D29 to D31 and the README.
 
 ## Decisions
 
@@ -74,7 +74,7 @@ README and site pages for: Settings (new switch), Update page, install on Linux,
 ## Open points (small, I will pick the simple choice unless told)
 
 - The update state lives in the `settings` row (two new columns) instead of a new table.
-- The special exit code for "restart me" is 75 on Linux and a normal exit on Windows (recovery restarts on any exit).
+- The special exit code for "restart me" is 75 on Linux and on Windows (the service recovery restarts on any exit).
 - Linux service user: the user who runs `service install`. A separate system user is not created.
 - No release candidate or pre-release channel. Only the latest full release is offered.
 
@@ -85,4 +85,26 @@ README and site pages for: Settings (new switch), Update page, install on Linux,
 3. Download, hash check, backup, swap.
 4. Restart and rollback.
 5. Linux `service install`. **Built (2026-11-10), reviewed and hardened (root-safe file handling, `ReadWritePaths`).**
-6. Docs and site.
+6. Docs and site. **Built (2026-11-10).**
+
+## What was built differently from the plan
+
+- The rollback is decided by the new program, not by an old launcher. At the very start (before the database opens) it reads `update-pending.json`.
+- Health check: the new program waits until its own `/healthz` answers, then deletes the state file. The state file counts starts (`tries`); the third start without a healthy answer rolls back. There is also a 60 second limit.
+- There is no age rule (the 5-minute rule was removed): a healthy new version is never rolled back later. A clean stop during the 60 seconds does not count as a failed start.
+- State files: `update-pending.json` (while an update is checked) and `update-rolled-back.json` (the note shown to the admin until dismissed).
+- Order: the database is restored first and the program file last (the last rename is the commit point), so a half-done rollback can run again safely. Files left behind: `<program>.old`, `<program>.bad`, `hsp.db.bak-<version>`, `hsp.db.failed-<version>`.
+- Before the swap the new file is run once with `version`. If the restart fails, the swap is undone.
+- Run by hand: the program starts the new file as a child after it has closed its ports.
+- The update state and the "Check for updates" switch live in the `settings` row. The API address can be changed with `HSP_UPDATE_API_URL` (tests and mirrors).
+- Linux: `service install` creates a system user `hotspotpluslight` and copies the program to `/var/lib/hotspotpluslight` (owned by that user), so the swap works. It never follows symlinks and refuses folders under `/home`, `/root` and `/run/user`.
+- The commit-style check in `ci` only warns; it never fails.
+
+## Not verified on real hardware or OS
+
+Watch these on the first real use:
+
+- The Windows service restart and recovery after an update (exit code 75, "restart on failure").
+- Real systemd: the unit, the restart after an update, `ReadWritePaths`, and `service uninstall`.
+- Windows renaming a running `.exe` during the swap (the tests do it, but not inside a real service).
+- The first real `autorelease` run on GitHub (the tag, the call to `release.yml`, and the release files).
