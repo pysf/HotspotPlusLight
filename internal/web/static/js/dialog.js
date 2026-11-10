@@ -64,6 +64,8 @@ document.addEventListener("click", (e) => {
 document.body.addEventListener("htmx:afterSwap", (e) => {
   const body = e.detail.target;
   if (!(body instanceof HTMLElement) || body.id !== "sheet-body") { return; }
+  // htmx still reports a swap for a reply with HX-Reswap: none; nothing arrived, so do not open.
+  if (e.detail.xhr && e.detail.xhr.getResponseHeader("HX-Reswap") === "none") { return; }
   const dlg = body.closest("dialog");
   if (!dlg || !body.firstElementChild) { return; }
   const title = body.querySelector("[data-sheet-title]");

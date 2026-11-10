@@ -72,3 +72,18 @@ func TestE21_02_BatchRenameReloads(t *testing.T) {
 		t.Error("batch list is stale after rename")
 	}
 }
+
+// E21.03 a saved sheet stays closed. htmx still reports a swap for a reply with HX-Reswap: none,
+// and dialog.js must not reopen the sheet for it. (Bug: after a save the form went away but an
+// empty side panel stayed open. A browser check showed this; the test pins the guard and the header.)
+func TestE21_03_SavedSheetStaysClosed(t *testing.T) {
+	f := newP5(t)
+	r := f.c.SendHX("POST", "/admin/plans", harness.PlanForm("Gold"), sheetTarget)
+	if r.Header.Get("HX-Reswap") != "none" {
+		t.Errorf("a saved sheet must answer HX-Reswap none, got %q", r.Header.Get("HX-Reswap"))
+	}
+	js := f.c.Get(f.c.Get("/admin/members").Doc(t).Find(`script[src*="js/dialog.js"]`).AttrOr("src", "")).Body
+	if !strings.Contains(js, `getResponseHeader("HX-Reswap") === "none"`) {
+		t.Error("dialog.js does not skip the reopen for HX-Reswap none")
+	}
+}
