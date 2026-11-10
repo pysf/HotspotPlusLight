@@ -1,5 +1,5 @@
 // Command hotspotpluslight runs HotspotPlus Lite. Its commands are serve, admin
-// set-password, gen-key, service (Windows only) and version.
+// set-password, gen-key, service (Windows and Linux only) and version.
 // The exit code is 0 on success, 1 on a failure, 2 on a usage error and 75 when a service manager must start the program again.
 package main
 

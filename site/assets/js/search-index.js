@@ -82,7 +82,7 @@ export default [
   "page": "Run as a service",
   "heading": "Linux (systemd)",
   "url": "docs/running-as-a-service/#systemd",
-  "keywords": "Create a user for the service, and an env file that only root and that user can read: sudo useradd --system --no-create-home --shell /usr/sbin/nologin hsp printf 'HSP_DATA_DIR=/var/lib/hotspotpluslight\\n' | sudo tee /etc/hotspotpluslight.env >/dev/null sudo ch"
+  "keywords": "The program can install itself as a systemd service. Go to the folder with hotspotpluslight and run it with sudo : sudo ./hotspotpluslight service install sudo ./hotspotpluslight service start service install does this: It never follows symbolic links: it stop"
  },
  {
   "page": "Run as a service",
@@ -94,7 +94,7 @@ export default [
   "page": "Run as a service",
   "heading": "macOS (launchd)",
   "url": "docs/running-as-a-service/#macos",
-  "keywords": "The service commands work only on Windows. On macOS, use launchd. Put variables such as HSP_DATA_DIR in the env file /usr/local/etc/hotspotpluslight.env (readable only by root). Then create /Library/LaunchDaemons/local.hotspotpluslight.plist : <?xml version=\"1"
+  "keywords": "The service commands work only on Windows and Linux. On macOS, use launchd. Put variables such as HSP_DATA_DIR in the env file /usr/local/etc/hotspotpluslight.env (readable only by root). Then create /Library/LaunchDaemons/local.hotspotpluslight.plist : <?xml "
  },
  {
   "page": "Run as a service",

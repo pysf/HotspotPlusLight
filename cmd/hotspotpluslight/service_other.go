@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !linux
 
 package main
 
@@ -17,5 +17,5 @@ func runAsService(string, func(string) string) error {
 
 // serviceCommand always fails outside Windows.
 func serviceCommand([]string, io.Writer) error {
-	return errors.New("the service commands work only on Windows")
+	return errors.New("the service commands work only on Windows and Linux")
 }

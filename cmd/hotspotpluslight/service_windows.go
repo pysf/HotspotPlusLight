@@ -4,8 +4,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -235,12 +233,10 @@ func installService(dir string, stdout io.Writer) error {
 	}
 	envFile := filepath.Join(dir, "hsp.env")
 	if _, err := os.Stat(envFile); errors.Is(err, os.ErrNotExist) {
-		key := make([]byte, 32)
-		if _, err := rand.Read(key); err != nil {
+		body, err := envFileText(dataDir)
+		if err != nil {
 			return err
 		}
-		body := fmt.Sprintf("# HotspotPlus Lite settings. Keep a copy of HSP_SECRET_KEY with your backups.\nHSP_SECRET_KEY=%s\nHSP_DATA_DIR=%s\n",
-			base64.StdEncoding.EncodeToString(key), dataDir)
 		if err := os.WriteFile(envFile, []byte(body), 0o600); err != nil {
 			return err
 		}

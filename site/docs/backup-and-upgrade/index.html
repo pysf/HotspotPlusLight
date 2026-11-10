@@ -73,8 +73,9 @@
 <pre><code>curl -LO https://github.com/pysf/HotspotPlusLight/releases/latest/download/hotspotpluslight-linux-amd64.tar.gz
 tar -xzf hotspotpluslight-linux-amd64.tar.gz
 sudo systemctl stop hotspotpluslight
-sudo install -m 755 hotspotpluslight /usr/local/bin/
+sudo install -o hotspotpluslight -g hotspotpluslight -m 755 hotspotpluslight /var/lib/hotspotpluslight/hotspotpluslight
 sudo systemctl start hotspotpluslight</code></pre>
+<p>This is the path that <code>service install</code> uses. Use your own folder if you chose one with <code>--dir</code>.</p>
 <h3>Windows service</h3>
 <pre><code>.\hotspotpluslight.exe service stop
 # replace hotspotpluslight.exe with the new file, in the same place

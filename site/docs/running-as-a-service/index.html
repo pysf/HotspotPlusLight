@@ -48,36 +48,50 @@
 <aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="./" aria-current="page">Run as a service</a><ul class="sub"><li><a href="#systemd">Linux (systemd)</a></li><li><a href="#windows">Windows service</a></li><li><a href="#macos">macOS (launchd)</a></li><li><a href="#check">Check that it runs</a></li></ul></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../dashboard/">Dashboard</a></li><li><a href="../router-setup/">Router setup</a></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
 <article class="doc"><span class="kick">Documentation</span><h1>Running as a service</h1><p class="intro">Run HotspotPlus Lite in the background and start it at boot, on Linux, Windows or macOS.</p>
 <section><h2 id="systemd"><a href="#systemd">Linux (systemd)</a></h2>
-<p>Create a user for the service, and an env file that only root and that user can read:</p>
-<pre><code>sudo useradd --system --no-create-home --shell /usr/sbin/nologin hsp
-printf 'HSP_DATA_DIR=/var/lib/hotspotpluslight\n' | sudo tee /etc/hotspotpluslight.env &gt;/dev/null
-sudo chown root:hsp /etc/hotspotpluslight.env
-sudo chmod 640 /etc/hotspotpluslight.env</code></pre>
-<p>At the first start, the server creates the secret key automatically, but only when there is no database yet. It saves the key to <code>/var/lib/hotspotpluslight/hsp.key</code>. Back up that folder: it holds both the database and the key.</p>
-<p>Create <code>/etc/systemd/system/hotspotpluslight.service</code>:</p>
+<p>The program can install itself as a systemd service. Go to the folder with <code>hotspotpluslight</code> and run it with <code>sudo</code>:</p>
+<pre><code>sudo ./hotspotpluslight service install
+sudo ./hotspotpluslight service start</code></pre>
+<p><code>service install</code> does this:</p>
+<ul>
+<li>It never follows symbolic links: it stops if <code>hsp.env</code>, the program file or anything in the <code>data</code> folder is a link.</li>
+<li>It creates the system user <code>hotspotpluslight</code> (no login) if the user does not exist. If <code>useradd</code> is missing, it tells you how to create the user by hand.</li>
+<li>It creates the folder <code>/var/lib/hotspotpluslight</code>. To use another folder, add <code>--dir /opt/hsp</code>. The folder belongs to the service user (mode 0750). The install refuses a folder under <code>/home</code>, <code>/root</code> or <code>/run/user</code>, because the unit hides them, and it refuses a folder that is a symbolic link. Missing parent folders are created owned by root.</li>
+<li>It copies the program to <code>hotspotpluslight</code> in that folder. The service user owns the file, so <strong>Update now</strong> can replace it.</li>
+<li>If the env file <code>hsp.env</code> does not exist yet, it creates the file with a new <code>HSP_SECRET_KEY</code>, and with <code>HSP_DATA_DIR</code> set to the <code>data</code> subfolder. Only the service user can read it. An existing <code>hsp.env</code> is kept as it is, but its mode is set to 0600.</li>
+<li>It writes <code>/etc/systemd/system/hotspotpluslight.service</code>, runs <code>systemctl daemon-reload</code> and <code>systemctl enable</code>.</li>
+</ul>
+<p>The unit restarts the program after any exit (<code>Restart=always</code>, after 2 seconds). This includes the restart after an update (exit code 75). The logs and the first-start block are in the journal:</p>
+<pre><code>journalctl -u hotspotpluslight -f</code></pre>
+<p>Back up the folder: it holds the database, <code>hsp.env</code> and the key. Stop and remove the service with the commands below. Your data folder and the user are kept.</p>
+<pre><code>sudo ./hotspotpluslight service stop
+sudo ./hotspotpluslight service uninstall</code></pre>
+<p>All the default ports are above 1024, so the service needs no extra privileges. If you choose a port below 1024, add <code>AmbientCapabilities=CAP_NET_BIND_SERVICE</code> to the <code>[Service]</code> part of the unit file, then run <code>sudo systemctl daemon-reload</code> and restart the service.</p>
+<p>The unit file looks like this (with the default folder):</p>
 <pre><code>[Unit]
-Description=HotspotPlus Lite
+Description=HotspotPlusLight
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=hsp
-EnvironmentFile=/etc/hotspotpluslight.env
-ExecStart=/usr/local/bin/hotspotpluslight serve
-StateDirectory=hotspotpluslight
-Restart=on-failure
+Type=simple
+User=hotspotpluslight
+WorkingDirectory=/var/lib/hotspotpluslight
+ExecStart=/var/lib/hotspotpluslight/hotspotpluslight --env-file /var/lib/hotspotpluslight/hsp.env serve
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+ProtectSystem=full
+ReadWritePaths=/var/lib/hotspotpluslight
+ProtectHome=yes
+PrivateTmp=yes
+LimitNOFILE=65536
+StandardOutput=journal
 
 [Install]
 WantedBy=multi-user.target</code></pre>
-<p>Start the service and make it start at boot:</p>
-<pre><code>sudo systemctl daemon-reload
-sudo systemctl enable --now hotspotpluslight
-systemctl status hotspotpluslight</code></pre>
-<p>The first-start block and the log lines are in the journal:</p>
-<pre><code>journalctl -u hotspotpluslight</code></pre>
-<p>All the ports are above 1024, so the service needs no extra privileges. <code>systemctl stop</code> sends SIGTERM. The server then stops taking new requests and lets the accounting requests (usage updates from the router) that are already in progress finish. Then it closes the database.</p>
+<p><code>systemctl stop</code> sends SIGTERM. The server then stops taking new requests and lets the accounting requests (usage updates from the router) that are already in progress finish. Then it closes the database.</p>
 <p>If you forget the admin password, run the reset as the service user, so that the database files keep their owner:</p>
-<pre><code>sudo -u hsp hotspotpluslight --env-file /etc/hotspotpluslight.env admin set-password</code></pre></section>
+<pre><code>sudo -u hotspotpluslight /var/lib/hotspotpluslight/hotspotpluslight admin set-password --env-file /var/lib/hotspotpluslight/hsp.env</code></pre></section>
 <section><h2 id="windows"><a href="#windows">Windows service</a></h2>
 <p>The program can install itself as a Windows service. Open PowerShell <strong>as Administrator</strong>, go to the folder with <code>hotspotpluslight.exe</code> and run:</p>
 <pre><code>cd C:\hotspotpluslight
@@ -103,7 +117,7 @@ systemctl status hotspotpluslight</code></pre>
 netsh advfirewall firewall add rule name="HotspotPlus Lite RADIUS" dir=in action=allow protocol=UDP localport=1812-1813</code></pre>
 <div class="note"><b>Keep a copy of hsp.env</b><p>It holds the secret key. Without the key, the stored member passwords cannot be read. See <a href="../backup-and-upgrade/">Backup and upgrade</a>.</p></div></section>
 <section><h2 id="macos"><a href="#macos">macOS (launchd)</a></h2>
-<p>The <code>service</code> commands work only on Windows. On macOS, use launchd. Put variables such as <code>HSP_DATA_DIR</code> in the env file <code>/usr/local/etc/hotspotpluslight.env</code> (readable only by root). Then create <code>/Library/LaunchDaemons/local.hotspotpluslight.plist</code>:</p>
+<p>The <code>service</code> commands work only on Windows and Linux. On macOS, use launchd. Put variables such as <code>HSP_DATA_DIR</code> in the env file <code>/usr/local/etc/hotspotpluslight.env</code> (readable only by root). Then create <code>/Library/LaunchDaemons/local.hotspotpluslight.plist</code>:</p>
 <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;plist version="1.0"&gt;
 &lt;dict&gt;

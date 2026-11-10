@@ -6,7 +6,7 @@ The admin creates plans and members (or batches of printable vouchers). The serv
 
 User guides (install, router setup, login pages, backup, troubleshooting) are on the site: https://pysf.github.io/HotspotPlusLight/
 
-This README is for developers. The public name is "HotspotPlus Lite". The binary, Go module and repo keep the name `hotspotpluslight`. The Windows service is named `HotspotPlusLight`.
+This README is for developers. The public name is "HotspotPlus Lite". The binary, Go module and repo keep the name `hotspotpluslight`. The Windows service is named `HotspotPlusLight`. On Linux, `sudo hotspotpluslight service install` creates the user `hotspotpluslight`, copies the program to `/var/lib/hotspotpluslight` (owned by that user, so self-update works) and installs the systemd unit `hotspotpluslight.service` (`service_systemd.go`). Because it runs as root, it never follows symlinks and refuses a folder under `/home`, `/root` or `/run/user`. macOS is manual only.
 
 License: GNU AGPL-3.0, see [LICENSE](LICENSE).
 
@@ -130,7 +130,7 @@ The whole page refreshes by itself every 10 seconds.
 
 | Path | What it holds |
 |---|---|
-| `cmd/hotspotpluslight` | the binary: `serve`, `admin set-password`, `gen-key`, `service` (Windows), `version`; `--env-file` |
+| `cmd/hotspotpluslight` | the binary: `serve`, `admin set-password`, `gen-key`, `service` (Windows, Linux systemd), `version`; `--env-file` |
 | `internal/app` | the only place that wires everything together (listeners, services, shutdown) |
 | `internal/domain` | pure business rules (BR-1...BR-30): login verdict, quota, units, MAC, forms. No I/O, no clock |
 | `internal/auth` | admin sessions, login throttle, the login evaluator used by RADIUS |

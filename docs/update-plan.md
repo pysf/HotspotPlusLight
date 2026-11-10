@@ -84,5 +84,5 @@ README and site pages for: Settings (new switch), Update page, install on Linux,
 2. `internal/update` check job, setting, notice, Update page (no install yet).
 3. Download, hash check, backup, swap.
 4. Restart and rollback.
-5. Linux `service install`.
+5. Linux `service install`. **Built (2026-11-10), reviewed and hardened (root-safe file handling, `ReadWritePaths`).**
 6. Docs and site.
