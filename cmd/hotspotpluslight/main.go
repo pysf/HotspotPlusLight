@@ -49,7 +49,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		err = app.Run(ctx, app.Options{Stdout: stdout, Getenv: getenv})
+		err = app.Run(ctx, app.Options{Stdout: stdout, Getenv: getenv, Version: version})
 	case len(args) == 1 && args[0] == "version":
 		fmt.Fprintln(stdout, version)
 	case len(args) == 1 && args[0] == "gen-key":

@@ -48,7 +48,7 @@ func runAsService(envFile string, getenv func(string) string) error {
 		return err
 	}
 	defer logFile.Close()
-	h := &handler{opts: app.Options{Stdout: logFile, LogWriter: logFile, Getenv: getenv}}
+	h := &handler{opts: app.Options{Stdout: logFile, LogWriter: logFile, Getenv: getenv, Version: version}}
 	return svc.Run(serviceName, h)
 }
 

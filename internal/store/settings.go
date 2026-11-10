@@ -12,7 +12,7 @@ import (
 const settingsSelect = `SELECT business_name, timezone, radius_shared_secret, coa_port, accounting_interval_seconds,
 		default_plan_id, batch_username_prefix, batch_counter, batch_max_count,
 		voucher_password_length, voucher_help, session_retention_days,
-		admin_addr, radius_auth_addr, radius_acct_addr, log_level, log_format FROM settings WHERE id=1`
+		admin_addr, radius_auth_addr, radius_acct_addr, log_level, log_format, check_updates FROM settings WHERE id=1`
 
 // GetSettings returns the single settings row.
 func (s *Store) GetSettings(ctx context.Context) (domain.Settings, error) {
@@ -26,7 +26,7 @@ func scanSettings(row *sql.Row) (domain.Settings, error) {
 	err := row.Scan(&st.BusinessName, &st.Timezone, &st.RadiusSharedSecret, &st.CoaPort, &st.AccountingIntervalSeconds, &def,
 		&st.BatchUsernamePrefix, &st.BatchCounter, &st.BatchMaxCount, &st.VoucherPasswordLength,
 		&st.VoucherHelp, &st.SessionRetentionDays,
-		&st.AdminAddr, &st.RadiusAuthAddr, &st.RadiusAcctAddr, &st.LogLevel, &st.LogFormat)
+		&st.AdminAddr, &st.RadiusAuthAddr, &st.RadiusAcctAddr, &st.LogLevel, &st.LogFormat, &st.CheckUpdates)
 	if def.Valid {
 		v := def.Int64
 		st.DefaultPlanID = &v
@@ -45,13 +45,32 @@ func (s *Store) UpdateSettings(ctx context.Context, st domain.Settings, now time
 		accounting_interval_seconds=?, default_plan_id=?, batch_username_prefix=?,
 		batch_counter=max(batch_counter, ?), batch_max_count=?, voucher_password_length=?, voucher_help=?,
 		session_retention_days=?, admin_addr=?, radius_auth_addr=?, radius_acct_addr=?,
-		log_level=?, log_format=?, updated_at=? WHERE id=1`,
+		log_level=?, log_format=?, check_updates=?, updated_at=? WHERE id=1`,
 		st.BusinessName, st.Timezone, st.RadiusSharedSecret, st.CoaPort, st.AccountingIntervalSeconds, def,
 		st.BatchUsernamePrefix, st.BatchCounter, st.BatchMaxCount,
 		st.VoucherPasswordLength, st.VoucherHelp, st.SessionRetentionDays,
-		st.AdminAddr, st.RadiusAuthAddr, st.RadiusAcctAddr, st.LogLevel, st.LogFormat, now.Unix())
+		st.AdminAddr, st.RadiusAuthAddr, st.RadiusAcctAddr, st.LogLevel, st.LogFormat, st.CheckUpdates, now.Unix())
 	if sqliteCode(err) == sqliteConstraintFK { // the default plan was deleted after the service checked it
 		return domain.ErrPlanGone
 	}
+	return err
+}
+
+// GetUpdateState returns the "Check for updates" setting and the result of the last check.
+func (s *Store) GetUpdateState(ctx context.Context) (domain.UpdateState, error) {
+	var u domain.UpdateState
+	var at int64
+	err := s.r.QueryRowContext(ctx, `SELECT check_updates, update_latest, update_url, update_checked_at, update_error
+		FROM settings WHERE id=1`).Scan(&u.Enabled, &u.Latest, &u.URL, &at, &u.Error)
+	if at > 0 {
+		u.CheckedAt = time.Unix(at, 0)
+	}
+	return u, err
+}
+
+// SaveUpdateResult stores the result of an update check. The setting itself is not touched.
+func (s *Store) SaveUpdateResult(ctx context.Context, u domain.UpdateState) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE settings SET update_latest=?, update_url=?, update_checked_at=?, update_error=? WHERE id=1`,
+		u.Latest, u.URL, u.CheckedAt.Unix(), u.Error)
 	return err
 }

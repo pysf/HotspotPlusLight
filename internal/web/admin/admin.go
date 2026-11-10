@@ -25,6 +25,7 @@ import (
 	"hotspotpluslight/internal/linkstatus"
 	"hotspotpluslight/internal/member"
 	"hotspotpluslight/internal/plan"
+	"hotspotpluslight/internal/update"
 	"hotspotpluslight/internal/web/static"
 	"hotspotpluslight/internal/web/ui"
 )
@@ -77,6 +78,12 @@ type SettingsService interface {
 	Update(ctx context.Context, f domain.SettingsForm) (domain.FieldErrors, error)
 }
 
+// UpdateService is the update check (internal/update).
+type UpdateService interface {
+	Status(ctx context.Context) (update.Status, error)
+	Check(ctx context.Context) (update.Status, error)
+}
+
 // LinkStatus is the in-memory router link status (implemented by linkstatus.Recorder).
 type LinkStatus interface {
 	Snapshot() linkstatus.Snapshot
@@ -92,6 +99,7 @@ type Deps struct {
 	Usage     UsageService
 	Dashboard DashboardService
 	Settings  SettingsService
+	Update    UpdateService
 	Router    RouterPack
 	Link      LinkStatus
 	// RadiusPorts gives the RADIUS UDP ports for the router setup script, read when the page is rendered.
@@ -193,6 +201,8 @@ func Handler(d Deps) http.Handler {
 				})
 				r.Get("/settings", h.settingsPage)
 				r.Put("/settings", h.settingsUpdate)
+				r.Get("/update", h.updatePage)
+				r.Post("/update/check", h.updateCheck)
 				r.Get("/dev/components", h.devComponents)
 			})
 		})
@@ -234,8 +244,8 @@ func (h handlers) pageEnv(next http.Handler) http.Handler {
 	})
 }
 
-// shellStatus fills the parts of the page frame that show live facts: the date, the online count and the
-// router state. Only a request with a session cookie gets them, so the login page costs nothing extra.
+// shellStatus fills the parts of the page frame that show live facts: the date, the online count, the
+// router state and the update notice. Only a request with a session cookie gets them, so the login page costs nothing extra.
 // A failed read leaves them hidden.
 func (h handlers) shellStatus(r *http.Request, env *ui.Env) {
 	if _, err := r.Cookie(cookieName); err != nil {
@@ -249,6 +259,13 @@ func (h handlers) shellStatus(r *http.Request, env *ui.Env) {
 			if v.Loc != nil {
 				env.Today = v.Now.In(v.Loc).Format("Monday 2 January")
 			}
+		}
+	}
+	if h.Update != nil {
+		if st, err := h.Update.Status(r.Context()); err != nil {
+			slog.Warn("admin: read the update status", "err", err)
+		} else if st.Available {
+			env.UpdateVersion = st.Latest
 		}
 	}
 	if h.Link != nil {

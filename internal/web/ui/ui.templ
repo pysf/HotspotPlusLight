@@ -195,6 +195,7 @@ templ Layout(d LayoutData) {
 							}
 						</header>
 						<main class="l-page">
+							@UpdateNoticeSlot(env.UpdateVersion, false)
 							<div id="flash" aria-live="polite"></div>
 							{ children... }
 						</main>
@@ -649,6 +650,27 @@ func noticeIcon(kind string) string {
 		return "info"
 	}
 	return "alert"
+}
+
+// UpdateNoticeSlot is the place of the update notice in the page. It is always present, so an
+// answer can replace it (oob) and the notice follows a "Check now" without a reload.
+templ UpdateNoticeSlot(version string, oob bool) {
+	<div id="update-notice" style="display: contents" if oob { hx-swap-oob="true" }>
+		if version != "" {
+			@UpdateNotice(version)
+		}
+	</div>
+}
+
+// UpdateNotice tells the admin that a newer version exists, with a link to the Update page.
+templ UpdateNotice(version string) {
+	<div class="c-notice" data-kind="info" data-update-notice role="status">
+		@Icon("info")
+		<div>
+			Version { version } is available.
+			<a href="/admin/update">See details</a>
+		</div>
+	</div>
 }
 
 // NoticeTitled is a Flash with a bold title line above the text.

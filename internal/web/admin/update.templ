@@ -1,0 +1,88 @@
+package admin
+
+import (
+	"hotspotpluslight/internal/update"
+	"hotspotpluslight/internal/web/ui"
+)
+
+// UpdateProps holds what the update page shows.
+type UpdateProps struct {
+	Status update.Status
+	// CheckedText is the last check time in the settings time zone; empty before the first check.
+	CheckedText string
+}
+
+// UpdatePage shows the running version, the latest version and the Check now button.
+templ UpdatePage(l ui.LayoutData, p UpdateProps) {
+	@ui.Layout(l) {
+		@ui.PageHeaderSub("Updates", "See if a newer version is out.")
+		@UpdateStatusView(p)
+	}
+}
+
+// versionOrDash returns v, or a dash when it is empty.
+func versionOrDash(v string) string {
+	if v == "" {
+		return "-"
+	}
+	return v
+}
+
+// updateRows returns the key and value lines of the update page.
+func updateRows(p UpdateProps) []ui.CredRow {
+	st := p.Status
+	checked := p.CheckedText
+	if checked == "" {
+		checked = "Not yet"
+	}
+	return []ui.CredRow{
+		{Label: "This version", Value: st.Current, Key: "current"},
+		{Label: "Latest version", Value: versionOrDash(st.Latest), Key: "latest"},
+		{Label: "Last checked", Value: checked, Key: "checked"},
+	}
+}
+
+// updateCheckAnswer is the answer to Check now: the status block, and the layout notice swapped out of band.
+templ updateCheckAnswer(p UpdateProps) {
+	@UpdateStatusView(p)
+	@ui.UpdateNoticeSlot(noticeVersion(p.Status), true)
+}
+
+// noticeVersion returns the version the layout notice announces, or "" when there is none.
+func noticeVersion(st update.Status) string {
+	if st.Available {
+		return st.Latest
+	}
+	return ""
+}
+
+// UpdateStatusView is the status block of the update page and the body of the Check now answer.
+templ UpdateStatusView(p UpdateProps) {
+	<div id="update-status" class="l-flow l-narrow" data-update-status>
+		if !p.Status.Enabled {
+			@ui.Flash("info", "Update checks are off. Turn them on in Settings to see new versions.")
+		} else if p.Status.Dev {
+			@ui.Flash("info", "This is a development build. It does not check for updates.")
+		} else {
+			if p.Status.Available {
+				@ui.NoticeTitled("ok", "Version "+p.Status.Latest+" is available.", "You are running "+p.Status.Current+".")
+			} else if p.Status.Error == "" && p.Status.Latest != "" {
+				@ui.Flash("ok", "You have the latest version.")
+			}
+			if p.Status.Error != "" {
+				@ui.Flash("warn", "The last check failed. "+p.Status.Error)
+			}
+		}
+		@ui.Card() {
+			@ui.KeyValues(updateRows(p))
+			if p.Status.Enabled && !p.Status.Dev {
+				if p.Status.URL != "" {
+					<p><a href={ templ.URL(p.Status.URL) } rel="noopener noreferrer" target="_blank" data-release-notes>Release notes</a></p>
+				}
+				@ui.ActionRow("Check now", "Asks GitHub for the latest release.") {
+					@ui.Button("secondary", "Check now", templ.Attributes{"type": "button", "hx-post": "/admin/update/check", "hx-target": "#update-status", "hx-swap": "outerHTML"})
+				}
+			}
+		}
+	</div>
+}

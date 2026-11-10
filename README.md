@@ -101,6 +101,10 @@ sequenceDiagram
     S-->>A: flag cleared, admin panel opens on the Dashboard (/admin)
 ```
 
+### Update check
+
+A background job asks the GitHub API for the latest release 30 seconds after the start and then once a day. It sends only a `User-Agent` header with the version. The answer (latest version, release notes link, time, last error) is saved in the settings row. When a newer release exists, every admin page shows "Version X is available" with a link to the **Updates** page (`/admin/update`), which also has a **Check now** button. The **Check for updates** switch on the **Settings** page turns it all off: then the server never calls GitHub. A development build (version `dev`) never checks. This step only looks; it does not download or install. `HSP_UPDATE_API_URL` changes the API address (tests and mirrors).
+
 ### Dashboard
 
 The admin home page (`/admin`) shows:
@@ -128,6 +132,7 @@ The whole page refreshes by itself every 10 seconds.
 | `internal/radius` | RADIUS auth and accounting server, Disconnect client (`layeh.com/radius`) |
 | `internal/routerpack` | the 8 hotspot folder downloads, the RouterOS setup script, built into the binary |
 | `internal/linkstatus` | in-memory "last packet seen" data for the router status panel on the Dashboard |
+| `internal/update` | update check: asks GitHub for the latest release once a day and keeps the answer (it does not install) |
 | `internal/dashboard` | read service for the Dashboard numbers (online, traffic, failed logins, attention lists, charts) |
 | `internal/settings`, `internal/config` | the single-row settings and the `HSP_*` environment |
 | `internal/secret` | AES-GCM for stored member passwords |

@@ -28,6 +28,8 @@ type Settings struct {
 	RadiusAcctAddr string
 	LogLevel       string
 	LogFormat      string
+	// CheckUpdates lets the server ask GitHub for a newer release. It applies at once.
+	CheckUpdates bool
 }
 
 // Location is the display zone. A bad zone name is a corrupt-settings error (the settings form validates it).
@@ -47,6 +49,7 @@ type SettingsForm struct {
 	VoucherPasswordLength, VoucherHelp, SessionRetentionDays                       string
 	// The server settings take effect after a restart.
 	AdminAddr, RadiusAuthAddr, RadiusAcctAddr, LogLevel, LogFormat string
+	CheckUpdates                                                   string // "on" or "off"
 }
 
 // FormFromSettings renders stored settings back into form text.
@@ -63,8 +66,16 @@ func FormFromSettings(s Settings) SettingsForm {
 		BatchCounter:        i(s.BatchCounter), BatchMaxCount: i(s.BatchMaxCount), VoucherPasswordLength: i(s.VoucherPasswordLength),
 		VoucherHelp: s.VoucherHelp, SessionRetentionDays: i(s.SessionRetentionDays),
 		AdminAddr: s.AdminAddr, RadiusAuthAddr: s.RadiusAuthAddr, RadiusAcctAddr: s.RadiusAcctAddr,
-		LogLevel: s.LogLevel, LogFormat: s.LogFormat,
+		LogLevel: s.LogLevel, LogFormat: s.LogFormat, CheckUpdates: onOff(s.CheckUpdates),
 	}
+}
+
+// onOff returns "on" or "off".
+func onOff(b bool) string {
+	if b {
+		return "on"
+	}
+	return "off"
 }
 
 // ParseSettings validates the form with the ranges of the DDL (plus sane
@@ -93,6 +104,7 @@ func ParseSettingsKeeping(f SettingsForm, storedSecret string) (Settings, FieldE
 		RadiusAcctAddr:            p.netAddr("radius_acct_addr", f.RadiusAcctAddr),
 		LogLevel:                  p.logLevel("log_level", f.LogLevel),
 		LogFormat:                 p.logFormat("log_format", f.LogFormat),
+		CheckUpdates:              Checked(f.CheckUpdates),
 	}
 	checkDistinctPorts(p.errs, s)
 	if f.DefaultPlanID != "" {

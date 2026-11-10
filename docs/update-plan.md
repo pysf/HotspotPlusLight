@@ -1,6 +1,6 @@
 # Automatic release and self-update: plan
 
-Status: Step 1 built (nextversion, autorelease, commit-style check). Later steps not built. Decisions are from the owner, 2026-11-10.
+Status: Steps 1 and 2 built (step 2: the update check, setting, notice and Update page; no install yet). Later steps not built. Decisions are from the owner, 2026-11-10.
 
 ## Decisions
 

@@ -40,6 +40,10 @@ type Options struct {
 	// AccountingBeforeCommit runs inside every accounting transaction just before
 	// it commits; an error rolls it back and the packet gets no reply (E4.15).
 	AccountingBeforeCommit func() error
+	// Version is the build version for the update check ("" = dev build, which never checks).
+	Version string
+	// UpdateFirstDelay is the wait before the first background update check (0 = the 30 s default).
+	UpdateFirstDelay time.Duration
 	// Logger receives the server log (default: discarded).
 	Logger *slog.Logger
 }
@@ -121,6 +125,9 @@ func TryStart(opts Options) (*Server, error) {
 		Clock:        opts.Clock,
 		Migrations:   opts.Migrations,
 		Disconnector: opts.Disconnector,
+
+		Version:          opts.Version,
+		UpdateFirstDelay: opts.UpdateFirstDelay,
 
 		AccountingBeforeCommit: opts.AccountingBeforeCommit,
 	})

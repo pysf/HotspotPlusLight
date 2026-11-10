@@ -27,6 +27,7 @@ func settingsForm(r *http.Request, cur domain.Settings) domain.SettingsForm {
 		AdminAddr:            server("admin_addr", keep.AdminAddr), RadiusAuthAddr: server("radius_auth_addr", keep.RadiusAuthAddr),
 		RadiusAcctAddr: server("radius_acct_addr", keep.RadiusAcctAddr),
 		LogLevel:       server("log_level", keep.LogLevel), LogFormat: server("log_format", keep.LogFormat),
+		CheckUpdates: server("check_updates", keep.CheckUpdates),
 	}
 }
 

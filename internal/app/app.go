@@ -33,6 +33,7 @@ import (
 	"hotspotpluslight/internal/session"
 	"hotspotpluslight/internal/settings"
 	"hotspotpluslight/internal/store"
+	"hotspotpluslight/internal/update"
 	"hotspotpluslight/internal/usage"
 	"hotspotpluslight/internal/voucher"
 	"hotspotpluslight/internal/web/admin"
@@ -53,6 +54,10 @@ type Options struct {
 	// AccountingBeforeCommit runs inside each accounting transaction just before the
 	// commit; an error rolls it back and the packet gets no reply (crash injection, E4.15).
 	AccountingBeforeCommit func() error
+	// Version is the build version for the update check ("dev" or empty = a dev build that never checks).
+	Version string
+	// UpdateFirstDelay is the wait before the first background update check (default 30 s).
+	UpdateFirstDelay time.Duration
 	// Ready, if set, is called by Run once all listeners are bound. The Windows service reports Running then.
 	Ready func()
 }
@@ -67,6 +72,7 @@ type services struct {
 	member    *member.Service
 	plan      *plan.Service
 	settings  *settings.Service
+	update    *update.Checker
 	session   *session.Service
 	usage     *usage.Service
 	voucher   *voucher.Service
@@ -90,6 +96,8 @@ type App struct {
 	stopOnce           sync.Once
 	pruneCancel        context.CancelFunc
 	pruneDone          chan struct{}
+	updateCancel       context.CancelFunc
+	updateDone         chan struct{}
 }
 
 // New loads config, opens and migrates the database, verifies the key, seeds
@@ -187,6 +195,10 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return fail(err)
 	}
+	var updateOpts []update.Option
+	if opts.UpdateFirstDelay > 0 {
+		updateOpts = append(updateOpts, update.WithFirstDelay(opts.UpdateFirstDelay))
+	}
 	a.svc = services{
 		auth:      auth.New(st, opts.Clock),
 		dashboard: dashboard.New(st, opts.Clock),
@@ -194,6 +206,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		member:    members,
 		plan:      plan.New(st, opts.Clock),
 		settings:  settings.New(st, opts.Clock),
+		update:    update.New(st, opts.Clock, log, cmp.Or(opts.Version, "dev"), opts.Getenv("HSP_UPDATE_API_URL"), updateOpts...),
 		session:   sess,
 		usage:     usage.New(st, opts.Clock),
 		voucher:   voucher.New(st, box, members, opts.Clock), // batch delete reuses the member delete path: kick, then remove
@@ -207,7 +220,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return fail(err)
 	}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Dashboard: a.svc.dashboard, Settings: a.svc.settings, Router: pack, Link: link, RadiusPorts: a.radiusPorts, RunningServer: a.runningServer, Assets: assets, Clock: opts.Clock, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Dashboard: a.svc.dashboard, Settings: a.svc.settings, Update: a.svc.update, Router: pack, Link: link, RadiusPorts: a.radiusPorts, RunningServer: a.runningServer, Assets: assets, Clock: opts.Clock, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 
@@ -353,6 +366,7 @@ func (a *App) Start() (err error) {
 	a.addrMu.Unlock()
 	go a.serveHTTP("admin", a.adminSrv, a.adminLn)
 	a.startPruning()
+	a.startUpdateChecks()
 	a.enforcer.Start(a.svc.session)
 	a.radius.Serve(a.authConn, a.acctConn)
 	a.log.Info("listening", "admin", a.addrs.Admin, "radius_auth", a.addrs.RadiusAuth, "radius_acct", a.addrs.RadiusAcct)
@@ -387,6 +401,16 @@ func (a *App) startPruning() {
 				run()
 			}
 		}
+	}()
+}
+
+// startUpdateChecks runs the update check job in the background until Shutdown.
+func (a *App) startUpdateChecks() {
+	ctx, cancel := context.WithCancel(context.Background())
+	a.updateCancel, a.updateDone = cancel, make(chan struct{})
+	go func() {
+		defer close(a.updateDone)
+		a.svc.update.Run(ctx)
 	}()
 }
 
@@ -431,6 +455,10 @@ func (a *App) Shutdown(ctx context.Context) error {
 		if a.pruneCancel != nil {
 			a.pruneCancel()
 			<-a.pruneDone
+		}
+		if a.updateCancel != nil {
+			a.updateCancel()
+			<-a.updateDone
 		}
 		err = errors.Join(a.adminSrv.Shutdown(ctx), a.radius.Shutdown(ctx))
 		a.enforcer.Stop() // after RADIUS, so no new checks are queued; it waits for the running ones

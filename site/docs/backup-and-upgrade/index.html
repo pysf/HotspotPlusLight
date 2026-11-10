@@ -81,6 +81,7 @@ sudo systemctl start hotspotpluslight</code></pre>
 .\hotspotpluslight.exe service start</code></pre>
 <h3>macOS or a plain run</h3>
 <p>Stop the program with <code>Ctrl+C</code> or SIGTERM. Replace the file and start it again.</p>
+<p>The server can tell you when a newer version exists. Once a day it asks GitHub for the latest release, and the admin panel shows <em>Version X is available</em> with a link to the <strong>Updates</strong> page. The page has the release notes and a <strong>Check now</strong> button. The server only looks; you still replace the program yourself. You can turn this off with the <strong>Check for updates</strong> setting.</p>
 <p>Check the version with <code>hotspotpluslight version</code>. When the database was upgraded, the log shows <code>migrations applied</code> with a count. The version is stored inside the program, not in the file name, so the download links never change.</p></section>
 <section><h2 id="retention"><a href="#retention">What is kept</a></h2>
 <p>Finished sessions older than 90 days are removed. You change this with the <strong>Keep finished sessions (days)</strong> setting on the <strong>Settings</strong> page; 0 keeps them forever. The daily usage history and the members are kept.</p></section>

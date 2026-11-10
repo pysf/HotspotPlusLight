@@ -38,6 +38,8 @@ type Env struct {
 	Online int
 	// RouterUp is true when the router has sent a packet recently.
 	RouterUp bool
+	// UpdateVersion is the newer release to announce in the page frame. Empty hides the notice.
+	UpdateVersion string
 }
 
 // TabTitle returns the browser tab title: the page title, then the business name when set, then the product name.
