@@ -84,6 +84,13 @@ type UpdateService interface {
 	Check(ctx context.Context) (update.Status, error)
 }
 
+// UpdateInstaller is the installer of a new version (internal/update).
+type UpdateInstaller interface {
+	Plan() update.PlanResult
+	Start(ctx context.Context) error
+	Progress() update.Progress
+}
+
 // LinkStatus is the in-memory router link status (implemented by linkstatus.Recorder).
 type LinkStatus interface {
 	Snapshot() linkstatus.Snapshot
@@ -100,6 +107,7 @@ type Deps struct {
 	Dashboard DashboardService
 	Settings  SettingsService
 	Update    UpdateService
+	Installer UpdateInstaller
 	Router    RouterPack
 	Link      LinkStatus
 	// RadiusPorts gives the RADIUS UDP ports for the router setup script, read when the page is rendered.
@@ -203,6 +211,8 @@ func Handler(d Deps) http.Handler {
 				r.Put("/settings", h.settingsUpdate)
 				r.Get("/update", h.updatePage)
 				r.Post("/update/check", h.updateCheck)
+				r.Post("/update/install", h.updateInstall)
+				r.Get("/update/progress", h.updateProgress)
 				r.Get("/dev/components", h.devComponents)
 			})
 		})

@@ -103,7 +103,11 @@ sequenceDiagram
 
 ### Update check
 
-A background job asks the GitHub API for the latest release 30 seconds after the start and then once a day. It sends only a `User-Agent` header with the version. The answer (latest version, release notes link, time, last error) is saved in the settings row. When a newer release exists, every admin page shows "Version X is available" with a link to the **Updates** page (`/admin/update`), which also has a **Check now** button. The **Check for updates** switch on the **Settings** page turns it all off: then the server never calls GitHub. A development build (version `dev`) never checks. This step only looks; it does not download or install. `HSP_UPDATE_API_URL` changes the API address (tests and mirrors).
+A background job asks the GitHub API for the latest release 30 seconds after the start and then once a day. It sends only a `User-Agent` header with the version. The answer (latest version, release notes link, time, last error) is saved in the settings row. When a newer release exists, every admin page shows "Version X is available" with a link to the **Updates** page (`/admin/update`), which also has a **Check now** button. The **Check for updates** switch on the **Settings** page turns it all off: then the server never calls GitHub. A development build (version `dev`) never checks. `HSP_UPDATE_API_URL` changes the API address (tests and mirrors).
+
+### Update from the admin page
+
+When a newer version exists and the program can update itself, the **Updates** page has an **Update now** button (`POST /admin/update/install`). After the admin confirms, one background job runs these steps and the page shows them (`GET /admin/update/progress`, polled every 2 seconds): it asks GitHub again for the latest release, downloads the file for this OS and CPU and `SHA256SUMS` from the same release, checks the hash, unpacks the program next to the running one (`<program>.new`), copies the database with `VACUUM INTO` to `hsp.db.bak-<old version>` in the data folder, then renames the running program to `<program>.old` and the new one to the real name, and asks the program to restart. Only one install runs at a time (a second one answers 409). A wrong or missing hash stops everything and changes nothing. The button is replaced by a reason when this is a development or test build, the release has no file for this system, the program file is not writable, or checks are off. Downloads must use https (the `HSP_UPDATE_API_URL` override also allows http, for tests). Limits: 200 MiB for the archive, 1 MiB for `SHA256SUMS`, 10 minutes in total. The automatic restart by a service manager and the rollback of a version that does not start come in the next step.
 
 ### Dashboard
 
@@ -132,7 +136,7 @@ The whole page refreshes by itself every 10 seconds.
 | `internal/radius` | RADIUS auth and accounting server, Disconnect client (`layeh.com/radius`) |
 | `internal/routerpack` | the 8 hotspot folder downloads, the RouterOS setup script, built into the binary |
 | `internal/linkstatus` | in-memory "last packet seen" data for the router status panel on the Dashboard |
-| `internal/update` | update check: asks GitHub for the latest release once a day and keeps the answer (it does not install) |
+| `internal/update` | update check: asks GitHub for the latest release once a day and keeps the answer; the Installer downloads, checks, backs up and swaps the program file |
 | `internal/dashboard` | read service for the Dashboard numbers (online, traffic, failed logins, attention lists, charts) |
 | `internal/settings`, `internal/config` | the single-row settings and the `HSP_*` environment |
 | `internal/secret` | AES-GCM for stored member passwords |

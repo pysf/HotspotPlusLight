@@ -655,7 +655,7 @@ func noticeIcon(kind string) string {
 // UpdateNoticeSlot is the place of the update notice in the page. It is always present, so an
 // answer can replace it (oob) and the notice follows a "Check now" without a reload.
 templ UpdateNoticeSlot(version string, oob bool) {
-	<div id="update-notice" style="display: contents" if oob { hx-swap-oob="true" }>
+	<div id="update-notice" class="u-contents" if oob { hx-swap-oob="true" }>
 		if version != "" {
 			@UpdateNotice(version)
 		}

@@ -58,6 +58,10 @@ type Options struct {
 	Version string
 	// UpdateFirstDelay is the wait before the first background update check (default 30 s).
 	UpdateFirstDelay time.Duration
+	// ExePath is the program file an update replaces (default: the running executable, symlinks resolved).
+	ExePath string
+	// Restarter restarts the program after an update swapped the files (default: shut down and exit).
+	Restarter update.Restarter
 	// Ready, if set, is called by Run once all listeners are bound. The Windows service reports Running then.
 	Ready func()
 }
@@ -73,6 +77,7 @@ type services struct {
 	plan      *plan.Service
 	settings  *settings.Service
 	update    *update.Checker
+	installer *update.Installer
 	session   *session.Service
 	usage     *usage.Service
 	voucher   *voucher.Service
@@ -211,6 +216,15 @@ func New(ctx context.Context, opts Options) (*App, error) {
 		usage:     usage.New(st, opts.Clock),
 		voucher:   voucher.New(st, box, members, opts.Clock), // batch delete reuses the member delete path: kick, then remove
 	}
+	exe := opts.ExePath
+	if exe == "" {
+		exe = runningExecutable(log)
+	}
+	restarter := opts.Restarter
+	if restarter == nil {
+		restarter = exitRestarter{a: a, log: log}
+	}
+	a.svc.installer = update.NewInstaller(a.svc.update, st, restarter, exe, cfg.DataDir)
 	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, link, log, radius.WithFailureRecorder(a.svc.dashboard), radius.WithClock(opts.Clock))
 	pack, err := routerpack.New()
 	if err != nil {
@@ -220,7 +234,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return fail(err)
 	}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Dashboard: a.svc.dashboard, Settings: a.svc.settings, Update: a.svc.update, Router: pack, Link: link, RadiusPorts: a.radiusPorts, RunningServer: a.runningServer, Assets: assets, Clock: opts.Clock, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Dashboard: a.svc.dashboard, Settings: a.svc.settings, Update: a.svc.update, Installer: a.svc.installer, Router: pack, Link: link, RadiusPorts: a.radiusPorts, RunningServer: a.runningServer, Assets: assets, Clock: opts.Clock, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 
@@ -522,3 +536,35 @@ func Run(ctx context.Context, opts Options) error {
 
 // EnforcementIdle reports whether no automatic-disconnect check is queued or running. Tests wait for it.
 func (a *App) EnforcementIdle() bool { return a.enforcer.Idle() }
+
+// runningExecutable returns the path of the running program with symlinks resolved, or "" if it is unknown.
+func runningExecutable(log *slog.Logger) string {
+	exe, err := os.Executable()
+	if err == nil {
+		exe, err = filepath.EvalSymlinks(exe)
+	}
+	if err != nil {
+		log.Warn("update: cannot find the program file", "err", err)
+		return ""
+	}
+	return exe
+}
+
+// exitRestarter is the default Restarter. It stops the app cleanly and ends the process.
+// Whatever runs the program (a service manager, or the admin by hand) starts the new file.
+type exitRestarter struct {
+	a   *App
+	log *slog.Logger
+}
+
+// Restart does not return when it works.
+func (r exitRestarter) Restart() error {
+	r.log.Info("restarting to run the new version")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := r.a.Shutdown(ctx); err != nil {
+		r.log.Warn("shutdown before restart", "err", err)
+	}
+	os.Exit(0)
+	return nil
+}

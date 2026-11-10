@@ -10,6 +10,10 @@ type UpdateProps struct {
 	Status update.Status
 	// CheckedText is the last check time in the settings time zone; empty before the first check.
 	CheckedText string
+	// InstallOK is true when this program can install the latest version. InstallReason says why not.
+	InstallOK     bool
+	InstallReason string
+	Progress      update.Progress
 }
 
 // UpdatePage shows the running version, the latest version and the Check now button.
@@ -75,14 +79,84 @@ templ UpdateStatusView(p UpdateProps) {
 		}
 		@ui.Card() {
 			@ui.KeyValues(updateRows(p))
+			@UpdateProgressView(p.Progress)
 			if p.Status.Enabled && !p.Status.Dev {
 				if p.Status.URL != "" {
 					<p><a href={ templ.URL(p.Status.URL) } rel="noopener noreferrer" target="_blank" data-release-notes>Release notes</a></p>
 				}
+				@updateInstallRow(p)
 				@ui.ActionRow("Check now", "Asks GitHub for the latest release.") {
 					@ui.Button("secondary", "Check now", templ.Attributes{"type": "button", "hx-post": "/admin/update/check", "hx-target": "#update-status", "hx-swap": "outerHTML"})
 				}
 			}
 		}
 	</div>
+}
+
+// updateConfirmText is the text of the confirm dialog of Update now.
+func updateConfirmText(st update.Status) string {
+	t := "Install " + st.Latest + " now?"
+	if st.URL != "" {
+		t += " Release notes: " + st.URL + "."
+	}
+	return t + " The admin panel is down for a moment. Online members stay connected. If the new version does not start, the old version and your data are restored."
+}
+
+// updateInstallAttrs returns the attributes of the Update now button: it asks first, then posts into the progress block.
+func updateInstallAttrs(st update.Status) templ.Attributes {
+	a := ui.ConfirmAttrs("post", "/admin/update/install", updateConfirmText(st))
+	a["hx-target"] = "#update-progress"
+	a["hx-swap"] = "outerHTML"
+	a["data-confirm-title"] = "Update to " + st.Latest + "?"
+	a["data-confirm-ok"] = "Update now"
+	a["data-confirm-icon"] = "download"
+	return a
+}
+
+// updateInstallRow shows Update now when a newer version exists and can be installed, else the reason.
+templ updateInstallRow(p UpdateProps) {
+	if p.Status.Available {
+		if !p.InstallOK {
+			@ui.Flash("warn", p.InstallReason)
+		} else if !p.Progress.Running() && p.Progress.State != update.StateDone {
+			@ui.ActionRow("Update now", "Installs "+p.Status.Latest+" and restarts the program.") {
+				@ui.Button("primary", "Update now", updateInstallAttrs(p.Status))
+			}
+		}
+	}
+}
+
+// progressText returns the line for a running step.
+func progressText(p update.Progress) string {
+	switch p.State {
+	case update.StateDownloading:
+		return "Downloading " + p.Version + "..."
+	case update.StateVerifying:
+		return "Checking the download..."
+	case update.StateBackingUp:
+		return "Backing up the database..."
+	case update.StateReplacing:
+		return "Replacing the program..."
+	}
+	return "Restarting..."
+}
+
+// UpdateProgressView is the install progress block. While a step runs it polls itself every 2 s;
+// it stops when the install is done or failed.
+templ UpdateProgressView(p update.Progress) {
+	if p.Running() {
+		<div id="update-progress" data-update-progress data-state={ string(p.State) } data-poll hx-get="/admin/update/progress" hx-trigger="every 2s" hx-swap="outerHTML">
+			@ui.Flash("info", progressText(p))
+		</div>
+	} else if p.State == update.StateDone {
+		<div id="update-progress" data-update-progress data-state="done">
+			@ui.Flash("ok", p.Version+" is installed. The program is restarting.")
+		</div>
+	} else if p.State == update.StateFailed {
+		<div id="update-progress" data-update-progress data-state="failed">
+			@ui.Flash("error", "The update failed. "+p.Reason)
+		</div>
+	} else {
+		<div id="update-progress" data-update-progress data-state="idle"></div>
+	}
 }

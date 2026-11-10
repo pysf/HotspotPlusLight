@@ -22,12 +22,19 @@ type fakeGitHub struct {
 	status int
 	agent  string
 	path   string
+	files  map[string][]byte // release files by name, served at /dl/<name>
+	gate   chan struct{}     // when set, the download of a release file other than SHA256SUMS waits until it is closed
+	dlHits atomic.Int32      // requests for release files
 }
 
 func newFakeGitHub(t *testing.T, tag string) *fakeGitHub {
 	t.Helper()
-	f := &fakeGitHub{tag: tag, status: 200}
+	f := &fakeGitHub{tag: tag, status: 200, files: map[string][]byte{"SHA256SUMS": nil}}
 	f.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if name, ok := strings.CutPrefix(r.URL.Path, "/dl/"); ok {
+			f.serveFile(w, r, name)
+			return
+		}
 		f.hits.Add(1)
 		f.mu.Lock()
 		tag, status := f.tag, f.status
@@ -37,10 +44,41 @@ func newFakeGitHub(t *testing.T, tag string) *fakeGitHub {
 			w.WriteHeader(status)
 			return
 		}
-		fmt.Fprintf(w, `{"tag_name":%q,"html_url":"https://example.test/releases/%s","body":"notes","assets":[{"name":"SHA256SUMS"}]}`, tag, tag)
+		fmt.Fprintf(w, `{"tag_name":%q,"html_url":"https://example.test/releases/%s","body":"notes","assets":[%s]}`, tag, tag, f.assetJSON())
 	}))
 	t.Cleanup(f.Close)
 	return f
+}
+
+// assetJSON lists the release files with their download links.
+func (f *fakeGitHub) assetJSON() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var items []string
+	for name := range f.files {
+		items = append(items, fmt.Sprintf(`{"name":%q,"browser_download_url":%q}`, name, f.URL+"/dl/"+name))
+	}
+	return strings.Join(items, ",")
+}
+
+func (f *fakeGitHub) serveFile(w http.ResponseWriter, r *http.Request, name string) {
+	f.dlHits.Add(1)
+	f.mu.Lock()
+	data, ok := f.files[name]
+	gate := f.gate
+	f.mu.Unlock()
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	if gate != nil && name != "SHA256SUMS" {
+		select {
+		case <-gate:
+		case <-r.Context().Done():
+			return
+		}
+	}
+	w.Write(data)
 }
 
 func (f *fakeGitHub) set(tag string, status int) {

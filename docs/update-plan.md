@@ -1,6 +1,6 @@
 # Automatic release and self-update: plan
 
-Status: Steps 1 and 2 built (step 2: the update check, setting, notice and Update page; no install yet). Later steps not built. Decisions are from the owner, 2026-11-10.
+Status: Steps 1 to 3 built (step 2: the update check, setting, notice and Update page; step 3: download, hash check, unpack, backup, swap and the Restarter hook; the real restart and the rollback are step 4). Later steps not built. Decisions are from the owner, 2026-11-10.
 
 ## Decisions
 

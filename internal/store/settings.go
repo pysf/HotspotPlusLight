@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"os"
 	"time"
 
 	"hotspotpluslight/internal/domain"
@@ -73,4 +75,26 @@ func (s *Store) SaveUpdateResult(ctx context.Context, u domain.UpdateState) erro
 	_, err := s.db.ExecContext(ctx, `UPDATE settings SET update_latest=?, update_url=?, update_checked_at=?, update_error=? WHERE id=1`,
 		u.Latest, u.URL, u.CheckedAt.Unix(), u.Error)
 	return err
+}
+
+// BackupTo writes a consistent copy of the database to path with VACUUM INTO. The copy holds member passwords,
+// so it is made private (0600) before it replaces any older file at path. VACUUM INTO refuses an existing file.
+func (s *Store) BackupTo(ctx context.Context, path string) error {
+	tmp := path + ".tmp"
+	if err := os.Remove(tmp); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `VACUUM INTO ?`, tmp); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Chmod(tmp, 0o600); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, path)
 }

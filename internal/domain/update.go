@@ -53,9 +53,10 @@ func IsNewerVersion(latest, current string) bool {
 
 // Release is the part of a GitHub release that the update check uses.
 type Release struct {
-	Tag    string
-	URL    string
-	Assets []string // file names
+	Tag        string
+	URL        string
+	Assets     []string          // file names
+	AssetLinks map[string]string // file name to download link, as the release gives it
 }
 
 // ParseLatestRelease reads the JSON of the GitHub "latest release" answer.
@@ -66,6 +67,7 @@ func ParseLatestRelease(data []byte) (Release, error) {
 		HTMLURL string `json:"html_url"`
 		Assets  []struct {
 			Name string `json:"name"`
+			URL  string `json:"browser_download_url"`
 		} `json:"assets"`
 	}
 	if err := json.Unmarshal(data, &in); err != nil {
@@ -79,8 +81,10 @@ func ParseLatestRelease(data []byte) (Release, error) {
 	if strings.HasPrefix(in.HTMLURL, "https://") { // a mirror must not put other schemes into the page
 		r.URL = in.HTMLURL
 	}
+	r.AssetLinks = map[string]string{}
 	for _, a := range in.Assets {
 		r.Assets = append(r.Assets, a.Name)
+		r.AssetLinks[a.Name] = a.URL
 	}
 	return r, nil
 }
@@ -125,4 +129,46 @@ type UpdateState struct {
 	URL       string    // release notes page
 	CheckedAt time.Time // zero before the first check
 	Error     string    // friendly text of the last failure, empty after a good check
+}
+
+// DownloadLinkOK reports whether a download link may be used. It must be https; plain http is allowed only
+// when allowHTTP is set, which is the case for a test or mirror API address.
+func DownloadLinkOK(link string, allowHTTP bool) bool {
+	return strings.HasPrefix(link, "https://") || (allowHTTP && strings.HasPrefix(link, "http://"))
+}
+
+// InstallFacts are the things that decide whether this program can update itself.
+type InstallFacts struct {
+	Dev         bool     // a development build
+	TestBinary  bool     // the program is a Go test binary
+	AssetsKnown bool     // the file list of the latest release is known
+	Assets      []string // file names of the latest release
+	GOOS        string
+	GOARCH      string
+	Writable    bool // the folder of the program file accepts new files
+}
+
+// InstallBlocker returns the reason an update cannot be installed, or "" when it can.
+// When the file list of the release is not known yet, the asset is not checked; the install checks it again.
+func InstallBlocker(f InstallFacts) string {
+	switch {
+	case f.Dev:
+		return "This is a development build. It cannot update itself."
+	case f.TestBinary:
+		return "This program is a test build. It cannot update itself."
+	}
+	if f.AssetsKnown {
+		want := AssetName(f.GOOS, f.GOARCH)
+		found := false
+		for _, a := range f.Assets {
+			found = found || a == want
+		}
+		if !found {
+			return "cannot update: this release has no file for " + f.GOOS + "/" + f.GOARCH + ". Update by hand."
+		}
+	}
+	if !f.Writable {
+		return "cannot update: the program file is not writable. Update by hand."
+	}
+	return ""
 }

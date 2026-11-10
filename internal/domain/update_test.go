@@ -70,3 +70,54 @@ func TestParseLatestReleaseLinkMustBeHTTPS(t *testing.T) {
 		}
 	}
 }
+
+func TestParseLatestReleaseKeepsLinks(t *testing.T) {
+	r, err := ParseLatestRelease([]byte(`{"tag_name":"v1.2.3","assets":[{"name":"a.zip","browser_download_url":"https://x/a.zip"},{"name":"SHA256SUMS","browser_download_url":"https://x/s"}]}`))
+	if err != nil || r.AssetLinks["a.zip"] != "https://x/a.zip" || r.AssetLinks["SHA256SUMS"] != "https://x/s" {
+		t.Fatalf("got %+v, %v", r, err)
+	}
+}
+
+func TestDownloadLinkOK(t *testing.T) {
+	cases := []struct {
+		link      string
+		allowHTTP bool
+		want      bool
+	}{
+		{"https://github.com/x", false, true},
+		{"http://github.com/x", false, false},
+		{"http://127.0.0.1:1/x", true, true},
+		{"ftp://x/y", true, false},
+		{"", true, false},
+	}
+	for _, c := range cases {
+		if got := DownloadLinkOK(c.link, c.allowHTTP); got != c.want {
+			t.Errorf("DownloadLinkOK(%q, %v) = %v", c.link, c.allowHTTP, got)
+		}
+	}
+}
+
+func TestInstallBlocker(t *testing.T) {
+	ok := InstallFacts{AssetsKnown: true, Assets: []string{"SHA256SUMS", "hotspotpluslight-linux-amd64.tar.gz"}, GOOS: "linux", GOARCH: "amd64", Writable: true}
+	if r := InstallBlocker(ok); r != "" {
+		t.Errorf("good facts: %q", r)
+	}
+	unknown := ok
+	unknown.AssetsKnown, unknown.Assets = false, nil
+	if r := InstallBlocker(unknown); r != "" {
+		t.Errorf("unknown asset list must not block: %q", r)
+	}
+	dev, test, noAsset, ro := ok, ok, ok, ok
+	dev.Dev = true
+	test.TestBinary = true
+	noAsset.GOARCH = "riscv64"
+	ro.Writable = false
+	for name, f := range map[string]InstallFacts{"dev": dev, "test": test, "asset": noAsset, "writable": ro} {
+		if InstallBlocker(f) == "" {
+			t.Errorf("%s: want a reason", name)
+		}
+	}
+	if r := InstallBlocker(ro); r != "cannot update: the program file is not writable. Update by hand." {
+		t.Errorf("writable text %q", r)
+	}
+}

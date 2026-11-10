@@ -1,4 +1,4 @@
-// Package update checks GitHub for a newer release. It only looks; it never downloads or installs.
+// Package update checks GitHub for a newer release (Checker) and installs it (Installer).
 package update
 
 import (
@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"hotspotpluslight/internal/clock"
@@ -55,6 +56,9 @@ type Checker struct {
 	apiURL     string
 	client     *http.Client
 	firstDelay time.Duration
+
+	mu     sync.Mutex
+	assets []string // file names of the release of the last good check; nil before one
 }
 
 // Option changes a Checker.
@@ -110,12 +114,26 @@ func (c *Checker) Check(ctx context.Context) (Status, error) {
 		u.Error = friendly(err)
 	} else {
 		u.Latest, u.URL = rel.Tag, rel.URL
+		c.mu.Lock()
+		c.assets = append([]string{}, rel.Assets...)
+		c.mu.Unlock()
 	}
 	if err := c.repo.SaveUpdateResult(ctx, u); err != nil {
 		return st, err
 	}
 	return c.Status(ctx)
 }
+
+// Assets returns the file names of the release of the last good check since the start.
+// The second value is false before such a check, because the names are not stored in the database.
+func (c *Checker) Assets() ([]string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.assets, c.assets != nil
+}
+
+// allowHTTP is true when the API address is not GitHub's, so a test or mirror may serve plain http.
+func (c *Checker) allowHTTP() bool { return c.apiURL != DefaultAPIURL }
 
 // errStatus is a non-200 answer from the server.
 type errStatus int

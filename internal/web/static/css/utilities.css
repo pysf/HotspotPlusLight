@@ -12,7 +12,7 @@
     border: 0;
   }
   .u-nums { font-variant-numeric: tabular-nums; }
-  .u-muted { color: var(--c-text-3); }
+  .u-contents { display: contents; }  .u-muted { color: var(--c-text-3); }
   .u-soft { color: var(--c-text-2); }
   .u-strong { font-weight: var(--fw-semibold); }
   .u-mono { font-family: var(--font-mono); }

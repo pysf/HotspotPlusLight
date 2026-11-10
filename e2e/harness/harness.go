@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -25,7 +26,17 @@ import (
 	"hotspotpluslight/internal/app"
 	"hotspotpluslight/internal/clock"
 	"hotspotpluslight/internal/session"
+	"hotspotpluslight/internal/update"
 )
+
+// FakeRestarter counts the restarts an update asks for.
+type FakeRestarter struct{ n atomic.Int32 }
+
+// Restart records the call.
+func (f *FakeRestarter) Restart() error { f.n.Add(1); return nil }
+
+// Calls returns how many restarts were asked for.
+func (f *FakeRestarter) Calls() int { return int(f.n.Load()) }
 
 // Options configures one start. The zero value means a fresh temp dir and a fresh key.
 type Options struct {
@@ -44,6 +55,10 @@ type Options struct {
 	Version string
 	// UpdateFirstDelay is the wait before the first background update check (0 = the 30 s default).
 	UpdateFirstDelay time.Duration
+	// ExePath is the program file an update replaces ("" = the test binary, which cannot update itself).
+	ExePath string
+	// Restarter is called after an update swapped the files (nil = a FakeRestarter that only counts).
+	Restarter update.Restarter
 	// Logger receives the server log (default: discarded).
 	Logger *slog.Logger
 }
@@ -117,6 +132,10 @@ func TryStart(opts Options) (*Server, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
+	restarter := opts.Restarter
+	if restarter == nil {
+		restarter = &FakeRestarter{} // never the real one: it would end the test process
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	a, err := app.New(ctx, app.Options{
 		Getenv:       func(k string) string { return env[k] },
@@ -127,6 +146,8 @@ func TryStart(opts Options) (*Server, error) {
 		Disconnector: opts.Disconnector,
 
 		Version:          opts.Version,
+		ExePath:          opts.ExePath,
+		Restarter:        restarter,
 		UpdateFirstDelay: opts.UpdateFirstDelay,
 
 		AccountingBeforeCommit: opts.AccountingBeforeCommit,
