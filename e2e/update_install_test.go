@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -84,6 +85,12 @@ type installEnv struct {
 
 func newInstallEnv(t *testing.T, version string) *installEnv {
 	t.Helper()
+	return newInstallEnvWith(t, version, harness.Options{})
+}
+
+// newInstallEnvWith is newInstallEnv with extra server options (Restarter, RunCheck).
+func newInstallEnvWith(t *testing.T, version string, o harness.Options) *installEnv {
+	t.Helper()
 	exe := filepath.Join(t.TempDir(), "hsp-prog")
 	if runtime.GOOS == "windows" {
 		exe += ".exe"
@@ -94,7 +101,11 @@ func newInstallEnv(t *testing.T, version string) *installEnv {
 	f := newFakeGitHub(t, "v1.2.0")
 	f.publish(t, "NEW-BINARY")
 	rest := &harness.FakeRestarter{}
-	s := harness.Start(t, harness.Options{Version: version, ExePath: exe, Restarter: rest, Env: map[string]string{"UPDATE_API_URL": f.URL}})
+	o.Version, o.ExePath, o.Env = version, exe, map[string]string{"UPDATE_API_URL": f.URL}
+	if o.Restarter == nil {
+		o.Restarter = rest
+	}
+	s := harness.Start(t, o)
 	c := harness.LoginAsAdmin(t, s)
 	return &installEnv{s: s, c: c, f: f, rest: rest, exe: exe}
 }
@@ -149,7 +160,7 @@ func TestE22_09_GoodUpdate(t *testing.T) {
 		t.Fatal("Update now button or its target is missing")
 	}
 	confirm := btn.AttrOr("hx-confirm", "")
-	for _, want := range []string{"v1.2.0", "https://example.test/releases/v1.2.0", "The admin panel is down for a moment. Online members stay connected. If the new version does not start, the old version and your data are restored."} {
+	for _, want := range []string{"v1.2.0", "https://example.test/releases/v1.2.0", "The admin panel is down for a moment. Online members stay connected. If the new version does not start, the old version and your data are restored. Changes made after the update started are lost then."} {
 		if !strings.Contains(confirm, want) {
 			t.Errorf("confirm text lacks %q: %q", want, confirm)
 		}
@@ -365,7 +376,8 @@ func TestE22_16_ProgressFragment(t *testing.T) {
 	close(gate)
 	e.waitState(t, "done")
 	done := e.progress(t).Body
-	if strings.Contains(done, "hx-trigger") || !strings.Contains(done, "v1.2.0 is installed") {
+	// After the swap the block keeps polling, because the program restarts (E22.19).
+	if !strings.Contains(done, "hx-trigger") || !strings.Contains(done, "v1.2.0 is installed") || !strings.Contains(done, "data-quiet-poll") {
 		t.Errorf("done block: %q", done)
 	}
 }
@@ -388,5 +400,174 @@ func TestE22_17_RechecksRelease(t *testing.T) {
 	waitFor(t, "second failure", func() bool { return strings.Contains(e.progress(t).Body, "GitHub answered with an error") })
 	if strings.Contains(e.progress(t).Body, "500 Internal") {
 		t.Error("raw error shown")
+	}
+}
+
+// E22.18 a rolled back update: every admin page shows the note until it is dismissed; dismiss needs CSRF and the login.
+func TestE22_18_RollbackNoticeAndDismiss(t *testing.T) {
+	e := newInstallEnv(t, "v1.0.0")
+	marker := filepath.Join(e.s.DataDir, "update-rolled-back.json")
+	if e.c.GetPage("/admin/update").Doc(t).Find("[data-rollback-notice]").Length() != 0 {
+		t.Fatal("no note without a rollback")
+	}
+	m := domain.RollbackMarker{From: "v1.0.0", To: "v1.1.0", Reason: "the new version did not start", At: 1700000000}
+	b, _ := m.Marshal()
+	if err := os.WriteFile(marker, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/admin/update", "/admin/members", "/admin/settings"} {
+		n := e.c.GetPage(path).Doc(t).Find("[data-rollback-notice]")
+		txt := n.Text()
+		if n.Length() != 1 || !strings.Contains(txt, "The last update to v1.1.0 failed and was rolled back (the new version did not start).") || !strings.Contains(txt, "Data that changed after the backup") {
+			t.Errorf("%s: notice %q", path, txt)
+		}
+		if n.Find(`button[hx-post="/admin/update/dismiss"]`).Length() != 1 {
+			t.Errorf("%s: no dismiss button", path)
+		}
+	}
+	if r := e.c.Do("POST", "/admin/update/dismiss", nil, ""); r.StatusCode != 403 || !exists(marker) {
+		t.Errorf("no CSRF: %d", r.StatusCode)
+	}
+	anon := harness.NewAdminClient(t, e.s)
+	if r := anon.Do("POST", "/admin/update/dismiss", nil, ""); r.StatusCode == 200 || r.StatusCode == 204 || !exists(marker) {
+		t.Errorf("anonymous: %d", r.StatusCode)
+	}
+	r := e.c.Send("POST", "/admin/update/dismiss", nil)
+	if r.StatusCode != 204 || r.Header.Get("HX-Refresh") != "true" || exists(marker) {
+		t.Errorf("dismiss: %d %q", r.StatusCode, r.Header.Get("HX-Refresh"))
+	}
+	if e.c.GetPage("/admin/update").Doc(t).Find("[data-rollback-notice]").Length() != 0 {
+		t.Error("note must be gone")
+	}
+	if r := e.c.Send("POST", "/admin/update/dismiss", nil); r.StatusCode != 204 {
+		t.Errorf("second dismiss: %d", r.StatusCode)
+	}
+}
+
+// E22.19 after the swap the progress block keeps polling and sends the state it saw. An idle answer to such a
+// poll comes from a new process, so it carries HX-Refresh. A poll without that header never refreshes.
+func TestE22_19_ProgressSurvivesRestart(t *testing.T) {
+	e := newInstallEnv(t, "v1.0.0")
+	e.check(t)
+	e.install()
+	e.waitState(t, "done")
+	el := e.progress(t).Doc(t).Find("#update-progress")
+	if el.AttrOr("hx-trigger", "") != "every 2s" || el.AttrOr("hx-headers", "") != `{"X-Update-Was": "done"}` || el.AttrOr("data-quiet-poll", "x") == "x" {
+		t.Errorf("done block attributes: %v", el.Nodes[0].Attr)
+	}
+	if e.progress(t).Header.Get("HX-Refresh") != "" {
+		t.Error("the old process must not refresh the page")
+	}
+	// A new process starts idle.
+	s2 := harness.Start(t, harness.Options{DataDir: e.s.DataDir, SecretKey: e.s.SecretKey, Version: "v1.2.0"})
+	c2 := harness.LoginAsAdmin(t, s2)
+	req := func(was string) harness.Resp {
+		return c2.DoHXHeader("GET", "/admin/update/progress", "update-progress", map[string]string{"X-Update-Was": was})
+	}
+	for _, was := range []string{"restarting", "done"} {
+		if r := req(was); r.StatusCode != 200 || r.Header.Get("HX-Refresh") != "true" {
+			t.Errorf("was %s: %d %q", was, r.StatusCode, r.Header.Get("HX-Refresh"))
+		}
+	}
+	for _, was := range []string{"", "downloading", "failed"} {
+		if r := req(was); r.Header.Get("HX-Refresh") != "" {
+			t.Errorf("was %q must not refresh", was)
+		}
+	}
+}
+
+// E22.20 the installer writes the state file before the swap with all fields, mode 0600; a failed install leaves none.
+func TestE22_20_PendingFileWritten(t *testing.T) {
+	e := newInstallEnv(t, "v1.0.0")
+	e.check(t)
+	e.install()
+	e.waitState(t, "done")
+	path := filepath.Join(e.s.DataDir, "update-pending.json")
+	p, err := domain.ParsePendingUpdate([]byte(readFile(t, path)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.FromVersion != "v1.0.0" || p.ToVersion != "v1.2.0" || p.Exe != e.exe || p.OldExe != e.exe+".old" ||
+		p.BackupDB != filepath.Join(e.s.DataDir, "hsp.db.bak-v1.0.0") || p.Tries != 0 || p.StartedAt == 0 {
+		t.Errorf("pending = %+v", p)
+	}
+	if st, _ := os.Stat(path); runtime.GOOS != "windows" && st.Mode().Perm() != 0o600 {
+		t.Errorf("mode = %v", st.Mode())
+	}
+
+	bad := newInstallEnv(t, "v1.0.0")
+	bad.f.setFile("SHA256SUMS", strings.Repeat("0", 64)+"  "+domain.AssetName(runtime.GOOS, runtime.GOARCH)+"\n")
+	bad.check(t)
+	bad.install()
+	bad.waitState(t, "failed")
+	if exists(filepath.Join(bad.s.DataDir, "update-pending.json")) {
+		t.Error("a failed install must leave no state file")
+	}
+}
+
+// failingRestarter fails like a restarter whose new program file does not run.
+type failingRestarter struct{}
+
+func (failingRestarter) Restart() error { return errors.New("cannot start") }
+
+// E22.22 a new program file that does not run is found before the swap: nothing is changed, no backup, no state file.
+func TestE22_22_NewFileThatDoesNotRunIsRefused(t *testing.T) {
+	e := newInstallEnvWith(t, "v1.0.0", harness.Options{RunCheck: func(string) error { return errors.New("exec format error") }})
+	e.check(t)
+	e.install()
+	e.waitState(t, "failed")
+	body := e.progress(t).Body
+	if !strings.Contains(body, "does not run on this computer. Nothing was changed.") {
+		t.Errorf("failed block: %q", body)
+	}
+	if readFile(t, e.exe) != oldBinary {
+		t.Error("program file changed")
+	}
+	for _, p := range []string{e.exe + ".new", e.exe + ".old", filepath.Join(e.s.DataDir, "hsp.db.bak-v1.0.0"), filepath.Join(e.s.DataDir, "update-pending.json")} {
+		if exists(p) {
+			t.Errorf("%s must not exist", p)
+		}
+	}
+	if e.rest.Calls() != 0 {
+		t.Error("restart must not happen")
+	}
+}
+
+// E22.23 if the restart fails after the swap, the swap is undone: the old program file is back, the state file is gone,
+// and the admin can try again.
+func TestE22_23_FailedRestartUndoesTheSwap(t *testing.T) {
+	e := newInstallEnvWith(t, "v1.0.0", harness.Options{Restarter: failingRestarter{}})
+	e.check(t)
+	e.install()
+	e.waitState(t, "failed")
+	if body := e.progress(t).Body; !strings.Contains(body, "could not restart itself") || !strings.Contains(body, "The old version was put back.") {
+		t.Errorf("failed block: %q", body)
+	}
+	if got := readFile(t, e.exe); got != oldBinary {
+		t.Errorf("program file = %q, want the old one", got)
+	}
+	for _, p := range []string{e.exe + ".old", e.exe + ".new", filepath.Join(e.s.DataDir, "update-pending.json")} {
+		if exists(p) {
+			t.Errorf("%s must not exist", p)
+		}
+	}
+	if e.buttons(t) != 1 {
+		t.Error("the admin can try again")
+	}
+}
+
+// E22.24 no install while the state file of an earlier update exists.
+func TestE22_24_NoInstallWhileUpdatePending(t *testing.T) {
+	e := newInstallEnv(t, "v1.0.0")
+	e.check(t)
+	if err := os.WriteFile(filepath.Join(e.s.DataDir, "update-pending.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := e.install()
+	if r.StatusCode != 422 || !strings.Contains(r.Body, "not finished yet") {
+		t.Errorf("install: %d %q", r.StatusCode, r.Body)
+	}
+	if e.f.dlHits.Load() != 0 || readFile(t, e.exe) != oldBinary {
+		t.Error("nothing may happen")
 	}
 }

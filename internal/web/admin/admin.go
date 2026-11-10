@@ -108,8 +108,12 @@ type Deps struct {
 	Settings  SettingsService
 	Update    UpdateService
 	Installer UpdateInstaller
-	Router    RouterPack
-	Link      LinkStatus
+	// RolledBack gives the note left by a rollback of a failed update (nil = never show it).
+	RolledBack func() (domain.RollbackMarker, bool)
+	// DismissRolledBack deletes that note.
+	DismissRolledBack func() error
+	Router            RouterPack
+	Link              LinkStatus
 	// RadiusPorts gives the RADIUS UDP ports for the router setup script, read when the page is rendered.
 	RadiusPorts func() (authPort, acctPort int)
 	// RunningServer gives the server settings the running process started with (nil = never show the restart notice).
@@ -213,6 +217,7 @@ func Handler(d Deps) http.Handler {
 				r.Post("/update/check", h.updateCheck)
 				r.Post("/update/install", h.updateInstall)
 				r.Get("/update/progress", h.updateProgress)
+				r.Post("/update/dismiss", h.updateDismiss)
 				r.Get("/dev/components", h.devComponents)
 			})
 		})
@@ -276,6 +281,11 @@ func (h handlers) shellStatus(r *http.Request, env *ui.Env) {
 			slog.Warn("admin: read the update status", "err", err)
 		} else if st.Available {
 			env.UpdateVersion = st.Latest
+		}
+	}
+	if h.RolledBack != nil {
+		if m, ok := h.RolledBack(); ok {
+			env.RolledBack = m.Message()
 		}
 	}
 	if h.Link != nil {

@@ -40,6 +40,8 @@ type Env struct {
 	RouterUp bool
 	// UpdateVersion is the newer release to announce in the page frame. Empty hides the notice.
 	UpdateVersion string
+	// RolledBack is the message about a failed update that was rolled back. Empty hides the notice.
+	RolledBack string
 }
 
 // TabTitle returns the browser tab title: the page title, then the business name when set, then the product name.

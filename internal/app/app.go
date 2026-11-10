@@ -60,8 +60,16 @@ type Options struct {
 	UpdateFirstDelay time.Duration
 	// ExePath is the program file an update replaces (default: the running executable, symlinks resolved).
 	ExePath string
-	// Restarter restarts the program after an update swapped the files (default: shut down and exit).
+	// Restarter restarts the program after an update swapped the files (default: shut down, then exit or start the new file).
 	Restarter update.Restarter
+	// Service is true when a Windows service runs the program. It decides how an update restarts the program.
+	Service bool
+	// CheckRunnable checks that a new program file runs before an update swaps it in (default: run it with "version").
+	CheckRunnable func(exe string) error
+	// HealthTimeout is how long the first start after an update has to become healthy (default 60 s).
+	HealthTimeout time.Duration
+	// HealthProbe checks that the admin listener at adminAddr answers (default: GET /healthz).
+	HealthProbe func(ctx context.Context, adminAddr string) error
 	// Ready, if set, is called by Run once all listeners are bound. The Windows service reports Running then.
 	Ready func()
 }
@@ -103,6 +111,27 @@ type App struct {
 	pruneDone          chan struct{}
 	updateCancel       context.CancelFunc
 	updateDone         chan struct{}
+
+	exe     string
+	mode    update.RestartMode
+	stopReq chan stopRequest // Run reads it: an update restart or a rollback ends the run
+	// watchDone is closed when the health watcher of the first start after an update has ended. Nil when there is none.
+	watchDone chan struct{}
+	now       func() time.Time
+}
+
+// stopRequest asks Run to stop for a restart. A non-nil rollback also puts the old version back first.
+type stopRequest struct {
+	rollback *domain.PendingUpdate
+	reason   string
+}
+
+// requestStop asks Run to stop. A second request while one is waiting is dropped.
+func (a *App) requestStop(r stopRequest) {
+	select {
+	case a.stopReq <- r:
+	default:
+	}
 }
 
 // New loads config, opens and migrates the database, verifies the key, seeds
@@ -141,7 +170,8 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	a := &App{cfg: cfg, log: log, store: st}
+	a := &App{cfg: cfg, log: log, store: st, stopReq: make(chan stopRequest, 1), now: opts.Clock.Now,
+		mode: update.ChooseRestartMode(opts.Service, opts.Getenv("INVOCATION_ID"))}
 	fail := func(err error) (*App, error) { st.Close(); return nil, err }
 
 	migs := opts.Migrations
@@ -220,11 +250,15 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if exe == "" {
 		exe = runningExecutable(log)
 	}
+	a.exe = exe
 	restarter := opts.Restarter
 	if restarter == nil {
-		restarter = exitRestarter{a: a, log: log}
+		restarter = processRestarter{a: a}
 	}
 	a.svc.installer = update.NewInstaller(a.svc.update, st, restarter, exe, cfg.DataDir)
+	if opts.CheckRunnable != nil {
+		a.svc.installer.SetRunCheck(opts.CheckRunnable)
+	}
 	a.radius = radius.New(st, a.svc.evaluator, a.svc.session, link, log, radius.WithFailureRecorder(a.svc.dashboard), radius.WithClock(opts.Clock))
 	pack, err := routerpack.New()
 	if err != nil {
@@ -234,7 +268,7 @@ func New(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return fail(err)
 	}
-	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Dashboard: a.svc.dashboard, Settings: a.svc.settings, Update: a.svc.update, Installer: a.svc.installer, Router: pack, Link: link, RadiusPorts: a.radiusPorts, RunningServer: a.runningServer, Assets: assets, Clock: opts.Clock, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
+	a.adminSrv = &http.Server{Handler: admin.Handler(admin.Deps{Auth: a.svc.auth, Plans: a.svc.plan, Members: a.svc.member, Batches: a.svc.voucher, Sessions: a.svc.session, Usage: a.svc.usage, Dashboard: a.svc.dashboard, Settings: a.svc.settings, Update: a.svc.update, Installer: a.svc.installer, RolledBack: a.rolledBack, DismissRolledBack: a.dismissRolledBack, Router: pack, Link: link, RadiusPorts: a.radiusPorts, RunningServer: a.runningServer, Assets: assets, Clock: opts.Clock, Dev: cfg.Dev, Log: log}), ReadHeaderTimeout: 10 * time.Second}
 	return a, nil
 }
 
@@ -514,9 +548,41 @@ func SetAdminPassword(ctx context.Context, opts Options, password string) error 
 	return err
 }
 
-// Run is the `serve` subcommand. It starts the app, waits until ctx ends, then
-// shuts down gracefully (10 s at most).
+// restartDelay is the wait before an update restart, so the browser gets the last progress answer.
+const restartDelay = 1500 * time.Millisecond
+
+// rolledBack returns the note left by a rollback of a failed update.
+func (a *App) rolledBack() (domain.RollbackMarker, bool) {
+	return update.ReadRollbackMarker(a.cfg.DataDir)
+}
+
+// dismissRolledBack deletes that note.
+func (a *App) dismissRolledBack() error { return update.DismissRollbackMarker(a.cfg.DataDir) }
+
+// Run is the `serve` subcommand. It first looks for an update that did not finish (see update.Recover),
+// then starts the app and waits until ctx ends, then shuts down gracefully (10 s at most).
+// It returns update.ErrRestart when a service manager must start the program again.
 func Run(ctx context.Context, opts Options) error {
+	if opts.Getenv == nil {
+		opts.Getenv = os.Getenv
+	}
+	if opts.Clock == nil {
+		opts.Clock = clock.Real{}
+	}
+	dataDir := config.DataDir(opts.Getenv)
+	version := cmp.Or(opts.Version, "dev")
+	boot := opts.Logger
+	if boot == nil {
+		boot = slog.New(slog.NewTextHandler(cmp.Or[io.Writer](opts.LogWriter, os.Stderr), nil))
+	}
+	rec, err := update.Recover(dataDir, version, opts.Clock.Now(), boot)
+	if err != nil {
+		return err
+	}
+	mode := update.ChooseRestartMode(opts.Service, opts.Getenv("INVOCATION_ID"))
+	if rec.Outcome == update.OutcomeRolledBack {
+		return restartProcess(mode, rec.Pending.Exe, boot)
+	}
 	a, err := New(ctx, opts)
 	if err != nil {
 		return err
@@ -528,10 +594,94 @@ func Run(ctx context.Context, opts Options) error {
 	if opts.Ready != nil {
 		opts.Ready()
 	}
-	<-ctx.Done()
+	watchCtx, stopWatching := context.WithCancel(ctx)
+	defer stopWatching()
+	if rec.Outcome == update.OutcomeProbation {
+		a.watchDone = a.watchHealth(watchCtx, rec.Pending, opts)
+	}
+	return a.serve(ctx, stopWatching)
+}
+
+// serve waits until ctx ends or a restart is requested, then shuts down. For a restart it also puts the old
+// version back when asked, and starts the program again (see restartProcess). stopWatching ends the health watcher.
+func (a *App) serve(ctx context.Context, stopWatching func()) error {
+	var req *stopRequest
+	select {
+	case <-ctx.Done():
+	case r := <-a.stopReq:
+		req = &r
+	}
+	stopWatching()
+	if a.watchDone != nil {
+		<-a.watchDone // so the state file is not changed from two places
+	}
 	sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return a.Shutdown(sctx)
+	err := a.Shutdown(sctx)
+	if req == nil {
+		// A clean stop during the health window is on purpose, so it is not a failed start of the new version.
+		if a.watchDone != nil {
+			if uerr := update.UndoTry(a.cfg.DataDir); uerr != nil {
+				a.log.Warn("update: cannot take back the start count", "err", uerr)
+			}
+		}
+		return err
+	}
+	if err != nil {
+		a.log.Warn("shutdown before restart", "err", err)
+	}
+	exe := a.exe
+	if req.rollback != nil {
+		// If the rollback cannot be done, the program starts again as it is. The note tells the admin.
+		update.RollbackOrGiveUp(a.cfg.DataDir, *req.rollback, req.reason, a.now(), a.log)
+		exe = req.rollback.Exe
+	}
+	return restartProcess(a.mode, exe, a.log)
+}
+
+// watchHealth waits in the background until the admin listener answers. Then the update is finished and the
+// state file is deleted. If it does not answer in time, the run is stopped and the old version is put back.
+// The returned channel is closed when the watcher has ended.
+func (a *App) watchHealth(ctx context.Context, p domain.PendingUpdate, opts Options) chan struct{} {
+	timeout := cmp.Or(opts.HealthTimeout, update.HealthTimeout)
+	probe := opts.HealthProbe
+	if probe == nil {
+		probe = func(ctx context.Context, addr string) error { return update.ProbeHealth(ctx, update.HealthURL(addr)) }
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		addr := a.Addrs().Admin
+		err := update.WaitHealthy(ctx, func(c context.Context) error { return probe(c, addr) }, timeout, 500*time.Millisecond)
+		switch {
+		case err == nil:
+			// A state file that stays would roll back a healthy version later, so deleting it is tried again.
+			if update.ClearPendingRetry(a.cfg.DataDir, a.log, 3, 200*time.Millisecond) == nil {
+				a.log.Info("update finished", "from", p.FromVersion, "to", p.ToVersion)
+			}
+		case ctx.Err() != nil:
+			// The program is stopping; serve decides what happens to the state file.
+		default:
+			a.log.Error("update: the new version is not healthy", "err", err)
+			a.requestStop(stopRequest{rollback: &p, reason: fmt.Sprintf("the new version was not healthy within %d seconds", int(timeout.Seconds()))})
+		}
+	}()
+	return done
+}
+
+// restartProcess starts the program file exe again. Under a service manager it returns update.ErrRestart,
+// so the command exits with a non-zero code and the manager starts the file. By hand it starts exe as
+// a detached child with the same arguments and environment. The listeners must be closed before.
+func restartProcess(mode update.RestartMode, exe string, log *slog.Logger) error {
+	if mode == update.RestartByManager {
+		log.Info("exiting so that the service manager starts the program again")
+		return update.ErrRestart
+	}
+	log.Info("starting the program again", "exe", exe)
+	if err := update.StartDetached(exe, os.Args[1:], os.Environ()); err != nil {
+		return fmt.Errorf("could not start %s again; start it by hand: %w", exe, err)
+	}
+	return nil
 }
 
 // EnforcementIdle reports whether no automatic-disconnect check is queued or running. Tests wait for it.
@@ -550,21 +700,17 @@ func runningExecutable(log *slog.Logger) string {
 	return exe
 }
 
-// exitRestarter is the default Restarter. It stops the app cleanly and ends the process.
-// Whatever runs the program (a service manager, or the admin by hand) starts the new file.
-type exitRestarter struct {
-	a   *App
-	log *slog.Logger
-}
+// processRestarter is the default Restarter. It checks that the new file runs, waits a moment, and asks Run
+// to stop. Run then shuts down and restarts the program (see restartProcess).
+type processRestarter struct{ a *App }
 
-// Restart does not return when it works.
-func (r exitRestarter) Restart() error {
-	r.log.Info("restarting to run the new version")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := r.a.Shutdown(ctx); err != nil {
-		r.log.Warn("shutdown before restart", "err", err)
+// Restart returns an error, and leaves the program running, when the new file does not run.
+func (r processRestarter) Restart() error {
+	if err := update.CheckRunnable(r.a.exe); err != nil {
+		return err
 	}
-	os.Exit(0)
+	r.a.log.Info("restarting to run the new version")
+	time.Sleep(restartDelay)
+	r.a.requestStop(stopRequest{})
 	return nil
 }

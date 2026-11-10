@@ -20,6 +20,7 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 
 	"hotspotpluslight/internal/app"
+	"hotspotpluslight/internal/update"
 )
 
 // serviceName is the Windows service name; defaultDir is the default folder for
@@ -48,7 +49,7 @@ func runAsService(envFile string, getenv func(string) string) error {
 		return err
 	}
 	defer logFile.Close()
-	h := &handler{opts: app.Options{Stdout: logFile, LogWriter: logFile, Getenv: getenv, Version: version}}
+	h := &handler{opts: app.Options{Stdout: logFile, LogWriter: logFile, Getenv: getenv, Version: version, Service: true}}
 	return svc.Run(serviceName, h)
 }
 
@@ -81,6 +82,9 @@ func (h *handler) Execute(_ []string, req <-chan svc.ChangeRequest, status chan<
 			// The app ended by itself (for example a bad config): report failure so Windows restarts it.
 			if err == nil && readyCh != nil {
 				err = errors.New("the app stopped before it was ready")
+			}
+			if errors.Is(err, update.ErrRestart) { // an update restart: a non-zero exit makes the recovery action start the service again
+				return true, update.RestartExitCode
 			}
 			if err != nil {
 				fmt.Fprintln(h.opts.Stdout, "error:", err)

@@ -195,6 +195,7 @@ templ Layout(d LayoutData) {
 							}
 						</header>
 						<main class="l-page">
+							@RollbackNotice(env.RolledBack)
 							@UpdateNoticeSlot(env.UpdateVersion, false)
 							<div id="flash" aria-live="polite"></div>
 							{ children... }
@@ -671,6 +672,20 @@ templ UpdateNotice(version string) {
 			<a href="/admin/update">See details</a>
 		</div>
 	</div>
+}
+
+// RollbackNotice tells the admin that the last update failed and was rolled back, until it is dismissed.
+templ RollbackNotice(msg string) {
+	if msg != "" {
+		<div id="rollback-notice" class="c-notice" data-kind="warn" data-rollback-notice role="alert">
+			@Icon("alert")
+			<div>
+				{ msg }
+				<a href="/admin/update">Updates</a>
+				@Button("secondary", "Dismiss", templ.Attributes{"type": "button", "hx-post": "/admin/update/dismiss", "hx-swap": "none"})
+			</div>
+		</div>
+	}
 }
 
 // NoticeTitled is a Flash with a bold title line above the text.

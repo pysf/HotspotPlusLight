@@ -1,5 +1,6 @@
 // Command hotspotpluslight runs HotspotPlus Lite. Its commands are serve, admin
 // set-password, gen-key, service (Windows only) and version.
+// The exit code is 0 on success, 1 on a failure, 2 on a usage error and 75 when a service manager must start the program again.
 package main
 
 import (
@@ -18,6 +19,7 @@ import (
 	"golang.org/x/term"
 
 	"hotspotpluslight/internal/app"
+	"hotspotpluslight/internal/update"
 )
 
 // version is set at build time with -ldflags "-X main.version=1.2.3".
@@ -61,6 +63,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	default:
 		fmt.Fprintln(stderr, "usage: hotspotpluslight [--env-file <path>] serve | admin set-password | gen-key | service install|uninstall|start|stop | version")
 		return 2
+	}
+	if errors.Is(err, update.ErrRestart) {
+		return update.RestartExitCode // a service manager (systemd, Windows) starts the program again
 	}
 	if err != nil {
 		fmt.Fprintln(stderr, "error:", err)

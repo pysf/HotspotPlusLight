@@ -65,9 +65,17 @@ func (h handlers) updateCheck(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, http.StatusOK, updateCheckAnswer(p))
 }
 
-// updateProgress answers the polled progress block.
+// updateWasHeader is sent by the progress block while the program restarts. Its value is the state the page last saw.
+const updateWasHeader = "X-Update-Was"
+
+// updateProgress answers the polled progress block. A page that saw the restart (or the end of the install)
+// gets an idle answer only from a new process, so the page reloads itself to show the new version or the rollback note.
 func (h handlers) updateProgress(w http.ResponseWriter, r *http.Request) {
-	h.render(w, r, http.StatusOK, UpdateProgressView(h.Installer.Progress()))
+	p := h.Installer.Progress()
+	if was := update.State(r.Header.Get(updateWasHeader)); p.State == update.StateIdle && (was == update.StateRestarting || was == update.StateDone) {
+		w.Header().Set("HX-Refresh", "true")
+	}
+	h.render(w, r, http.StatusOK, UpdateProgressView(p))
 }
 
 // updateInstall starts the install as a background job and answers at once with the progress block.
@@ -94,4 +102,16 @@ func (h handlers) updateRefuse(w http.ResponseWriter, r *http.Request, status in
 	setTrigger(w, map[string]any{"toast": msg})
 	w.Header().Set("HX-Reswap", "none")
 	h.render(w, r, status, ui.Flash("warn", msg))
+}
+
+// updateDismiss deletes the note about a rolled back update and reloads the page.
+func (h handlers) updateDismiss(w http.ResponseWriter, r *http.Request) {
+	if h.DismissRolledBack != nil {
+		if err := h.DismissRolledBack(); err != nil {
+			h.serverError(w, r, err)
+			return
+		}
+	}
+	w.Header().Set("HX-Refresh", "true")
+	w.WriteHeader(http.StatusNoContent)
 }

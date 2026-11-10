@@ -1,6 +1,6 @@
 # Automatic release and self-update: plan
 
-Status: Steps 1 to 3 built (step 2: the update check, setting, notice and Update page; step 3: download, hash check, unpack, backup, swap and the Restarter hook; the real restart and the rollback are step 4). Later steps not built. Decisions are from the owner, 2026-11-10.
+Status: Steps 1 to 4 built and hardened after review (database first, program file last; no age rule; a clean stop is not a failed start; the new file is run before the swap; a failed restart undoes the swap) (step 2: the update check, setting, notice and Update page; step 3: download, hash check, unpack, backup, swap and the Restarter hook; step 4: restart by exit code 75 or a child process, the state file, the health check and the automatic rollback, see `PLAN.md` D31). Later steps not built. Decisions are from the owner, 2026-11-10.
 
 ## Decisions
 

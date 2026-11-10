@@ -115,6 +115,7 @@ type Installer struct {
 	goos      string
 	goarch    string
 	client    *http.Client
+	runCheck  func(exe string) error // checks that a program file runs; tests replace it
 
 	mu      sync.Mutex
 	prog    Progress
@@ -123,7 +124,7 @@ type Installer struct {
 
 // NewInstaller returns an Installer for the program file exe. Backups and downloads go to dataDir.
 func NewInstaller(ck *Checker, backup Backuper, restarter Restarter, exe, dataDir string) *Installer {
-	i := &Installer{ck: ck, backup: backup, restarter: restarter, log: ck.log, exe: exe, dataDir: dataDir, goos: runtime.GOOS, goarch: runtime.GOARCH}
+	i := &Installer{ck: ck, backup: backup, restarter: restarter, log: ck.log, exe: exe, dataDir: dataDir, goos: runtime.GOOS, goarch: runtime.GOARCH, runCheck: CheckRunnable}
 	i.client = &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 10 {
 			return errors.New("too many redirects")
@@ -135,6 +136,9 @@ func NewInstaller(ck *Checker, backup Backuper, restarter Restarter, exe, dataDi
 	}}
 	return i
 }
+
+// SetRunCheck replaces the check that the new program file runs. Tests use it, because their fake program files do not run.
+func (i *Installer) SetRunCheck(f func(exe string) error) { i.runCheck = f }
 
 // Progress returns the state of the install.
 func (i *Installer) Progress() Progress {
@@ -180,6 +184,10 @@ func (i *Installer) Start(ctx context.Context) error {
 	if i.prog.Running() || i.prog.State == StateDone || i.swapped {
 		i.mu.Unlock()
 		return ErrBusy
+	}
+	if _, err := os.Stat(filepath.Join(i.dataDir, PendingFile)); err == nil {
+		i.mu.Unlock()
+		return &RefusedError{"The last update is not finished yet. Wait until the program is healthy, then try again."}
 	}
 	i.prog = Progress{State: StateDownloading, Version: st.Latest}
 	i.mu.Unlock()
@@ -269,6 +277,10 @@ func (i *Installer) install(ctx context.Context, version *string) error {
 		os.Remove(newExe)
 		return fail("The download could not be unpacked. Nothing was changed.", err)
 	}
+	if err := i.runCheck(newExe); err != nil {
+		os.Remove(newExe)
+		return fail("The new program does not run on this computer. Nothing was changed.", err)
+	}
 
 	i.step(StateBackingUp, rel.Tag)
 	old := i.ck.version
@@ -281,7 +293,15 @@ func (i *Installer) install(ctx context.Context, version *string) error {
 	}
 
 	i.step(StateReplacing, rel.Tag)
+	// The state file comes before the swap: if the new program never gets healthy, the next start finds it and rolls back.
+	pending := domain.PendingUpdate{FromVersion: old, ToVersion: rel.Tag, StartedAt: time.Now().Unix(),
+		Exe: i.exe, OldExe: i.exe + ".old", BackupDB: filepath.Join(i.dataDir, "hsp.db.bak-"+old)}
+	if err := WritePending(i.dataDir, pending); err != nil {
+		os.Remove(newExe)
+		return fail("The update could not be prepared. Nothing was changed.", err)
+	}
 	if err := swap(i.exe); err != nil {
+		ClearPending(i.dataDir)
 		// If the old file could not be put back either, exe.new may be the only copy left. Keep it.
 		if _, statErr := os.Stat(i.exe); statErr == nil {
 			os.Remove(newExe)
@@ -294,7 +314,15 @@ func (i *Installer) install(ctx context.Context, version *string) error {
 	i.mu.Unlock()
 	i.step(StateRestarting, rel.Tag)
 	if err := i.restarter.Restart(); err != nil {
-		return fail("The new version is installed, but the program could not restart itself. Restart it by hand.", err)
+		ClearPending(i.dataDir)
+		if uerr := unswap(i.exe); uerr != nil {
+			return fail("The new version is installed, but the program could not restart itself. Restart it by hand.", errors.Join(err, uerr))
+		}
+		// The old program file is back, and this program still runs it: a new try is possible.
+		i.mu.Lock()
+		i.swapped = false
+		i.mu.Unlock()
+		return fail("The program could not restart itself with the new version. The old version was put back.", err)
 	}
 	i.set(Progress{State: StateDone, Version: rel.Tag})
 	return nil
@@ -378,5 +406,25 @@ func swap(exe string) error {
 		}
 		return err
 	}
+	return nil
+}
+
+// unswap undoes swap after the restart failed: the new program file goes to exe.new and exe.old is renamed back.
+// Windows allows renaming a running program, but not overwriting it, so exe.new is removed first. If the last rename fails the new file is put back.
+func unswap(exe string) error {
+	oldExe, newExe := exe+".old", exe+".new"
+	if err := os.Remove(newExe); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := os.Rename(exe, newExe); err != nil {
+		return err
+	}
+	if err := os.Rename(oldExe, exe); err != nil {
+		if rerr := os.Rename(newExe, exe); rerr != nil {
+			return errors.Join(err, rerr)
+		}
+		return err
+	}
+	os.Remove(newExe)
 	return nil
 }

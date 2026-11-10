@@ -47,4 +47,8 @@ document.body.addEventListener("htmx:responseError", (e) => {
   const redirecting = xhr && xhr.getResponseHeader("HX-Redirect"); // 401/403: the page is leaving
   if (!redirecting && !trigger.includes('"toast"')) { show("Something went wrong.", "error"); }
 });
-document.body.addEventListener("htmx:sendError", () => show("Cannot reach the server.", "error"));
+// A poll marked data-quiet-poll fails on purpose while the program restarts after an update: no toast.
+document.body.addEventListener("htmx:sendError", (e) => {
+  if (e.detail.elt && e.detail.elt.closest("[data-quiet-poll]")) { return; }
+  show("Cannot reach the server.", "error");
+});

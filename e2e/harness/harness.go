@@ -59,6 +59,8 @@ type Options struct {
 	ExePath string
 	// Restarter is called after an update swapped the files (nil = a FakeRestarter that only counts).
 	Restarter update.Restarter
+	// RunCheck checks that a new program file runs before the swap (nil = always fine, because test program files are fake).
+	RunCheck func(exe string) error
 	// Logger receives the server log (default: discarded).
 	Logger *slog.Logger
 }
@@ -136,6 +138,10 @@ func TryStart(opts Options) (*Server, error) {
 	if restarter == nil {
 		restarter = &FakeRestarter{} // never the real one: it would end the test process
 	}
+	runCheck := opts.RunCheck
+	if runCheck == nil {
+		runCheck = func(string) error { return nil }
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	a, err := app.New(ctx, app.Options{
 		Getenv:       func(k string) string { return env[k] },
@@ -148,6 +154,7 @@ func TryStart(opts Options) (*Server, error) {
 		Version:          opts.Version,
 		ExePath:          opts.ExePath,
 		Restarter:        restarter,
+		CheckRunnable:    runCheck,
 		UpdateFirstDelay: opts.UpdateFirstDelay,
 
 		AccountingBeforeCommit: opts.AccountingBeforeCommit,

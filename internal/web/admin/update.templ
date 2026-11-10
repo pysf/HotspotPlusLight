@@ -99,7 +99,7 @@ func updateConfirmText(st update.Status) string {
 	if st.URL != "" {
 		t += " Release notes: " + st.URL + "."
 	}
-	return t + " The admin panel is down for a moment. Online members stay connected. If the new version does not start, the old version and your data are restored."
+	return t + " The admin panel is down for a moment. Online members stay connected. If the new version does not start, the old version and your data are restored. Changes made after the update started are lost then."
 }
 
 // updateInstallAttrs returns the attributes of the Update now button: it asks first, then posts into the progress block.
@@ -141,15 +141,21 @@ func progressText(p update.Progress) string {
 	return "Restarting..."
 }
 
-// UpdateProgressView is the install progress block. While a step runs it polls itself every 2 s;
-// it stops when the install is done or failed.
+// UpdateProgressView is the install progress block. While a step runs it polls itself every 2 s.
+// After the program file is swapped (restarting, done) it keeps polling, because the program restarts:
+// the poll fails for a few seconds without an error toast (data-quiet-poll), and the first idle answer
+// of the new process makes the page reload (see updateProgress). A failed install stops the polling.
 templ UpdateProgressView(p update.Progress) {
-	if p.Running() {
+	if p.State == update.StateRestarting {
+		<div id="update-progress" data-update-progress data-state={ string(p.State) } data-quiet-poll data-poll hx-get="/admin/update/progress" hx-trigger="every 2s" hx-swap="outerHTML" hx-headers={ restartHeaders(p.State) }>
+			@ui.Flash("info", progressText(p))
+		</div>
+	} else if p.Running() {
 		<div id="update-progress" data-update-progress data-state={ string(p.State) } data-poll hx-get="/admin/update/progress" hx-trigger="every 2s" hx-swap="outerHTML">
 			@ui.Flash("info", progressText(p))
 		</div>
 	} else if p.State == update.StateDone {
-		<div id="update-progress" data-update-progress data-state="done">
+		<div id="update-progress" data-update-progress data-state="done" data-quiet-poll data-poll hx-get="/admin/update/progress" hx-trigger="every 2s" hx-swap="outerHTML" hx-headers={ restartHeaders(p.State) }>
 			@ui.Flash("ok", p.Version+" is installed. The program is restarting.")
 		</div>
 	} else if p.State == update.StateFailed {
@@ -159,4 +165,9 @@ templ UpdateProgressView(p update.Progress) {
 	} else {
 		<div id="update-progress" data-update-progress data-state="idle"></div>
 	}
+}
+
+// restartHeaders returns the request header the polling block sends: the state the page saw.
+func restartHeaders(s update.State) string {
+	return `{"` + updateWasHeader + `": "` + string(s) + `"}`
 }

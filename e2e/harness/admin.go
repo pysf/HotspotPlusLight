@@ -88,6 +88,27 @@ func (c *AdminClient) DoHX(method, path string, form url.Values, csrf, target st
 	return Resp{resp, string(b)}
 }
 
+// DoHXHeader is a GET sent like htmx with the given HX-Target and extra headers.
+func (c *AdminClient) DoHXHeader(method, path, target string, headers map[string]string) Resp {
+	c.t.Helper()
+	req, err := http.NewRequest(method, c.Base+path, nil)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Target", target)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return Resp{resp, string(b)}
+}
+
 // GetPage is a GET like a browser page load: it carries no HX-Request header.
 func (c *AdminClient) GetPage(path string) Resp {
 	c.t.Helper()
