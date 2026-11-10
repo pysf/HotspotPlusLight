@@ -77,8 +77,15 @@ The project tags `MONITOR:` (rule 7) and `VERIFY-ON-HARDWARE` (rule 8) still app
 - **Document constraints and workarounds.** If a line looks strange or surprising, say why.
 - **Refactor before commenting.** If a block needs a comment only to explain what it does, try a better name or a smaller function first.
 
+## Commit messages and releases (owner, 2026-11-10)
+Commit subjects use conventional commits: `type(scope)?!?: text`, for example `fix: stop double kick` or `feat(plans): add weekly quota`.
+- `fix:` makes a patch release, `feat:` a minor release.
+- `type!:` or a `BREAKING CHANGE:` line in the body makes a major release. The highest bump wins.
+- `docs`, `chore`, `test`, `site`, `ci`, `refactor`, `build`, `style` and `perf` make no release.
+- After `ci` is green on `main`, `.github/workflows/autorelease.yml` tags the commit and publishes the release. Details: `docs/update-plan.md`.
+
 ## Phase workflow (owner, 2026-11-01)
-Each phase is done by its own agent: tests first (E2E ids from `PLAN.md` §11), implement until green, **do not commit**. Then the orchestrator: (1) re-runs `gofmt -l .`, `go vet ./...`, `go test -race -count=1 ./internal/... ./cmd/...` and the full e2e suite `go test -count=1 -timeout 600s ./e2e/` (the orchestrator runs it; sub agents do not); (2) starts a **separate review agent** (fresh context, not the implementing agent) that runs the `code-review` skill at `medium` on the uncommitted changes and reports findings; real findings are fixed and the tests re-run; (3) commits with a `Phase N: …` message; (4) only then starts the next phase.
+Each phase is done by its own agent: tests first (E2E ids from `PLAN.md` §11), implement until green, **do not commit**. Then the orchestrator: (1) re-runs `gofmt -l .`, `go vet ./...`, `go test -race -count=1 ./internal/... ./cmd/...` and the full e2e suite `go test -count=1 -timeout 600s ./e2e/` (the orchestrator runs it; sub agents do not); (2) starts a **separate review agent** (fresh context, not the implementing agent) that runs the `code-review` skill at `medium` on the uncommitted changes and reports findings; real findings are fixed and the tests re-run; (3) commits with a conventional message such as `feat: phase N …` (see "Commit messages and releases"); (4) only then starts the next phase.
 
 Medium and large tasks run as sub agents. Sub agents use the Sonnet model (owner, 2026-11-09).
 

@@ -1,0 +1,63 @@
+name: autorelease
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+# One run at a time, so two pushes cannot pick the same version.
+concurrency:
+  group: autorelease
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.next.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: work out the next version and tag the tested commit
+        id: next
+        run: |
+          set -euo pipefail
+          if [ -n "$(git tag --points-at HEAD)" ]; then
+            echo "HEAD already has a tag, nothing to do."
+            exit 0
+          fi
+          last=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' --exclude 'v*-*' HEAD)
+          next=$(git log --format=%B%x00 "${last}..HEAD" | go run ./tools/nextversion "$last")
+          if [ -z "$next" ]; then
+            echo "No feat or fix commit since ${last}, no release."
+            exit 0
+          fi
+          # A tag is never moved or deleted.
+          if git rev-parse -q --verify "refs/tags/${next}" >/dev/null; then
+            echo "Tag ${next} already exists, nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$next" -m "$next" HEAD
+          git push origin "refs/tags/${next}"
+          echo "tag=${next}" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}

@@ -2,6 +2,20 @@ name: release
 on:
   push:
     tags: ["v*"]
+  # Run by hand to publish a release for a tag that has none (for example after a failed run).
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The existing tag to build and publish.
+        required: true
+        type: string
+  # autorelease.yml calls this, because a tag pushed with GITHUB_TOKEN starts no workflow.
+  workflow_call:
+    inputs:
+      tag:
+        description: The existing tag to build and publish.
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -9,14 +23,18 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - name: build and pack all platforms
-        run: make release VERSION=${GITHUB_REF_NAME}
+        run: make release VERSION=${TAG}
       - name: create the GitHub Release
-        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
+        run: gh release create "$TAG" dist/* --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}

@@ -178,6 +178,11 @@ Release files have stable names without the version, so `https://github.com/pysf
 `hotspotpluslight-<os>-<arch>.tar.gz` (`.zip` for Windows) for linux amd64, 386, arm64, arm (ARMv7); windows amd64, 386, arm64; darwin amd64, arm64, and `SHA256SUMS`.
 The version is inside the binary (`hotspotpluslight version`, set with `-X main.version`).
 Pushing a tag `v*` runs `.github/workflows/release.yml`, which builds these files and makes a GitHub Release.
+You do not tag by hand: when `ci` is green on `main`, `.github/workflows/autorelease.yml` reads the commit messages since the last tag and, if needed, tags the commit and calls `release.yml`.
+
+### Commit messages
+
+Use conventional commits: `type(scope)?!?: text`. `fix:` makes a patch release, `feat:` a minor release, and `type!:` or a `BREAKING CHANGE:` line in the body makes a major release. `docs`, `chore`, `test`, `site`, `ci`, `refactor`, `build`, `style` and `perf` make no release. The `ci` workflow warns (it never fails) when the last subject does not follow this form.
 
 ### Tests
 

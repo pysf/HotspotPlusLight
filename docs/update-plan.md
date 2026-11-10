@@ -1,6 +1,6 @@
 # Automatic release and self-update: plan
 
-Status: plan only, nothing built yet. Decisions are from the owner, 2026-11-10.
+Status: Step 1 built (nextversion, autorelease, commit-style check). Later steps not built. Decisions are from the owner, 2026-11-10.
 
 ## Decisions
 

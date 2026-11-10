@@ -41,3 +41,18 @@ jobs:
           go-version-file: go.mod
       - name: build all 9 platforms
         run: make build-cross VERSION=ci
+
+  # Only a warning, never a failure: old commits and merge commits do not follow
+  # the style, and a hard fail would block pushes. The warning shows in the run.
+  commit-style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: check the last commit subject
+        run: |
+          subject=$(git log -1 --format=%s)
+          if ! printf '%s\n' "$subject" | grep -Eq '^[a-z]+(\([^)]*\))?!?: .+'; then
+            echo "::warning title=Commit style::Subject should be 'type(scope)?: text' (feat, fix, docs, chore, test, site, ci, refactor, build, style, perf). Without feat or fix there is no release. Got: ${subject}"
+          fi

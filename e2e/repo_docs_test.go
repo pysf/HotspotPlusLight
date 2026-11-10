@@ -142,7 +142,7 @@ func TestE13_02_ReleaseAssetNames(t *testing.T) {
 	}
 	wf := readRoot(t, ".github/workflows/release.yml")
 	for _, w := range []string{`tags: ["v*"]`, "contents: write", "ubuntu-latest", "actions/checkout@v5", "actions/setup-go@v6", "go-version-file: go.mod",
-		"make release VERSION=${GITHUB_REF_NAME}", `gh release create "$GITHUB_REF_NAME" dist/* --generate-notes`, "GH_TOKEN: ${{ github.token }}"} {
+		"make release VERSION=${TAG}", `gh release create "$TAG" dist/* --generate-notes`, "workflow_call:", "workflow_dispatch:", "GH_TOKEN: ${{ github.token }}"} {
 		if !strings.Contains(wf, w) {
 			t.Errorf("release.yml lacks %q", w)
 		}
