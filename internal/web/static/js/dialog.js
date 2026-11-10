@@ -95,11 +95,13 @@ document.addEventListener("close", (e) => {
   }
 }, true);
 
-// Server events: HX-Trigger "close-sheet" closes every open sheet.
+// Server events: HX-Trigger "close-sheet" closes every open sheet. The server sends it last. The
+// host is emptied after the other events have fired, because events fired on a removed form never
+// reach the body and the list would not refresh.
 document.body.addEventListener("close-sheet", () => {
   for (const d of document.querySelectorAll("dialog.c-sheet[open]")) {
-    // The answer is swapped in after this event; an old form left in the host would reopen the sheet.
-    d.querySelector(".c-sheet__host")?.replaceChildren();
     d.close();
+    // An old form left in the host would reopen the sheet.
+    setTimeout(() => d.querySelector(".c-sheet__host")?.replaceChildren(), 0);
   }
 });

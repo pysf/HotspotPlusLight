@@ -11,7 +11,9 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/a-h/templ"
@@ -321,6 +323,7 @@ const (
 
 	membersChanged = "members-changed" // events sent in HX-Trigger; the list regions refresh on them
 	plansChanged   = "plans-changed"
+	closeSheet     = "close-sheet"
 )
 
 // hxTarget returns the HX-Target header of the request.
@@ -349,11 +352,36 @@ func keepTarget(w http.ResponseWriter, r *http.Request, status int, msg string) 
 }
 
 // setTrigger sets the HX-Trigger header: one event per key (a string value is the toast text).
+// close-sheet always goes last: it removes the sheet form from the page, and events fired on a
+// removed form never reach the body, so the list refresh and the toast would be lost.
 func setTrigger(w http.ResponseWriter, events map[string]any) {
-	b, err := json.Marshal(events)
-	if err == nil {
-		w.Header().Set("HX-Trigger", string(b))
+	keys := make([]string, 0, len(events))
+	for k := range events {
+		keys = append(keys, k)
 	}
+	sort.Slice(keys, func(i, j int) bool {
+		if (keys[i] == closeSheet) != (keys[j] == closeSheet) {
+			return keys[j] == closeSheet
+		}
+		return keys[i] < keys[j]
+	})
+	var b strings.Builder
+	b.WriteByte('{')
+	for i, k := range keys {
+		kb, err1 := json.Marshal(k)
+		vb, err2 := json.Marshal(events[k])
+		if err1 != nil || err2 != nil {
+			return
+		}
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.Write(kb)
+		b.WriteByte(':')
+		b.Write(vb)
+	}
+	b.WriteByte('}')
+	w.Header().Set("HX-Trigger", b.String())
 }
 
 // appDone answers a change made from a list or the sheet: the list refreshes (changed), a toast
@@ -361,7 +389,7 @@ func setTrigger(w http.ResponseWriter, events map[string]any) {
 func (h handlers) appDone(w http.ResponseWriter, r *http.Request, status int, changed, msg string) {
 	ev := map[string]any{changed: true, "toast": msg}
 	if inSheet(r) {
-		ev["close-sheet"] = true
+		ev[closeSheet] = true
 	}
 	setTrigger(w, ev)
 	w.Header().Set("HX-Reswap", "none")

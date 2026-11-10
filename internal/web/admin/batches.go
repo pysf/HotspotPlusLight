@@ -109,6 +109,8 @@ func (h handlers) batchRename(w http.ResponseWriter, r *http.Request) {
 	case len(errs) > 0:
 		h.render(w, r, http.StatusUnprocessableEntity, ui.FieldError("label", errs["label"]))
 	default:
+		// Reload the page, so the list shows the new label (and keeps its page number).
+		w.Header().Set("HX-Refresh", "true")
 		h.render(w, r, http.StatusOK, ui.Flash("ok", "Label saved."))
 	}
 }

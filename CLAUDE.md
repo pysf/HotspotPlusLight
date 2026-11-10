@@ -47,6 +47,7 @@ Phases 0–19 and design v2 (steps 1 to 7) are done (Phases 17–19 added the da
 7. **Enforcement in two layers.** The router gets exact limits at login (`Mikrotik-Xmit/Recv-Limit` + Gigawords, `Session-Timeout`). The server also disconnects by itself: on each Start/Interim, `session.Enforcer` runs `domain.ShouldEnd` and sends a Disconnect. Keep `MONITOR:` comments only for real remaining gaps.
 8. **Do not guess RouterOS/RADIUS vendor details.** The hardware items were verified by the owner on 2026-11-09. Mark any new unverified detail with `VERIFY-ON-HARDWARE`.
 9. **Keep README and site in sync.** When you change user-facing features, routes, settings, or behavior, update `README.md` and the relevant `site/` pages in the same change.
+10. **Every bug fix gets a test.** Add an e2e test that fails without the fix and passes with it, in the same change. Name it `E<phase>.<nn>` and say in a comment which bug it covers.
 
 ## Go comments (owner, 2026-11-04)
 
