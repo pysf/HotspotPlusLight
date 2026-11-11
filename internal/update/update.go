@@ -26,7 +26,7 @@ const (
 	requestTimeout = 10 * time.Second
 	maxBody        = 1 << 20 // a release answer is a few KB; this only stops a runaway answer
 	firstDelay     = 30 * time.Second
-	checkEvery     = 24 * time.Hour
+	checkEvery     = time.Hour
 )
 
 // Repo is what the checker needs from storage (store.Store).
@@ -184,7 +184,7 @@ func (c *Checker) fetch(ctx context.Context) (domain.Release, error) {
 	return rel, nil
 }
 
-// Run checks once after a short delay and then every 24 hours, until ctx ends.
+// Run checks once after a short delay and then every hour, until ctx ends.
 // The setting is read on every round, so a change applies without a restart.
 func (c *Checker) Run(ctx context.Context) {
 	timer := time.NewTimer(c.firstDelay)

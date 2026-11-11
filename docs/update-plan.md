@@ -10,7 +10,7 @@ Status: All steps built (1 to 6). Decisions are from the owner, 2026-11-10. The 
 | What makes a release | Only `feat` and `fix` (and breaking). `docs:`, `chore:`, `test:`, `site:`, `ci:`, `refactor:` make none. |
 | When | Every push to `main`, after `ci` is green on Linux and Windows. |
 | Start | `v0.9.0` already exists. The next release is computed from it. |
-| Update check | Server asks the GitHub API for the latest release. Once a day, plus a "Check now" button. |
+| Update check | Server asks the GitHub API for the latest release. Every hour, plus a "Check now" button. |
 | Trust | `SHA256SUMS` from the same release. No signing. |
 | Privacy | Setting "Check for updates", on by default. Off means no call to GitHub. |
 | Approval | Admin presses Update and confirms in a dialog. No password re-entry. |
@@ -33,7 +33,7 @@ Status: All steps built (1 to 6). Decisions are from the owner, 2026-11-10. The 
 ## Part 2: the server checks for updates
 
 1. Package `internal/update`. Pure part in `internal/domain`: compare versions, pick the asset name for this OS/arch, parse `SHA256SUMS`.
-2. A background job asks `https://api.github.com/repos/pysf/HotspotPlusLight/releases/latest` once a day. It sends no data about the install. It stores the answer (version, notes URL, time) in the `settings` table or a small table.
+2. A background job asks `https://api.github.com/repos/pysf/HotspotPlusLight/releases/latest` every hour. It sends no data about the install. It stores the answer (version, notes URL, time) in the `settings` table or a small table.
 3. New setting "Check for updates" (default on) on the Settings page. Off: no job, no calls, and the button is hidden.
 4. The admin layout shows a small notice "Version X is available" with a link to the Update page. The dashboard shows it too.
 5. Update page `GET /admin/update`: current version, latest version, release notes link, "Check now", "Update now".

@@ -107,7 +107,7 @@ The default admin address is `:8080` (it was `:8081` before 2026-11-11, left fro
 
 ### Update check
 
-A background job asks the GitHub API for the latest release 30 seconds after the start and then once a day. It sends only a `User-Agent` header with the version. The answer (latest version, release notes link, time, last error) is saved in the settings row. When a newer release exists, every admin page shows "Version X is available" with a link to the **Updates** page (`/admin/update`), which also has a **Check now** button. The **Check for updates** switch on the **Settings** page turns it all off: then the server never calls GitHub. A development build (version `dev`) never checks. `HSP_UPDATE_API_URL` changes the API address (tests and mirrors).
+A background job asks the GitHub API for the latest release 30 seconds after the start and then every hour. It sends only a `User-Agent` header with the version. The answer (latest version, release notes link, time, last error) is saved in the settings row. When a newer release exists, every admin page shows "Version X is available" with a link to the **Updates** page (`/admin/update`), which also has a **Check now** button. The **Check for updates** switch on the **Settings** page turns it all off: then the server never calls GitHub. A development build (version `dev`) never checks. `HSP_UPDATE_API_URL` changes the API address (tests and mirrors).
 
 ### Update from the admin page
 
@@ -144,7 +144,7 @@ The whole page refreshes by itself every 10 seconds.
 | `internal/radius` | RADIUS auth and accounting server, Disconnect client (`layeh.com/radius`) |
 | `internal/routerpack` | the 8 hotspot folder downloads, the RouterOS setup script, built into the binary |
 | `internal/linkstatus` | in-memory "last packet seen" data for the router status panel on the Dashboard |
-| `internal/update` | update check: asks GitHub for the latest release once a day and keeps the answer; the Installer downloads, checks, backs up and swaps the program file; Recover, Rollback and the restart helpers handle a new version that does not start |
+| `internal/update` | update check: asks GitHub for the latest release every hour and keeps the answer; the Installer downloads, checks, backs up and swaps the program file; Recover, Rollback and the restart helpers handle a new version that does not start |
 | `internal/dashboard` | read service for the Dashboard numbers (online, traffic, failed logins, attention lists, charts) |
 | `internal/settings`, `internal/config` | the single-row settings and the `HSP_*` environment |
 | `internal/secret` | AES-GCM for stored member passwords |

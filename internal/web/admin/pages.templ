@@ -353,7 +353,7 @@ templ SettingsFormView(p SettingsProps) {
 				@ui.Select(ui.SelectProps{Label: "Log format", Name: "log_format", Value: p.Form.LogFormat, Options: []ui.Option{{Value: "text", Label: "text (key=value)"}, {Value: "json", Label: "json"}}, Error: p.Errors["log_format"]})
 			</div>
 		}
-		@ui.SettingGroup("Updates", "The server can ask GitHub once a day if a newer version exists. It sends nothing about your install. Changes apply at once.") {
+		@ui.SettingGroup("Updates", "The server can ask GitHub every hour if a newer version exists. It sends nothing about your install. Changes apply at once.") {
 			@ui.SwitchRow(ui.CheckboxProps{Label: "Check for updates", Name: "check_updates", Checked: p.Form.CheckUpdates == "on", Hint: "Off means the server never contacts GitHub."})
 			<input type="hidden" name="check_updates" value="off"/>
 			<p class="c-field__hint"><a href="/admin/update">Open the Updates page</a></p>

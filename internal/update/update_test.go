@@ -96,3 +96,11 @@ func TestRunChecksAfterDelay(t *testing.T) {
 		t.Fatal("no check")
 	}
 }
+
+// A new release must show up within the hour. (Bug: the check ran once a day, so the notice
+// could come a day after a release.)
+func TestCheckEveryHour(t *testing.T) {
+	if checkEvery > time.Hour {
+		t.Errorf("checkEvery = %v, want at most one hour", checkEvery)
+	}
+}

@@ -1340,7 +1340,7 @@ func SettingsFormView(p SettingsProps) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = ui.SettingGroup("Updates", "The server can ask GitHub once a day if a newer version exists. It sends nothing about your install. Changes apply at once.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var47), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ui.SettingGroup("Updates", "The server can ask GitHub every hour if a newer version exists. It sends nothing about your install. Changes apply at once.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var47), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
