@@ -49,7 +49,7 @@ release: build-cross
 	$$SUM *.zip *.tar.gz > SHA256SUMS; \
 	ls -l
 
-# Build and start the whole stack (admin :8081, RADIUS :1812/:1813) with data in ./data.
+# Build and start the whole stack (admin :8080, RADIUS :1812/:1813) with data in ./data.
 # The key is auto-generated to data/hsp.key on first start and reused on restarts.
 run: build
 	./bin/hotspotpluslight serve

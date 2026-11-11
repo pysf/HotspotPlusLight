@@ -340,7 +340,7 @@ templ SettingsFormView(p SettingsProps) {
 			</div>
 		}
 		@ui.SettingGroup("Server addresses", "Where this app listens. A change needs a restart.") {
-			@ui.Field(ui.FieldProps{Label: "Admin address", Name: "admin_addr", Value: p.Form.AdminAddr, Error: p.Errors["admin_addr"], Hint: "host:port or :port for the admin panel (e.g. :8081). Port 0 = OS-assigned."})
+			@ui.Field(ui.FieldProps{Label: "Admin address", Name: "admin_addr", Value: p.Form.AdminAddr, Error: p.Errors["admin_addr"], Hint: "host:port or :port for the admin panel (e.g. :8080). Port 0 = OS-assigned."})
 			<div class="c-form-grid">
 				@ui.Field(ui.FieldProps{Label: "RADIUS auth address", Name: "radius_auth_addr", Value: p.Form.RadiusAuthAddr, Error: p.Errors["radius_auth_addr"], Hint: "host:port for RADIUS authentication (e.g. :1812)."})
 				@ui.Field(ui.FieldProps{Label: "RADIUS acct address", Name: "radius_acct_addr", Value: p.Form.RadiusAcctAddr, Error: p.Errors["radius_acct_addr"], Hint: "host:port for RADIUS accounting (e.g. :1813)."})

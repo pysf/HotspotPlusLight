@@ -348,7 +348,7 @@ func TestE16_01_ServerSettingsForm(t *testing.T) {
 
 	// Invalid values: bad address format, bad log level.
 	for _, iv := range []struct{ field, val string }{
-		{"admin_addr", "8081"},          // missing colon
+		{"admin_addr", "8080"},          // missing colon
 		{"radius_auth_addr", ""},        // empty
 		{"radius_acct_addr", ":999999"}, // port out of range
 		{"log_level", "verbose"},        // unknown level

@@ -114,7 +114,7 @@ WantedBy=multi-user.target</code></pre>
 <p>Do not move <code>hotspotpluslight.exe</code> after the install, because the service points to it. To reset the admin password:</p>
 <pre><code>.\hotspotpluslight.exe admin set-password --env-file C:\ProgramData\HotspotPlusLight\hsp.env</code></pre>
 <p>Allow the ports in the Windows firewall. Run this in PowerShell as Administrator:</p>
-<pre><code>netsh advfirewall firewall add rule name="HotspotPlus Lite admin" dir=in action=allow protocol=TCP localport=8081
+<pre><code>netsh advfirewall firewall add rule name="HotspotPlus Lite admin" dir=in action=allow protocol=TCP localport=8080
 netsh advfirewall firewall add rule name="HotspotPlus Lite RADIUS" dir=in action=allow protocol=UDP localport=1812-1813</code></pre>
 <div class="note"><b>Keep a copy of hsp.env</b><p>It holds the secret key. Without the key, the stored member passwords cannot be read. See <a href="../backup-and-upgrade/">Backup and upgrade</a>.</p></div></section>
 <section><h2 id="macos"><a href="#macos">macOS (launchd)</a></h2>
@@ -143,7 +143,7 @@ sudo mkdir -p /usr/local/var/hotspotpluslight</code></pre>
 sudo launchctl bootout system /Library/LaunchDaemons/local.hotspotpluslight.plist</code></pre>
 <p>The first command starts the service. The second command stops it. The project does not test launchd, so use this setup as a starting point.</p></section>
 <section><h2 id="check"><a href="#check">Check that it runs</a></h2>
-<p>On the server, <code>curl http://127.0.0.1:8081/healthz</code> prints <code>ok</code>. In a browser, <code>http://SERVER-IP:8081/admin</code> shows the admin login page. Then continue with <a href="../first-login/">First login</a>.</p></section>
+<p>On the server, <code>curl http://127.0.0.1:8080/healthz</code> prints <code>ok</code>. In a browser, <code>http://SERVER-IP:8080/admin</code> shows the admin login page. Then continue with <a href="../first-login/">First login</a>.</p></section>
 <nav class="pager" aria-label="Previous and next page"><a class="prev" rel="prev" href="../installation/"><small>Previous</small>Installation</a><a class="next" rel="next" href="../configuration/"><small>Next</small>Configuration</a></nav></article>
 </div></main>
 <footer class="foot"><div class="wrap"><span>HotspotPlus Lite &middot; Open source, <a href="https://github.com/pysf/HotspotPlusLight/blob/main/LICENSE" rel="noopener">AGPL-3.0</a> &middot; Made with love for Iran</span>

@@ -110,7 +110,7 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	c := Config{
 		DataDir:            get("DATA_DIR", "data"),
-		AdminAddr:          get("ADMIN_ADDR", ":8081"),
+		AdminAddr:          get("ADMIN_ADDR", ":8080"),
 		RadiusAuthAddr:     get("RADIUS_AUTH_ADDR", ":1812"),
 		RadiusAcctAddr:     get("RADIUS_ACCT_ADDR", ":1813"),
 		AdminUsername:      get("ADMIN_USERNAME", "admin"),

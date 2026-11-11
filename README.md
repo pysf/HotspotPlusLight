@@ -14,7 +14,7 @@ License: GNU AGPL-3.0, see [LICENSE](LICENSE).
 
 ```mermaid
 flowchart LR
-    admin["Admin browser"] -->|"HTTP :8081 (admin panel, /healthz)"| app
+    admin["Admin browser"] -->|"HTTP :8080 (admin panel, /healthz)"| app
     subgraph host["Server machine (Windows service, systemd or plain run)"]
         app["hotspotpluslight<br/>RADIUS + admin panel"] --- db[("hsp.db<br/>one SQLite file")]
     end
@@ -75,7 +75,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant A as Admin browser
-    participant S as Server (:8081)
+    participant S as Server (:8080)
     participant R as MikroTik router
     participant D as SQLite
     A->>S: POST kick (online sessions page)
@@ -100,6 +100,10 @@ sequenceDiagram
     A->>S: set a new password
     S-->>A: flag cleared, admin panel opens on the Dashboard (/admin)
 ```
+
+### Default admin port
+
+The default admin address is `:8080` (it was `:8081` before 2026-11-11, left from the two-listener design). A new install seeds the settings row from the config default. An existing install keeps its saved address after an upgrade. To use 8080, change **Admin address** on the Settings page, restart, and update firewall rules and bookmarks.
 
 ### Update check
 

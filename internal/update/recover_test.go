@@ -364,11 +364,11 @@ func TestChooseRestartMode(t *testing.T) {
 
 func TestHealthURL(t *testing.T) {
 	cases := map[string]string{
-		"127.0.0.1:8081": "http://127.0.0.1:8081/healthz",
-		":8081":          "http://127.0.0.1:8081/healthz",
-		"0.0.0.0:8081":   "http://127.0.0.1:8081/healthz",
-		"[::]:8081":      "http://127.0.0.1:8081/healthz",
-		"[::1]:8081":     "http://[::1]:8081/healthz",
+		"127.0.0.1:8080": "http://127.0.0.1:8080/healthz",
+		":8080":          "http://127.0.0.1:8080/healthz",
+		"0.0.0.0:8080":   "http://127.0.0.1:8080/healthz",
+		"[::]:8080":      "http://127.0.0.1:8080/healthz",
+		"[::1]:8080":     "http://[::1]:8080/healthz",
 		"192.168.1.5:80": "http://192.168.1.5:80/healthz",
 	}
 	for in, want := range cases {

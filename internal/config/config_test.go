@@ -16,7 +16,7 @@ func TestLoadDefaultsAndRequired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.AdminAddr != ":8081" || c.RadiusAuthAddr != ":1812" ||
+	if c.AdminAddr != ":8080" || c.RadiusAuthAddr != ":1812" ||
 		c.RadiusAcctAddr != ":1813" || c.AdminUsername != "admin" || c.DataDir == "" {
 		t.Fatalf("defaults: %+v", c)
 	}

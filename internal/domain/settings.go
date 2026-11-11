@@ -128,7 +128,7 @@ func (p *parser) netAddr(field, v string) string {
 	}
 	_, portStr, err := net.SplitHostPort(v)
 	if err != nil {
-		p.errs.add(field, "Must be host:port or :port (e.g. :8081).")
+		p.errs.add(field, "Must be host:port or :port (e.g. :8080).")
 		return v
 	}
 	port, err := strconv.Atoi(portStr)

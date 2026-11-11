@@ -58,7 +58,7 @@ Status: All steps built (1 to 6). Decisions are from the owner, 2026-11-10. The 
 2. Unit: `Restart=always`, `RestartSec=2`, `User=` the user who runs the command (or a `hotspotpluslight` user if the owner prefers), `WorkingDirectory` and `HSP_DATA_DIR` set, `NoNewPrivileges=yes`.
 3. `uninstall`, `start`, `stop` use `systemctl`.
 4. The binary must be writable by the service user, or self-update cannot swap it. The installer puts it in a directory owned by that user. This is checked and shown on the Update page ("cannot update: file not writable").
-5. The default ports (1812, 1813, 8081) are above 1024, so no root is needed. If the admin picks a port below 1024, the doc says to add `AmbientCapabilities=CAP_NET_BIND_SERVICE` to the unit.
+5. The default ports (1812, 1813, 8080) are above 1024, so no root is needed. If the admin picks a port below 1024, the doc says to add `AmbientCapabilities=CAP_NET_BIND_SERVICE` to the unit.
 
 ## Part 5: tests (E22 and later)
 

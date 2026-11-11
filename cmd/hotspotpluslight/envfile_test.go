@@ -105,11 +105,11 @@ func newScanner(s string) *bufio.Scanner { return bufio.NewScanner(strings.NewRe
 // TestE16_06_EnvFileQuotedWithComment covers review B1: a quoted value
 // followed by " # comment" must be unquoted.
 func TestE16_06_EnvFileQuotedWithComment(t *testing.T) {
-	m, err := parseEnvFileString("A=\"127.0.0.1:8081\" # local\nB='x # y'   # c\nC=\"a\"\nD=\"unclosed # x\n")
+	m, err := parseEnvFileString("A=\"127.0.0.1:8080\" # local\nB='x # y'   # c\nC=\"a\"\nD=\"unclosed # x\n")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for k, want := range map[string]string{"A": "127.0.0.1:8081", "B": "x # y", "C": "a", "D": `"unclosed`} {
+	for k, want := range map[string]string{"A": "127.0.0.1:8080", "B": "x # y", "C": "a", "D": `"unclosed`} {
 		if m[k] != want {
 			t.Errorf("%s = %q, want %q", k, m[k], want)
 		}

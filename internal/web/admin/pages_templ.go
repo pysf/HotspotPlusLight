@@ -1254,7 +1254,7 @@ func SettingsFormView(p SettingsProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = ui.Field(ui.FieldProps{Label: "Admin address", Name: "admin_addr", Value: p.Form.AdminAddr, Error: p.Errors["admin_addr"], Hint: "host:port or :port for the admin panel (e.g. :8081). Port 0 = OS-assigned."}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Field(ui.FieldProps{Label: "Admin address", Name: "admin_addr", Value: p.Form.AdminAddr, Error: p.Errors["admin_addr"], Hint: "host:port or :port for the admin panel (e.g. :8080). Port 0 = OS-assigned."}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

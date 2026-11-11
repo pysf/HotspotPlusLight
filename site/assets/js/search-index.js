@@ -76,7 +76,7 @@ export default [
   "page": "Installation",
   "heading": "Ports",
   "url": "docs/installation/#ports",
-  "keywords": "The MikroTik router talks to the server with RADIUS (the protocol the router uses to ask the server about each login). Port Direction Used for TCP 8081 to the server, from your computer The admin panel and /healthz (plain HTTP). UDP 1812 to the server, from th"
+  "keywords": "The MikroTik router talks to the server with RADIUS (the protocol the router uses to ask the server about each login). Port Direction Used for TCP 8080 to the server, from your computer The admin panel and /healthz (plain HTTP). UDP 1812 to the server, from th"
  },
  {
   "page": "Run as a service",
@@ -232,7 +232,7 @@ export default [
   "page": "Router setup",
   "heading": "Firewall",
   "url": "docs/router-setup/#firewall",
-  "keywords": "These ports must be open. The server never talks to members. It talks only to the router and to you: Where Rule On the server, from the router UDP 1812 (login) and UDP 1813 (accounting), inbound. On the server, from your computer TCP 8081 (admin panel), inboun"
+  "keywords": "These ports must be open. The server never talks to members. It talks only to the router and to you: Where Rule On the server, from the router UDP 1812 (login) and UDP 1813 (accounting), inbound. On the server, from your computer TCP 8080 (admin panel), inboun"
  },
  {
   "page": "Router setup",
@@ -328,7 +328,7 @@ export default [
   "page": "Architecture",
   "heading": "One HTTP listener",
   "url": "docs/architecture/#listeners",
-  "keywords": "The server has one HTTP listener (the admin panel on :8081 , with /healthz ) and 2 UDP listeners for RADIUS. There is no public web server and no API for the login page. The router hosts the login page by itself. The admin panel uses plain HTTP, and it must no"
+  "keywords": "The server has one HTTP listener (the admin panel on :8080 , with /healthz ) and 2 UDP listeners for RADIUS. There is no public web server and no API for the login page. The router hosts the login page by itself. The admin panel uses plain HTTP, and it must no"
  },
  {
   "page": "Architecture",

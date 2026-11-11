@@ -42,7 +42,7 @@ func goodSettingsForm() SettingsForm {
 	return SettingsForm{
 		BusinessName: "T", Timezone: "UTC", RadiusSharedSecret: "s", CoaPort: "3799", AccountingIntervalSeconds: "60",
 		BatchUsernamePrefix: "wifi", BatchCounter: "1360", BatchMaxCount: "30", VoucherPasswordLength: "6", SessionRetentionDays: "90",
-		AdminAddr: ":8081", RadiusAuthAddr: ":1812", RadiusAcctAddr: ":1813", LogLevel: "info", LogFormat: "text",
+		AdminAddr: ":8080", RadiusAuthAddr: ":1812", RadiusAcctAddr: ":1813", LogLevel: "info", LogFormat: "text",
 	}
 }
 
@@ -62,7 +62,7 @@ func TestParseSettings(t *testing.T) {
 		"default_plan_id":             func(f *SettingsForm) { f.DefaultPlanID = "x" },
 		"session_retention_days":      func(f *SettingsForm) { f.SessionRetentionDays = "-1" },
 		"business_name":               func(f *SettingsForm) { f.BusinessName = "Hotel\nAria" },
-		"admin_addr":                  func(f *SettingsForm) { f.AdminAddr = "8081" }, // missing colon
+		"admin_addr":                  func(f *SettingsForm) { f.AdminAddr = "8080" }, // missing colon
 		"radius_auth_addr":            func(f *SettingsForm) { f.RadiusAuthAddr = "" },
 		"radius_acct_addr":            func(f *SettingsForm) { f.RadiusAcctAddr = ":65536" }, // port out of range
 		"log_level":                   func(f *SettingsForm) { f.LogLevel = "verbose" },
@@ -132,8 +132,8 @@ func TestTimezoneNamesAreUnique(t *testing.T) {
 }
 
 func TestRestartNeeded(t *testing.T) {
-	run := ServerSettings{":8081", ":1812", ":1813", "info", "text"}
-	if RestartNeeded(run, run) || RestartNeeded(ServerSettings{":8081", ":1812", ":1813", "INFO", "text"}, run) {
+	run := ServerSettings{":8080", ":1812", ":1813", "info", "text"}
+	if RestartNeeded(run, run) || RestartNeeded(ServerSettings{":8080", ":1812", ":1813", "INFO", "text"}, run) {
 		t.Fatal("same settings must not need a restart")
 	}
 	for name, mutate := range map[string]func(*ServerSettings){

@@ -19,7 +19,7 @@ If `PLAN.md` and this file disagree, `PLAN.md` wins; fix this file.
 - Single business, one admin, one router, MikroTik only, PAP only.
 - Native Go RADIUS (auth 1812, acct 1813, Disconnect to 3799). No FreeRADIUS.
 - SQLite only. No Redis, ClickHouse, Kafka.
-- One HTTP listener (`ADMIN_ADDR` :8081) — admin panel + `/healthz`. No public listener.
+- One HTTP listener (`ADMIN_ADDR` :8080) — admin panel + `/healthz`. No public listener.
 - The member login page lives on the MikroTik router (static HTML). The server does not host it and offers no API for it.
 - 8 static router page downloads (MikroTik default + 7 themes). No settings feed the pages.
 - Everything is English. `Reply-Message` = reject code only; the router page maps it to text.

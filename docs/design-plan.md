@@ -102,7 +102,7 @@ it, and keep each test's intent. No inline style or script (CSP).
 2. Needs Go 1.26. No Node. templ runs with `go run github.com/a-h/templ/cmd/templ@v0.3.1100 generate`
    (the generated `*_templ.go` files are committed, so run it after every `.templ` change).
 3. Check that all is green before you start: `make ci` (vet + all tests incl. e2e, about 1-6 min).
-   Look at the app: `make run`, then open http://localhost:8081/admin (admin / admin on a new
+   Look at the app: `make run`, then open http://localhost:8080/admin (admin / admin on a new
    database; `make reset-db` for a fresh one). `HSP_DEV=1 make run` adds the component gallery at
    `/admin/dev/components`.
 4. Read, in this order: `CLAUDE.md`, this file, `docs/design/README.md`, `docs/ui-notes.md`

@@ -432,7 +432,7 @@ func TestE13_08_ConfigVars(t *testing.T) {
 		}
 	})
 	defaults := map[string]string{
-		"HSP_DATA_DIR": "data", "HSP_ADMIN_ADDR": ":8081", "HSP_RADIUS_AUTH_ADDR": ":1812", "HSP_RADIUS_ACCT_ADDR": ":1813",
+		"HSP_DATA_DIR": "data", "HSP_ADMIN_ADDR": ":8080", "HSP_RADIUS_AUTH_ADDR": ":1812", "HSP_RADIUS_ACCT_ADDR": ":1813",
 		"HSP_ADMIN_USERNAME": "admin", "HSP_LOG_LEVEL": "info", "HSP_LOG_FORMAT": "text", "HSP_SECRET_KEY": "(auto-generated)",
 		"HSP_RADIUS_SHARED_SECRET": "(generated)", "HSP_DEV": "(empty)",
 	}
@@ -450,7 +450,7 @@ func TestE13_08_ConfigVars(t *testing.T) {
 	}
 	// The defaults must come from the code, not only from this test.
 	src := readRoot(t, "internal/config/config.go")
-	for _, d := range []string{`"DATA_DIR", "data"`, `"ADMIN_ADDR", ":8081"`, `"RADIUS_AUTH_ADDR", ":1812"`, `"RADIUS_ACCT_ADDR", ":1813"`,
+	for _, d := range []string{`"DATA_DIR", "data"`, `"ADMIN_ADDR", ":8080"`, `"RADIUS_AUTH_ADDR", ":1812"`, `"RADIUS_ACCT_ADDR", ":1813"`,
 		`"ADMIN_USERNAME", "admin"`, `"LOG_LEVEL", "info"`, `"LOG_FORMAT", "text"`} {
 		if !strings.Contains(src, d) {
 			t.Errorf("internal/config no longer has the default %s", d)

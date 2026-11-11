@@ -16,7 +16,7 @@ import (
 
 // E11.33 Windows service smoke test: install, start, /healthz, stop, uninstall.
 // It needs Administrator rights and changes the machine, so it runs only in CI
-// (HSP_TEST_WINDOWS_SERVICE=1). It uses the default ports (admin :8081).
+// (HSP_TEST_WINDOWS_SERVICE=1). It uses the default ports (admin :8080).
 func TestE11_33_WindowsService(t *testing.T) {
 	if os.Getenv("HSP_TEST_WINDOWS_SERVICE") != "1" {
 		t.Skip("set HSP_TEST_WINDOWS_SERVICE=1 (Administrator, changes Windows services)")
@@ -41,7 +41,7 @@ func TestE11_33_WindowsService(t *testing.T) {
 	svc("start")
 	ok := false
 	for i := 0; i < 60 && !ok; i++ {
-		if r, err := http.Get("http://127.0.0.1:8081/healthz"); err == nil {
+		if r, err := http.Get("http://127.0.0.1:8080/healthz"); err == nil {
 			ok = r.StatusCode == 200
 			r.Body.Close()
 		}

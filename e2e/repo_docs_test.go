@@ -157,12 +157,12 @@ func TestE13_02_ReleaseAssetNames(t *testing.T) {
 // This is the hard exit item of docs/phase13-notes.md.
 func TestE13_11_MovedReadmeChecks(t *testing.T) {
 	want := map[string][]string{
-		"docs/installation/index.html": {"make build", "first start", "HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "8081", "firewall"},
+		"docs/installation/index.html": {"make build", "first start", "HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "8080", "firewall"},
 		"docs/configuration/index.html": {"HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "HSP_LOG_LEVEL", "HSP_LOG_FORMAT",
 			"make set-password", "admin set-password"},
 		"docs/first-login/index.html":          {"admin set-password", "make set-password", "first-start block"},
-		"docs/router-setup/index.html":         {"/admin/router", "hotspot folder", "8081", "firewall", "UDP 1812", "UDP 3799"},
-		"docs/running-as-a-service/index.html": {"[Unit]", "ExecStart=", "systemd", "HSP_SECRET_KEY", "HSP_DATA_DIR", "8081", "firewall"},
+		"docs/router-setup/index.html":         {"/admin/router", "hotspot folder", "8080", "firewall", "UDP 1812", "UDP 3799"},
+		"docs/running-as-a-service/index.html": {"[Unit]", "ExecStart=", "systemd", "HSP_SECRET_KEY", "HSP_DATA_DIR", "8080", "firewall"},
 		"docs/backup-and-upgrade/index.html":   {`sqlite3 hsp.db ".backup`, "HSP_SECRET_KEY", "unrecoverable"},
 	}
 	for page, strs := range want {
@@ -175,7 +175,7 @@ func TestE13_11_MovedReadmeChecks(t *testing.T) {
 	}
 	all := siteText(t)
 	for _, s := range []string{"make build", "HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "HSP_LOG_LEVEL", "HSP_LOG_FORMAT",
-		"first start", "make set-password", "admin set-password", "/admin/router", "hotspot folder", "8081", "firewall", "sqlite3 hsp.db", ".backup",
+		"first start", "make set-password", "admin set-password", "/admin/router", "hotspot folder", "8080", "firewall", "sqlite3 hsp.db", ".backup",
 		"unrecoverable", "[Unit]", "ExecStart=", "systemd"} {
 		if !strings.Contains(all, s) {
 			t.Errorf("the site lacks %q", s)
@@ -203,7 +203,7 @@ func TestE8_09_Readme(t *testing.T) {
 		"https://pysf.github.io/HotspotPlusLight/", "PLAN.md", "CLAUDE.md",
 		"make run", "make test", "make ci", "make generate", "make perf", "make perf-quick", "make release", "make build-cross",
 		"<!-- perf:start -->", "<!-- perf:end -->",
-		"flowchart", "sequenceDiagram", "1812", "1813", "3799", "8081",
+		"flowchart", "sequenceDiagram", "1812", "1813", "3799", "8080",
 	} {
 		if !strings.Contains(r, want) {
 			t.Errorf("README lacks %q", want)
@@ -212,7 +212,7 @@ func TestE8_09_Readme(t *testing.T) {
 	if n := strings.Count(r, "```mermaid"); n < 5 {
 		t.Errorf("README has %d mermaid blocks, want at least 5 (architecture + 4 sequences)", n)
 	}
-	for _, gone := range []string{"public_base_url", "walled garden", "walled-garden", "8080", "HSP_HTTP_ADDR", "Public base URL"} {
+	for _, gone := range []string{"public_base_url", "walled garden", "walled-garden", "HSP_HTTP_ADDR", "Public base URL"} {
 		if strings.Contains(r, gone) {
 			t.Errorf("README still mentions %q (removed in Phase 12a)", gone)
 		}
