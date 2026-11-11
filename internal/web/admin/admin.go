@@ -358,6 +358,8 @@ const (
 	planListID  = "plan-list"   // the plans list region
 	sheetBodyID = "sheet-body"  // the body of the one sheet (new/edit forms)
 
+	extraBlockID = "extra-bulk-block" // the extra data block inside the edit sheet
+
 	membersChanged = "members-changed" // events sent in HX-Trigger; the list regions refresh on them
 	plansChanged   = "plans-changed"
 	closeSheet     = "close-sheet"

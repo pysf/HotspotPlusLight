@@ -360,7 +360,7 @@ func TestE10_15_SheetFragments(t *testing.T) {
 	}
 	var names []string
 	d.Find("[data-state] button, details[data-more] button").Each(func(_ int, s *goquery.Selection) { names = append(names, text(s)) })
-	if strings.Join(names, "|") != "Kick now|Renew|Delete" {
+	if strings.Join(names, "|") != "Kick now|Renew|Save|Delete" {
 		t.Errorf("sheet actions %q", names)
 	}
 	kick := d.Find(`button:contains("Kick now")`)
@@ -386,8 +386,8 @@ func TestE10_15_SheetFragments(t *testing.T) {
 	if u := d.Find(`form#member-form input[name=username]`); u.Length() != 1 || u.AttrOr("disabled", "x") != "x" || u.AttrOr("readonly", "x") != "x" {
 		t.Error("the username stays editable, in the form (not in More options)")
 	}
-	if a := d.Find(`a[href="` + mpath(id) + `"]`); text(a) != "Open details" {
-		t.Errorf("Open details link: %q", text(a))
+	if d.Find(`a[href="`+mpath(id)+`"]`).Length() != 0 || strings.Contains(d.Text(), "Open details") {
+		t.Error("the sheet must not link to the member page")
 	}
 	if full := f.c.GetHX(mpath(id), ""); !strings.Contains(full.Body, "<html") || !strings.Contains(full.Body, "Extra data") {
 		t.Error("the member page is unchanged without the sheet target")

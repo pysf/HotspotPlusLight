@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"cmp"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -538,7 +539,7 @@ func sheetAction(method, url, confirm string, extra templ.Attributes) templ.Attr
 
 // MemberEditSheet is the edit sheet (design sheet 4b): the current state, the form (username, password, plan, valid until), then "More options".
 // The action buttons sit outside the form element, so htmx sends no form fields with them. The state
-// card holds the "Account enabled" switch and Kick now; More options holds Renew, Open details and Delete.
+// card holds the "Account enabled" switch and Kick now; More options holds Renew, Extra data and Delete.
 // The switch and the More fields (the personal fields) belong to the form through the form attribute.
 templ MemberEditSheet(p MemberFormProps, m memberVM) {
 	@ui.SheetPane(templ.Attributes{"data-sheet-title": m.Username, "data-sheet-sub": m.SheetSub()}) {
@@ -549,7 +550,7 @@ templ MemberEditSheet(p MemberFormProps, m memberVM) {
 					@ui.Pill(statusPill(m.Status), statusLabel(m.Status))
 					@ui.OnlineState(m.Online)
 				</div>
-				@UsageCell(m)
+				@SheetUsage(m, false)
 				@activeSwitch(p, "", formAttr)
 				<div class="l-cluster" data-actions>
 					@ui.ButtonIcon("danger", "power", "Kick now", sheetAction("post", memberURL(m.ID)+"/disconnections", confirmDisconnect, kickNowAttrs(m.Online)))
@@ -570,9 +571,7 @@ templ MemberEditSheet(p MemberFormProps, m memberVM) {
 				@ui.ActionRow("Renew now", "Restarts the validity window. Used data, time and extra data are cleared.") {
 					@ui.ButtonIcon("secondary", "clock", "Renew", sheetAction("post", memberURL(m.ID)+"/renewals", confirmRenew, nil))
 				}
-				@ui.ActionRow("Open details", "Extra data and the usage summary.") {
-					@ui.LinkButton("ghost", memberURL(m.ID), "Open details", templ.Attributes{"data-size": "sm"})
-				}
+				@ExtraBulkBlock(m, ExtraBulkProps{})
 				@ui.ActionRow("Delete member", "Removes the login and its usage history.") {
 					@ui.ButtonIcon("danger", "trash", "Delete", sheetAction("delete", memberURL(m.ID), confirmDelete, nil))
 				}
@@ -583,6 +582,31 @@ templ MemberEditSheet(p MemberFormProps, m memberVM) {
 			@ui.Button("primary", "Save changes", templ.Attributes{"type": "submit", "form": "member-form"})
 		}
 	}
+}
+
+// SheetUsage is the usage cell of the edit sheet. With oob it is sent as an out-of-band
+// swap, so saving extra data refreshes the figures next to the extra data block.
+templ SheetUsage(m memberVM, oob bool) {
+	<div id="sheet-usage" { oobAttrs(oob)... }>
+		@UsageCell(m)
+	</div>
+}
+
+// ExtraBulkBlock is the extra data part of the edit sheet: the current value and the form.
+// A plan with unlimited data gets a short note instead. The form swaps this block (also the 422 answer).
+templ ExtraBulkBlock(m memberVM, p ExtraBulkProps) {
+	<div id={ extraBlockID } class="l-stack">
+		<strong>Extra data</strong>
+		if m.UnlimitedData {
+			<p class="u-muted">This plan has unlimited data.</p>
+		} else {
+			<p>Current extra data: <strong class="u-nums" data-extra-bulk>{ m.ExtraBulk }</strong></p>
+			if p.Value == "" && p.Errors == nil {
+				p.Value = m.ExtraBulkValue
+			}
+			@ExtraBulkFormView(ExtraBulkProps{URL: memberURL(m.ID) + "/extra-bulk", Value: p.Value, Unit: cmp.Or(p.Unit, m.PlanUnit), Errors: p.Errors, Target: "#" + extraBlockID})
+		}
+	</div>
 }
 
 // kickNowAttrs disables Kick now when the member is not online.
@@ -709,12 +733,13 @@ templ MemberPage(l ui.LayoutData, m memberVM, p MemberFormProps) {
 // ExtraBulkProps holds what the extra data form shows.
 type ExtraBulkProps struct {
 	URL, Value, Unit string
+	Target           string // the hx-target; empty means the form itself
 	Errors           domain.FieldErrors
 }
 
 // ExtraBulkFormView sets (not adds) the extra data; it is also the 422 response body.
 templ ExtraBulkFormView(p ExtraBulkProps) {
-	<form id="extra-bulk-form" class="l-stack" hx-put={ p.URL } hx-target="this" hx-swap="outerHTML">
+	<form id="extra-bulk-form" class="l-stack" hx-put={ p.URL } hx-target={ cmp.Or(p.Target, "this") } hx-swap="outerHTML">
 		@ui.FieldPair(ui.PairProps{Label: "Set extra data to", For: "value", Hint: "Replaces the current amount. 0 removes it. Decimals allowed.", Errors: []ui.NamedError{{Name: "value", Msg: p.Errors["value"]}, {Name: "unit", Msg: p.Errors["unit"]}}}) {
 			@ui.InputControl(ui.FieldProps{Name: "value", Value: p.Value, Error: p.Errors["value"]})
 			@ui.SelectControl(ui.SelectProps{Name: "unit", Value: p.Unit, Options: unitOptions(domain.BulkUnits), Error: p.Errors["unit"]})
@@ -755,4 +780,10 @@ templ BulkConfirm(st member.BulkStats, sel url.Values) {
 templ DeletedNotice(res member.DeleteResult, backURL, backLabel string) {
 	@ui.Flash("warn", fmt.Sprintf("Deleted %d members. %d of %d open sessions could not be disconnected.", res.Deleted, res.Kick.Failed, res.Kick.Attempted))
 	<p><a href={ templ.SafeURL(backURL) }>{ backLabel }</a></p>
+}
+
+// extraBulkSaved is the answer to a saved extra data form in the sheet: the new block and the new usage cell.
+templ extraBulkSaved(m memberVM) {
+	@ExtraBulkBlock(m, ExtraBulkProps{})
+	@SheetUsage(m, true)
 }

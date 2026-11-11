@@ -395,11 +395,30 @@ func (h handlers) memberExtraBulk(w http.ResponseWriter, r *http.Request) {
 		h.render(w, r, http.StatusConflict, ui.ErrorFragment("This plan has unlimited data, so extra bulk cannot be added."))
 	case err != nil:
 		h.serverError(w, r, err)
+	case hxTarget(r) == extraBlockID:
+		h.extraBulkInSheet(w, r, id, value, unit, errs)
 	case len(errs) > 0:
 		h.render(w, r, http.StatusUnprocessableEntity, ExtraBulkFormView(ExtraBulkProps{URL: memberURL(id) + "/extra-bulk", Value: value, Unit: unit, Errors: errs}))
 	default:
 		htmxRedirect(w, r, http.StatusOK, memberURL(id))
 	}
+}
+
+// extraBulkInSheet answers an extra data save made inside the edit sheet. It keeps the sheet open:
+// the answer is the fresh extra data block plus the usage cell as an out-of-band swap, and the list refreshes.
+func (h handlers) extraBulkInSheet(w http.ResponseWriter, r *http.Request, id int64, value, unit string, errs domain.FieldErrors) {
+	v, err := h.Members.Get(r.Context(), id)
+	if err != nil {
+		h.serverError(w, r, err)
+		return
+	}
+	m := newVM(v)
+	if len(errs) > 0 {
+		h.render(w, r, http.StatusUnprocessableEntity, ExtraBulkBlock(m, ExtraBulkProps{Value: value, Unit: unit, Errors: errs}))
+		return
+	}
+	setTrigger(w, map[string]any{membersChanged: true, "toast": "Extra data saved."})
+	h.render(w, r, http.StatusOK, extraBulkSaved(m))
 }
 
 // passwordReveal shows the stored password of a member.
