@@ -434,7 +434,7 @@ func TestE13_08_ConfigVars(t *testing.T) {
 	defaults := map[string]string{
 		"HSP_DATA_DIR": "data", "HSP_ADMIN_ADDR": ":8080", "HSP_RADIUS_AUTH_ADDR": ":1812", "HSP_RADIUS_ACCT_ADDR": ":1813",
 		"HSP_ADMIN_USERNAME": "admin", "HSP_LOG_LEVEL": "info", "HSP_LOG_FORMAT": "text", "HSP_SECRET_KEY": "(auto-generated)",
-		"HSP_RADIUS_SHARED_SECRET": "(generated)", "HSP_DEV": "(empty)",
+		"HSP_RADIUS_SHARED_SECRET": "(generated)", "HSP_DEV": "(empty)", "HSP_OPEN_BROWSER": "(empty)",
 	}
 	for _, v := range vars {
 		got, ok := rows[v]

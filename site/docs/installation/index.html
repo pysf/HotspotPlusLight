@@ -87,7 +87,7 @@ Forgot it later? Run: hotspotpluslight admin set-password
 ====================================
 time=2026-11-04T17:44:47.593+01:00 level=INFO msg="admin account created with the default password; it must be changed at first login"
 time=2026-11-04T17:44:47.594+01:00 level=INFO msg=listening admin=[::]:8080 radius_auth=[::]:1812 radius_acct=[::]:1813</code></pre>
-<p>Open <code>http://SERVER-IP:8080/admin</code> in a browser. <code>SERVER-IP</code> is the address of the computer that runs the server. The <code>/healthz</code> address answers <code>ok</code> without a login, so monitoring tools can use it.</p>
+<p>When you start the server from a terminal, it prints <code>Admin panel: http://localhost:8080/admin</code> and opens that page in your browser by itself. Set <code>HSP_OPEN_BROWSER=0</code> to stop that. From another computer, open <code>http://SERVER-IP:8080/admin</code> in a browser. <code>SERVER-IP</code> is the address of the computer that runs the server. The <code>/healthz</code> address answers <code>ok</code> without a login, so monitoring tools can use it.</p>
 <p>Next: <a href="../first-login/">First login</a>.</p></section>
 <section><h2 id="build"><a href="#build">Build from source</a></h2>
 <p>You need Go 1.26 (see <code>go.mod</code>) and <code>make</code>. The build needs no cgo and no Node.js step.</p>

@@ -130,7 +130,7 @@ export default [
   "page": "First login",
   "heading": "Log in",
   "url": "docs/first-login/#login",
-  "keywords": "Open . After you set your password, the admin panel opens on the Dashboard . At the first start, the user name is admin and the password is admin . You can set another user name with HSP_ADMIN_USERNAME before the first start, or change it later on the Password"
+  "keywords": "When you start the server from a terminal, the admin page opens in your browser by itself. If it does not, open . After you set your password, the admin panel opens on the Dashboard . At the first start, the user name is admin and the password is admin . You c"
  },
  {
   "page": "First login",

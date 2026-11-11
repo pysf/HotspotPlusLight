@@ -101,6 +101,10 @@ sequenceDiagram
     S-->>A: flag cleared, admin panel opens on the Dashboard (/admin)
 ```
 
+### Admin page opens by itself
+
+When you start `serve` from a terminal, the server prints `Admin panel: http://localhost:8080/admin` and opens that page in your browser. Set `HSP_OPEN_BROWSER=0` to stop that. It never opens under a service (Windows service, systemd), after an update restart, or on a Linux machine with no screen.
+
 ### Default admin port
 
 The default admin address is `:8080` (it was `:8081` before 2026-11-11, left from the two-listener design). A new install seeds the settings row from the config default. An existing install keeps its saved address after an upgrade. To use 8080, change **Admin address** on the Settings page, restart, and update firewall rules and bookmarks.

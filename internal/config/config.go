@@ -38,6 +38,16 @@ func DataDir(getenv func(string) string) string {
 	return "data"
 }
 
+// OpenBrowserOff reports whether HSP_OPEN_BROWSER is 0, false, no or off, which stops the admin page from opening at start.
+// It is env-only and never stored.
+func OpenBrowserOff(getenv func(string) string) bool {
+	switch strings.ToLower(strings.TrimSpace(getenv("HSP_OPEN_BROWSER"))) {
+	case "0", "false", "no", "off":
+		return true
+	}
+	return false
+}
+
 // EnsureKey returns the base64-encoded AES-256 key to use, trying in order:
 // (1) HSP_SECRET_KEY env var, (2) {dataDir}/hsp.key file, (3) auto-generate and
 // write to {dataDir}/hsp.key. It creates dataDir if it does not exist.

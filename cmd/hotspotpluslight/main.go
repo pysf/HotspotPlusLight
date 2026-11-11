@@ -51,7 +51,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		err = app.Run(ctx, app.Options{Stdout: stdout, Getenv: getenv, Version: version})
+		err = app.Run(ctx, app.Options{Stdout: stdout, Getenv: getenv, Version: version, Interactive: isTerminal(stdout), OpenBrowser: app.SystemOpener})
 	case len(args) == 1 && args[0] == "version":
 		fmt.Fprintln(stdout, version)
 	case len(args) == 1 && args[0] == "gen-key":
@@ -130,4 +130,10 @@ func setPassword(args []string, stdin io.Reader, stderr io.Writer, getenv func(s
 	}
 	fmt.Fprintln(stderr, "Admin password updated; all admin sessions were ended.")
 	return nil
+}
+
+// isTerminal reports whether w is a terminal.
+func isTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
 }

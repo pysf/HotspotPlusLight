@@ -72,6 +72,10 @@ type Options struct {
 	HealthProbe func(ctx context.Context, adminAddr string) error
 	// Ready, if set, is called by Run once all listeners are bound. The Windows service reports Running then.
 	Ready func()
+	// Interactive is true when stdout is a terminal. Only then the admin address is printed and the browser may open.
+	Interactive bool
+	// OpenBrowser opens a URL in the default browser. Nil means never open one (tests leave it nil).
+	OpenBrowser func(url string) error
 }
 
 // Addrs are the bound listener addresses. They are useful when the configured port is 0.
@@ -594,6 +598,7 @@ func Run(ctx context.Context, opts Options) error {
 	if opts.Ready != nil {
 		opts.Ready()
 	}
+	a.announceAdmin(opts)
 	watchCtx, stopWatching := context.WithCancel(ctx)
 	defer stopWatching()
 	if rec.Outcome == update.OutcomeProbation {
@@ -671,14 +676,14 @@ func (a *App) watchHealth(ctx context.Context, p domain.PendingUpdate, opts Opti
 
 // restartProcess starts the program file exe again. Under a service manager it returns update.ErrRestart,
 // so the command exits with a non-zero code and the manager starts the file. By hand it starts exe as
-// a detached child with the same arguments and environment. The listeners must be closed before.
+// a detached child with the same arguments and environment. The child gets HSP_RESTARTED=1, so it does not open the browser again. The listeners must be closed before.
 func restartProcess(mode update.RestartMode, exe string, log *slog.Logger) error {
 	if mode == update.RestartByManager {
 		log.Info("exiting so that the service manager starts the program again")
 		return update.ErrRestart
 	}
 	log.Info("starting the program again", "exe", exe)
-	if err := update.StartDetached(exe, os.Args[1:], os.Environ()); err != nil {
+	if err := update.StartDetached(exe, os.Args[1:], append(os.Environ(), "HSP_RESTARTED=1")); err != nil {
 		return fmt.Errorf("could not start %s again; start it by hand: %w", exe, err)
 	}
 	return nil
