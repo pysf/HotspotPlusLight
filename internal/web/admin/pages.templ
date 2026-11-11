@@ -317,6 +317,7 @@ templ SettingsFormView(p SettingsProps) {
 			@ui.FieldPair(ui.PairProps{Label: "RADIUS shared secret", For: "radius_shared_secret", Hint: "Letters and digits only. Use a long random one (20 or more characters). Must match the secret configured on the router. Changes apply immediately.", Errors: []ui.NamedError{{Name: "radius_shared_secret", Msg: p.Errors["radius_shared_secret"]}}}) {
 				@ui.InputControl(ui.FieldProps{Name: "radius_shared_secret", Type: "password", Value: p.Form.RadiusSharedSecret, Error: p.Errors["radius_shared_secret"], Attrs: templ.Attributes{"autocomplete": "off", "data-mono": true}})
 				@ui.RevealButton("radius_shared_secret")
+				@ui.ButtonIcon("secondary", "copy", "Copy", templ.Attributes{"type": "button", "data-size": "sm", "data-copy-target": "radius_shared_secret"})
 				@ui.ButtonIcon("secondary", "wand", "Generate", templ.Attributes{"type": "button", "data-size": "sm", "data-generate-alnum": "radius_shared_secret"})
 			}
 			<div class="c-form-grid">
