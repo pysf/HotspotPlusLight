@@ -615,7 +615,8 @@ func TestE13_13_RouterAndPagesFacts(t *testing.T) {
 	script := routerpack.SetupScript(routerpack.ScriptConfig{Secret: "YOUR-SHARED-SECRET", AuthPort: 1812, AcctPort: 1813, CoaPort: 3799, InterimSeconds: 60})
 	router := siteDoc(t, "docs/router-setup/index.html")
 	n := 0
-	router.Find("pre code").Each(func(_ int, s *goquery.Selection) {
+	// The Wi-Fi only section holds extra commands that are not part of the setup script.
+	router.Find("section:not(:has(#wifi-only)) pre code").Each(func(_ int, s *goquery.Selection) {
 		for _, line := range strings.Split(s.Text(), "\n") {
 			if !strings.HasPrefix(line, "/radius") && !strings.HasPrefix(line, "/ip hotspot") {
 				continue

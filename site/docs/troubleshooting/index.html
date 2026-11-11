@@ -52,7 +52,7 @@
 <ol>
 <li>Open the <strong>Dashboard</strong> and look at the <strong>Router link</strong> card. If no login request arrived, the router cannot reach the server. Check <code>&lt;SERVER-IP&gt;</code> in <code>/radius</code>, and check that UDP 1812 and UDP 1813 are open on the server.</li>
 <li>If the card counts packets with a wrong shared secret, the shared secret on the router is different from the one on the <strong>Settings</strong> page. The server drops such packets and does not answer them. Make the two the same.</li>
-<li>If the router log says <em>RADIUS server is not responding</em> but the server log shows that replies were sent, the router ignores the replies. A common cause is a server on the hotspot network. See <a href="../router-setup/#firewall">Router setup</a>.</li>
+<li>If the router log says <em>RADIUS server is not responding</em> but the server log shows that replies were sent, the router ignores the replies. A common cause is a server on the hotspot network. See <a href="../router-setup/#wifi-only">Hotspot on Wi-Fi only</a>.</li>
 <li>Check that the hotspot profile has <code>use-radius=yes</code> and <code>login-by=http-pap</code>.</li>
 <li>Read the server log. For more detail, set <strong>Log level</strong> to <code>debug</code> on the <strong>Settings</strong> page and restart the server.</li>
 </ol></details><details><summary>The page shows a code such as OUT_OF_BULK</summary>

@@ -236,6 +236,12 @@ export default [
  },
  {
   "page": "Router setup",
+  "heading": "Hotspot on Wi-Fi only",
+  "url": "docs/router-setup/#wifi-only",
+  "keywords": "If Wi-Fi and the LAN ports are in one bridge and the hotspot runs on that bridge, every device on it is a hotspot guest, including the server. The router then ignores the server's replies, and logins fail with RADIUS server is not responding . Fix (recommended"
+ },
+ {
+  "page": "Router setup",
   "heading": "Test it",
   "url": "docs/router-setup/#test",
   "keywords": "Create a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the Online now page. The Dashboard has a Router link card. It shows the time and source address of the last login request, the last accounting pack"

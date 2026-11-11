@@ -45,7 +45,7 @@
   <a class="btn primary sm" href="../installation/">Get started</a>
 </div></header>
 <main id="main" class="docs"><div class="wrap">
-<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../dashboard/">Dashboard</a></li><li><a href="./" aria-current="page">Router setup</a><ul class="sub"><li><a href="#overview">Overview</a></li><li><a href="#settings">Step 1: the shared secret</a></li><li><a href="#script">Step 2: the setup script</a></li><li><a href="#page">Step 3: the login page</a></li><li><a href="#firewall">Firewall</a></li><li><a href="#test">Test it</a></li></ul></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
+<aside class="side" aria-label="Documentation"><p class="side-title">Docs</p><nav aria-label="Docs pages"><ul><li><a href="../">Introduction</a></li><li><a href="../installation/">Installation</a></li><li><a href="../running-as-a-service/">Run as a service</a></li><li><a href="../configuration/">Configuration</a></li><li><a href="../first-login/">First login</a></li><li><a href="../dashboard/">Dashboard</a></li><li><a href="./" aria-current="page">Router setup</a><ul class="sub"><li><a href="#overview">Overview</a></li><li><a href="#settings">Step 1: the shared secret</a></li><li><a href="#script">Step 2: the setup script</a></li><li><a href="#page">Step 3: the login page</a></li><li><a href="#firewall">Firewall</a></li><li><a href="#wifi-only">Hotspot on Wi-Fi only</a></li><li><a href="#test">Test it</a></li></ul></li><li><a href="../hotspot-login-pages/">Hotspot login pages</a></li><li><a href="../how-it-works/">How it works</a></li><li><a href="../architecture/">Architecture</a></li><li><a href="../backup-and-upgrade/">Backup and upgrade</a></li><li><a href="../troubleshooting/">Troubleshooting</a></li></ul></nav></aside>
 <article class="doc"><span class="kick">Documentation</span><h1>Router setup</h1><p class="intro">Connect a MikroTik router to HotspotPlus Lite: RADIUS, Disconnect, the hotspot profile, the login page and the firewall.</p>
 <section><h2 id="overview"><a href="#overview">Overview</a></h2>
 <p>This page assumes that the hotspot feature already works on your MikroTik router (a hotspot server, a hotspot profile and an address pool). You then change 3 things. The router asks HotspotPlus Lite about each login over RADIUS (the protocol the router uses to ask the server about each login), and it sends accounting packets (usage updates during a session). The router accepts Disconnect requests. The router uses a login page from HotspotPlus Lite.</p></section>
@@ -74,12 +74,33 @@
 <section><h2 id="firewall"><a href="#firewall">Firewall</a></h2>
 <p>These ports must be open. The server never talks to members. It talks only to the router and to you:</p>
 <div class="tbl" tabindex="0" role="region" aria-label="Firewall rules"><table><thead><tr><th scope="col">Where</th><th scope="col">Rule</th></tr></thead><tbody><tr><td>On the server, from the router</td><td>UDP 1812 (login) and UDP 1813 (accounting), inbound.</td></tr><tr><td>On the server, from your computer</td><td>TCP 8081 (admin panel), inbound. Do not allow it from the hotspot network.</td></tr><tr><td>On the router, from the server</td><td>UDP 3799 (Disconnect requests), inbound. The router must accept this traffic. The command <code>/radius incoming set accept=yes port=3799</code> turns on the listener.</td></tr></tbody></table></div>
-<div class="note"><b>Server on the hotspot network</b><p>If the server is on the hotspot network (for example, on the same bridge as your members), the router may treat it as a guest that has not logged in and ignore its replies. Logins then fail with <em>RADIUS server is not responding</em>, although the server answers. Check the hotspot and firewall rules on your router.</p><p>Disconnect requests have a similar problem. The server sends them to the address the router used for accounting. The router's default firewall drops traffic that arrives from its uplink.</p></div>
+<div class="note"><b>Server on the hotspot network</b><p>If the server is on the hotspot network, the router may treat it as a guest and ignore its replies. Logins then fail with <em>RADIUS server is not responding</em>. See <a href="#wifi-only">Hotspot on Wi-Fi only</a>.</p><p>Disconnect requests have a similar problem. The server sends them to the address the router used for accounting. The router's default firewall drops traffic that arrives from its uplink.</p></div>
 <p>For example, on Linux with ufw (replace the addresses):</p>
 <pre><code>sudo ufw allow from ROUTER-IP to any port 1812 proto udp
 sudo ufw allow from ROUTER-IP to any port 1813 proto udp
 sudo ufw allow from ADMIN-PC-IP to any port 8081 proto tcp</code></pre>
 <p>On Windows, see the <code>netsh</code> commands in <a href="../running-as-a-service/#windows">Run as a service</a>. To keep the admin panel off the hotspot network, you can also bind it to one address. For example, set <code>HSP_ADMIN_ADDR=192.168.1.10:8081</code> for the first start, or change the address on the <strong>Settings</strong> page later.</p></section>
+<section><h2 id="wifi-only"><a href="#wifi-only">Hotspot on Wi-Fi only</a></h2>
+<p>If Wi-Fi and the LAN ports are in one bridge and the hotspot runs on that bridge, every device on it is a hotspot guest, including the server. The router then ignores the server's replies, and logins fail with <em>RADIUS server is not responding</em>.</p>
+<p><strong>Fix (recommended): use two bridges.</strong> Keep the existing bridge for the LAN ports (with the server) and run no hotspot on it. Make a new bridge with only the Wi-Fi interface, give it its own subnet and a DHCP server, and run the hotspot only on the new bridge.</p>
+<ol>
+<li>Back up first: <code>/export file=before-split</code>.</li>
+<li>Do the change over a LAN port, not over Wi-Fi.</li>
+<li><code>/ip hotspot remove</code> deletes the current hotspot server, so note its settings first.</li>
+<li>Run the commands. Replace <code>wlan1</code>, the addresses, and <code>hsprof1</code> with your own values.</li>
+</ol>
+<pre><code>/interface bridge add name=bridge-wifi
+/interface bridge port remove [find interface=wlan1]
+/interface bridge port add bridge=bridge-wifi interface=wlan1
+/ip address add address=10.5.50.1/24 interface=bridge-wifi
+/ip pool add name=pool-wifi ranges=10.5.50.10-10.5.50.250
+/ip dhcp-server add name=dhcp-wifi interface=bridge-wifi address-pool=pool-wifi disabled=no
+/ip dhcp-server network add address=10.5.50.0/24 gateway=10.5.50.1 dns-server=10.5.50.1
+/ip hotspot remove [find]
+/ip hotspot add name=hotspot-wifi interface=bridge-wifi address-pool=pool-wifi profile=hsprof1</code></pre>
+<p>After that, run the <a href="#script">setup script</a> again. Check that the NAT masquerade rule covers the new subnet. If a <code>/radius</code> <code>src-address</code> is set, it must be the router's LAN address.</p>
+<p><strong>Quick option:</strong> keep one bridge and bypass only the server and the admin PC. Any other device on the LAN ports stays a hotspot guest.</p>
+<pre><code>/ip hotspot ip-binding add mac-address=SERVER-MAC type=bypassed</code></pre></section>
 <section><h2 id="test"><a href="#test">Test it</a></h2>
 <p>Create a member in the admin panel. On a phone, join the hotspot Wi-Fi, open any web page and log in. Then check the <strong>Online now</strong> page. The <a href="../dashboard/#router-status">Dashboard</a> has a <strong>Router link</strong> card. It shows the time and source address of the last login request, the last accounting packet and the last Disconnect request. It also shows how many packets the server dropped because of a wrong shared secret. The card updates every 10 seconds. It is kept in memory, so it is empty after a restart.</p>
 <p>If something fails, see <a href="../troubleshooting/">Troubleshooting</a>.</p></section>
