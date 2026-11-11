@@ -328,7 +328,7 @@ templ MemberNewPage(l ui.LayoutData, p MemberFormProps) {
 		@ui.PageHeader("New member")
 		if len(p.Plans) == 0 {
 			@ui.EmptyState("No plans yet", "No plans exist yet. Create a plan first, then add members.") {
-				@ui.LinkButton("primary", "/admin/plans/new", "New plan", nil)
+				@ui.LinkButton("primary", "/admin/plans", "Go to plans", nil)
 			}
 		} else {
 			@MemberFormView(p)
@@ -518,7 +518,7 @@ templ MemberNewSheet(p MemberFormProps) {
 	if len(p.Plans) == 0 {
 		<div data-sheet-title="Add member">
 			@ui.EmptyState("No plans yet", "No plans exist yet. Create a plan first, then add members.") {
-				@ui.LinkButton("primary", "/admin/plans/new", "New plan", nil)
+				@ui.LinkButtonIcon("primary", "plus", "/admin/plans/new", "Add plan", sheetOpen("/admin/plans/new"))
 			}
 		</div>
 	} else {

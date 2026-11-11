@@ -143,7 +143,7 @@ func TestE7_01_CreateBatch(t *testing.T) {
 // E7.01b with no plan the form says to create one; the default plan is preselected (O10).
 func TestE7_01b_NewFormPlans(t *testing.T) {
 	f := newP7(t)
-	if b := f.c.Get("/admin/batches/new").Body; !strings.Contains(b, "/admin/plans/new") || strings.Contains(b, `id="batch-form"`) {
+	if b := f.c.Get("/admin/batches/new").Body; !strings.Contains(b, `href="/admin/plans"`) || strings.Contains(b, "/admin/plans/new") || strings.Contains(b, `id="batch-form"`) {
 		t.Fatalf("no plans: %s", b)
 	}
 	f.plan("A")

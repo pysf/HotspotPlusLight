@@ -61,7 +61,7 @@ templ BatchesPage(l ui.LayoutData, p BatchesProps) {
 		<div class="l-cols" data-cols="1-1.5">
 			if len(p.Form.Plans) == 0 {
 				@ui.EmptyState("No plans yet", "No plans exist yet. Create a plan first, then create batches.") {
-					@ui.LinkButton("primary", "/admin/plans/new", "New plan", nil)
+					@ui.LinkButton("primary", "/admin/plans", "Go to plans", nil)
 				}
 			} else {
 				@BatchFormView(p.Form)

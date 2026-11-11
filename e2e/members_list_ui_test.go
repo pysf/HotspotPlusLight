@@ -398,8 +398,14 @@ func TestE10_15_SheetFragments(t *testing.T) {
 	}
 	// No plans: the new-member sheet says so.
 	g := newP2(t)
-	if !strings.Contains(g.c.GetHX("/admin/members/new", sheetTarget).Body, "No plans exist yet") {
+	noPlan := g.c.GetHX("/admin/members/new", sheetTarget)
+	if !strings.Contains(noPlan.Body, "No plans exist yet") {
 		t.Error("no-plan hint missing in the sheet")
+	}
+	// The add-plan button loads the new plan form into the same sheet, not the old full page
+	// (bug: it was a plain link to /admin/plans/new).
+	if a := fragmentDoc(t, noPlan).Find(`a[href="/admin/plans/new"]`); a.AttrOr("hx-get", "") != "/admin/plans/new" || a.AttrOr("hx-target", "") != "#sheet-body" {
+		t.Errorf("the add-plan link must open the plan form in the sheet: %s", noPlan.Body)
 	}
 	// Plans.
 	frag = f.c.GetHX("/admin/plans/new", sheetTarget)
