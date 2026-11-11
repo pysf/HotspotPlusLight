@@ -253,7 +253,7 @@ func TestE4_10_UnknownUser(t *testing.T) {
 }
 
 // E4.11 Accounting-On/Off are acknowledged and change nothing (PLAN 7.3: reboot handling declined by the owner;
-// PLAN section 11 still says "ends open sessions" - see docs/open-questions.md).
+// PLAN section 11 still says "ends open sessions", but section 7.3 wins).
 func TestE4_11_AccountingOnOff(t *testing.T) {
 	f := newP4(t)
 	id := f.member(f.plan("Basic"), "alice")

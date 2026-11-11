@@ -11,7 +11,7 @@ import (
 
 // E15.01 a request with a wrong Message-Authenticator is dropped without a reply;
 // a good one is answered with a reply that carries a correct Message-Authenticator
-// as its first attribute (RouterOS 7.15+ drops replies without it; docs/radius-reply-bug.md).
+// as its first attribute (RouterOS 7.15+ drops replies without it).
 func TestE15_01_MessageAuthenticatorOnAuth(t *testing.T) {
 	f := newP5(t)
 	good := f.nas.PAPPacket("nobody", "pw")

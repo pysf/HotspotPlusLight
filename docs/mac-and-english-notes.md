@@ -1,9 +1,0 @@
-# MAC spelling and English-only (2026-11-02)
-
-**MAC (BR-3).** Stored form is the RouterOS spelling `AA:BB:CC:DD:EE:FF`. `domain.NormalizeMAC` is the only normalizer: strips `:`, `-`, `.` and spaces, requires exactly 12 hex digits, upper-cases and re-inserts colons. Used by the member form, accounting capture (BR-12), `/api/v1/devices/{mac}/credentials`, and session rows. The Disconnect sends `session.mac` as is (`domain.RouterMAC` removed). No migration: migration 0001 has no CHECK on `mac` (only an index), so it was not touched; comments in PLAN section 6 were updated. Still VERIFY-ON-HARDWARE that the router matches this spelling in a Disconnect (open-questions row 12).
-
-Changed test expectations (only the stored spelling): `TestNormalizeMAC`, `TestCredentialsByMAC*`, session service test, E2.04 (stored `AA:BB:CC:DD:EE:FF` / `11:22:33:44:55:66`; added space-separated and `..:GG` inputs), E4.01 (member and session MAC), E5.12 (MAC cell), E5.03 comment, E6.07 seed data. Lookup inputs in E6.07 keep all spellings.
-
-**English only.** The `fa` table, RTL switch and Persian labels are gone from the starter page. `HSP_MESSAGES` keeps the code-keyed mechanism with `en` only; a comment in `login.html` explains how to add a language by hand (copy the `en` block, new key, set `HSP_LANG`). E6 dictionary checks now expect 1 entry per code and fail on any Arabic-script character in `login.html`. Persian/Arabic digits remain in username-rejection tests (E2.02, E3, E6, domain): they are invalid-input cases, not UI text.
-
-**Old data.** A dev database that already holds MACs in the old 12-lower-hex form is not converted: MAC auto-login will not find those members and a kick of such a session sends the old spelling. Pre-release there is no real data, so delete `./data` and let it be recreated, or run a one-off `UPDATE` per MAC. (Whitespace/CR/LF around a MAC is ignored by `NormalizeMAC`.)

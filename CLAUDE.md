@@ -33,7 +33,7 @@ If `PLAN.md` and this file disagree, `PLAN.md` wins; fix this file.
 All open decisions are resolved. The hardware items were verified by the owner on 2026-11-09. See `PLAN.md` §3 for the full list.
 
 ## Current status
-Phases 0–19 and design v2 (steps 1 to 7) are done (Phases 17–19 added the dashboard home page, `PLAN.md` D25–D28, BR-25–BR-30, §11). The full e2e suite passes. The owner verified the hardware checklist on a real MikroTik on 2026-11-09 (`PLAN.md` §13). Per-phase notes are in `docs/phaseN-notes.md` and in git history.
+Phases 0–19 and design v2 (steps 1 to 7) are done (Phases 17–19 added the dashboard home page, `PLAN.md` D25–D28, BR-25–BR-30, §11). The full e2e suite passes. The owner verified the hardware checklist on a real MikroTik on 2026-11-09 (`PLAN.md` §13). Per-phase notes were removed from `docs/` (2026-11-12); they are in git history.
 
 ## How we work here
 00. **Simple language.** Short sentences, plain words. No jargon. This applies to chat, docs, comments, and commit messages.

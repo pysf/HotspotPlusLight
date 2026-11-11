@@ -15,7 +15,7 @@ import (
 // Why we need it: RouterOS 7.15+ answers the BlastRADIUS attack (CVE-2024-3596)
 // by sending it in Access-Requests and, with `require-message-auth`
 // set, silently dropping replies that do not carry it. layeh.com/radius
-// never adds it, so the router ignored every Accept and Reject (docs/radius-reply-bug.md).
+// never adds it, so such a router ignores every Accept and Reject.
 //
 // DECISION: a request without Message-Authenticator is still accepted (older
 // routers do not send it). A future setting could require it.

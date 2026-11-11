@@ -124,10 +124,6 @@ it, and keep each test's intent. No inline style or script (CSP).
   only if a packet came in the last 5 minutes.
 - Checked in headless Chrome in step 3: sheets (add, edit, credentials), filled member rows, row menu, phone cards. The More menu was seen open only on the phone tab bar earlier.
 
-## Other open work (not design)
-Router login bug (reply leaves, router times out; see `docs/radius-reply-bug.md`), Group C items in
-`docs/review-findings.md`, GitHub Pages setup, hardware lab checks (`PLAN.md` section 13).
-
 ## Known notes from step 3
 - Fixed by deviation 11: the edit sheet actions now sit outside the form, and they stay after a 422.
 - The bulk bar has a danger Delete selected button with a trash icon and a Clear button (part of deviation 8).

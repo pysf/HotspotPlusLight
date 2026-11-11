@@ -154,7 +154,7 @@ func TestE13_02_ReleaseAssetNames(t *testing.T) {
 }
 
 // TestE13_11_MovedReadmeChecks asserts, on the page that owns each, the README checks that moved to the site in Phase 13a (E13.11).
-// This is the hard exit item of docs/phase13-notes.md.
+// This was the hard exit item of Phase 13a.
 func TestE13_11_MovedReadmeChecks(t *testing.T) {
 	want := map[string][]string{
 		"docs/installation/index.html": {"make build", "first start", "HSP_SECRET_KEY", "HSP_DATA_DIR", "HSP_ADMIN_ADDR", "HSP_RADIUS_AUTH_ADDR", "HSP_RADIUS_ACCT_ADDR", "8080", "firewall"},
